@@ -166,6 +166,7 @@ WorkingDirectory=$APP
 Environment=BASSBLEND_DATA=$DATA
 Environment=BASSBLEND_CONFIG=$CONF
 Environment=PYTHONUNBUFFERED=1
+ExecStartPre=+/bin/sh $APP/deploy/linux/boot-import.sh $DATA $RUN_USER
 ExecStart=$VENV/bin/python -m subtune serve --lan --port $PORT
 Restart=on-failure
 RestartSec=3
@@ -175,6 +176,9 @@ $HARDEN
 WantedBy=multi-user.target
 UNIT
 live && systemctl daemon-reload
+if [ "$DEV" -eq 0 ]; then                     # over-the-air updates pushed from your computer (deploy/push-update.sh)
+  install -m 0755 "$APP/deploy/linux/bassblend-update" /usr/local/sbin/bassblend-update
+fi
 systemctl enable bassblend.service >/dev/null
 
 pin_is_set() { [ -s "$CONF/auth.json" ] && grep -q pin_hash "$CONF/auth.json"; }
@@ -199,7 +203,6 @@ if ! pin_is_set; then
   echo "until a PIN is chosen, anyone on your network who opens the page could choose it."
 fi
 echo
-echo "Your tunes and settings live in $DATA. To bring them over from Windows, copy the"
-echo "contents of the BassBlend 'data' folder there (then: sudo chown -R $RUN_USER: $DATA)"
-echo "and upload the mic calibration file again from Setup checklist."
+echo "Your tunes and settings live in $DATA. To bring them over from another BassBlend,"
+echo "download a settings file there (menu: Settings file) and import it here."
 echo "Logs:  journalctl -u bassblend -f      Restart:  sudo systemctl restart bassblend"

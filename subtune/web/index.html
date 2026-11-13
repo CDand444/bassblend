@@ -290,6 +290,8 @@ a.btn { text-decoration: none; }
 .gstep h4 { margin: 3px 0 8px; font-size: 14.5px; font-weight: 650; }
 .gstep p { margin: 0 0 10px; font-size: 13.5px; color: var(--text-2); max-width: 68ch; }
 .gstep p:last-child { margin-bottom: 0; }
+.cfg-h { font-size: 13px; font-weight: 650; margin: 16px 0 8px; color: var(--text-1); }
+#cfgCard .cb { margin-bottom: 8px; }
 .chk { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
 .chk li { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 9px; align-items: center; font-size: 13.5px; color: var(--text-2); }
 .chk .mk { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; flex: none; background: var(--warn); }
@@ -835,6 +837,22 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <ul class="steps" id="steps"></ul>
       <p class="muted" id="jobNote" style="margin:6px 0 0"></p>
     </details>
+    <section class="card" id="cfgCard">
+      <div class="card-h"><h2>Settings file</h2></div>
+      <p class="muted" style="margin:0 0 12px">One file with your room, speaker layout, subs, receiver, mic calibration and tunes.
+        Import it on a new SD card or another computer instead of setting everything up again.</p>
+      <h3 class="cfg-h">Save</h3>
+      <label class="cb"><input type="checkbox" id="cfgHist" checked><span>Tunes, results and measurements<small>Leave unticked for just the setup.</small></span></label>
+      <label class="cb"><input type="checkbox" id="cfgPin"><span>Dashboard PIN<small>Stored as a scrambled hash, never the PIN itself. Skips choosing a PIN on a new card.</small></span></label>
+      <label class="cb"><input type="checkbox" id="cfgKey"><span>Anthropic API key<small>Anyone with the file could use your API credit: keep it private.</small></span></label>
+      <div class="row" style="margin-top:10px"><button class="btn primary" id="cfgSave">Download settings file</button></div>
+      <h3 class="cfg-h">Load</h3>
+      <p class="muted small" style="margin:0 0 8px">Settings in the file replace the same settings here. This device keeps its own
+        miniDSP and audio device connections.</p>
+      <div class="row"><label class="btn ghost">Import settings file…<input type="file" accept=".json,application/json" id="cfgFile" hidden></label></div>
+      <div id="cfgOut" class="small" style="margin-top:10px" aria-live="polite"></div>
+      <p class="muted small" style="margin:14px 0 0" id="cfgTip"></p>
+    </section>
   </aside>
 </main>
 
@@ -952,6 +970,7 @@ const tabs = (el, keys, sel, label, onPick) => {
 function render() {
   const st = S, grid = st.grid, preview = st.preview, res = preview || st.result, set = st.settings || {};
   $('#previewBanner').hidden = !preview;
+  renderCfgTip();
   if (preview) $('#previewText').innerHTML = `Showing saved tune <b>${esc(preview.tune_name)}</b>: expected results only. It isn't playing.`;
   const job = st.job || {}, a = job.auto, waiting = a && a.status === 'waiting';
   const busy = st.busy || job.running;
@@ -2004,6 +2023,34 @@ document.addEventListener('change', async e => {
   alert(`Calibration loaded: ${r.name}\n${r.points} points, ${r.range_hz[0]} Hz to ${r.range_hz[1]} Hz, sensitivity ${r.sens_db >= 0 ? '+' : ''}${r.sens_db} dB.\n\nMeasurements from now on use it.`);
   setupKey = null; poll();
 });
+$('#cfgSave').onclick = () => {
+  const q = new URLSearchParams({history: $('#cfgHist').checked ? 1 : 0, pin: $('#cfgPin').checked ? 1 : 0, key: $('#cfgKey').checked ? 1 : 0});
+  location.href = '/api/config/export?' + q;
+};
+$('#cfgFile').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const out = $('#cfgOut');
+  let b;
+  try { b = JSON.parse(await f.text()); } catch (err) { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a BassBlend settings file.</span>'; return; }
+  if (!b || b.format !== 'bassblend-config') { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a BassBlend settings file.</span>'; return; }
+  const extras = [b.tunes && b.tunes.length ? `${b.tunes.length} tune${b.tunes.length > 1 ? 's' : ''}` : '', b.secrets && b.secrets.pin ? 'the PIN' : '', b.secrets && b.secrets.ai_key ? 'the AI key' : ''].filter(Boolean);
+  if (!confirm(`Load the settings saved on ${b.from || 'another device'} (${b.exported || 'unknown date'})?
+
+` +
+               `Room, speakers, subs, receiver and mic file${extras.length ? ', plus ' + extras.join(', ') : ''} replace what is set here. ` +
+               `Nothing is sent to the miniDSP or the receiver.`)) return;
+  out.textContent = 'Importing…';
+  const r = await post('/api/config/import', {bundle: b});
+  if (r.error) { out.innerHTML = `<span style="color:var(--bad)">${esc(r.error)}</span>`; return; }
+  out.innerHTML = `<b>Imported</b> ${esc(r.imported.join(' · '))}`;
+  setupKey = null; poll(); if (sheetKey === 'tunes') loadTunes();
+};
+function renderCfgTip() {
+  const t = `BassBlend ${S.version || ''}` + ((S.net || {}).lan
+    ? ' · New SD card: copy a settings file onto the card’s boot drive as <code>bassblend-config.json</code> before the first start and it loads by itself.'
+    : '');
+  if ($('#cfgTip').dataset.t !== t) { $('#cfgTip').dataset.t = t; $('#cfgTip').innerHTML = t; }
+}
 let setupKey = null;
 function renderSetup() {
   const key = JSON.stringify(setupItems());
@@ -2282,6 +2329,7 @@ const IC = {
   meters: '<rect x="2" y="9" width="3" height="5" rx=".5"/><rect x="6.5" y="5" width="3" height="9" rx=".5"/><rect x="11" y="2" width="3" height="12" rx=".5"/>',
   log: '<path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><path d="M2 4h.5M2 8h.5M2 12h.5"/>',
   manual: '<path d="M4.5 3l8 5-8 5z"/>',
+  file: '<path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3M6 9h4M6 11.5h4"/>',
 };
 const icon = k => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
 let seenErrors = 0;
@@ -2318,6 +2366,7 @@ const MENU = [
   {grp: 'More', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
    tag: () => { const e = events.filter(x => x.kind === 'error' && x.t > seenErrors).length; return e ? [String(e), 'alert'] : null; }},
   {grp: 'More', key: 'manual', icon: 'manual', title: 'Manual steps', full: 'Manual steps', el: $('#manualCard'), tag: () => null},
+  {grp: 'More', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
 ];
 const homeOf = m => m.home || $('#store');
 MENU.forEach(m => homeOf(m).appendChild(m.el));               // off the main page (or into the wizard)

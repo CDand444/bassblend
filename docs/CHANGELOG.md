@@ -1,5 +1,21 @@
 # BassBlend changelog
 
+## Nov 13, 2026 — settings file and over-the-air updates
+
+- **Settings file**: menu → Settings file saves room, speaker layout, subs, receiver, mic
+  calibration and (by default) tunes, slot contents, the current result and measurements to one
+  `.json`. PIN (as its hash) and API key only when ticked. Import it from the same page, the
+  first-boot setup page, or `subtune import-config`. Machine-specific settings (USB path, audio
+  device names) are never carried, so a Windows file works on the Pi. A file can't give BassBlend
+  slot 1, and only known data files are written.
+- **First boot**: `bassblend-config.json` on a fresh card's boot drive is imported automatically
+  and removed from the boot drive. `BASSBLEND_SETTINGS=` bakes one into an image build.
+- **Over-the-air updates**: `deploy/push-update.sh [--watch]` sends the code over SSH;
+  `bassblend-update` on the Pi checks it compiles, installs, restarts only for Python changes and
+  rolls back if the new version doesn't start.
+- The version shows in the dashboard; image builds write it to `BASSBLEND.txt` (was "dev").
+- The saved API key file is owner-only on Linux. 6 checks in `tests/test_bundle.py`.
+
 ## Nov 13, 2026 — first-boot setup in the browser (for a ready-made SD card)
 
 - A fresh BassBlend in network mode (no PIN yet) shows a **setup guide** instead of the dashboard:

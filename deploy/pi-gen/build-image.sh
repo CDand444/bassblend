@@ -3,6 +3,8 @@
 # Works from Linux, macOS, or Git Bash on Windows with Docker Desktop running.
 #
 #   deploy/pi-gen/build-image.sh            # result: dist/bassblend-<version>.img.xz
+#   BASSBLEND_SETTINGS=my-settings.json deploy/pi-gen/build-image.sh
+#                                           # also put a settings file on the card: imported on first boot
 #   RESUME=1 deploy/pi-gen/build-image.sh   # after a failed BassBlend stage: reuse the finished
 #                                           # Raspberry Pi OS stages (saves ~35 minutes)
 #
@@ -58,6 +60,13 @@ SRC="$WORK/stage-bassblend/00-bassblend/files/bassblend"
 mkdir -p "$SRC"
 (cd "$ROOT" && git ls-files -z --cached --others --exclude-standard) | (cd "$ROOT" && xargs -0 tar -cf - --) | tar -xf - -C "$SRC"
 rm -rf "$SRC/build" "$SRC/dist" "$SRC/data" "$SRC/tools"
+printf '%s\n' "$VERSION" > "$SRC/VERSION"
+CFG="$WORK/stage-bassblend/00-bassblend/files/bassblend-config.json"
+if [ -n "${BASSBLEND_SETTINGS:-}" ]; then      # bake a settings file in: imported on first boot
+  [ -f "$BASSBLEND_SETTINGS" ] || { echo "BASSBLEND_SETTINGS: no such file: $BASSBLEND_SETTINGS" >&2; exit 1; }
+  cp "$BASSBLEND_SETTINGS" "$CFG"
+  echo "Including settings file $(basename "$BASSBLEND_SETTINGS") (anyone with the image can read it)"
+fi
 # shell scripts must have Unix line endings, whatever the checkout did
 find "$WORK/stage-bassblend" "$WORK/config" -type f \( -name '*.sh' -o -name config -o -name EXPORT_IMAGE \) \
   -exec sed -i 's/\r$//' {} +

@@ -715,39 +715,9 @@ def _system_brief():
 
 
 def _save_cal(body):
-    """Store an uploaded mic calibration file (UMIK-1 style text: 'freq dB' rows,
-    optional 'Sens Factor' line) and make it the one measurements use."""
-    import re
-    from .audio import load_cal
-    from .config import DATA
-    text = str(body.get("text") or "")
-    if not text or len(text) > 2_000_000:
-        raise ValueError("choose a calibration file (plain text, under 2 MB)")
-    name = re.sub(r"[^A-Za-z0-9._ -]", "_", str(body.get("name") or "mic_cal.txt")).strip(" .")[:80] or "mic_cal.txt"
-    if not name.lower().endswith((".txt", ".cal", ".frd")):
-        name += ".txt"
-    d = DATA / "cal"
-    d.mkdir(parents=True, exist_ok=True)
-    tmp = d / (name + ".part")
-    tmp.write_text(text, encoding="utf-8")
-    try:
-        f, db, sens = load_cal(tmp)
-    except Exception as e:
-        tmp.unlink(missing_ok=True)
-        raise ValueError(f"couldn't read that file: {e}")
-    ok = len(f) >= 20 and f.min() < 30 and f.max() > 1000 and (abs(db) < 30).all()
-    if not ok:
-        tmp.unlink(missing_ok=True)
-        raise ValueError("that doesn't look like a mic calibration file (expected rows of 'frequency  dB' "
-                         "covering about 20 Hz to 20 kHz)")
-    dest = d / name
-    tmp.replace(dest)
-    s = load_settings()
-    s["cal_file"] = str(dest)
-    save_settings(s)
-    event("config", f"mic calibration file set: {name} ({len(f)} points, sensitivity {sens:+.1f} dB)")
-    return {"ok": True, "name": name, "points": int(len(f)), "sens_db": round(float(sens), 2),
-            "range_hz": [round(float(f.min()), 1), round(float(f.max()))]}
+    """Store an uploaded mic calibration file and make it the one measurements use."""
+    from .bundle import save_cal
+    return save_cal(body.get("name"), body.get("text"))
 
 
 def _apply_settings(body):
@@ -893,6 +863,8 @@ class H(BaseHTTPRequestHandler):
             st["net"] = {"lan": NET["lan"], "signed_in": NET["lan"] and not self._local()}
             st["ai_key"] = key_source()          # "environment" | "saved" | None (never the key)
             st["ai_api"] = st["ai_key"] is not None
+            from . import version
+            st["version"] = version()
             return self._send(200, st)
         if u.path == "/api/live":
             return self._send(200, _live_levels())
@@ -936,6 +908,22 @@ class H(BaseHTTPRequestHandler):
             return
         if u.path == "/api/events":
             return self._send(200, _events(float(q.get("since", ["0"])[0])))
+        if u.path == "/api/config/export":             # settings file to download
+            from . import bundle
+            flag = lambda k, d: q.get(k, [d])[0] in ("1", "true", "yes")
+            b = bundle.export(include_history=flag("history", "1"), include_pin=flag("pin", "0"),
+                              include_key=flag("key", "0"))
+            event("config", "exported settings file" + (" (with PIN)" if "pin" in b.get("secrets", {}) else "")
+                  + (" (with AI key)" if "ai_key" in b.get("secrets", {}) else ""))
+            data = bundle.dumps(b).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="{bundle.filename()}"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         self._send(404, {"error": "not found"})
 
     def do_POST(self):
@@ -946,7 +934,7 @@ class H(BaseHTTPRequestHandler):
         if origin and urlparse(origin).netloc != self.headers.get("Host", ""):
             return self._send(403, {"error": "forbidden"})
         n = int(self.headers.get("Content-Length", 0) or 0)
-        if n > 4_000_000:
+        if n > (12_000_000 if path == "/api/config/import" else 4_000_000):
             return self._send(413, {"error": "too large"})
         try:
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
@@ -1046,6 +1034,11 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True})
             if path == "/api/calfile":
                 return self._send(200, _save_cal(body))
+            if path == "/api/config/import":
+                if RUN.running() or load_state().get("busy"):
+                    raise RuntimeError("wait for the current job to finish, then import")
+                from . import bundle
+                return self._send(200, bundle.import_bundle(body.get("bundle")))
             if path == "/api/apply":
                 return self._send(200, {"started": RUN.apply_tune(body)})
             if path == "/api/slot":
@@ -1152,6 +1145,10 @@ def serve(port=8765, lan=False):
         update_state(busy=False, step="idle", analysis_status={"running": False},
                      suggest_status={"running": False})
     NET["lan"] = bool(lan)
+    from . import bundle
+    r = bundle.import_pending()                    # settings file copied off a fresh SD card
+    if r:
+        print("Imported the settings file from the SD card: " + ", ".join(r["imported"]), flush=True)
     # BASSBLEND_BIND pins the address (tests run network mode on 127.0.0.1 with BASSBLEND_AUTH_LOCAL=1)
     srv = ThreadingHTTPServer((os.environ.get("BASSBLEND_BIND") or ("0.0.0.0" if lan else "127.0.0.1"), port), H)
     if lan:

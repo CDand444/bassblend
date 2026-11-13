@@ -415,6 +415,32 @@ def cmd_set_pin(a):
     print("PIN saved. Anyone signed in on another device will need to sign in again.")
 
 
+
+def cmd_export_config(a):
+    """Write a settings file (room, subs, speakers, mic file, tunes) to carry to another device."""
+    from pathlib import Path
+    from . import bundle
+    b = bundle.export(include_history=not a.no_history, include_pin=a.include_pin, include_key=a.include_key)
+    out = Path(a.out or bundle.filename())
+    out.write_text(bundle.dumps(b), encoding="utf-8")
+    try:
+        out.chmod(0o600 if b.get("secrets") else 0o644)
+    except OSError:
+        pass
+    print(f"Saved {out} ({out.stat().st_size // 1024} KB)"
+          + (" - it contains secrets, keep it private" if b.get("secrets") else ""))
+
+
+def cmd_import_config(a):
+    """Merge a settings file into this device."""
+    from pathlib import Path
+    from . import bundle
+    try:
+        r = bundle.import_bundle(bundle.loads(Path(a.file).read_text(encoding="utf-8")))
+    except (OSError, ValueError) as e:
+        sys.exit(f"Couldn't import: {e}")
+    print("Imported: " + ", ".join(r["imported"]))
+
 def main(argv=None):
     p = argparse.ArgumentParser(prog="subtune", description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -475,6 +501,15 @@ def main(argv=None):
     s = sp.add_parser("set-pin", help="set the dashboard PIN for network mode")
     s.add_argument("--stdin", action="store_true", help="read the PIN from standard input (for setup scripts)")
     s.set_defaults(fn=cmd_set_pin)
+    s = sp.add_parser("export-config", help="save room, speaker, sub and tune settings to a file")
+    s.add_argument("--out", help="file to write (default: bassblend-config-<host>-<date>.json)")
+    s.add_argument("--no-history", action="store_true", help="leave out tunes, results and measurements")
+    s.add_argument("--include-pin", action="store_true", help="include the PIN (as its hash)")
+    s.add_argument("--include-key", action="store_true", help="include the Anthropic API key")
+    s.set_defaults(fn=cmd_export_config)
+    s = sp.add_parser("import-config", help="load a settings file saved by export-config or the dashboard")
+    s.add_argument("file")
+    s.set_defaults(fn=cmd_import_config)
     a = p.parse_args(argv)
     a.fn(a)
 

@@ -50,7 +50,7 @@ def delete_key() -> None:
     f = _key_file()
     if f.exists():
         f.unlink()
-    event("config", "Anthropic API key removed from this PC")
+    event("config", "Anthropic API key removed from this device")
 
 
 def key_source() -> str | None:

@@ -16,9 +16,17 @@ apt-get clean
 EOF
 
 # Say what this is on the boot partition, next to Raspberry Pi's own issue.txt
+BB_VERSION="$(cat files/bassblend/VERSION 2>/dev/null || echo dev)"
+if [ -f files/bassblend-config.json ]; then     # settings baked into this image: imported on first boot
+  install -m 0644 files/bassblend-config.json "${ROOTFS_DIR}/boot/firmware/bassblend-config.json"
+fi
 cat > "${ROOTFS_DIR}/boot/firmware/BASSBLEND.txt" << EOF
-BassBlend ${BASSBLEND_VERSION:-dev}
+BassBlend ${BB_VERSION}
 Plug the Pi into your network with a cable, power it on, wait about two minutes,
 then open http://bassblend.local:8765 on your phone or computer.
 The first visit walks you through choosing a PIN.
+
+Already set BassBlend up somewhere else? Copy your settings file (dashboard menu:
+Settings file -> Download) onto this drive as bassblend-config.json before the
+first start: it is loaded automatically, then removed from this drive.
 EOF

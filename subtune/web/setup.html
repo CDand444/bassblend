@@ -48,6 +48,9 @@ h1 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.01em;
 .step p { margin: 0 0 12px; color: var(--text-2); font-size: 14px; max-width: 58ch; }
 .step.done .body, .step.later .body { display: none; }
 .step.done.open .body { display: block; }
+.imp { margin-top: 14px; padding: 14px 18px; border: 1px dashed var(--border); border-radius: 14px; display: flex; gap: 12px;
+  align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--text-2); }
+.imp b { color: var(--text-1); } .imp .grow { flex: 1 1 260px; }
 label.f { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
 input[type=password], input[type=text] { height: 42px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text);
   padding: 0 12px; font: inherit; font-size: 16px; width: 100%; max-width: 360px; }
@@ -86,6 +89,7 @@ select { height: 42px; border: 1px solid var(--border); border-radius: 9px; back
     <p class="lead" id="lead">Four short steps, about five minutes. Nothing here makes a sound, and you can change any of it later from the Setup checklist.</p>
     <div class="progress" id="progress" aria-hidden="true"></div>
   </header>
+  <div id="imp"></div>
   <div id="steps"></div>
   <div class="finish" id="finish"></div>
 </main>
@@ -131,6 +135,11 @@ function render() {
   }).join('');
   const allDone = !cur;
   const pinOk = list[0].done;
+  $('#imp').innerHTML = pinOk && !allDone
+    ? `<div class="imp"><span class="grow"><b>Set up BassBlend before?</b> Load your settings file (Settings file → Download, on the other device) and skip the rest.</span>
+        <label class="btn">Import settings file<input type="file" id="impFile" accept=".json,application/json" hidden></label>
+        <p class="msg" id="impMsg" role="alert" style="flex-basis:100%;margin:0"></p></div>`
+    : '';
   $('#finish').innerHTML = pinOk
     ? `<button class="btn ${allDone ? 'primary' : ''}" id="go">${allDone ? 'Open BassBlend' : 'Finish later and open BassBlend'}</button>
        <span class="state" style="font-size:13px;color:var(--text-3)">${allDone ? 'Next: plug in the miniDSP and mic, then “Tune my system”.' : 'Anything left shows in the Setup checklist.'}</span>`
@@ -234,6 +243,20 @@ function wire() {
     };
     ak.onclick = go; $('#aiKey').onkeydown = e => { if (e.key === 'Enter') go(); };
   }
+  const imf = $('#impFile');
+  if (imf) imf.onchange = async () => {
+    const f = imf.files[0], m = $('#impMsg'); if (!f) return;
+    let b = null;
+    try { b = JSON.parse(await f.text()); } catch (e) {}
+    if (!b || b.format !== 'bassblend-config') { m.className = 'msg bad'; m.textContent = 'That isn’t a BassBlend settings file.'; imf.value = ''; return; }
+    m.className = 'msg'; m.textContent = 'Importing…';
+    const r = await post('/api/config/import', {bundle: b});
+    if (r.error) { m.className = 'msg bad'; m.textContent = r.error; imf.value = ''; return; }
+    open = null; await load();
+    const done = $('#impMsg') || $('#finish');
+    if (done) { const n = document.createElement('p'); n.className = 'msg'; n.style.color = 'var(--good)';
+      n.textContent = 'Imported: ' + r.imported.join(' · '); $('#finish').prepend(n); }
+  };
   const g = $('#go');
   if (g) g.onclick = async () => { g.disabled = true; await post('/api/setup/done'); location.href = '/'; };
 }
