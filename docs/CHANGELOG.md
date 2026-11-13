@@ -1,5 +1,19 @@
 # BassBlend changelog
 
+## Nov 13, 2026 — first-boot setup in the browser (for a ready-made SD card)
+
+- A fresh BassBlend in network mode (no PIN yet) shows a **setup guide** instead of the dashboard:
+  1. choose a PIN, 2. add the mic calibration file, 3. find the receiver (automatic search, or by
+  hand), 4. add the AI key (optional). Steps can be skipped or changed later; "Finish later and
+  open BassBlend" lands on the Setup checklist.
+- The first PIN can only be chosen once; after that the page needs signing in, and someone else
+  on the network can't replace it. Until setup is finished, signed-in visits to the dashboard
+  come back to the guide once.
+- The Linux setup script no longer asks for a PIN in the terminal (`--pin` still does). This is
+  what lets an SD card image need no terminal at all.
+- Tested end to end on an isolated "fresh card" copy, with phone and dark layouts checked.
+  12 checks in `tests/test_portable.py`.
+
 ## Nov 13, 2026 — ready for Linux / Raspberry Pi (silent)
 
 - **git**: the project is now a git repository (nothing committed yet). Your `data/` folder and the

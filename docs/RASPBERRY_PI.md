@@ -18,8 +18,12 @@ yet**. Expect a first session of small fixes, ideally with Claude connected to t
    cd ~/bassblend
    sudo ./deploy/linux/install.sh
    ```
-   It installs everything, asks you to choose a PIN, and starts BassBlend.
-4. Open **http://bassblend.local:8765** on your phone or PC and sign in with the PIN.
+   It installs everything and starts BassBlend.
+4. Open **http://bassblend.local:8765** on your phone or PC. The first visit opens a short
+   **setup guide**: choose your PIN, add the mic calibration file, find the receiver, and
+   (optionally) add your AI key. Do this straight away: until a PIN is chosen, anyone on your
+   network who opens the page could choose it. After that, everyone has to sign in.
+   (`--pin` makes the script ask for the PIN in the terminal instead.)
 
 To bring your tunes over from Windows, copy the contents of the BassBlend `data` folder into
 `/var/lib/bassblend` on the Pi, run `sudo chown -R bassblend: /var/lib/bassblend`, restart

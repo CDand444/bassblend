@@ -146,6 +146,24 @@ def test_sessions_and_new_pin_signs_out():
     _with_conf(t)
 
 
+def test_first_pin_can_only_be_set_once():
+    def t(auth, d):
+        auth.set_first_pin("first-pin-1")
+        try:
+            auth.set_first_pin("hijack-pin-2")
+        except PermissionError:
+            assert auth.check_pin("first-pin-1", "x") and not auth.check_pin("hijack-pin-2", "y")
+            return
+        raise AssertionError("a second first-boot PIN must be refused")
+    import time as _t
+    real = _t.sleep
+    try:
+        _t.sleep = lambda s: None
+        _with_conf(t)
+    finally:
+        _t.sleep = real
+
+
 def test_guessing_is_locked_out():
     def t(auth, d):
         auth.set_pin("bass-2026")

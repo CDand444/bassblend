@@ -28,7 +28,7 @@ COOKIE = "bb_session"
 SESSION_DAYS = 30
 ITER = 200_000
 MAX_TRIES, LOCK_S = 5, 300
-_lock = threading.Lock()
+_lock = threading.RLock()
 _fails: dict[str, list[float]] = {}
 
 
@@ -73,6 +73,15 @@ def set_pin(pin: str) -> None:
     salt = secrets.token_bytes(16)
     with _lock:
         _save({"pin_hash": _hash(pin, salt), "salt": salt.hex(), "sessions": {}})   # new PIN signs everyone out
+
+
+def set_first_pin(pin: str) -> None:
+    """First-boot setup: choose the PIN only if none exists yet. Once one is
+    set, the setup page can't change it (that needs the current PIN or a terminal)."""
+    with _lock:
+        if pin_set():
+            raise PermissionError("a PIN has already been chosen; sign in instead")
+        set_pin(pin)
 
 
 def check_pin(pin: str, who: str = "?") -> bool:

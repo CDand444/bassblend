@@ -11,7 +11,10 @@
 # Options:
 #   --port N            dashboard port (default 8765)
 #   --hostname NAME     rename this computer, so the dashboard is at http://NAME.local:PORT
-#   --no-pin            skip the PIN prompt (the service won't start until a PIN is set)
+#   --pin               choose the dashboard PIN here instead of in the browser
+#
+# Without --pin, the first person to open the dashboard is walked through
+# choosing a PIN (and the mic file, receiver and AI key) in the browser.
 #
 # Safe to run again: it updates what's there and keeps your data.
 set -euo pipefail
@@ -19,15 +22,16 @@ set -euo pipefail
 MINIDSP_VERSION="0.1.12"
 PORT=8765
 DEV=0
-SET_PIN=1
+SET_PIN=0
 NEW_HOSTNAME=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dev) DEV=1 ;;
     --port) PORT="$2"; shift ;;
     --hostname) NEW_HOSTNAME="$2"; shift ;;
-    --no-pin) SET_PIN=0 ;;
-    -h|--help) sed -n '2,20p' "$0"; exit 0 ;;
+    --pin) SET_PIN=1 ;;
+    --no-pin) SET_PIN=0 ;;                     # the default now; kept so older notes still work
+    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -169,17 +173,14 @@ if [ "$SET_PIN" -eq 1 ] && ! pin_is_set; then
       bash -c "cd '$APP' && '$VENV/bin/python' -m subtune set-pin"
 fi
 
-if pin_is_set; then
-  systemctl restart bassblend.service
-  sleep 2
-  systemctl is-active --quiet bassblend.service || die "the service didn't start. See: journalctl -u bassblend -n 50"
-  say "Done"
-  echo "Open:  http://$(hostname).local:$PORT   (or http://$(hostname -I | awk '{print $1}'):$PORT)"
-else
-  say "Almost done"
-  echo "Set a PIN, then start the service:"
-  echo "  sudo -u $RUN_USER env BASSBLEND_DATA=$DATA BASSBLEND_CONFIG=$CONF $VENV/bin/python -m subtune set-pin"
-  echo "  sudo systemctl start bassblend"
+systemctl restart bassblend.service
+sleep 2
+systemctl is-active --quiet bassblend.service || die "the service didn't start. See: journalctl -u bassblend -n 50"
+say "Done"
+echo "Open:  http://$(hostname).local:$PORT   (or http://$(hostname -I | awk '{print $1}'):$PORT)"
+if ! pin_is_set; then
+  echo "The first time you open it, BassBlend asks you to choose a PIN. Do that straight away:"
+  echo "until a PIN is chosen, anyone on your network who opens the page could choose it."
 fi
 echo
 echo "Your tunes and settings live in $DATA. To bring them over from Windows, copy the"

@@ -807,28 +807,71 @@ class H(BaseHTTPRequestHandler):
         from . import auth
         return not NET["lan"] or self._local() or auth.session_ok(auth.cookie_from(self.headers.get("Cookie")))
 
-    def _gate(self, path) -> bool:
-        """True if the request may go on; otherwise answers it (sign-in page or 401)."""
+    def _setup_needed(self):
+        """Network mode with no PIN yet: a freshly written SD card. Only the
+        first-boot setup page answers until a PIN is chosen."""
         from . import auth
+        return NET["lan"] and not auth.pin_set()
+
+    def _redirect(self, to):
+        self._send(303, b"", "text/plain", [("Location", to)])
+
+    def _gate(self, path) -> bool:
+        """True if the request may go on; otherwise answers it (setup, sign-in page or 401)."""
+        from . import auth
+        setup = self._setup_needed()
+        if path == "/setup":
+            if setup or self._authed():
+                self._send(200, (WEB_DIR / "setup.html").read_bytes(), "text/html; charset=utf-8")
+            else:
+                self._redirect("/login")
+            return False
+        if path in ("/api/setup/status", "/api/setup/pin") and (setup or self._authed()):
+            return True
+        if setup:
+            if path.startswith(("/api/", "/media/")):
+                self._send(401, {"error": "finish setting up BassBlend first", "setup": "/setup"})
+            else:
+                self._redirect("/setup")
+            return False
         if path == "/login":
             if self._authed():
-                self._send(303, b"", "text/plain", [("Location", "/")])
+                self._redirect("/")
             else:
                 self._send(200, auth.LOGIN_PAGE.encode(), "text/html; charset=utf-8")
             return False
         if path in ("/api/login", "/favicon.ico") or self._authed():
+            if path in ("/", "/index.html") and NET["lan"] and not load_settings().get("onboarded"):
+                self._redirect("/setup")                 # finish (or skip) the first-boot steps once
+                return False
             return True
         if path.startswith(("/api/", "/media/")):
             self._send(401, {"error": "sign in first", "login": "/login"})
         else:
-            self._send(303, b"", "text/plain", [("Location", "/login")])
+            self._redirect("/login")
         return False
+
+    def _setup_status(self):
+        from pathlib import Path
+        from . import auth
+        from .analysis import key_source
+        s = load_settings()
+        cal = s.get("cal_file")
+        import socket
+        return {"lan": NET["lan"], "pin_set": auth.pin_set(), "signed_in": self._authed(),
+                "onboarded": bool(s.get("onboarded")), "host": socket.gethostname(), "port": self.server.server_address[1],
+                "cal": {"ok": bool(cal) and Path(cal).is_file(), "name": Path(str(cal).replace("\\", "/")).name if cal else None},
+                "avr": {"configured": bool(s.get("avr_host")), "host": s.get("avr_host"), "make": s.get("avr_make", "Onkyo"),
+                        "model": s.get("avr_model", "")},
+                "ai_key": key_source() is not None}
 
     def do_GET(self):
         u = urlparse(self.path)
         q = parse_qs(u.query)
         if not self._gate(u.path):
             return
+        if u.path == "/api/setup/status":
+            return self._send(200, self._setup_status())
         if u.path in ("/", "/index.html"):
             return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
         if u.path == "/api/state":
@@ -921,6 +964,21 @@ class H(BaseHTTPRequestHandler):
                 return self._send(401, {"error": "That PIN is not right."})
             event("config", f"signed in from {self.client_address[0]}")
             return self._send(200, {"ok": True}, headers=[("Set-Cookie", auth.set_cookie(auth.new_session()))])
+        if path == "/api/setup/pin":
+            if not self._setup_needed():
+                return self._send(409, {"error": "a PIN has already been chosen; sign in instead"})
+            try:
+                auth.set_first_pin(str(body.get("pin", "")))
+            except PermissionError as e:
+                return self._send(409, {"error": str(e)})
+            except ValueError as e:
+                return self._send(400, {"error": str(e)[:1].upper() + str(e)[1:] + "."})
+            event("config", f"PIN chosen in first-boot setup from {self.client_address[0]}")
+            return self._send(200, {"ok": True}, headers=[("Set-Cookie", auth.set_cookie(auth.new_session()))])
+        if path == "/api/setup/done":
+            st = load_settings(); st["onboarded"] = True; save_settings(st)
+            event("config", "first-boot setup finished")
+            return self._send(200, {"ok": True})
         if path == "/api/logout":
             auth.end_session(auth.cookie_from(self.headers.get("Cookie")))
             return self._send(200, {"ok": True}, headers=[("Set-Cookie", auth.clear_cookie())])
@@ -1090,8 +1148,6 @@ class H(BaseHTTPRequestHandler):
 def serve(port=8765, lan=False):
     """lan=False: this computer only. lan=True: your home network, PIN required."""
     from . import auth
-    if lan and not auth.pin_set():
-        raise SystemExit("Set a PIN before opening BassBlend to your network:  python -m subtune set-pin")
     if not RUN.running():                          # clear stale flags from a killed run
         update_state(busy=False, step="idle", analysis_status={"running": False},
                      suggest_status={"running": False})
@@ -1101,7 +1157,8 @@ def serve(port=8765, lan=False):
     if lan:
         import socket
         name = socket.gethostname()
-        print(f"BassBlend dashboard on your network: http://{name}.local:{port}  (PIN required)", flush=True)
+        print(f"BassBlend dashboard on your network: http://{name}.local:{port}  "
+              + ("(PIN required)" if auth.pin_set() else "(first boot: open it to choose a PIN)"), flush=True)
     else:
         print(f"BassBlend dashboard: http://127.0.0.1:{port}", flush=True)
     srv.serve_forever()
