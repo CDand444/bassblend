@@ -12,6 +12,8 @@
 #   --port N            dashboard port (default 8765)
 #   --hostname NAME     rename this computer, so the dashboard is at http://NAME.local:PORT
 #   --pin               choose the dashboard PIN here instead of in the browser
+#   --image             used by the SD card image build (pi-gen): installs into an
+#                       offline system, so nothing is started and no PIN is asked
 #
 # Without --pin, the first person to open the dashboard is walked through
 # choosing a PIN (and the mic file, receiver and AI key) in the browser.
@@ -22,6 +24,7 @@ set -euo pipefail
 MINIDSP_VERSION="0.1.12"
 PORT=8765
 DEV=0
+IMAGE=0
 SET_PIN=0
 NEW_HOSTNAME=""
 while [ $# -gt 0 ]; do
@@ -30,8 +33,9 @@ while [ $# -gt 0 ]; do
     --port) PORT="$2"; shift ;;
     --hostname) NEW_HOSTNAME="$2"; shift ;;
     --pin) SET_PIN=1 ;;
+    --image) IMAGE=1 ;;
     --no-pin) SET_PIN=0 ;;                     # the default now; kept so older notes still work
-    -h|--help) sed -n '2,24p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,26p' "$0"; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 2 ;;
   esac
   shift
@@ -41,6 +45,11 @@ say()  { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 die()  { printf '\nError: %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "run this with sudo"
+if [ "$IMAGE" -eq 1 ]; then
+  [ "$DEV" -eq 0 ] || die "--image and --dev can't be used together"
+  SET_PIN=0
+fi
+live() { [ "$IMAGE" -eq 0 ]; }                 # false while building an SD card image
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 [ -f "$SRC/subtune/__main__.py" ] || [ -f "$SRC/subtune/cli.py" ] || die "run this from inside the BassBlend folder"
 case "$PORT" in ''|*[!0-9]*) die "--port must be a number" ;; esac
@@ -110,7 +119,8 @@ fi
 [ "$DEV" -eq 1 ] && chown -R "$RUN_USER:" "$APP/tools"
 # BassBlend talks to the miniDSP directly; minidsp-rs's own background service would hold the USB device.
 if systemctl list-unit-files minidspd.service >/dev/null 2>&1; then
-  systemctl disable --now minidspd.service >/dev/null 2>&1 || true
+  if live; then systemctl disable --now minidspd.service >/dev/null 2>&1 || true
+  else systemctl disable minidspd.service >/dev/null 2>&1 || true; fi
 fi
 
 say "Letting BassBlend use the miniDSP over USB without root"
@@ -119,8 +129,10 @@ cat > /etc/udev/rules.d/60-bassblend-minidsp.rules <<'RULES'
 SUBSYSTEM=="usb", ATTRS{idVendor}=="2752", MODE="0660", GROUP="plugdev"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2752", MODE="0660", GROUP="plugdev"
 RULES
-udevadm control --reload-rules
-udevadm trigger --subsystem-match=usb --subsystem-match=hidraw || true
+if live; then
+  udevadm control --reload-rules || true
+  udevadm trigger --subsystem-match=usb --subsystem-match=hidraw || true
+fi
 
 say "Preparing the data folder ($DATA)"
 mkdir -p "$DATA" "$CONF"
@@ -162,7 +174,7 @@ $HARDEN
 [Install]
 WantedBy=multi-user.target
 UNIT
-systemctl daemon-reload
+live && systemctl daemon-reload
 systemctl enable bassblend.service >/dev/null
 
 pin_is_set() { [ -s "$CONF/auth.json" ] && grep -q pin_hash "$CONF/auth.json"; }
@@ -173,6 +185,10 @@ if [ "$SET_PIN" -eq 1 ] && ! pin_is_set; then
       bash -c "cd '$APP' && '$VENV/bin/python' -m subtune set-pin"
 fi
 
+if ! live; then
+  say "BassBlend is installed in the image; it starts on first boot"
+  exit 0
+fi
 systemctl restart bassblend.service
 sleep 2
 systemctl is-active --quiet bassblend.service || die "the service didn't start. See: journalctl -u bassblend -n 50"

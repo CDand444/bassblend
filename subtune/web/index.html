@@ -1428,8 +1428,8 @@ function renderAI() {
   $('#keyForm').hidden = !showForm;
   $('#askRow').style.display = S.ai_key ? '' : 'none';
   $('#keyState').innerHTML = S.ai_key === 'environment' ? 'Key from ANTHROPIC_API_KEY'
-    : S.ai_key === 'saved' ? 'Key saved on this PC · <button class="btn ghost" id="keyRemove" style="height:24px;padding:0 6px">Remove</button>' : '';
-  const rm = $('#keyRemove'); if (rm) rm.onclick = async () => { if (!confirm('Remove the saved API key from this PC?')) return; await post('/api/apikey', {remove: true}); poll(); };
+    : S.ai_key === 'saved' ? 'Key saved on this device · <button class="btn ghost" id="keyRemove" style="height:24px;padding:0 6px">Remove</button>' : '';
+  const rm = $('#keyRemove'); if (rm) rm.onclick = async () => { if (!confirm('Remove the saved API key from this device?')) return; await post('/api/apikey', {remove: true}); poll(); };
   const key = a ? String(a.t) : '';
   if ($('#aiOut').dataset.key !== key) { $('#aiOut').dataset.key = key; $('#aiOut').innerHTML = a ? md(a.markdown) : ''; }
 }

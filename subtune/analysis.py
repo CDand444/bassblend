@@ -39,7 +39,11 @@ def save_key(key: str) -> None:
     f = _key_file()
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(key, encoding="utf-8")
-    event("config", "Anthropic API key saved on this PC")
+    try:
+        f.chmod(0o600)                    # owner-only on Linux; a no-op on Windows
+    except OSError:
+        pass
+    event("config", "Anthropic API key saved on this device")
 
 
 def delete_key() -> None:

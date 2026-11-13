@@ -627,7 +627,7 @@ def avr_action(body):
         s["avr_host"], s["avr_make"], s["avr_model"] = host, make, str(body.get("model") or "")[:40]
         save_settings(s)
         _avr["obj"], _avr["t"] = None, 0
-        event("config", f"receiver set to {make} {s['avr_model']} at {host}")
+        event("config", f"receiver set to {' '.join(x for x in (make, s['avr_model']) if x)} at {host}")
         return avr_status(force=True)
     o = avr_obj()
     if act == "discover":

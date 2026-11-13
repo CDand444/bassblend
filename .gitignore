@@ -21,3 +21,6 @@ Thumbs.db
 *.key
 .env
 anthropic_api_key
+build/
+dist/
+build-image.log
