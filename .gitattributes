@@ -1,0 +1,6 @@
+# Shell scripts must keep Unix line endings or bash on the Pi refuses them.
+*.sh        text eol=lf
+*.service   text eol=lf
+*.rules     text eol=lf
+# Windows launcher
+*.cmd       text eol=crlf

@@ -1,0 +1,23 @@
+# Your measurements, tunes, settings, chats and logs: personal, and they differ per machine.
+# Back them up separately (copy the data folder); they never go into git.
+data/
+
+# Downloaded third-party binaries (minidsp-rs). The setup scripts fetch them.
+tools/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Keys and local secrets, wherever they end up
+*.key
+.env
+anthropic_api_key
