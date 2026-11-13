@@ -209,9 +209,20 @@ def cmd_avrblend(a):
     from . import avrmeasure
     try:
         with busy(f"AVR blend test at spot {a.pos}"):
-            avrmeasure.run(a.mode, a.pos, speakers=a.speakers)
+            avrmeasure.run(a.mode, a.pos, speakers=a.speakers, auto_volume=not a.no_auto_volume)
     except Exception as e:
         update_state(avr_blend_status={"running": False, "error": str(e)})
+        raise
+
+
+def cmd_deepcheck(a):
+    """Full-range system report through the receiver (left, right, both)."""
+    from . import deepcheck
+    try:
+        with busy(f"system report at spot {a.pos}"):
+            deepcheck.run(a.mode, a.pos, auto_volume=not a.no_auto_volume)
+    except Exception as e:
+        update_state(deep_status={"running": False, "error": str(e)})
         raise
 
 
@@ -470,7 +481,13 @@ def main(argv=None):
     s = sp.add_parser("avrblend"); s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--speakers", choices=["L", "LR"], default="L", help="L = left only, LR = left then right")
+    s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_avrblend)
+    s = sp.add_parser("deepcheck", help="full-range system report through the receiver")
+    s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s.add_argument("--pos", type=int, default=1)
+    s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
+    s.set_defaults(fn=cmd_deepcheck)
     s = sp.add_parser("avrapply"); s.add_argument("--multi", action="store_true", help="use the multi-seat blend")
     s.set_defaults(fn=cmd_avrapply)
     sp.add_parser("blendseats").set_defaults(fn=cmd_blendseats)

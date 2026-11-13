@@ -1,0 +1,633 @@
+"""Full-range system report: bass, mids and highs through the receiver, in plain words.
+
+One test file, played by the receiver in Stereo (so the subs join in through its
+bass management, exactly as you listen):
+
+    [lead-in: room noise]  LEFT sweep  [gap]  RIGHT sweep  [gap]  BOTH sweep  [tail]
+
+Each sweep runs 20 Hz - 20 kHz. From the one recording (the sweeps' timing is
+exact, so they share one time base) BassBlend works out:
+
+  * frequency response of left, right and both, against your target curve,
+    split into deep bass / bass / low mids / mids / upper mids / highs;
+  * the biggest peaks and dips, and what kind of problem each probably is
+    (room resonance, wall cancellation, reflection, speaker);
+  * left/right match: level, tone, timing (is the seat centred?) and polarity
+    (is a speaker wired backwards?);
+  * how long the room rings per octave (RT60) and the strongest early reflections;
+  * distortion across the range, background noise and hum, and how trustworthy
+    each part of the measurement is (signal-to-noise);
+  * how deep the system really plays.
+
+Every finding comes with what it means, why it matters and what you can do.
+"""
+from __future__ import annotations
+
+import time
+import wave
+
+import numpy as np
+from scipy.signal import butter, find_peaks, hilbert, sosfiltfilt, welch
+
+from . import audio
+from .config import AUDIO_FS as FS, load_settings
+
+F1, F2 = 20.0, 20000.0
+SWEEP = 8.0
+LEAD, GAP, TAIL = 4.0, 3.0, 3.0
+FILE_DBFS = -20.0
+MEDIA_NAME = "bassblend_full_range_test.wav"
+OFFS = {"left": 0.0, "right": SWEEP + GAP, "both": 2 * (SWEEP + GAP)}
+TOTAL = OFFS["both"] + SWEEP + TAIL
+FG = np.geomspace(20.0, 20000.0, int(24 * np.log2(1000)) + 1)       # 1/24 octave
+BANDS = [("deep_bass", "Deep bass", 20, 40), ("bass", "Bass", 40, 120), ("low_mids", "Low mids", 120, 500),
+         ("mids", "Mids", 500, 2000), ("upper_mids", "Upper mids", 2000, 6000), ("highs", "Highs", 6000, 16000)]
+RT_BANDS = [63, 125, 250, 500, 1000, 2000, 4000, 8000]
+THD_FREQS = [40, 63, 100, 200, 500, 1000, 2000, 5000]
+AREAS = [("bass", "Bass"), ("mids", "Mids"), ("highs", "Highs"), ("stereo", "Left & right"),
+         ("room", "Room"), ("clean", "Clean & quiet")]
+C = 343.0
+RANK = {"good": 0, "watch": 1, "fix": 2, "info": -1}
+
+
+# ------------------------------------------------------------------- signal
+def sweep_signal():
+    return audio.log_sweep(F1, F2, SWEEP) * audio.db_to_lin(FILE_DBFS)
+
+
+def file_signal():
+    sw = sweep_signal()
+    st = np.zeros((int((LEAD + TOTAL) * FS), 2))
+    at = lambda sec: int((LEAD + sec) * FS)
+    st[at(OFFS["left"]):at(OFFS["left"]) + len(sw), 0] = sw
+    st[at(OFFS["right"]):at(OFFS["right"]) + len(sw), 1] = sw
+    st[at(OFFS["both"]):at(OFFS["both"]) + len(sw), 0] = sw
+    st[at(OFFS["both"]):at(OFFS["both"]) + len(sw), 1] = sw
+    return st
+
+
+def build_file(path=None):
+    from .avr import MEDIA
+    path = path or (MEDIA / MEDIA_NAME)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pcm = (np.clip(file_signal(), -1, 1) * 32767).astype("<i2")
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(2); w.setsampwidth(2); w.setframerate(FS); w.writeframes(pcm.tobytes())
+    return path
+
+
+# ----------------------------------------------------------------- helpers
+def _bp(lo, hi, order=4):
+    return butter(order, [lo, min(hi, FS / 2 * 0.95)], "bandpass", fs=FS, output="sos")
+
+
+def spl_offset(cal) -> float:
+    return 94.0 + 18.0 - (cal[2] if cal else 0.0)
+
+
+def _cal_db(cal, f):
+    if cal is None:
+        return np.zeros_like(f)
+    fr, db, _ = cal
+    return np.interp(np.log(f), np.log(fr), db)
+
+
+def frac_smooth(f_bins, p_bins, centres, frac=6):
+    """Power average over a 1/frac-octave window around each centre (dB)."""
+    cs = np.concatenate([[0.0], np.cumsum(p_bins)])
+    lo = np.searchsorted(f_bins, centres * 2 ** (-0.5 / frac))
+    hi = np.searchsorted(f_bins, centres * 2 ** (0.5 / frac))
+    out = np.empty(len(centres))
+    for i, (a, b) in enumerate(zip(lo, hi)):
+        out[i] = (cs[b] - cs[a]) / (b - a) if b - a >= 1 else np.interp(centres[i], f_bins, p_bins)
+    return 10 * np.log10(np.maximum(out, 1e-20))
+
+
+def response(ir, anchor, length=0.3, pre=0.005):
+    """(dB on FG, 1/6-octave smoothed, raw complex spectrum + its bin freqs)."""
+    a = anchor - int(pre * FS)
+    seg = np.take(ir, np.arange(a, a + int((pre + length) * FS)), mode="wrap").copy()
+    nt = int(0.3 * len(seg))
+    seg[-nt:] *= np.cos(np.linspace(0, np.pi / 2, nt)) ** 2
+    n = 1 << 16
+    H = np.fft.rfft(seg, n)
+    f = np.fft.rfftfreq(n, 1 / FS)
+    return frac_smooth(f[1:], np.abs(H[1:]) ** 2, FG, 6)
+
+
+def direct_arrival(ir, rough, span=0.06):
+    """Sample index of the direct sound (high-passed, so the subs don't pull it later)."""
+    a, b = max(0, rough - int(span * FS)), rough + int(span * FS)
+    env = np.abs(hilbert(sosfiltfilt(_bp(1000, 8000), ir[a:b])))
+    return a + int(np.argmax(env))
+
+
+def band_mean(f, db, lo, hi):
+    m = (f >= lo) & (f < hi)
+    return float(10 * np.log10(np.mean(10 ** (db[m] / 10)))) if m.any() else float("nan")
+
+
+def target_curve(s, sy):
+    from .dirac import target_points
+    pts = target_points(float(s.get("house_db", 0)), float(s.get("house_fc", 45)), sy.get("treble", "gentle"))
+    pf, pg = np.array([p[0] for p in pts]), np.array([p[1] for p in pts])
+    return np.interp(np.log(FG), np.log(pf), pg)
+
+
+def _spec_at(ir, center, freqs, pre=0.02, length=0.12):
+    a, b = center - int(pre * FS), center + int(length * FS)
+    seg = np.take(ir, np.arange(a, b), mode="wrap") * np.hanning(b - a)
+    n = 1 << 15
+    H = np.abs(np.fft.rfft(seg, n))
+    f = np.fft.rfftfreq(n, 1 / FS)
+    return np.array([np.max(H[(f >= x / 2 ** (1 / 12)) & (f <= x * 2 ** (1 / 12))]) for x in freqs])
+
+
+def distortion(ir, arrival):
+    """THD (2nd + 3rd harmonic, %) from the harmonic impulse responses (Farina)."""
+    L = SWEEP / np.log(F2 / F1)
+    f0 = np.array([f for f in THD_FREQS if 3 * f < F2 * 0.9], float)
+    h1 = _spec_at(ir, arrival, f0)
+    h2 = _spec_at(ir, arrival - int(L * np.log(2) * FS), 2 * f0)
+    h3 = _spec_at(ir, arrival - int(L * np.log(3) * FS), 3 * f0)
+    n2 = _spec_at(ir, arrival + int(2.0 * FS), 2 * f0)
+    n3 = _spec_at(ir, arrival + int(2.0 * FS), 3 * f0)
+    out = []
+    for i, f in enumerate(f0):
+        thd = 100 * np.sqrt(h2[i] ** 2 + h3[i] ** 2) / max(h1[i], 1e-12)
+        below = h2[i] < 2 * n2[i] and h3[i] < 2 * n3[i]
+        out.append({"f": float(f), "pct": round(float(thd), 2), "h2": round(float(100 * h2[i] / max(h1[i], 1e-12)), 2),
+                    "h3": round(float(100 * h3[i] / max(h1[i], 1e-12)), 2), "below_noise": bool(below)})
+    return out
+
+
+def rt60(ir, arrival):
+    from .checkup import decay_times
+    return decay_times(ir, arrival, RT_BANDS)
+
+
+def reflections(ir, direct, max_ms=25.0):
+    """Strong early reflections after the direct sound (energy-time curve, 500 Hz-10 kHz)."""
+    a = direct - int(0.002 * FS)
+    seg = ir[a:direct + int(max_ms / 1000 * FS)]
+    env = np.abs(hilbert(sosfiltfilt(_bp(500, 10000), seg)))
+    k = max(1, int(0.00025 * FS))
+    env = np.convolve(env, np.ones(k) / k, mode="same")
+    db = 20 * np.log10(np.maximum(env / max(env.max(), 1e-12), 1e-9))
+    d0 = int(np.argmax(db[: int(0.004 * FS)]))
+    pk, _ = find_peaks(db, height=-16, distance=int(0.0004 * FS), prominence=3)
+    out = []
+    for p in pk:
+        dt = (p - d0) / FS * 1000
+        if dt < 0.6:
+            continue
+        out.append({"ms": round(dt, 2), "db": round(float(db[p]), 1), "extra_cm": round(dt / 1000 * C * 100)})
+    out.sort(key=lambda r: -r["db"])
+    return out[:6], db[::max(1, int(FS / 8000))].round(1).tolist()
+
+
+def polarity_match(ir, dl, dr):
+    """+1 if left and right have the same polarity, -1 if one is wired backwards."""
+    sos = _bp(300, 3000)
+    seg = lambda d: sosfiltfilt(sos, ir[d - int(0.002 * FS): d + int(0.004 * FS)])
+    a, b = seg(dl), seg(dr)
+    best = max(range(-24, 25), key=lambda s: abs(np.dot(a, np.roll(b, s))))
+    c = np.dot(a, np.roll(b, best)) / max(np.linalg.norm(a) * np.linalg.norm(b), 1e-12)
+    return float(c)
+
+
+def noise_report(x, off):
+    """Background noise: level per octave (dB SPL), overall, bass, and mains hum."""
+    if len(x) < FS:
+        return None
+    f, p = welch(x, FS, nperseg=1 << 15)
+    p = p * 2                                                # sine-referenced, like the meter
+    lvl = lambda lo, hi: 10 * np.log10(max(np.sum(p[(f >= lo) & (f < hi)]) * (f[1] - f[0]), 1e-20)) + off
+    octs = [{"f": fc, "spl": round(lvl(fc / 2 ** 0.5, fc * 2 ** 0.5), 1)} for fc in [31.5, 63, 125, 250, 500, 1000, 2000, 4000, 8000]]
+    hum = None
+    for base in (50.0, 60.0):
+        hits = 0
+        for k in (1, 2, 3):
+            m = (f > base * k - 1.5) & (f < base * k + 1.5)
+            ref = (f > base * k - 12) & (f < base * k + 12) & ~m
+            if m.any() and ref.any() and 10 * np.log10(p[m].max() / np.median(p[ref])) > 12:
+                hits += 1
+        if hits >= 2:
+            hum = base
+    df = f[1] - f[0]
+    bw = FG * (2 ** (1 / 12) - 2 ** (-1 / 12))                  # 1/6-octave band, as the response is smoothed
+    band = frac_smooth(f[1:], p[1:] * df, FG, 6) + 10 * np.log10(np.maximum(bw / df, 1)) + off
+    return {"overall": round(lvl(20, 20000), 1), "bass": round(lvl(20, 120), 1), "octaves": octs, "hum_hz": hum,
+            "band_spl": band.round(1).tolist()}
+
+
+def bass_extension(f, norm):
+    """Lowest frequency still within 6 dB of the midrange (scanning down from 100 Hz)."""
+    m = (f <= 100) & (f >= 20)
+    ff, dd = f[m][::-1], norm[m][::-1]
+    below = np.nonzero(dd < -6)[0]
+    return float(ff[below[0]]) if len(below) else 20.0
+
+
+# ---------------------------------------------------------------- analysis
+def analyse(rec, t_start, cal=None, settings=None, system=None):
+    s = settings or load_settings()
+    if system is None:
+        from .dirac import system as _sy
+        system = _sy()
+    sw = sweep_signal()
+    ir = audio.deconvolve(rec, sw, F1, F2)
+    off = spl_offset(cal)
+    guess = int(t_start * FS)
+    a_bass = audio.find_arrival(ir, max(0, guess - int(3.5 * FS)), guess + int(0.5 * FS))
+    rough = {k: a_bass + int(v * FS) for k, v in OFFS.items()}
+    d = {k: direct_arrival(ir, r) for k, r in rough.items()}
+    cal_fg = _cal_db(cal, FG)
+    resp = {k: response(ir, d[k]) - cal_fg + FILE_DBFS + off for k in OFFS}      # ~dB SPL for the test level
+    # each speaker on its own, averaged: the tonal balance you hear from either side. (The 'both'
+    # sweep is kept for what only it shows: cancellation between the sides.)
+    resp["avg"] = 10 * np.log10((10 ** (resp["left"] / 10) + 10 ** (resp["right"] / 10)) / 2)
+    tgt = target_curve(s, system)
+    tgt = tgt - band_mean(FG, tgt, 500, 2000)
+    ref = {k: band_mean(FG, v, 500, 2000) for k, v in resp.items()}
+    norm = {k: resp[k] - ref[k] for k in resp}
+    dev = {k: norm[k] - tgt for k in norm}
+
+    bands = []
+    for key, label, lo, hi in BANDS:
+        m = (FG >= lo) & (FG < hi)
+        row = {"key": key, "label": label, "lo": lo, "hi": hi}
+        for k in ("left", "right", "both", "avg"):
+            dd = dev[k][m]
+            row[k] = {"vs_target_db": round(float(np.mean(dd)), 1), "rough_db": round(float(np.std(dd)), 1),
+                      "max_db": round(float(dd.max()), 1), "min_db": round(float(dd.min()), 1)}
+        bands.append(row)
+
+    # left/right
+    lr_diff = resp["left"] - resp["right"]
+    m_mid = (FG >= 200) & (FG < 4000)
+    m_hi = (FG >= 1000) & (FG < 10000)
+    lr = {"level_db": round(float(np.mean(lr_diff[m_mid])), 1),
+          "tone_spread_db": round(float(np.std(lr_diff[m_hi] - np.mean(lr_diff[m_hi]))), 1),
+          "timing_ms": round(float((d["right"] - d["left"]) / FS * 1000 - OFFS["right"] * 1000), 2),
+          "polarity_corr": round(polarity_match(ir, d["left"], d["right"]), 2)}
+    lr["timing_cm"] = round(lr["timing_ms"] / 1000 * C * 100, 1)
+    lr["polarity"] = "reversed" if lr["polarity_corr"] < -0.4 else "same" if lr["polarity_corr"] > 0.4 else "unclear"
+    m_b = (FG >= 40) & (FG < 120)
+    lr["both_gain_bass_db"] = round(float(np.mean(resp["both"][m_b] - 10 * np.log10(
+        (10 ** (resp["left"][m_b] / 10) + 10 ** (resp["right"][m_b] / 10)) / 2))), 1)
+
+    refl, etc = reflections(ir, d["left"])
+    refl_r, _ = reflections(ir, d["right"])
+    decay = rt60(ir, d["both"])
+    thd = distortion(ir, d["both"])
+    pre = rec[int(0.3 * FS): max(int(0.3 * FS), int((t_start - 0.8) * FS))]
+    noise = noise_report(pre, off)
+    snr = None
+    if noise:
+        snr = (resp["both"] - np.array(noise["band_spl"])).round(1)
+    ext = bass_extension(FG, norm["avg"])
+    peak = float(np.max(np.abs(rec)))
+    r = {"t": time.time(), "grid": FG.round(2).tolist(),
+         "curves": {k: v.round(1).tolist() for k, v in norm.items() if k != "avg"},
+         "target": tgt.round(2).tolist(),
+         "spl_ref": {k: round(v, 1) for k, v in ref.items()},
+         "bands": bands, "lr": lr, "reflections": {"left": refl, "right": refl_r}, "etc": etc,
+         "decay": decay, "thd": thd, "noise": noise, "snr": None if snr is None else snr.tolist(),
+         "bass_extension_hz": round(ext, 1), "peak_dbfs": round(20 * np.log10(max(peak, 1e-9)), 1)}
+    r["findings"] = findings(r, dev, norm)
+    r["areas"] = area_status(r["findings"])
+    return r
+
+
+# ---------------------------------------------------------------- findings
+def _f(area, status, title, found, why, todo, **kw):
+    return {"area": area, "status": status, "title": title, "found": found, "why": why, "todo": todo, **kw}
+
+
+def _hz(f):
+    return f"{f / 1000:.1f} kHz" if f >= 1000 else f"{f:.0f} Hz"
+
+
+def peaks_dips(dev, norm):
+    """Biggest deviations from the target (left and right averaged), classified."""
+    db = dev["avg"]
+    out = []
+    for sign in (1, -1):
+        idx, pr = find_peaks(sign * db, prominence=3.5, width=2)
+        for i in idx:
+            v = float(db[i])
+            if sign * v < 4 or FG[i] < 22 or FG[i] > 16000:
+                continue
+            out.append((abs(v), int(i), sign))
+    out.sort(reverse=True)
+    picked, n_hi = [], 0
+    for mag, i, sign in out:
+        if FG[i] >= 2000:                          # treble ripple is usually one cause: show the 2 biggest
+            if n_hi >= 2:
+                continue
+            n_hi += 1
+        picked.append((mag, i, sign))
+        if len(picked) == 6:
+            break
+    res = []
+    for mag, i, sign in picked:
+        f = float(FG[i]); v = float(db[i])
+        both_sides = dev["left"][i] * sign > 3 and dev["right"][i] * sign > 3
+        kind = "peak" if sign > 0 else "dip"
+        st = "fix" if mag > (6 if sign > 0 else 8) else "watch"
+        area = "bass" if f < 120 else "mids" if f < 2000 else "highs"
+        if sign > 0 and f < 300:
+            title = f"Boom at {_hz(f)} (+{mag:.0f} dB)"
+            found = f"The room adds {mag:.0f} dB around {_hz(f)}. That's a room resonance (a 'mode'): sound bouncing between two walls reinforces itself at that pitch."
+            why = "Bass notes near this pitch sound louder and ring longer than the rest, so bass lines sound uneven and boomy."
+            todo = ("BassBlend's sub tune can pull it down if it's in the subs' range; Dirac Live corrects it for the speakers. "
+                    "Peaks EQ well; moving the subs or the seat changes which pitch booms.")
+        elif sign < 0 and f < 400:
+            if both_sides and 60 <= f <= 400:
+                dist = C / (4 * f)
+                title = f"Hole at {_hz(f)} ({v:.0f} dB): probably the wall behind the speakers"
+                found = (f"Both speakers lose {mag:.0f} dB around {_hz(f)}. A dip at this pitch in both speakers is usually a "
+                         f"wall bounce cancelling the direct sound: a surface about {dist * 100:.0f} cm ({dist / 0.3048:.1f} ft) "
+                         "from the speakers' woofers (most often the wall behind them).")
+                why = "Instruments and voices lose body in that range; it can sound thin or hollow."
+                todo = (f"EQ can't fill a cancellation (boosting just wastes power). Moving the speakers closer to the wall "
+                        f"(under {dist * 100 / 3:.0f} cm) or further out shifts it; crossing over to the subs above {_hz(f)} also avoids it.")
+            else:
+                title = f"Hole at {_hz(f)} ({v:.0f} dB)"
+                found = f"The response drops {mag:.0f} dB around {_hz(f)}. At this pitch that's a cancellation: sound arriving two ways cancels out at your seat."
+                why = "Notes there sound weaker. It often changes a lot if you move your head or the seat."
+                todo = "Don't EQ it up (it won't work). Moving the seat, subs or speakers is what changes a null; the multi-seat blend can help in the sub range."
+        elif f < 2000:
+            title = f"{'Bump' if sign > 0 else 'Dip'} at {_hz(f)} ({v:+.0f} dB)"
+            found = f"The midrange is {mag:.0f} dB {'louder' if sign > 0 else 'quieter'} around {_hz(f)} than your target."
+            why = ("Voices sit here; a bump makes them honky or boxy, a dip makes them recessed." if f > 300 else
+                   "This is the warmth range; a bump sounds muddy, a dip sounds thin.")
+            todo = ("Often a reflection from a table, desk or side wall, or the speaker itself. Dirac Live corrects it; "
+                    "if it's only in one speaker, look for something near that speaker.")
+        else:
+            title = f"{'Peak' if sign > 0 else 'Dip'} at {_hz(f)} ({v:+.0f} dB)"
+            found = f"The treble is {mag:.0f} dB {'louder' if sign > 0 else 'quieter'} around {_hz(f)}."
+            why = ("Peaks here sound harsh or sibilant ('s' sounds spit)." if sign > 0 else
+                   "Dips here make detail and air sound veiled.")
+            todo = ("Check toe-in (speakers aimed at your ears) and the mic height (ear height). High frequencies depend a lot on "
+                    "exact mic position, so confirm at a second spot before changing anything.")
+        res.append(_f(area, st, title, found, why, todo, f=round(f, 1), db=round(v, 1), kind=kind))
+    return res
+
+
+def findings(r, dev, norm):
+    out = []
+    b = {x["key"]: x["avg"] for x in r["bands"]}
+    # tonal balance
+    bass_v = (b["bass"]["vs_target_db"] + b["deep_bass"]["vs_target_db"]) / 2
+    if bass_v > 4:
+        out.append(_f("bass", "watch" if bass_v < 7 else "fix", f"Bass is heavy (+{bass_v:.0f} dB over your target)",
+                      "Overall, the bass is louder than the curve you chose.", "Heavy bass masks voices and makes music sound thick.",
+                      "Lower the receiver's subwoofer level, or reduce the bass lift in Target curve."))
+    elif bass_v < -4:
+        out.append(_f("bass", "watch" if bass_v > -7 else "fix", f"Bass is light ({bass_v:.0f} dB under your target)",
+                      "Overall, the bass is quieter than the curve you chose.", "Movies and music lose weight and impact.",
+                      "Raise the receiver's subwoofer level a few dB, then run the blend test to keep subs and mains in step."))
+    else:
+        out.append(_f("bass", "good", "Bass level matches your target",
+                      f"The bass sits within {abs(bass_v):.0f} dB of your target curve.", "Balanced bass supports everything without covering it.", ""))
+    ext = r["bass_extension_hz"]
+    out.append(_f("bass", "good" if ext <= 25 else "watch" if ext <= 35 else "info",
+                  f"Plays down to about {ext:.0f} Hz",
+                  f"Your system stays within 6 dB of the midrange down to {ext:.0f} Hz.",
+                  "Below about 30 Hz you feel more than hear: explosions, organ, synth bass." + (" Yours reaches it." if ext <= 30 else ""),
+                  "" if ext <= 30 else "Deeper extension needs the subs: their placement and gain, or the bass lift in Target curve."))
+    rough_lm = b["low_mids"]["rough_db"]
+    if rough_lm > 3:
+        out.append(_f("mids", "watch" if rough_lm < 5 else "fix", "Uneven low mids",
+                      f"From 120 to 500 Hz the response wobbles by about ±{rough_lm:.0f} dB.",
+                      "This is where warmth and clarity trade off; unevenness makes male voices and cellos change tone from note to note.",
+                      "Dirac Live corrects most of this. Rugs, sofas and bookshelves smooth it physically."))
+    hi_v = b["highs"]["vs_target_db"]
+    um_v = b["upper_mids"]["vs_target_db"]
+    if hi_v < -5:
+        out.append(_f("highs", "watch", f"Treble is dull ({hi_v:.0f} dB)", "The highs are well below your target.",
+                      "Detail, air and spaciousness fade; dialogue can sound muffled.",
+                      "Check the speakers point at your seat and nothing blocks them (screen, grille cloth). Dirac can lift it a little; "
+                      "a softer 'gentle' target treble is also normal for in-room listening."))
+    elif hi_v > 3 or um_v > 3:
+        out.append(_f("highs", "watch", "Treble is bright", "The upper mids or highs are above your target.",
+                      "Bright systems sound detailed at first, then tiring; sibilance stands out.",
+                      "Less toe-in, a rug or curtains at the side walls, or a steeper treble target in Dirac."))
+    else:
+        out.append(_f("highs", "good", "Treble is balanced", "The upper mids and highs follow your target.", "", ""))
+    pd = peaks_dips(dev, norm)
+    strong_refl = [x for x in r["reflections"]["left"] + r["reflections"]["right"] if x["db"] > -6 and x["ms"] < 6]
+    if strong_refl:
+        x = max(strong_refl, key=lambda y: y["db"])
+        for f in pd:
+            # a reflection t ms late first cancels at 1/(2t), then at every odd multiple
+            if f["kind"] == "dip" and f["f"] >= 0.8 * 1000 / (2 * x["ms"]):
+                f["todo"] = (f"This is likely ripple from the strong reflection {x['ms']:.1f} ms after the direct sound "
+                             "(it cancels a series of evenly spaced pitches). Fix the reflection rather than EQ-ing the dips.")
+    out += pd
+    # left / right
+    lr = r["lr"]
+    if lr["polarity"] == "reversed":
+        out.append(_f("stereo", "fix", "One front speaker seems wired backwards",
+                      "The left and right speakers push in opposite directions (their pulses have opposite signs).",
+                      "Reversed polarity cancels the bass and smears the centre image, so voices sound vague and 'phasey'.",
+                      "Check the + and − (red/black) wires at both speakers and the receiver. Swap them on the speaker that's reversed, then run this again."))
+    else:
+        out.append(_f("stereo", "good" if lr["polarity"] == "same" else "info", "Both front speakers have the same polarity"
+                      if lr["polarity"] == "same" else "Couldn't confirm the speakers' polarity",
+                      "Left and right push in the same direction." if lr["polarity"] == "same" else "The reflections were too strong to tell.",
+                      "", ""))
+    lv = lr["level_db"]
+    out.append(_f("stereo", "good" if abs(lv) < 1 else "watch" if abs(lv) < 2 else "fix",
+                  "Left and right are equally loud" if abs(lv) < 1 else f"The {'left' if lv > 0 else 'right'} speaker is {abs(lv):.1f} dB louder",
+                  f"Level difference in the mids: {lv:+.1f} dB (left minus right).",
+                  "A louder side pulls the centre image (voices) towards it.",
+                  "" if abs(lv) < 1 else "Set the speaker levels in the receiver (or let Dirac do it), and check the mic is centred."))
+    tm = lr["timing_ms"]
+    out.append(_f("stereo", "good" if abs(tm) < 0.15 else "watch",
+                  "The seat is centred between the speakers" if abs(tm) < 0.15 else
+                  f"The {'right' if tm > 0 else 'left'} speaker's sound arrives {abs(tm):.2f} ms later",
+                  f"Arrival difference {tm:+.2f} ms, about {abs(lr['timing_cm']):.0f} cm of extra distance.",
+                  "Even a few centimetres off-centre shifts the image; at 0.3 ms+ voices drift to the nearer speaker.",
+                  "" if abs(tm) < 0.15 else "If the mic was centred, set the speaker distances in the receiver (or let Dirac do it). "
+                  "If it wasn't, this is just the mic position."))
+    ts = lr["tone_spread_db"]
+    if ts > 2.5:
+        out.append(_f("stereo", "watch", "Left and right sound different in the treble",
+                      f"Above 1 kHz the two sides differ by about ±{ts:.0f} dB from each other.",
+                      "Unequal surroundings (a window on one side, a wall close on the other) make the image lopsided.",
+                      "Match the toe-in, and look for what's different next to each speaker; a panel or curtain on the reflective side helps."))
+    if lr["both_gain_bass_db"] < 2:
+        out.append(_f("stereo", "watch", "Left and right partly cancel in the bass",
+                      f"Playing both speakers adds only {lr['both_gain_bass_db']:+.1f} dB in the bass (two in-step speakers add about +6).",
+                      "Something is out of step in the bass: polarity, delay or the subs' blend.",
+                      "Run the blend test (left + right) to line the subs up with the mains."))
+    # room
+    good_rt = [x for x in r["decay"] if x["t60"] is not None and x["f"] >= 250]
+    if good_rt:
+        mid = float(np.median([x["t60"] for x in good_rt]))
+        st = "good" if 0.2 <= mid <= 0.5 else "watch" if mid >= 0.08 else "info"
+        if st == "info":
+            good_rt = []
+        else:
+            out.append(_f("room", st, f"Room ring time {mid:.2f} s" + ("" if st == "good" else (" (lively)" if mid > 0.5 else " (very dead)")),
+                      f"Above 250 Hz, sound dies away by 60 dB in about {mid:.2f} s.",
+                      "Home theatres sound best around 0.2-0.4 s: lively enough to feel natural, dead enough for clear dialogue.",
+                      "" if st == "good" else ("Add soft furnishings: a rug, curtains, panels at the side walls' first reflection points." if mid > 0.5
+                                               else "A very dead room can feel closed-in; a few reflective surfaces (bookshelf, wood) liven it up.")))
+    if good_rt:
+        bass_rt = [x for x in r["decay"] if x["t60"] is not None and x["f"] <= 125]
+        if bass_rt and max(x["t60"] for x in bass_rt) > mid * 2.5 and max(x["t60"] for x in bass_rt) > 0.6:
+            w = max(bass_rt, key=lambda x: x["t60"])
+            out.append(_f("room", "watch", f"Bass rings much longer than the rest ({w['t60']:.1f} s at {w['f']:g} Hz)",
+                          "Low notes keep sounding after the mids have stopped.",
+                          "Lingering bass blurs kick drums and dialogue: 'boomy' rather than 'punchy'.",
+                          "The sub tune and Dirac reduce the peaks that ring; bass traps in corners reduce the ringing itself."))
+    refl = r["reflections"]["left"]
+    strong = [x for x in refl if x["db"] > -6 and x["ms"] < 6]
+    if strong:
+        x = strong[0]
+        out.append(_f("room", "watch", f"Strong early reflection {x['ms']:.1f} ms after the direct sound",
+                      f"A reflection only {abs(x['db']):.0f} dB quieter than the speaker itself arrives {x['ms']:.1f} ms later: "
+                      f"its path is about {x['extra_cm']} cm longer. Typically the floor, a coffee table, a desk or the nearest side wall.",
+                      "Early, strong reflections blur the image and colour the sound (they cause the comb-like ripples in the treble).",
+                      "A rug, moving a table out of the path, or an absorption panel at the mirror point on the side wall."))
+    elif refl:
+        out.append(_f("room", "good", "No strong early reflections", "The earliest reflections are well below the direct sound.", "", ""))
+    # clean & quiet
+    n = r["noise"]
+    if n:
+        st = "good" if n["bass"] < 45 and n["overall"] < 50 else "watch" if n["overall"] < 60 else "fix"
+        out.append(_f("clean", st, f"Background noise {n['overall']:.0f} dB",
+                      f"The room measured {n['overall']:.0f} dB SPL before the test ({n['bass']:.0f} dB in the bass).",
+                      "Noise masks quiet details and limits how far down in level a measurement is trustworthy.",
+                      "" if st == "good" else "Turn off HVAC, fans and fridges while measuring and listening critically."))
+        if n.get("hum_hz"):
+            out.append(_f("clean", "watch", f"Electrical hum at {n['hum_hz']:.0f} Hz",
+                          f"The noise has sharp peaks at {n['hum_hz']:.0f} Hz and its harmonics.",
+                          "That's mains hum, often a ground loop between the receiver, subs and cable/TV box.",
+                          "Plug the audio gear into one power strip; if the subs hum, try a ground-loop isolator on the sub cable or the TV's antenna input."))
+    valid = [x for x in r["thd"] if not x["below_noise"]]
+    if valid:
+        w = max(valid, key=lambda x: x["pct"] / (3 if x["f"] < 100 else 1))
+        lim = 10 if w["f"] < 100 else 3
+        st = "good" if w["pct"] < lim / 3 else "watch" if w["pct"] < lim else "fix"
+        out.append(_f("clean", st, "Low distortion" if st == "good" else f"Distortion {w['pct']:.1f}% at {_hz(w['f'])}",
+                      f"Worst harmonic distortion at this volume: {w['pct']:.1f}% at {_hz(w['f'])}.",
+                      "Distortion adds a gritty edge; a rattle in the room shows up here too.",
+                      "" if st == "good" else "Listen for rattles (panels, shelves, the speaker grille) while a tone plays at that pitch; "
+                      "if it's the speaker, it may be straining: turn down or cross it over higher."))
+    snr = r.get("snr")
+    if snr is not None:
+        s = np.array(snr)
+        bad = [b for b in BANDS if np.median(s[(FG >= b[2]) & (FG < b[3])]) < 15]
+        if bad:
+            out.append(_f("clean", "watch", "Part of this measurement is unreliable",
+                          "The test signal was less than 15 dB above the room noise in: " + ", ".join(x[1].lower() for x in bad) + ".",
+                          "Findings in those ranges may be the noise, not your speakers.",
+                          "Run again a little louder (raise the max volume for tests) or in a quieter moment."))
+    if r["peak_dbfs"] > -1:
+        out.append(_f("clean", "fix", "The mic overloaded", "The recording hit full scale.", "Overloaded parts are distorted by the mic, not the speakers.",
+                      "Run again at a lower volume (lower the max volume or target level)."))
+    out.sort(key=lambda x: (-RANK[x["status"]], AREAS.index(next(a for a in AREAS if a[0] == x["area"]))))
+    return out
+
+
+def area_status(fs):
+    res = {}
+    for key, label in AREAS:
+        mine = [x for x in fs if x["area"] == key and x["status"] != "info"]
+        worst = max(mine, key=lambda x: RANK[x["status"]])["status"] if mine else "info"
+        res[key] = {"label": label, "status": worst,
+                    "fix": sum(x["status"] == "fix" for x in mine), "watch": sum(x["status"] == "watch" for x in mine)}
+    return res
+
+
+# ---------------------------------------------------------------------- run
+def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None):
+    """Measure through the receiver and store the report. mode: 'dlna' | 'manual'."""
+    from . import autolevel, avr
+    from .avrmeasure import SweepWatcher
+    from .dsp import MiniDSP
+    from .state import event, load_state, update_state
+    log = log or (lambda *a, **k: event(*a, **k))
+    status = status or (lambda txt: update_state(deep_status={"running": True, "text": txt, "mode": mode, "pos": pos}))
+    s = load_settings()
+    cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
+    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
+    dsp = MiniDSP(s)
+    o = avr.Onkyo()
+    build_file()
+    autolevel.build_probe()
+    snap = o.snapshot()
+    dsp_before = dsp.status()["master"]["source"].lower()
+    renderer = None
+    level = None
+    lay = {"mains_len": 0.0, "total": TOTAL}
+    try:
+        status("Getting the receiver ready…")
+        if snap.get("power") is False:
+            o.power(True)
+            time.sleep(3)
+            # remember its volume and input now that it answers; restore() sets them back before standby
+            snap.update({k: v for k, v in o.snapshot().items() if k != "power"})
+        if dsp_before == "usb":                                # subs listen to the receiver for this test
+            dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")], "system report: subs on the receiver's sub out")
+        if mode == "dlna":
+            renderer = avr.DLNARenderer(o.host)
+            base = avr.MediaServer.get(avr.local_ip_for(o.host))
+
+            def play(name, title):
+                last = None
+                for _ in range(5):
+                    try:
+                        renderer.play(f"{base}/{name}", title)
+                        return
+                    except Exception as e:
+                        last = e
+                        time.sleep(2)
+                raise RuntimeError(f"The receiver couldn't fetch the test file ({last}).")
+            o.set_mode("00")
+            if auto_volume:
+                level = autolevel.dial_in(o, rec_dev, lambda: play(autolevel.PROBE_NAME, "BassBlend level probe"),
+                                          renderer.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
+                                          ceiling_setting=s.get("avr_test_max_volume"))
+                time.sleep(1.0)
+
+            def start():
+                status("Sending the test to the receiver…")
+                play(MEDIA_NAME, "BassBlend full-range test")
+                time.sleep(1.0)
+                o.set_mode("00")
+                status("Playing: a sweep on the left speaker, then the right, then both (about 35 s)…")
+        else:
+            def start():
+                o.set_mode("00")
+                status(f"Press play on the receiver now ({MEDIA_NAME} on your USB stick). Listening…")
+        watcher = SweepWatcher(rec_dev, lambda: None, max_seconds=240.0 if mode != "dlna" else 90.0, lay=lay)
+        rec, t0 = watcher.run(started=start)
+        status("Analysing…")
+    finally:
+        try:
+            if renderer:
+                renderer.stop()
+        except Exception:
+            pass
+        try:
+            if dsp_before == "usb":
+                dsp.batch([dsp.c_source("usb")], "system report done: input back to USB")
+        finally:
+            o.restore(snap)
+            log("avr", f"system report: receiver restored (volume {snap.get('volume')})")
+    r = analyse(rec, t0, cal, s)
+    r.update({"pos": pos, "mode": mode, "level": level,
+              "avr": {k: snap.get(k) for k in ("volume", "sub_level", "input_code", "mode_code")},
+              "tune_id": (load_state().get("result") or {}).get("tune_id")})
+    reports = load_state().get("deep_reports") or {}
+    reports[str(pos)] = r
+    update_state(deep_reports=reports, deep_status={"running": False})
+    n = r["areas"]
+    log("measure", f"system report at spot {pos}: " + ", ".join(f"{v['label']} {v['status']}" for v in n.values()))
+    return r

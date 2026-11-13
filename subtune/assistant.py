@@ -37,7 +37,20 @@ the current tune, and only then propose applying. Save good candidates with save
 app shows an Approve button. Before calling one, say in one sentence what it will do and why. If \
 they decline, accept it and offer an alternative.
 - A measurement needs the mic in place: ask the owner where the mic is when it matters.
-- Never try to raise the receiver volume; you can't, and loud sweeps must stay the owner's choice.
+- You can't raise the receiver volume directly. Tests through the receiver (run_system_report, and \
+run_avr_blend with auto_volume) can set it themselves: soft pink noise first, then the volume is stepped \
+until the mic reads the owner's test level (75 dB C by default), never above their "max volume for \
+tests" (default: their volume + 12, never above 70), stopping if the mic overloads, and the original \
+volume is put back afterwards. Mention this when you propose such a test.
+- System report (run_system_report / get_system_report): a full-range check of the front left and \
+right speakers plus the subs, 20 Hz-20 kHz: response vs the target per range (deep bass, bass, low \
+mids, mids, upper mids, highs), peaks and dips classified (room resonance, wall cancellation, \
+reflection), left/right level, timing (seat centring) and polarity (a speaker wired backwards), \
+RT60 per octave, early reflections, distortion, noise and hum, bass extension. Explain findings in \
+plain words, most important first; separate what EQ/Dirac can fix (peaks) from what needs placement \
+(dips/cancellations), and what the owner must do by hand (wiring, receiver menu, furnishings). High \
+frequencies depend on exact mic position: suggest confirming at a second spot before acting on them. \
+It does not cover the centre, surrounds or heights yet.
 - Be honest about trade-offs and uncertainty; quote the numbers tools return.
 - Auto-tune and moving the mic are guided by on-screen prompts; after starting it, tell the owner \
 to follow the prompts on the main screen.
@@ -114,15 +127,26 @@ TOOLS = [
                   "BD/DVD, '12' TV, '2B' NET; mode: '00' Stereo, '01' Direct, '0C' All Ch Stereo, '80' Dolby "
                   "Surround, '82' DTS:X/Neural:X; sub_level: dB e.g. '-12.5'"}},
        ["action", "value"], approval=True),
+    _t("get_system_report", "The latest full-range system report (or the one for a spot): findings with "
+       "status (fix / watch / good), per-range levels vs target, left/right match, RT60, reflections, "
+       "distortion, noise. No sound.", {"pos": {"type": "integer", "description": "spot; 0 = latest"}}, ["pos"]),
+    _t("run_system_report", "Full-range test through the receiver: a 20 Hz-20 kHz sweep on the left speaker, "
+       "the right, then both (about a minute), then the report. With auto_volume the receiver volume is set "
+       "first with soft pink noise and put back afterwards.",
+       {"pos": SPOT, "mode": {"type": "string", "enum": ["dlna", "manual"],
+                              "description": "dlna = automatic over the network; manual = owner plays a file from USB"},
+        "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (dlna only)"}},
+       ["pos", "mode", "auto_volume"], approval=True),
     _t("run_avr_blend", "Measure through the receiver: left speaker alone, then with subs; finds the sub "
-       "timing/polarity and level that blend best with the speakers. Plays two sweeps through the receiver "
-       "at its current volume.",
+       "timing/polarity and level that blend best with the speakers. Plays sweeps through the receiver; "
+       "with auto_volume it first sets the volume to the test level (and puts it back after).",
        {"pos": SPOT, "mode": {"type": "string", "enum": ["dlna", "manual"],
                               "description": "dlna = automatic over the network; manual = owner plays a file from USB"},
         "speakers": {"type": "string", "enum": ["left", "both"],
                      "description": "left = left speaker only (about 30 s); both = left then right (about 40 s), "
-                                    "so the blend is balanced for both front speakers. Prefer both."}},
-       ["pos", "mode", "speakers"], approval=True),
+                                    "so the blend is balanced for both front speakers. Prefer both."},
+        "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (dlna only)"}},
+       ["pos", "mode", "speakers", "auto_volume"], approval=True),
     _t("apply_avr_blend", "Bake the blend fix (sub delay, polarity, optional all-pass) into a new saved tune "
        "on the playing slot. Uses the all-seats answer when seats were measured with the playing tune, "
        "otherwise the latest single blend test.", approval=True),
@@ -155,7 +179,11 @@ DESCRIBE = {
     "avr_control": lambda i: f"Receiver: {i['action'].replace('_', ' ')} → {i['value']}",
     "run_avr_blend": lambda i: (f"Blend test through the receiver at spot {i['pos']}, "
                                 + ("left + right speakers" if i.get("speakers") == "both" else "left speaker")
-                                + (" (network)" if i["mode"] == "dlna" else " (USB stick)")),
+                                + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
+                                + (", volume set automatically" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+    "run_system_report": lambda i: (f"Full-range system report at spot {i['pos']}: sweeps on the left, right and both "
+                                    "front speakers" + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
+                                    + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
     "apply_avr_blend": lambda i: "Apply the blend fix (all measured seats, if any) as a new tune on the playing slot",
 }
 
@@ -311,6 +339,7 @@ def _brief(name, inp, out):
              "level_match": "Compared sub levels", "test_tone": "Played a test tone",
              "start_autotune": "Started auto-tune", "avr_status": "Checked the receiver",
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",
+             "get_system_report": "Read the system report", "run_system_report": "Ran the system report",
              "apply_avr_blend": "Applied the blend fix"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):

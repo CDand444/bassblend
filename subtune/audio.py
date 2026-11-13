@@ -59,11 +59,21 @@ def pick_device(devices, apis, name: str, hostapi: str, kind: str, platform: str
     return None
 
 
-def find_device(name: str, hostapi: str, kind: str) -> int:
-    """The `kind` ("input"/"output") device whose name contains `name`."""
+def find_device(name: str, hostapi: str, kind: str, wait: float = 0.0) -> int:
+    """The `kind` ("input"/"output") device whose name contains `name`.
+
+    wait: keep looking this many seconds. On Linux a device another program has
+    open (the dashboard's level meter letting go of the mic) is left out of the
+    list until it is free, so measurements give it a moment."""
     import sys
-    apis = [h["name"] for h in sd.query_hostapis()]
-    i = pick_device(list(sd.query_devices()), apis, name, hostapi, kind, sys.platform)
+    deadline = time.time() + wait
+    while True:
+        apis = [h["name"] for h in sd.query_hostapis()]
+        i = pick_device(list(sd.query_devices()), apis, name, hostapi, kind, sys.platform)
+        if i is not None or time.time() >= deadline:
+            break
+        time.sleep(0.5)
+        sd._terminate(); sd._initialize()          # PortAudio only lists devices when it starts
     if i is None:
         raise RuntimeError(f"audio {kind} device containing {name!r} not found. Is it plugged in? "
                            f"(looked in: {', '.join(apis) or 'no audio systems'})")
@@ -97,8 +107,12 @@ def playrec(signal: np.ndarray, play_dev: int, rec_dev: int,
     rec, pos = [], [0]
     done = threading.Event()
 
+    from .splmeter import LevelTap
+    tap = LevelTap(fs)                         # the dashboard's level meter reads along
+
     def in_cb(indata, frames, t, status):
         rec.append(indata[:, 0].copy())
+        tap.feed(indata[:, 0])
 
     def out_cb(outdata, frames, t, status):
         p = pos[0]
@@ -121,14 +135,17 @@ def playrec(signal: np.ndarray, play_dev: int, rec_dev: int,
             except Exception as e:      # surfaced after the run
                 errors.append(e)
 
-    with sd.InputStream(device=rec_dev, channels=1, samplerate=fs, callback=in_cb, dtype="float32"):
-        time.sleep(0.2)
-        with sd.OutputStream(device=play_dev, channels=2, samplerate=fs, callback=out_cb, dtype="float32"):
-            th = threading.Thread(target=cue_worker, daemon=True)
-            th.start()
-            done.wait(timeout=len(signal) / fs + 10)
-            time.sleep(0.3)
-        th.join(timeout=5)
+    try:
+        with sd.InputStream(device=rec_dev, channels=1, samplerate=fs, callback=in_cb, dtype="float32"):
+            time.sleep(0.2)
+            with sd.OutputStream(device=play_dev, channels=2, samplerate=fs, callback=out_cb, dtype="float32"):
+                th = threading.Thread(target=cue_worker, daemon=True)
+                th.start()
+                done.wait(timeout=len(signal) / fs + 10)
+                time.sleep(0.3)
+            th.join(timeout=5)
+    finally:
+        tap.close()
     if errors:
         raise errors[0]
     return np.concatenate(rec)

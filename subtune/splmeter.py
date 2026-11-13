@@ -12,7 +12,9 @@ import time
 import numpy as np
 from scipy.signal import bilinear_zpk, butter, freqz_zpk, sosfilt, sosfilt_zi, zpk2sos
 
-from .config import AUDIO_FS as FS, load_settings
+from .config import AUDIO_FS as FS, DATA, load_settings
+
+LIVE_FILE = DATA / "spl_live.json"        # levels from a test in progress (it owns the mic)
 
 
 def c_weighting_sos(fs=FS):
@@ -101,7 +103,105 @@ class SPLMeter:
                 self.stop()
 
     def read(self):
+        """The meter's own reading, or, while a test has the mic, the test's live levels."""
         self.last_poll = time.time()
+        if not self.running:
+            live = read_live()
+            if live:
+                return {"running": True, "source": "test", "reading": live["reading"], "max_c": live["max_c"],
+                        "history": live["history"], "calibrated": live["calibrated"], "error": None}
+        return self._own()
+
+    def _own(self):
         return {"running": self.running, "reading": self.reading if self.running else None,
                 "max_c": None if self.max_c is None else round(self.max_c, 1),
-                "history": self.history, "calibrated": getattr(self, "calibrated", False), "error": self.error}
+                "history": self.history, "calibrated": getattr(self, "calibrated", False), "error": self.error,
+                "source": "meter"}
+
+
+def _offset():
+    """dBFS -> dB SPL for the UMIK-1 with its calibration file (as the meter does)."""
+    try:
+        from . import audio
+        s = load_settings()
+        cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
+    except Exception:
+        cal = None
+    return 94.0 + 18.0 - (cal[2] if cal else 0.0), cal is not None
+
+
+class LevelTap:
+    """Sound level from a recording in progress, so the dashboard's meter keeps
+    reading while a test sweep or tone has the mic. Fed from the recording's
+    audio callback; a small thread writes the latest level to spl_live.json.
+    It never raises: a level meter must not break a measurement."""
+
+    BLOCK = 0.25
+
+    def __init__(self, fs=FS):
+        self.ok = True
+        try:
+            self.fs = fs
+            self.off, self.calibrated = _offset()
+            self.sos_c = c_weighting_sos(fs)
+            self.sos_b = butter(4, [20, 120], "bandpass", fs=fs, output="sos")
+            self.zi_c = sosfilt_zi(self.sos_c) * 0
+            self.zi_b = sosfilt_zi(self.sos_b) * 0
+            self.acc_c = self.acc_b = 0.0
+            self.n, self.pk = 0, 0.0
+            self.max_c, self.history, self.reading = None, [], None
+            self.dirty, self.closed = False, False
+            threading.Thread(target=self._writer, daemon=True).start()
+        except Exception:
+            self.ok = False
+
+    def feed(self, x):
+        if not self.ok:
+            return
+        try:
+            x = np.asarray(x, dtype=np.float64).ravel()
+            yc, self.zi_c = sosfilt(self.sos_c, x, zi=self.zi_c)
+            yb, self.zi_b = sosfilt(self.sos_b, x, zi=self.zi_b)
+            self.acc_c += float(np.sum(yc * yc)); self.acc_b += float(np.sum(yb * yb))
+            self.pk = max(self.pk, float(np.max(np.abs(x))) if len(x) else 0.0)
+            self.n += len(x)
+            if self.n >= self.BLOCK * self.fs:
+                db = lambda acc: 20 * np.log10(max(np.sqrt(acc / self.n) * np.sqrt(2), 1e-9)) + self.off
+                c, b = db(self.acc_c), db(self.acc_b)
+                self.max_c = c if self.max_c is None else max(self.max_c, c)
+                self.history = (self.history + [round(c, 1)])[-120:]
+                self.reading = {"c": round(c, 1), "bass": round(b, 1), "clip": self.pk > 0.98, "t": time.time()}
+                self.acc_c = self.acc_b = 0.0
+                self.n, self.pk, self.dirty = 0, 0.0, True
+        except Exception:
+            self.ok = False
+
+    def _writer(self):
+        import json
+        import os
+        while not self.closed:
+            time.sleep(self.BLOCK)
+            if not self.dirty:
+                continue
+            self.dirty = False
+            try:
+                tmp = LIVE_FILE.with_suffix(".tmp")
+                tmp.write_text(json.dumps({"t": time.time(), "reading": self.reading,
+                                           "max_c": None if self.max_c is None else round(self.max_c, 1),
+                                           "history": self.history, "calibrated": self.calibrated}))
+                os.replace(tmp, LIVE_FILE)
+            except Exception:
+                pass
+
+    def close(self):
+        self.closed = True
+
+
+def read_live(max_age: float = 1.5):
+    """The latest level from a test in progress, or None if nothing is recording."""
+    import json
+    try:
+        d = json.loads(LIVE_FILE.read_text())
+    except Exception:
+        return None
+    return d if time.time() - d.get("t", 0) <= max_age and d.get("reading") else None

@@ -20,8 +20,8 @@ class Rig:
     def __init__(self):
         self.s = load_settings()
         self.dsp = MiniDSP(self.s)
-        self.play = audio.find_device(self.s["play_device"], self.s["hostapi"], "output")
-        self.rec = audio.find_device(self.s["rec_device"], self.s["hostapi"], "input")
+        self.play = audio.find_device(self.s["play_device"], self.s["hostapi"], "output", wait=5)
+        self.rec = audio.find_device(self.s["rec_device"], self.s["hostapi"], "input", wait=5)
         self.cal = audio.load_cal(self.s["cal_file"]) if self.s.get("cal_file") else None
         self.subs = list(self.s["subs"])
         self.ref = self.s.get("ref_sub")

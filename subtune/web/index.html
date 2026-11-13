@@ -67,6 +67,18 @@ header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, v
 @keyframes pulse { 50% { opacity: .3; } }
 .grow { flex: 1; }
 @media (max-width: 920px) { .brand span { display: none; } .hbar { gap: 8px; } }
+.spl-pill { border: 0; cursor: pointer; font-variant-numeric: tabular-nums; }
+.spl-pill:hover { color: var(--text-1); }
+.spl-pill b { color: var(--text-1); font-weight: 650; display: inline-block; min-width: 3.4ch; text-align: right; }
+.spl-pill .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); }
+.spl-mini { width: 44px; height: 6px; border-radius: 3px; background: color-mix(in srgb, var(--text-3) 25%, transparent); overflow: hidden; }
+.spl-mini i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 3px; transition: width .3s; }
+.spl-pill.on .dot { background: var(--good); }
+.spl-pill.live { background: color-mix(in srgb, var(--accent) 16%, var(--surface)); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent); }
+.spl-pill.live .dot { background: var(--accent); animation: pulse 1.2s infinite; }
+.spl-pill.clip .spl-mini i { background: var(--bad); }
+.spl-pill.clip b { color: var(--bad); }
+@media (max-width: 560px) { .spl-mini { display: none; } }
 
 /* ---------- layout */
 main { max-width: 1080px; margin: 0 auto; padding: 20px 24px 48px; display: block; }
@@ -290,6 +302,50 @@ a.btn { text-decoration: none; }
 .gstep h4 { margin: 3px 0 8px; font-size: 14.5px; font-weight: 650; }
 .gstep p { margin: 0 0 10px; font-size: 13.5px; color: var(--text-2); max-width: 68ch; }
 .gstep p:last-child { margin-bottom: 0; }
+.dc-controls { gap: 14px 18px; }
+.dc-areas { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; margin-bottom: 16px; }
+@media (max-width: 900px) { .dc-areas { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .dc-areas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.dc-area { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+.dc-area .top { display: flex; align-items: center; gap: 7px; font-weight: 650; font-size: 13px; }
+.dc-area .w { font-size: 12px; color: var(--text-3); margin-top: 3px; }
+.dc-chart { height: 300px; position: relative; }
+.dc-fd { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.dc-fd li { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.dc-fd summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 10px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 11px 14px; }
+.dc-fd summary::-webkit-details-marker { display: none; }
+.dc-fd summary b { font-size: 13.5px; font-weight: 650; }
+.dc-fd summary small { display: block; color: var(--text-2); font-size: 12.5px; margin-top: 2px; }
+.dc-fd .tag { font-size: 11px; color: var(--text-3); white-space: nowrap; }
+.dc-fd .more { padding: 0 14px 12px 34px; font-size: 13px; color: var(--text-2); display: grid; gap: 6px; }
+.dc-fd .more b { color: var(--text-1); font-weight: 600; }
+.dc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; }
+@media (max-width: 760px) { .dc-grid { grid-template-columns: 1fr; } }
+.dc-grid h3, .dc-h { font-size: 13.5px; font-weight: 650; margin: 0 0 4px; }
+.dc-tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.dc-tbl th, .dc-tbl td { padding: 5px 6px; border-bottom: 1px solid var(--grid); text-align: right; }
+.dc-tbl th:first-child, .dc-tbl td:first-child { text-align: left; }
+.dc-tbl th { color: var(--text-3); font-weight: 600; }
+#printRoot { display: none; }
+.pr-head { display: none; }
+@media print {
+  @page { margin: 14mm 12mm; }
+  body.pr { background: #fff !important; }
+  body.pr > *:not(#printRoot) { display: none !important; }
+  body.pr #printRoot { display: block; }
+  #printRoot .card { border: 0; box-shadow: none; padding: 0; background: #fff; }
+  #printRoot .dc-controls, #printRoot .card-h, #printRoot #dcFile, #printRoot .lead, #printRoot #dcSpots, #printRoot .notice { display: none !important; }
+  #printRoot .pr-head { display: block; margin: 0 0 14px; }
+  #printRoot .pr-head h1 { font-size: 20px; margin: 0 0 2px; }
+  #printRoot .pr-head p { margin: 0; font-size: 12px; color: #555; }
+  #printRoot .dc-areas { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  #printRoot .dc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #printRoot .dc-fd li, #printRoot .dc-area, #printRoot .dc-grid > div, #printRoot .dc-chart { break-inside: avoid; }
+  #printRoot .dc-fd summary .tag { white-space: normal; }
+  #printRoot .tip, #printRoot .xh { display: none !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+.dc-gloss dt { font-weight: 650; font-size: 13px; margin-top: 8px; } .dc-gloss dd { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
 .cfg-h { font-size: 13px; font-weight: 650; margin: 16px 0 8px; color: var(--text-1); }
 #cfgCard .cb { margin-bottom: 8px; }
 .chk { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
@@ -556,6 +612,9 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <div class="seg" id="inputSeg" role="radiogroup" aria-label="DSP input" title="What feeds the subs: your AVR (analog) or this PC (USB, used for test sweeps)">
       <button type="button" data-in="avr">AVR</button><button type="button" data-in="usb">USB</button></div>
     <span class="pill" id="micPill" title="">Mic: …</span>
+    <button type="button" class="pill spl-pill" id="splPill" aria-label="Sound level meter">
+      <span class="dot" aria-hidden="true"></span><span id="splPillTxt">SPL –</span>
+      <span class="spl-mini" aria-hidden="true"><i id="splPillBar"></i></span></button>
     <span class="grow"></span>
     <button class="btn danger" id="stopBtn" hidden>Stop</button>
     <button class="btn icon ghost" id="themeBtn" title="Switch light or dark" aria-label="Switch light or dark theme">
@@ -603,6 +662,9 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           </div>
           <label class="f">Mic spots
             <span class="stepper"><button type="button" data-d="-1" aria-label="Fewer">−</button><input id="aSeats" type="number" min="1" max="8" value="5" aria-label="Mic spots"><button type="button" data-d="1" aria-label="More">+</button></span>
+          </label>
+          <label class="f">Tune into
+            <select id="aSlot" aria-describedby="aSlotHint" style="min-width:150px"></select>
           </label>
           <label class="check"><input type="checkbox" id="aChecks" checked> Pre-checks (find subs, set level, test EQ writes)</label>
           <span class="grow"></span>
@@ -695,6 +757,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <div class="seg" id="blendSpk" role="radiogroup">
             <button type="button" data-s="LR" class="on">Left + right</button><button type="button" data-s="L">Left only</button></div></label>
         <label class="f" style="width:130px">Mic at<select id="blendPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label>
+        <label class="cb" style="max-width:230px"><input type="checkbox" id="blendAuto" checked><span>Set the receiver volume for me<small>Steps it to your test level first (System report settings); put back afterwards.</small></span></label>
         <span class="grow"></span>
         <button class="btn primary lg" id="blendRun">Run blend test</button>
       </div>
@@ -724,6 +787,22 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <button class="btn primary lg" id="ckRun">Run check-up</button>
       </div>
       <div id="ckOut" style="margin-top:16px"></div>
+    </section>
+
+    <section class="card" id="deepCard">
+      <div class="card-h"><h2>System report</h2><span class="grow"></span><button class="btn ghost" id="dcPrint" hidden title="Opens the print dialog; choose “Save as PDF” to keep a copy">Print / Save as PDF</button><button class="btn ghost ask" data-ask="Walk me through my latest system report. What matters most, what should I do first, and what can I ignore?">Ask about this</button></div>
+      <p class="lead">A full-range check of your front speakers and subs, the way you listen: a 20 Hz to 20 kHz sweep on the left speaker, the right, then both. About a minute. It finds things that are hard to hear on your own (polarity, timing, reflections, resonances, how long the room rings, distortion, noise) and says what each means and what to do.</p>
+      <div class="tune-controls dc-controls">
+        <label class="f">Mic at<select id="dcPos"></select></label>
+        <label class="f">Playback<select id="dcMode"><option value="dlna">The receiver plays it (network)</option><option value="manual">I'll play it from a USB stick</option></select></label>
+        <label class="cb" style="max-width:260px"><input type="checkbox" id="dcAuto" checked><span>Set the receiver volume for me<small>Pink noise first, then steps the volume to the target level at the mic. Your volume is put back afterwards.</small></span></label>
+        <label class="f">Target level<select id="dcSpl"><option value="70">70 dB (quiet)</option><option value="75">75 dB (standard)</option><option value="80">80 dB (louder)</option></select></label>
+        <label class="f">Max volume<span class="unit" data-u="vol"><input id="dcMax" type="number" min="20" max="70" step="0.5" placeholder="auto" title="The highest receiver volume a test may use. Empty = your current volume + 12 (never above 70)."></span></label>
+        <span class="grow"></span>
+        <button class="btn primary lg" id="dcRun">Run system report</button>
+      </div>
+      <p class="muted small" id="dcFile" style="margin:8px 0 0"></p>
+      <div id="dcOut" style="margin-top:16px"></div>
     </section>
 
     <!-- TOOLS: SPL METER -->
@@ -927,9 +1006,10 @@ function lineChart(el, series, opt = {}) {
   if (opt.band) g += `<rect x="${X(opt.band[0])}" y="${m.t}" width="${X(opt.band[1]) - X(opt.band[0])}" height="${H - m.t - m.b}" fill="var(--band)"/>`;
   const step = ymax - ymin > 40 ? 10 : 5;
   for (let v = ymin; v <= ymax; v += step) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/><text x="${m.l - 8}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="var(--text-3)">${v}</text>`;
-  const ticks = [10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300].filter(f => f >= x0 && f <= x1);
+  const ticks = (opt.ticks || [10, 20, 30, 40, 50, 60, 80, 100, 150, 200, 300]).filter(f => f >= x0 && f <= x1);
+  const fl = f => f >= 1000 ? f / 1000 + 'k' : f;
   ticks.forEach((f, i) => { const last = i === ticks.length - 1;
-    g += `<line x1="${X(f)}" x2="${X(f)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${X(f)}" y="${H - 7}" text-anchor="${last ? 'end' : 'middle'}" font-size="11" fill="var(--text-3)">${f}${last ? ' Hz' : ''}</text>`; });
+    g += `<line x1="${X(f)}" x2="${X(f)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${X(f)}" y="${H - 7}" text-anchor="${last ? 'end' : 'middle'}" font-size="11" fill="var(--text-3)">${fl(f)}${last ? ' Hz' : ''}</text>`; });
   g += `<text x="${m.l - 8}" y="${m.t - 5}" text-anchor="end" font-size="11" fill="var(--text-3)">dB</text>`;
   let lastLbl = -99;                                // skip a marker's label when it would sit on the previous one
   (opt.markers || []).filter(k => k.f >= x0 && k.f <= x1).sort((a, b) => a.f - b.f).forEach(k => {
@@ -948,7 +1028,7 @@ function lineChart(el, series, opt = {}) {
     xh.setAttribute('x1', X(xs[b])); xh.setAttribute('x2', X(xs[b])); xh.style.display = '';
     const dRow = opt.diff ? (() => { const dv = series[opt.diff[0]].y[b] - series[opt.diff[1]].y[b];
       return `<div class="r" style="border-top:1px solid var(--grid);margin-top:4px;padding-top:4px">Actual vs expected<b>${Math.abs(dv) < 0.05 ? 'same' : (dv > 0 ? '+' : '') + dv.toFixed(1) + ' dB'}</b></div>`; })() : '';
-    tip.innerHTML = `<b>${xs[b].toFixed(1)} Hz</b>` + series.filter(s => s.name && isFinite(s.y[b])).map(s => `<div class="r"><span class="sw" style="background:${s.color}"></span>${esc(s.name)}<b>${s.y[b].toFixed(1)} dB</b></div>`).join('') + dRow;
+    tip.innerHTML = `<b>${xs[b] >= 1000 ? (xs[b] / 1000).toFixed(2) + ' kHz' : xs[b].toFixed(1) + ' Hz'}</b>` + series.filter(s => s.name && isFinite(s.y[b])).map(s => `<div class="r"><span class="sw" style="background:${s.color}"></span>${esc(s.name)}<b>${s.y[b].toFixed(1)} dB</b></div>`).join('') + dRow;
     tip.style.display = 'block';
     const tx = X(xs[b]) + 12; tip.style.left = (tx + tip.offsetWidth > W ? X(xs[b]) - tip.offsetWidth - 12 : tx) + 'px'; tip.style.top = '14px';
   });
@@ -1143,6 +1223,7 @@ function renderAuto() {
   $('#tuneIdle').hidden = !!active; $('#tuneRun').hidden = !a || $('#tuneRun').dataset.dismissed === String(a.started);
   $('#aStart').disabled = !!job.running || S.busy || (S.settings || {}).preset == null;
   $('#tuneSub').textContent = a ? ({running: 'Running', waiting: 'Waiting for you', done: 'Finished', stopped: 'Stopped', failed: 'Failed'})[a.status] : `Writes to slot ${((S.settings || {}).preset ?? 3) + 1} only; your original in slot 1 is never touched`;
+  renderSlotPick(!!job.running || S.busy);
   if (!a) { if (!modeInit && S.selftest !== undefined) { modeInit = true; if (+$('#aSeats').value === 3 && !(S.selftest && S.selftest.ok)) { $('#aChecks').checked = true; syncMode(); } } return; }
   $('#aStages').innerHTML = a.stages.map((s, i) => `<li class="${s.status}"><i>${s.status === 'done' ? '✓' : s.status === 'failed' ? '!' : i + 1}</i>${esc(s.label)}</li>`).join('');
   const p = a.prompt, key = p ? p.title + p.actions.join() : '';
@@ -1158,10 +1239,28 @@ function renderAuto() {
   $('#aDone').innerHTML = active ? '' : '<button class="btn" id="aClose">Close</button>';
   const c = $('#aClose'); if (c) c.onclick = () => { $('#tuneRun').dataset.dismissed = String(a.started); $('#tuneRun').hidden = true; $('#tuneIdle').hidden = false; };
 }
+let slotsLoaded = false;
+function renderSlotPick(locked) {
+  const sel = $('#aSlot'), cur = ((S.settings || {}).preset ?? 3) + 1;
+  if (!slotsLoaded) { slotsLoaded = true; loadTunes(); }
+  const key = [cur, locked, JSON.stringify(TUNES.slots)].join('|');
+  if (sel.dataset.key === key) return; sel.dataset.key = key;
+  sel.innerHTML = [2, 3, 4].map(n => `<option value="${n}" ${n === cur ? 'selected' : ''}>Slot ${n} · ${esc(slotLabel(n))}</option>`).join('');
+  sel.disabled = locked;
+  sel.title = 'The miniDSP slot this tune is measured in and written to. Slot 1 is your original setup and is never used.';
+}
+$('#aSlot').onchange = async e => {
+  const r = await post('/api/settings', {slot: +e.target.value});
+  if (r.error) { alert(r.error); }
+  $('#aSlot').dataset.key = ''; poll();
+};
 $('#aStart').onclick = async () => {
-  if (!confirm(`Start auto-tune?\n\nPreset ${(S.settings.preset ?? 3) + 1} is reset to neutral, then test sweeps play through the subs.`)) return;
+  const slot = +$('#aSlot').value || ((S.settings.preset ?? 3) + 1);
+  const held = TUNES.slots[String(slot)];
+  if (!confirm(`Start auto-tune in slot ${slot}?\n\n` + (held ? `Slot ${slot} holds “${held.name}”. It is reset to neutral and replaced by the new tune (it stays saved in Tunes & slots).\n\n` : `Slot ${slot} is reset to neutral, `) +
+               `${held ? 'Then t' : 't'}est sweeps play through the subs.`)) return;
   delete $('#tuneRun').dataset.dismissed;
-  const r = await post('/api/auto/start', {seats: +$('#aSeats').value, checks: $('#aChecks').checked});
+  const r = await post('/api/auto/start', {seats: +$('#aSeats').value, checks: $('#aChecks').checked, slot});
   if (r.error) alert(r.error); poll();
 };
 function syncMode() {
@@ -1752,9 +1851,13 @@ document.querySelectorAll('#blendMode button').forEach(b => b.onclick = () => {
   blendMode = b.dataset.m; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x === b)); blendKey = null; renderBlend();
 });
 $('#blendRun').onclick = async () => {
-  const pos = +$('#blendPos').value;
-  if (!confirm(`Run the blend test at ${spotName(pos)}?\n\nThe receiver ${blendMode === 'dlna' ? 'plays' : 'will play'} ${blendSpk === 'LR' ? 'three sweeps (left speaker, right speaker, then left again with the subs; about 40 seconds)' : 'two sweeps on the left speaker (about 30 seconds)'} at its current volume. Input, mode and power are put back afterwards.`)) return;
-  const r = await post('/api/avr/blend', {mode: blendMode, pos, speakers: blendSpk}); if (r.error) alert(r.error); blendKey = null; poll();
+  const pos = +$('#blendPos').value, auto = $('#blendAuto').checked && blendMode === 'dlna', set = S.settings || {};
+  const tgt = Math.round(set.test_spl || 75), mx = set.avr_test_max_volume;
+  if (!confirm(`Run the blend test at ${spotName(pos)}?\n\n` +
+      (auto ? `First soft pink noise plays while BassBlend steps the receiver volume to ${tgt} dB at the mic (never above ${mx != null ? mx : 'your current volume + 12'}). ` : '') +
+      `The receiver ${blendMode === 'dlna' ? 'plays' : 'will play'} ${blendSpk === 'LR' ? 'three sweeps (left speaker, right speaker, then left again with the subs; about 40 seconds)' : 'two sweeps on the left speaker (about 30 seconds)'}` +
+      `${auto ? '' : ' at its current volume'}. Input, mode, volume and power are put back afterwards.`)) return;
+  const r = await post('/api/avr/blend', {mode: blendMode, pos, speakers: blendSpk, auto_volume: auto}); if (r.error) alert(r.error); blendKey = null; poll();
 };
 setInterval(() => { if (sheetKey === 'avr') loadAvr(); }, 5000);
 
@@ -1903,6 +2006,148 @@ $('#ckRun').onclick = async () => {
   const r = await post('/api/run', {cmd: 'checkup', pos}); if (r.error) alert(r.error); ckKey = null; poll();
 };
 
+// ---------- system report (full range, through the receiver)
+let dcKey = null, dcSel = null, dcInit = false;
+const DC_WORD = {good: 'Good', watch: 'Worth a look', fix: 'Fix this', info: 'For info'};
+const DC_LIGHT = {good: 'good', watch: 'warn', fix: 'bad', info: 'none'};
+function deepLatest() {
+  const all = Object.values(S.deep_reports || {});
+  return all.length ? all.reduce((a, b) => a.t > b.t ? a : b) : null;
+}
+function renderDeep() {
+  const reps = S.deep_reports || {}, ds = S.deep_status || {}, job = S.job || {}, set = S.settings || {};
+  const running = !!ds.running && !!job.running;
+  if (!dcInit) {
+    dcInit = true;
+    $('#dcSpl').value = String(Math.round(set.test_spl || 75));
+    if (set.avr_test_max_volume != null) $('#dcMax').value = set.avr_test_max_volume;
+  }
+  const nSpots = Math.max(3, Object.keys(S.measurements || {}).length);
+  if ($('#dcPos').options.length !== nSpots) $('#dcPos').innerHTML = Array.from({length: nSpots}, (_, i) => `<option value="${i + 1}">${spotName(i + 1)}</option>`).join('');
+  const manual = $('#dcMode').value === 'manual';
+  $('#dcAuto').disabled = manual;
+  $('#dcFile').innerHTML = manual ? 'Copy <a href="/media/bassblend_full_range_test.wav" download>bassblend_full_range_test.wav</a> to a USB stick, plug it into the receiver, press Run, then press play on the receiver.' : '';
+  $('#dcRun').disabled = !!job.running || !!S.busy;
+  $('#dcRun').textContent = running ? 'Running…' : Object.keys(reps).length ? 'Run again' : 'Run system report';
+  const latest = deepLatest();
+  if (dcSel == null || !reps[dcSel]) dcSel = latest ? String(latest.pos) : null;
+  const r = dcSel ? reps[dcSel] : null;
+  $('#dcPrint').hidden = !r || running;
+  const key = [r ? r.t : '', running, ds.text, ds.error, dcSel, Object.keys(reps).join()].join('|');
+  if (key === dcKey) { if (r && !$('#dcChart svg')) drawDeepChart(r); return; }
+  dcKey = key;
+  let h = '';
+  if (running) h += `<div class="notice"><span class="spin"></span>&nbsp; ${esc(ds.text || 'Working')}</div>`;
+  else if (ds.error) h += `<div class="notice bad">The last run stopped: ${esc(ds.error)}</div>`;
+  if (!r) { $('#dcOut').innerHTML = h + (running ? '' : empty('No system report yet', 'Put the mic at your seat at ear height, pointing up, then press Run system report.')); return; }
+  if (Object.keys(reps).length > 1) h += `<div class="seg" id="dcSpots" style="margin-bottom:12px"></div>`;
+  h += `<div class="dc-areas">${Object.entries(r.areas).map(([k, a]) => `<div class="dc-area"><div class="top"><span class="light ${DC_LIGHT[a.status]}"></span>${esc(a.label)}</div>
+    <div class="w">${a.fix ? a.fix + ' to fix' : a.watch ? a.watch + ' to look at' : a.status === 'info' ? 'not measured' : 'All good'}</div></div>`).join('')}</div>`;
+  const lv = r.level;
+  h += `<h3 class="dc-h">Frequency response</h3><p class="hint muted small" style="margin:0 0 6px">How loud each pitch arrives at your seat, against your target (dashed). The midrange is set to 0 dB so the shapes compare. Dotted lines split the ranges in the table below (deep bass, bass, low mids, mids, upper mids, highs). Above about 5 kHz the exact mic position matters a lot.</p>
+    <div class="legend" id="dcLegend"></div><div class="chart dc-chart" id="dcChart"></div>`;
+  const fs = r.findings, order = ['fix', 'watch', 'info', 'good'];
+  h += `<h3 class="dc-h" style="margin-top:18px">What we found</h3><ul class="dc-fd">${order.flatMap(st => fs.filter(x => x.status === st)).map(x => `<li><details>
+    <summary><span class="light ${DC_LIGHT[x.status]}"></span><span><b>${esc(x.title)}</b><small>${esc(x.found)}</small></span><span class="tag">${esc((r.areas[x.area] || {}).label || '')} · ${DC_WORD[x.status]}</span></summary>
+    ${x.why || x.todo ? `<div class="more">${x.why ? `<div><b>Why it matters:</b> ${esc(x.why)}</div>` : ''}${x.todo ? `<div><b>What you can do:</b> ${esc(x.todo)}</div>` : ''}</div>` : ''}</details></li>`).join('')}</ul>`;
+  // details
+  const bandRow = b => { const c = v => `${v.vs_target_db > 0 ? '+' : ''}${v.vs_target_db.toFixed(1)}`;
+    return `<tr><td>${esc(b.label)} <span class="muted">${b.lo >= 1000 ? b.lo / 1000 + 'k' : b.lo}–${b.hi >= 1000 ? b.hi / 1000 + 'k' : b.hi}</span></td><td>${c(b.left)}</td><td>${c(b.right)}</td><td>${c(b.both)}</td><td>±${(b.avg || b.both).rough_db.toFixed(1)}</td></tr>`; };
+  const rtLim = f => f <= 125 ? 0.6 : 0.5;
+  const rt = r.decay.map(d => `<span class="lab">${d.f >= 1000 ? d.f / 1000 + 'k' : d.f}</span><div class="track"><div class="fill ${d.t60 == null ? 'none' : d.t60 <= rtLim(d.f) * 0.8 ? 'good' : d.t60 <= rtLim(d.f) * 1.3 ? 'warn' : 'bad'}" style="width:${d.t60 == null ? 2 : Math.max(2, Math.min(100, d.t60 / 1.2 * 100))}%"></div><div class="mark" style="left:${rtLim(d.f) / 1.2 * 100}%"></div></div><span class="v">${d.t60 == null ? '–' : d.t60.toFixed(2) + ' s'}</span>`).join('');
+  const refl = (r.reflections.left || []).slice(0, 5);
+  const thd = r.thd.map(d => `<tr><td>${d.f >= 1000 ? d.f / 1000 + ' kHz' : d.f + ' Hz'}</td><td>${d.below_noise ? '<span class="muted">too low</span>' : (d.pct < 0.1 ? '<0.1' : d.pct.toFixed(1)) + ' %'}</td><td>${d.below_noise ? '' : d.h2.toFixed(1)}</td><td>${d.below_noise ? '' : d.h3.toFixed(1)}</td></tr>`).join('');
+  const lr = r.lr, n = r.noise;
+  h += `<div class="dc-grid">
+    <div><h3>By range, vs your target (dB)</h3><p class="hint muted small" style="margin:0 0 6px">Positive = louder than the target. The last column is how bumpy that range is.</p>
+      <div class="tw"><table class="dc-tbl"><thead><tr><th>Range (Hz)</th><th>Left</th><th>Right</th><th>Both</th><th>Bumpiness</th></tr></thead><tbody>${r.bands.map(bandRow).join('')}</tbody></table></div></div>
+    <div><h3>How long the room rings (RT60)</h3><p class="hint muted small" style="margin:0 0 6px">Time for sound to fade by 60 dB. Home theatres sound best around 0.2–0.4 s; the small line marks the upper limit.</p><div class="bars">${rt}</div></div>
+    <div><h3>Left vs right</h3><table class="dc-tbl"><tbody>
+      <tr><td>Level difference (left − right)</td><td>${lr.level_db > 0 ? '+' : ''}${lr.level_db.toFixed(1)} dB</td></tr>
+      <tr><td>Arrival difference</td><td>${lr.timing_ms > 0 ? '+' : ''}${lr.timing_ms.toFixed(2)} ms (${Math.abs(lr.timing_cm).toFixed(0)} cm)</td></tr>
+      <tr><td>Polarity</td><td>${lr.polarity === 'same' ? 'Same' : lr.polarity === 'reversed' ? '<b style="color:var(--bad)">Reversed</b>' : 'Unclear'} <span class="muted">(${lr.polarity_corr.toFixed(2)})</span></td></tr>
+      <tr><td>Treble difference</td><td>±${lr.tone_spread_db.toFixed(1)} dB</td></tr>
+      <tr><td>Both together in the bass</td><td>${lr.both_gain_bass_db > 0 ? '+' : ''}${lr.both_gain_bass_db.toFixed(1)} dB <span class="muted">(ideal about +6)</span></td></tr>
+      <tr><td>Plays down to (−6 dB)</td><td>${r.bass_extension_hz.toFixed(0)} Hz</td></tr></tbody></table></div>
+    <div><h3>Early reflections (left speaker)</h3><p class="hint muted small" style="margin:0 0 6px">Sound bouncing off a nearby surface, arriving just after the direct sound. Within 6 dB of the direct sound and under 6 ms is strong.</p>
+      ${refl.length ? `<table class="dc-tbl"><thead><tr><th>After</th><th>Level</th><th>Extra path</th></tr></thead><tbody>${refl.map(x => `<tr><td>${x.ms.toFixed(1)} ms</td><td>${x.db.toFixed(0)} dB</td><td>${x.extra_cm} cm</td></tr>`).join('')}</tbody></table>` : '<p class="muted small">None strong enough to list.</p>'}</div>
+    <div><h3>Distortion</h3><p class="hint muted small" style="margin:0 0 6px">At this test level. 2nd harmonic sounds warm, 3rd sounds harsh. Under 1% in the mids is clean.</p>
+      <table class="dc-tbl"><thead><tr><th>At</th><th>Total</th><th>2nd %</th><th>3rd %</th></tr></thead><tbody>${thd}</tbody></table></div>
+    <div><h3>Background noise</h3>${n ? `<p class="hint muted small" style="margin:0 0 6px">Measured in the second before the test. Overall ${n.overall.toFixed(0)} dB, bass ${n.bass.toFixed(0)} dB${n.hum_hz ? `, <b>hum at ${n.hum_hz} Hz</b>` : ''}.</p>
+      <table class="dc-tbl"><thead><tr><th>Octave</th>${n.octaves.map(o => `<th>${o.f >= 1000 ? o.f / 1000 + 'k' : o.f}</th>`).join('')}</tr></thead><tbody><tr><td>dB</td>${n.octaves.map(o => `<td>${o.spl.toFixed(0)}</td>`).join('')}</tr></tbody></table>` : '<p class="muted small">Not enough quiet time before the test to measure it.</p>'}</div>
+  </div>`;
+  h += `<p class="muted small" style="margin:16px 0 0">${spotName(r.pos)} · ${new Date(r.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} · ` +
+    (lv ? `volume set automatically: ${lv.start} → ${lv.volume} (${lv.spl.toFixed(0)} dB at the mic${lv.reached ? '' : `, target ${lv.target} not reached under the max of ${lv.ceiling}`}), back to ${lv.start} afterwards` :
+      `receiver volume ${r.avr && r.avr.volume != null ? r.avr.volume : '?'}`) +
+    `. Covers the front left and right speakers and the subs; centre, surrounds and heights aren't in this test yet.</p>
+  <details style="margin-top:12px" class="dc-gloss"><summary class="muted small" style="cursor:pointer">What these words mean</summary><dl>
+    <dt>Room resonance (mode)</dt><dd>A pitch where sound bouncing between walls reinforces itself: those bass notes are louder and ring longer. EQ fixes peaks well.</dd>
+    <dt>Cancellation (null, dip)</dt><dd>Sound arriving by two paths cancels at your seat. EQ can't fill it; moving the seat, subs or speakers can.</dd>
+    <dt>Polarity</dt><dd>Whether a speaker cone pushes or pulls on the same signal. Both fronts must match or bass and the centre image suffer.</dd>
+    <dt>Early reflection</dt><dd>A bounce off a nearby surface (floor, table, side wall) arriving a few milliseconds after the direct sound. Strong ones blur the image.</dd>
+    <dt>RT60</dt><dd>How long a sound takes to fade by 60 dB. Too long: echoey and boomy. Too short: dead and closed-in.</dd>
+    <dt>Distortion (THD)</dt><dd>Extra tones the system adds that weren't in the signal. Rattles and straining drivers show up here.</dd>
+    <dt>Target curve</dt><dd>The tonal balance you're aiming for: BassBlend's bass lift plus your chosen treble. It's the dashed line.</dd>
+    <dt>Signal-to-noise</dt><dd>How far the test was above the room's background noise. Below 15 dB, that part of the result isn't trustworthy.</dd></dl></details>`;
+  $('#dcOut').innerHTML = h;
+  if ($('#dcSpots')) tabs($('#dcSpots'), Object.keys(reps).sort(), dcSel, k => spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
+  drawDeepChart(r);
+}
+function drawDeepChart(r) {
+  const el = $('#dcChart'); if (!el) return;
+  const cl = y => y.map(v => Math.max(v, -30));             // a deep null shouldn't squash the whole chart
+  const series = [
+    {name: 'Left', y: cl(r.curves.left), color: css('--s1'), w: 1.5, op: .85},
+    {name: 'Right', y: cl(r.curves.right), color: css('--s2'), w: 1.5, op: .85},
+    {name: 'Both', y: cl(r.curves.both), color: css('--text'), w: 2.2},
+    {name: 'Target', y: r.target, color: css('--text-3'), dash: true, w: 1.5}];
+  legend($('#dcLegend'), [{name: 'Left', color: css('--s1')}, {name: 'Right', color: css('--s2')}, {name: 'Both', color: css('--text'), thick: true}, {name: 'Your target', color: css('--text-3'), dash: true}]);
+  lineChart(el, series, {x: r.grid, xmin: 20, xmax: 16000, ticks: el.clientWidth < 520 ? [20, 100, 1000, 10000] : [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000], aria: 'Full-range frequency response',
+    markers: [40, 120, 500, 2000, 6000].map(f => ({f, label: ''}))});
+}
+$('#dcMode').onchange = () => { dcKey = null; renderDeep(); };
+// Print / Save as PDF: the report alone, light theme, every finding opened, chart drawn at page width
+$('#dcPrint').onclick = () => {
+  const r = dcSel ? (S.deep_reports || {})[dcSel] : null; if (!r) return;
+  const card = $('#deepCard'), home = card.parentNode, next = card.nextSibling;
+  let root = $('#printRoot');
+  if (!root) { root = document.createElement('div'); root.id = 'printRoot'; document.body.appendChild(root); }
+  const theme = document.documentElement.dataset.theme;
+  const sy = S.system || {}, set = S.settings || {};
+  const head = document.createElement('div'); head.className = 'pr-head';
+  head.innerHTML = `<h1>BassBlend system report</h1><p>${esc(spotName(r.pos))} · ${new Date(r.t * 1000).toLocaleString([], {dateStyle: 'long', timeStyle: 'short'})}` +
+    `${sy.label ? ' · ' + esc(sy.label) : ''}${set.avr_model ? '' : ''} · target: +${set.house_db ?? 0} dB bass lift below ${set.house_fc ?? 45} Hz</p>`;
+  document.documentElement.dataset.theme = 'light';
+  const ch = $('#dcChart'); ch.style.width = '680px'; drawDeepChart(r);   // draw at page width while it can be measured
+  root.appendChild(head); root.appendChild(card);
+  document.body.classList.add('pr');
+  const opened = [...card.querySelectorAll('details:not([open])')]; opened.forEach(d => d.open = true);
+  const done = () => {
+    window.removeEventListener('afterprint', done);
+    opened.forEach(d => d.open = false);
+    ch.style.width = '';
+    document.body.classList.remove('pr');
+    head.remove(); home.insertBefore(card, next);
+    if (theme) document.documentElement.dataset.theme = theme; else delete document.documentElement.dataset.theme;
+    drawDeepChart(r); render();
+  };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => window.print(), 50);
+};
+$('#dcRun').onclick = async () => {
+  const pos = +$('#dcPos').value, mode = $('#dcMode').value, auto = $('#dcAuto').checked && mode === 'dlna';
+  const tgt = +$('#dcSpl').value, mx = $('#dcMax').value.trim();
+  const set = {test_spl: tgt}; if (mx !== '') set.avr_test_max_volume = +mx;
+  const sr = await post('/api/settings', set); if (sr.error) { alert(sr.error); return; }
+  if (!confirm(`Run the system report at ${spotName(pos)}?\n\n` +
+      (auto ? `First soft pink noise plays while BassBlend steps the receiver volume until it reads ${tgt} dB at the mic` +
+              ` (never above ${mx !== '' ? mx : 'your current volume + 12'}). ` : 'The receiver stays at its current volume. ') +
+      `Then three 8-second sweeps play: left speaker, right speaker, both (about a minute in all).\n\n` +
+      `Your input, listening mode and volume are put back afterwards. Keep the mic at ear height, and the room quiet.`)) return;
+  const r = await post('/api/deepcheck', {pos, mode, auto_volume: auto});
+  if (r.error) alert(r.error); dcKey = null; poll();
+};
+
 // ---------- tools: sub level match
 let lmKey = null;
 function renderLevelMatch() {
@@ -1953,8 +2198,10 @@ function splStart() { if (!splTimer) splTimer = setInterval(splPoll, 500); }
 async function splStop() { if (splState.running) { splState = await post('/api/spl', {action: 'stop'}); } clearInterval(splTimer); splTimer = null; renderSpl(); }
 function renderSpl() {
   const s = splState, r = s.reading;
-  $('#splToggle').textContent = s.running ? 'Stop meter' : 'Start meter';
+  const fromTest = s.running && s.source === 'test';
+  $('#splToggle').textContent = fromTest ? 'Reading from the test' : s.running ? 'Stop meter' : 'Start meter';
   $('#splToggle').classList.toggle('primary', !s.running);
+  $('#splToggle').disabled = fromTest;
   $('#splBig').textContent = s.running && r ? r.c.toFixed(1) : '––';
   $('#splBig').classList.toggle('clip', !!(r && r.clip));
   $('#splBass').textContent = s.running && r ? r.bass.toFixed(1) + ' dB' : '––';
@@ -1974,7 +2221,39 @@ function renderSpl() {
     $('#splSpark').innerHTML = `<svg viewBox="0 0 ${W} ${H}">${near ? `<line x1="0" x2="${W}" y1="${Y(tgt)}" y2="${Y(tgt)}" stroke="var(--good)" stroke-dasharray="3 4" opacity=".7"/>` : ''}<path d="${hst.map((v, i) => (i ? 'L' : 'M') + X(i + 120 - hst.length).toFixed(1) + ',' + Y(v).toFixed(1)).join('')}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/></svg>`;
   } else $('#splSpark').innerHTML = '';
 }
+// SPL in the header: always on while the dashboard is open, and fed by the test itself
+// while a sweep or tone has the mic (the meter can't open the mic then).
+let splUserOff = false, splRetry = 0, splTicking = false;
+async function splTopTick() {
+  if (document.hidden || splTicking) return;
+  splTicking = true;
+  try {
+    try { splState = await fetch('/api/spl').then(r => r.json()); } catch (e) { return; }
+    const busy = !!(S.job || {}).running || !!S.busy;
+    if (!splState.running && !splUserOff && !busy && Date.now() > splRetry) {
+      const r = await post('/api/spl', {action: 'start'});
+      if (r.error) splRetry = Date.now() + 15000; else splState = r;
+    }
+    renderSplPill();
+    if (sheetKey === 'spl') renderSpl();
+  } finally { splTicking = false; }
+}
+function renderSplPill() {
+  const s = splState, r = s.running ? s.reading : null, test = s.source === 'test', p = $('#splPill');
+  p.classList.toggle('live', !!(test && r)); p.classList.toggle('on', !!(r && !test)); p.classList.toggle('clip', !!(r && r.clip));
+  $('#splPillTxt').innerHTML = r ? `${test ? '<span class="lbl">Test</span> ' : ''}<b>${r.c.toFixed(1)}</b> dBC`
+    : splUserOff ? 'SPL off' : 'SPL –';
+  $('#splPillBar').style.width = r ? Math.max(2, Math.min(100, (r.c - 40) / 75 * 100)).toFixed(0) + '%' : '0';
+  p.title = r ? `Sound level at the mic: ${r.c.toFixed(1)} dB (C-weighted), bass ${r.bass.toFixed(1)} dB` +
+      (s.max_c != null ? `, peak ${s.max_c.toFixed(1)} dB` : '') + (test ? ', live from the running test' : '') +
+      (r.clip ? '. TOO LOUD for the mic' : '') + '. Click for the full meter.'
+    : splUserOff ? 'Sound level meter is off. Click to open it.' : 'Sound level meter: waiting for the mic. Click to open it.';
+}
+$('#splPill').onclick = () => openSheet('spl');
+setInterval(splTopTick, 700);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) splTopTick(); });
 $('#splToggle').onclick = async () => {
+  splUserOff = !!splState.running && splState.source !== 'test';
   if (splState.running) return splStop();
   const r = await post('/api/spl', {action: 'start'});
   if (r.error) { alert(r.error); return; }
@@ -2320,6 +2599,7 @@ const IC = {
   avr: '<rect x="1.5" y="4.5" width="13" height="7" rx="1"/><circle cx="11.2" cy="8" r="1.6"/><path d="M3.5 8h4"/>',
   chat: '<path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/>',
   checkup: '<path d="M1 8.5h3l2-4.5 3 8 2-3.5h4"/>',
+  report: '<path d="M2 13.5V2.5M2 13.5h12"/><path d="M4 10.5c2-1 2.5-6 4.5-6s2.5 5 5.5 4"/>',
   spl: '<path d="M2.5 11.5a5.5 5.5 0 1 1 11 0"/><path d="M8 11.5l3-3.5"/>',
   match: '<path d="M3 14V8M8 14V3M13 14V6"/>',
   room: '<path d="M2 7.5L8 2.5l6 5V14H2z"/><path d="M6.5 14v-4h3v4"/>',
@@ -2342,6 +2622,8 @@ try {   // first visit: count only errors from now on, not old history
 const MENU = [
   {grp: 'Tune', key: 'tunes', icon: 'tunes', title: 'Tunes & slots', full: 'Saved tunes & DSP slots', el: $('#tunesCard'),
    tag: () => liveMaster ? [`slot ${liveMaster.preset + 1}`, ''] : null},
+  {grp: 'Measure', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
+   tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
   {grp: 'Measure', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
      const bad = Object.values(c.verdicts).filter(v => v.status !== 'good').length; return bad ? [String(bad), 'alert'] : ['✓', '']; }},
@@ -2418,7 +2700,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCheckup(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     if (sheetKey && !$('#sheetNav').contains(document.activeElement)) renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);

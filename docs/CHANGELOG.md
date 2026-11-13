@@ -1,5 +1,29 @@
 # BassBlend changelog
 
+## Nov 13, 2026 — system report, automatic receiver volume, header SPL meter, target slot
+
+- **System report** (menu → Measure): a 20 Hz-20 kHz sweep on the left speaker, the right, then
+  both, through the receiver in Stereo with the subs on. Plain-language findings with why they
+  matter and what to do: tone per range vs the target, peaks and dips classified (room
+  resonance, wall cancellation with distance, reflection ripple), left/right level, timing (seat
+  centring) and polarity (a speaker wired backwards), RT60 per octave, early reflections,
+  distortion, noise and hum, measurement reliability, bass extension. Chart, detail tables,
+  glossary, **Print / Save as PDF**. The assistant can read and run it. Front L/R and subs only.
+- **Automatic receiver volume** for the system report and the blend test: pink noise, then the
+  volume steps (at most 3 at a time) to the test level at the mic (75 dB C default), never above
+  the max you set (default: your volume + 12, never above 70), turning down and stopping if the
+  mic overloads; your volume, input and mode are put back afterwards.
+- **Receiver restore fix**: the before-test snapshot now retries and refuses to start a test
+  without knowing the volume and input (a slow reply had left the receiver at the test volume);
+  a receiver that was in standby gets its volume back before going back to standby.
+- **SPL meter in the header**: always on while the dashboard is open, fed by the test itself
+  while sweeps or tones play ("TEST"); the mic is reserved for the whole job, and measurements
+  wait up to 5 s for it (on the Pi only one program can hold the mic).
+- **Tune into slot 2, 3 or 4**: auto-tune's whole run (reset, sweeps, apply, verify) uses the
+  chosen slot; slot 1 can't be picked.
+- Tests: `test_deepcheck.py` (12, synthetic room with planted problems), `test_slot.py`,
+  `test_spl_tap.py`.
+
 ## Nov 13, 2026 — settings file and over-the-air updates
 
 - **Settings file**: menu → Settings file saves room, speaker layout, subs, receiver, mic

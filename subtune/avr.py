@@ -223,14 +223,27 @@ class Onkyo:
         self.send("SWL", half_db_to_signed(db) if db else "00")
 
     # ---- snapshot / restore around a measurement
-    def snapshot(self):
-        st = self.status()
-        return {k: st.get(k) for k in ("power", "volume", "mute", "input_code", "mode_code", "sub_level")}
+    def snapshot(self, tries=4):
+        """The settings a test must put back. Retries: a busy receiver sometimes doesn't
+        answer in time, and a test must never start without knowing what to restore."""
+        keys = ("power", "volume", "mute", "input_code", "mode_code", "sub_level")
+        for i in range(tries):
+            st = self.status()
+            snap = {k: st.get(k) for k in keys}
+            if snap["power"] is False:                     # standby: nothing else to read yet
+                return snap
+            if snap["power"] and snap["volume"] is not None and snap["input_code"]:
+                return snap
+            time.sleep(1.0 + i)
+        raise RuntimeError("couldn't read the receiver's current volume and input, so the test didn't start "
+                           "(nothing was changed). Check the receiver is on the network and try again.")
 
     def restore(self, snap):
+        """Put back input, mode, volume and mute; then standby if it was in standby
+        (the receiver remembers its volume, so that is restored first)."""
         if not snap:
             return
-        if snap.get("power") is False:
+        if snap.get("power") is False and snap.get("volume") is None:
             self.power(False)
             return
         if snap.get("input_code"):
@@ -241,6 +254,9 @@ class Onkyo:
         if snap.get("volume") is not None:
             self.send("MVL", display_to_vol(snap["volume"]))      # back to exactly where it was
         self.send("AMT", "01" if snap.get("mute") else "00")
+        if snap.get("power") is False:
+            time.sleep(0.5)
+            self.power(False)
 
 
 # ------------------------------------------------------------- DLNA playback

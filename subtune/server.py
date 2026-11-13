@@ -33,7 +33,8 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "global_peq_bands": (int, 0, 8), "sub_peq_bands": (int, 0, 3),
             "mlp_weight": (float, 1, 4), "nearfield_max_cut_db": (float, 0, 12),
             "nearfield_max_boost_db": (float, 0, 6), "nearfield_max_eq_cut_db": (float, 1, 10),
-            "nearfield_min_q": (float, 0.5, 6)}
+            "nearfield_min_q": (float, 0.5, 6),
+            "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70)}
 
 
 def _cmd_args(cmd, params=None):
@@ -154,8 +155,25 @@ class Runner:
         update_state(avr_blend_status={"running": True, "text": "Starting…", "mode": mode})
         spk = "LR" if body.get("speakers") in ("LR", "both") else "L"
         args = [sys.executable, "-m", "subtune", "avrblend", "--mode", mode, "--pos", str(pos), "--speakers", spk]
+        if not body.get("auto_volume") or mode != "dlna":
+            args.append("--no-auto-volume")
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = f"avr blend ({mode})"
+        return self.cmd
+
+    def start_deepcheck(self, body):
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        mode = body.get("mode") if body.get("mode") in ("dlna", "manual") else "dlna"
+        pos = int(body.get("pos", 1))
+        if not 1 <= pos <= 8:
+            raise ValueError("spot must be 1-8")
+        update_state(deep_status={"running": True, "text": "Starting…", "mode": mode, "pos": pos})
+        args = [sys.executable, "-m", "subtune", "deepcheck", "--mode", mode, "--pos", str(pos)]
+        if body.get("auto_volume") is False or mode != "dlna":
+            args.append("--no-auto-volume")
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = f"system report ({mode})"
         return self.cmd
 
     def start_avrapply(self, multi=None):
@@ -208,6 +226,8 @@ class Runner:
     def start_auto(self, opts):
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
+        if opts.get("slot") is not None:
+            set_target_slot(opts["slot"])
         s = load_settings()
         if s.get("preset") is None or not s.get("subs"):
             raise RuntimeError("no preset/subs configured yet")
@@ -361,12 +381,31 @@ ALLOWED["clear"] = []
 
 from .splmeter import SPLMeter  # noqa: E402
 METER = SPLMeter()
-# anything that measures needs the mic: stop the meter first
-for _name in ("start_single", "start_auto", "start_tone", "start_verify"):
+# anything that measures needs the mic: reserve it, stop the meter, then start the job.
+# The reservation lasts until the job is over, so the dashboard can't restart the meter
+# in between (on Linux only one program can have the mic open).
+MIC = {"held": False, "t": 0.0}
+
+
+def mic_free() -> bool:
+    if RUN.running() or load_state().get("busy"):
+        return False
+    if MIC["held"] and time.time() - MIC["t"] < 5:     # a job is starting up
+        return False
+    MIC["held"] = False
+    return True
+
+
+for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
+        MIC["held"], MIC["t"] = True, time.time()
         METER.stop()
-        return _o(self, *a, **k)
+        try:
+            return _o(self, *a, **k)
+        except Exception:
+            MIC["held"] = False
+            raise
     setattr(Runner, _name, _wrapped)
 _ai = {"thread": None}
 _avr = {"t": 0, "data": None, "err": None, "obj": None}
@@ -542,10 +581,10 @@ def build_executors():
         r = avr_action(body)
         return {**(r["status"] or {}), "summary": f"{action} {value}"}
 
-    def blend(pos, mode, speakers="left"):
-        b = _measure(lambda: RUN.start_avrblend({"pos": pos, "mode": mode,
+    def blend(pos, mode, speakers="left", auto_volume=False):
+        b = _measure(lambda: RUN.start_avrblend({"pos": pos, "mode": mode, "auto_volume": auto_volume,
                                                  "speakers": "LR" if speakers == "both" else "L"}),
-                     "avr_blend", timeout=300)
+                     "avr_blend", timeout=360)
         out = {k: b[k] for k in ("delay_ms", "invert", "loss_now_db", "loss_best_db", "level_err_db", "advice")}
         m = load_state().get("avr_blend_multi")
         if m:                                  # every seat measured with this tune, optimised together
@@ -553,6 +592,34 @@ def build_executors():
                                                    "level_err_db", "advice")}
         return out | {"summary": f"best sub delay {b['delay_ms']:+.1f} ms, level {b['level_err_db']:+.1f} dB vs target"
                       + (f"; {len(m['seats'])} seats measured" if m else "")}
+
+    def report_view(r):
+        if not r:
+            return {"summary": "no system report yet"}
+        keep = ("title", "status", "found", "why", "todo", "area")
+        return {"spot": r["pos"], "measured": time.strftime("%Y-%m-%d %H:%M", time.localtime(r["t"])),
+                "areas": {k: v["status"] for k, v in r["areas"].items()},
+                "findings": [{k: f[k] for k in keep} for f in r["findings"]],
+                "ranges_vs_target_db": {b["label"]: {"left": b["left"]["vs_target_db"], "right": b["right"]["vs_target_db"],
+                                                     "both": b["both"]["vs_target_db"], "bumpiness": b["both"]["rough_db"]}
+                                        for b in r["bands"]},
+                "left_right": r["lr"], "rt60_s": {str(d["f"]): d["t60"] for d in r["decay"]},
+                "early_reflections_left": r["reflections"]["left"][:4],
+                "distortion_pct": {str(d["f"]): (None if d["below_noise"] else d["pct"]) for d in r["thd"]},
+                "noise": {k: (r["noise"] or {}).get(k) for k in ("overall", "bass", "hum_hz")},
+                "bass_extension_hz": r["bass_extension_hz"], "volume": r.get("level"),
+                "summary": ", ".join(f"{v['label']} {v['status']}" for v in r["areas"].values())}
+
+    def report_get(pos=0):
+        reps = load_state().get("deep_reports") or {}
+        if pos:
+            return report_view(reps.get(str(pos)))
+        return report_view(max(reps.values(), key=lambda r: r["t"]) if reps else None)
+
+    def report_run(pos, mode, auto_volume=True):
+        r = _measure(lambda: RUN.start_deepcheck({"pos": pos, "mode": mode, "auto_volume": auto_volume}),
+                     "deep_reports", timeout=420)
+        return report_view((r or {}).get(str(pos)))
 
     def blend_apply():
         t0 = time.time()
@@ -573,7 +640,8 @@ def build_executors():
             "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot,
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
-            "apply_avr_blend": blend_apply, "_tune_name": tune_name}
+            "apply_avr_blend": blend_apply, "get_system_report": report_get, "run_system_report": report_run,
+            "_tune_name": tune_name}
 
 
 _assistant = {"obj": None}
@@ -720,7 +788,29 @@ def _save_cal(body):
     return save_cal(body.get("name"), body.get("text"))
 
 
+def set_target_slot(slot) -> int:
+    """Choose the miniDSP slot (2-4) that auto-tune, manual steps and Apply write to.
+    Slot 1 holds the owner's original setup and can't be chosen here."""
+    from .library import ORIGINAL_SLOT
+    n = int(slot)
+    if n == ORIGINAL_SLOT + 1:
+        raise ValueError(f"slot {n} holds your original setup; pick slot 2, 3 or 4")
+    if not 1 <= n <= 4:
+        raise ValueError("slot must be 2, 3 or 4")
+    s = load_settings()
+    if s.get("preset") != n - 1:
+        s["preset"] = n - 1
+        save_settings(s)
+        event("config", f"tunes now go to slot {n}")
+    return n
+
+
 def _apply_settings(body):
+    body = dict(body)
+    if "slot" in body:
+        set_target_slot(body.pop("slot"))
+        if not body:
+            return {"slot": load_settings()["preset"] + 1}
     s = load_settings()
     changed = {}
     for k, v in body.items():
@@ -882,6 +972,9 @@ class H(BaseHTTPRequestHandler):
             for spk in ("L", "LR"):                    # make the blend test files on first download
                 if name == avrmeasure.layout(spk)["file"] and not f.exists():
                     avrmeasure.build_file(speakers=spk)
+            from . import deepcheck
+            if name == deepcheck.MEDIA_NAME and not f.exists():
+                deepcheck.build_file()
             if "/" in name or "\\" in name or ".." in name or not name.endswith(".wav") or not f.exists():
                 return self._send(404, {"error": "not found"})
             self.send_response(200)
@@ -979,7 +1072,7 @@ class H(BaseHTTPRequestHandler):
             if path == "/api/spl":
                 act = body.get("action")
                 if act == "start":
-                    if RUN.running() or load_state().get("busy"):
+                    if not mic_free():
                         return self._send(409, {"error": "the mic is busy with a measurement"})
                     try:
                         METER.start()
@@ -1013,6 +1106,8 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, assistant().view())
             if path == "/api/avr/blend":
                 return self._send(200, {"started": RUN.start_avrblend(body)})
+            if path == "/api/deepcheck":
+                return self._send(200, {"started": RUN.start_deepcheck(body)})
             if path == "/api/avr/apply":
                 m = body.get("multi")
                 return self._send(200, {"started": RUN.start_avrapply(None if m is None else bool(m))})
