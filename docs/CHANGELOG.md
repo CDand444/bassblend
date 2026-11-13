@@ -15,6 +15,11 @@
   rolls back if the new version doesn't start.
 - The version shows in the dashboard; image builds write it to `BASSBLEND.txt` (was "dev").
 - The saved API key file is owner-only on Linux. 6 checks in `tests/test_bundle.py`.
+- **Pi fix: miniDSP "not detected"**. Without a cached address, minidsp-rs also searched the
+  network for ~10 s on every call, so the dashboard's status check kept the USB device busy and
+  other commands (slot switches) failed with "No devices found". Calls now look only over USB
+  (`--usb 2752:0011`, ~0.1 s), take turns (thread + file lock shared with job subprocesses), and
+  retry briefly when the device is busy.
 
 ## Nov 13, 2026 — first-boot setup in the browser (for a ready-made SD card)
 

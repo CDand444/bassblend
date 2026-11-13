@@ -5,16 +5,59 @@ one preset slot and always writes every parameter it relies on.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
 import subprocess
+import threading
+import time
 
-from .config import (DSP_FS, IS_WINDOWS, MINIDSP_EXE, MINIDSP_RS_FS, N_OUTPUTS, PEQ_BANDS, load_settings,
+from .config import (DATA, DSP_FS, IS_WINDOWS, MINIDSP_EXE, MINIDSP_RS_FS, N_OUTPUTS, PEQ_BANDS, load_settings,
                      save_settings)
 from .state import event
 
 UNITY = (1.0, 0.0, 0.0, 0.0, 0.0)
+# Only look for the 2x4HD over USB. Without this, minidsp-rs also searches the network
+# for about 10 seconds on every call that has no cached address (seen on Linux).
+USB_ID = "2752:0011"
+# On Linux only one program at a time can open the miniDSP over USB; a second one gets
+# "No devices found". So every call waits its turn: a thread lock inside this process
+# plus a file lock shared with the job subprocesses. A miss is retried a few times.
+_THREAD_LOCK = threading.RLock()
+BUSY_RE = re.compile(r"no devices found|resource busy|device or resource busy|timed out|timeout", re.I)
+BUSY_TRIES = 4
+
+
+@contextlib.contextmanager
+def device_lock():
+    with _THREAD_LOCK:
+        f = None
+        if not IS_WINDOWS:
+            try:
+                import fcntl
+                DATA.mkdir(parents=True, exist_ok=True)
+                f = open(DATA / ".minidsp.lock", "a")
+                fcntl.flock(f, fcntl.LOCK_EX)
+            except OSError:
+                f = None
+        try:
+            yield
+        finally:
+            if f:
+                f.close()
+
+
+def _call(args, stdin=None, env=None):
+    """Run the minidsp tool with the device to ourselves, retrying while it is busy."""
+    for i in range(BUSY_TRIES):
+        with device_lock():
+            p = subprocess.run(args, input=stdin, capture_output=True, text=True, env=env, timeout=60)
+        out = (p.stderr or "") + (p.stdout or "")
+        if p.returncode == 0 or not BUSY_RE.search(out) or i == BUSY_TRIES - 1:
+            return p
+        time.sleep(0.3 * (i + 1))
+    return p
 
 
 class DSPError(RuntimeError):
@@ -45,25 +88,33 @@ class MiniDSP:
         args = [str(MINIDSP_EXE), "--force-kind", self.kind]
         if self._url():
             args += ["--url", self._url()]
+        else:
+            args += ["--usb", USB_ID]
         return args
 
     def probe(self) -> dict:
         if not MINIDSP_EXE.exists():
             raise DSPError(f"The miniDSP control tool isn't installed (looked for {MINIDSP_EXE}). "
                            "On Linux, run deploy/linux/install.sh.")
-        out = subprocess.run([str(MINIDSP_EXE), "probe"], capture_output=True,
-                             text=True, env=self.env, timeout=60).stdout
+        out = ""
+        for i in range(BUSY_TRIES):
+            out = _call([str(MINIDSP_EXE), "--usb", USB_ID, "probe"], env=self.env).stdout
+            if "serial" in out:
+                break
+            time.sleep(0.5 * (i + 1))                 # just plugged in, or still settling
         m = re.search(r"serial (\d+) at (\S+) \[hw_id: (\d+), dsp_version: (\d+)\]", out)
         if not m:
             raise DSPError(f"No miniDSP found over USB. probe said: {out.strip()!r}")
         info = {"serial": m[1], "url": m[2], "hw_id": int(m[3]), "dsp_version": int(m[4])}
         self.s["minidsp_url"] = info["url"]
-        save_settings(self.s)
+        fresh = load_settings()                       # don't write back an old copy of everything else
+        if fresh.get("minidsp_url") != info["url"]:
+            fresh["minidsp_url"] = info["url"]
+            save_settings(fresh)
         return info
 
     def _run(self, args, stdin=None, retry=True) -> str:
-        p = subprocess.run(self._base() + args, input=stdin, capture_output=True,
-                           text=True, env=self.env, timeout=60)
+        p = _call(self._base() + args, stdin=stdin, env=self.env)
         if p.returncode != 0:
             if retry:
                 # HID path changes after replug: re-probe once
