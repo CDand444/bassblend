@@ -98,7 +98,7 @@ def cmd_allspeakers(a):
     from . import allspk
     try:
         with busy(f"all-speakers check at spot {a.pos}"):
-            allspk.run(a.pos, a.mode, auto_volume=not a.no_auto_volume)
+            allspk.run(a.pos, a.mode, auto_volume=not a.no_auto_volume, avr_input=a.avr_input)
     except Exception as e:
         update_state(allspk_status={"running": False, "error": str(e)})
         raise
@@ -114,6 +114,22 @@ def cmd_headroom(a):
     with busy(f"headroom test on output {a.output}"):
         rig = _rig()
         _restoring(rig, lambda: headroom.run(rig, out))
+
+
+def cmd_heights(a):
+    """Height speaker check: measure one step (the room, or the speaker the receiver's test tone is on)."""
+    from . import heights
+    if a.reset:
+        update_state(heights=None, heights_status={"running": False})
+        return
+    try:
+        with busy(f"height check: {a.step}"):
+            update_state(heights_status={"running": True, "step": a.step})
+            heights.measure(a.step, a.pos)
+        update_state(heights_status={"running": False})
+    except Exception as e:
+        update_state(heights_status={"running": False, "error": str(e)})
+        raise
 
 
 def cmd_tone(a):
@@ -238,7 +254,7 @@ def cmd_avrblend(a):
     from . import avrmeasure
     try:
         with busy(f"AVR blend test at spot {a.pos}"):
-            avrmeasure.run(a.mode, a.pos, speakers=a.speakers, auto_volume=not a.no_auto_volume)
+            avrmeasure.run(a.mode, a.pos, speakers=a.speakers, auto_volume=not a.no_auto_volume, avr_input=a.avr_input)
     except Exception as e:
         update_state(avr_blend_status={"running": False, "error": str(e)})
         raise
@@ -249,7 +265,7 @@ def cmd_deepcheck(a):
     from . import deepcheck
     try:
         with busy(f"system report at spot {a.pos}"):
-            deepcheck.run(a.mode, a.pos, auto_volume=not a.no_auto_volume)
+            deepcheck.run(a.mode, a.pos, auto_volume=not a.no_auto_volume, avr_input=a.avr_input)
     except Exception as e:
         update_state(deep_status={"running": False, "error": str(e)})
         raise
@@ -260,7 +276,7 @@ def cmd_fixup(a):
     from . import fixup
     try:
         with busy(f"fixes at spot {a.pos}"):
-            fixup.run(a.pos, a.mode)
+            fixup.run(a.pos, a.mode, avr_input=a.avr_input)
     except Exception as e:
         update_state(fix_status={"running": False, "error": str(e)})
         raise
@@ -520,26 +536,39 @@ def main(argv=None):
     s.add_argument("--allow-original", action="store_true", help="allow overwriting slot 1")
     s.set_defaults(fn=cmd_apply)
     s = sp.add_parser("slot"); s.add_argument("--n", type=int, required=True); s.set_defaults(fn=cmd_slot)
-    s = sp.add_parser("avrblend"); s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s = sp.add_parser("avrblend"); s.add_argument("--mode", choices=["hdmi", "dlna", "manual"], default="dlna",
+                   help="hdmi = the Pi plays it out of its HDMI port; dlna = the receiver's network player; manual = USB stick")
+    s.add_argument("--avr-input", default=None, help="receiver input the Pi's HDMI is plugged into (hdmi mode)")
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--speakers", choices=["L", "LR"], default="L", help="L = left only, LR = left then right")
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_avrblend)
     s = sp.add_parser("deepcheck", help="full-range system report through the receiver")
-    s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s.add_argument("--mode", choices=["hdmi", "dlna", "manual"], default="dlna",
+                   help="hdmi = the Pi plays it out of its HDMI port; dlna = the receiver's network player; manual = USB stick")
+    s.add_argument("--avr-input", default=None, help="receiver input the Pi's HDMI is plugged into (hdmi mode)")
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_deepcheck)
     s = sp.add_parser("allspeakers", help="experimental: check every bed speaker with a 7.1 test file")
     s.add_argument("--pos", type=int, default=1)
-    s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s.add_argument("--mode", choices=["hdmi", "manual"], default="hdmi",
+                   help="hdmi = the Pi plays it out of its HDMI port; manual = you play it from another source")
+    s.add_argument("--avr-input", default=None, help="receiver input code the Pi's HDMI is plugged into (e.g. 10 = BD/DVD)")
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_allspeakers)
+    s = sp.add_parser("heights", help="height speaker check with the receiver's test tone (one step at a time)")
+    s.add_argument("--step", default="noise", help="noise, FL, FR, or a height (TFL TFR TML TMR TRL TRR)")
+    s.add_argument("--pos", type=int, default=1)
+    s.add_argument("--reset", action="store_true", help="forget the current height check")
+    s.set_defaults(fn=cmd_heights)
     s = sp.add_parser("headroom", help="how loud one sub can play cleanly (loud; stops automatically)")
     s.add_argument("--output", type=int, required=True, help="1-based output")
     s.set_defaults(fn=cmd_headroom)
     s = sp.add_parser("fixup", help="fix what BassBlend can from the latest system report, then check again")
-    s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s.add_argument("--mode", choices=["hdmi", "dlna", "manual"], default="dlna",
+                   help="hdmi = the Pi plays it out of its HDMI port; dlna = the receiver's network player; manual = USB stick")
+    s.add_argument("--avr-input", default=None, help="receiver input the Pi's HDMI is plugged into (hdmi mode)")
     s.add_argument("--pos", type=int, default=1)
     s.set_defaults(fn=cmd_fixup)
     s = sp.add_parser("avrapply"); s.add_argument("--multi", action="store_true", help="use the multi-seat blend")

@@ -1,11 +1,11 @@
 """All-speakers check (experimental): level, distance and polarity of every bed speaker.
 
-A 7.1 WAV file with a sweep on one channel at a time. By default the receiver
-plays it over the network (DLNA) in Direct mode, with the volume set automatically
-and everything restored afterwards. The TX-RZ50's player only lists 1-2 channel
-PCM explicitly (it also accepts generic WAV), so if only the front pair comes
-through, the result says so and the owner uses the other option: play the file
-from an HDMI source or a USB stick while BassBlend listens. Sweep order:
+A 7.1 WAV file with a sweep on one channel at a time. The Pi plays it out of its
+own HDMI port into the receiver, which BassBlend switches to that input and to
+Direct mode, with the volume set automatically and everything restored
+afterwards. (The receiver's network player won't play 8-channel files, so this
+test needs HDMI.) The owner can also play the file from another HDMI source or a
+USB stick while BassBlend listens. Sweep order:
 
     FL, FR, C, SL, SR, SBL, SBR (20 Hz-20 kHz), then LFE (15-150 Hz)
 
@@ -44,13 +44,14 @@ def sweep(ch):
     return audio.log_sweep(LF1, LF2, SWEEP) if ch == "LFE" else audio.log_sweep(F1, F2, SWEEP)
 
 
-def file_signal():
+def file_signal(order=None):
+    order = order or WAV_CH
     n = int((LEAD + TOTAL) * FS)
     st = np.zeros((n, 8))
     for ch in ORDER:
         a = int((LEAD + OFFS[ch]) * FS)
         sw = sweep(ch) * audio.db_to_lin(FILE_DBFS)
-        st[a:a + len(sw), WAV_CH.index(ch)] = sw
+        st[a:a + len(sw), order.index(ch)] = sw
     return st
 
 
@@ -67,11 +68,11 @@ def write_wav71(path, st):
         f.write(b"data" + struct.pack("<I", len(pcm)) + pcm)
 
 
-def build_file(path=None):
+def build_file(path=None, order=None):
     from .avr import MEDIA
     path = path or (MEDIA / MEDIA_NAME)
     path.parent.mkdir(parents=True, exist_ok=True)
-    write_wav71(path, file_signal())
+    write_wav71(path, file_signal(order))
     return path
 
 
@@ -127,7 +128,15 @@ def analyse(rec, t_start, cal=None):
     return {"t": time.time(), "grid2": FG[::2].round(2).tolist(), "speakers": out, "advice": advice(out)}
 
 
+def nothing_heard(out) -> bool:
+    """Not even the front left rose above the room noise: the file never played."""
+    return not out["FL"]["heard"] and not any(r["heard"] for r in out.values())
+
+
 def advice(out):
+    if nothing_heard(out):
+        return [{"ch": "", "status": "fix", "text": "Nothing came through: not one speaker rose above the room noise, so the "
+                 "test file didn't play. Check the receiver is on the right input and not muted, then try again."}]
     tips = []
     for ch, r in out.items():
         if ch == "FL":
@@ -162,10 +171,20 @@ def stereo_only(out) -> bool:
     return sp["FL"]["heard"] and sp["FR"]["heard"] and not any(sp[c]["heard"] for c in ("C", "SL", "SR", "SBL", "SBR"))
 
 
-def run(pos=1, mode="dlna", auto_volume=True, log=None, status=None):
-    """mode 'dlna': the receiver plays the 7.1 file over the network (Direct mode, volume set
-    automatically, everything restored afterwards). mode 'manual': the owner plays it from an
-    HDMI source or USB stick while BassBlend listens."""
+from .hdmi import HDMI_INPUTS, HdmiPlayer, hdmi_port  # noqa: E402,F401  (tests patch these names here)
+
+ALSA_CHMAP = None
+# The Pi's HDMI port takes 7.1 in the HDMI (CEA-861) slot order FL FR LFE FC RL RR RLC RRC, where a 7.1
+# receiver plays RL/RR on the surrounds and RLC/RRC on the surround backs. aplay can't remap the WAV's
+# order onto it, so the Pi plays its own copy with the channels already in that order.
+HDMI_CH = ["FL", "FR", "LFE", "C", "SL", "SR", "SBL", "SBR"]
+HDMI_MEDIA_NAME = "bassblend_all_speakers_hdmi.wav"
+
+
+def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=None):
+    """mode 'hdmi': the Pi plays the 7.1 file out of its own HDMI port into the receiver, which
+    BassBlend switches to that input in Direct mode, sets the volume, and restores afterwards.
+    mode 'manual': the owner plays it from another HDMI source or a USB stick while BassBlend listens."""
     from . import autolevel, avr
     from .avrmeasure import SweepWatcher
     from .dsp import MiniDSP
@@ -174,20 +193,35 @@ def run(pos=1, mode="dlna", auto_volume=True, log=None, status=None):
     status = status or (lambda txt: update_state(allspk_status={"running": True, "text": txt, "pos": pos, "mode": mode}))
     s = load_settings()
     cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
-    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
-    build_file()
-    lay = {"mains_len": 0.0, "total": TOTAL}
     level = None
-    if mode != "dlna":
+    playback = {}
+    if mode == "hdmi":
+        avr_input = (avr_input or s.get("avr_pi_input") or "").upper()
+        if avr_input not in HDMI_INPUTS:
+            raise RuntimeError("Pick the receiver input the Pi's HDMI cable is plugged into, then run it again.")
+        card = hdmi_port()
+        if not card:
+            raise RuntimeError("The Pi doesn't see anything on its HDMI ports. Plug the Pi's HDMI port (micro-HDMI 0, "
+                               "next to the USB-C power) into a receiver HDMI input, make sure the receiver is on, and try again.")
+    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
+    if mode == "hdmi":
+        from .avr import MEDIA
+        build_file(MEDIA / HDMI_MEDIA_NAME, HDMI_CH)
+    else:
+        build_file()
+    lay = {"mains_len": 0.0, "total": TOTAL}
+    if mode != "hdmi":
         status(f"Press play on {MEDIA_NAME} now (HDMI source or USB stick, receiver in a direct or multichannel mode). Listening…")
         rec, t0 = SweepWatcher(rec_dev, lambda: None, max_seconds=300.0, lay=lay).run()
     else:
+        from .avr import MEDIA
         dsp = MiniDSP(s)
         o = avr.Onkyo()
         autolevel.build_probe()
         snap = o.snapshot()
         dsp_before = dsp.status()["master"]["source"].lower()
-        renderer = None
+        player = HdmiPlayer(card)
+        playback.update({"port": card, "input": avr_input})
         try:
             status("Getting the receiver ready…")
             if snap.get("power") is False:
@@ -199,58 +233,51 @@ def run(pos=1, mode="dlna", auto_volume=True, log=None, status=None):
                 log("avr", "all-speakers check: switched off for the test (put back afterwards): " + ", ".join(flat))
             if dsp_before == "usb":                       # the subs listen to the receiver (LFE)
                 dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")], "all-speakers check: subs on the receiver's sub out")
-            renderer = avr.DLNARenderer(o.host)
-            base = avr.MediaServer.get(avr.local_ip_for(o.host))
-
-            def play(name, title):
-                last = None
-                for _ in range(5):
-                    try:
-                        renderer.play(f"{base}/{name}", title)
-                        return
-                    except Exception as e:
-                        last = e
-                        time.sleep(2)
-                raise RuntimeError(f"The receiver couldn't fetch the test file ({last}).")
+            o.set_input(avr_input)
+            log("avr", f"all-speakers check: receiver on {HDMI_INPUTS[avr_input]} (the Pi's HDMI)")
+            time.sleep(3.0)                               # HDMI handshake after the input change
             if auto_volume:
                 o.set_mode("00")                          # the stereo probe plays in Stereo
-                level = autolevel.dial_in(o, rec_dev, lambda: play(autolevel.PROBE_NAME, "BassBlend level probe"),
-                                          renderer.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
+                level = autolevel.dial_in(o, rec_dev, lambda: player.play(MEDIA / autolevel.PROBE_NAME),
+                                          player.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
                                           ceiling_setting=s.get("avr_test_max_volume"))
                 time.sleep(1.0)
+            o.set_mode("01")                              # Direct: every channel to its own speaker, no upmix or downmix
+            time.sleep(1.0)
 
             def start():
-                status("Sending the 7.1 test to the receiver…")
-                play(MEDIA_NAME, "BassBlend all-speakers test")
-                time.sleep(1.0)
-                o.set_mode("01")                          # Direct: every channel to its own speaker, no upmix or downmix
                 status("Playing: a sweep on each speaker in turn, then the subs (about a minute)…")
+                player.play(MEDIA / HDMI_MEDIA_NAME, ALSA_CHMAP)
+                if player.note:
+                    playback["note"] = player.note
+                    log("measure", "all-speakers check: " + player.note)
             rec, t0 = SweepWatcher(rec_dev, lambda: None, max_seconds=120.0, lay=lay).run(started=start)
         finally:
-            try:
-                if renderer:
-                    renderer.stop()
-            except Exception:
-                pass
+            player.stop()
             try:
                 if dsp_before == "usb":
                     dsp.batch([dsp.c_source("usb")], "all-speakers check done: input back to USB")
             finally:
                 o.restore(snap)
-                log("avr", f"all-speakers check: receiver restored (volume {snap.get('volume')})")
+                log("avr", f"all-speakers check: receiver restored (input {snap.get('input_code')}, volume {snap.get('volume')})")
     status("Analysing…")
     r = analyse(rec, t0, cal)
-    r.update({"pos": pos, "mode": mode, "level": level})
-    if mode == "dlna" and stereo_only(r):
-        r["advice"].insert(0, {"ch": "", "status": "fix", "text": "Only the front left and right came through: the receiver played the "
-                               "file over the network in stereo. Use the USB stick / HDMI option for this test instead."})
+    r.update({"pos": pos, "mode": mode, "level": level, "playback": playback or None})
+    if mode == "hdmi" and nothing_heard(r["speakers"]):
+        r["advice"] = [{"ch": "", "status": "fix", "text": "Nothing came through from the Pi's HDMI. Check the receiver "
+                        f"input picked ({HDMI_INPUTS.get(playback.get('input'), playback.get('input'))}) is the one the Pi "
+                        "is plugged into, and that the receiver shows a PCM multichannel signal while the test plays."}]
+    elif stereo_only(r):
+        r["advice"].insert(0, {"ch": "", "status": "fix", "text": "Only the front left and right came through: the receiver "
+                               "got or played the file as stereo. Check it's in Direct or a multichannel mode, and that "
+                               "its HDMI input isn't set to 2-channel audio."})
         r["stereo_only"] = True
     st = load_state()
     allr = st.get("allspk") or {}
     allr[str(pos)] = r
     update_state(allspk=allr, allspk_status={"running": False})
     from . import journal
-    journal.add("allspk", "All-speakers check" + (" (network)" if mode == "dlna" else " (USB/HDMI)") + ": "
+    journal.add("allspk", "All-speakers check" + (" (Pi HDMI)" if mode == "hdmi" else " (own source)") + ": "
                 + "; ".join(t["text"].split(":")[0] for t in r["advice"])[:300], pos=pos)
     log("measure", f"all-speakers check at spot {pos}: {len(r['advice'])} notes")
     return r

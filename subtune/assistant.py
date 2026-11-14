@@ -105,10 +105,20 @@ below their safe limit (no_boost_below_hz). Prefer the receiver doing the crosso
 LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies (Hsu: one port open, \
 EQ1, Q 0.7).
 - All-speakers check (run_all_speakers / get_overview -> all_speakers_check, experimental): level, arrival and \
-polarity of every bed speaker and the LFE against the front left, from a 7.1 test file. By default the receiver \
-plays it over the network in Direct mode (volume set automatically, restored after); if only the front pair \
-comes through (stereo_only), the receiver can't do multichannel over the network: suggest mode "manual" (the \
-owner plays the file from an HDMI source or USB stick). Heights can't be tested this way.
+polarity of every bed speaker and the LFE against the front left, from a 7.1 test file. It needs HDMI: the Pi \
+plays the file out of its own HDMI port and BassBlend switches the receiver to the input the Pi is plugged into \
+(chosen once on the All speakers page), in Direct mode, volume set automatically, all restored after. The \
+receiver's network player can't play 8 channels, so there is no network option. Mode "manual" = the owner plays \
+the file from another HDMI source or USB stick. Heights can't be tested this way.
+- Height check (get_overview -> height_check): the Atmos/height speakers can't be reached from a file, so the \
+owner starts the receiver's test tone (Speaker Setup > Level Calibration) on one speaker at a time and presses \
+Measure on the Height speakers page (room noise first, then front left, front right, each height). It reports \
+each height's level vs the front left (the Level Calibration change), left/right balance and tone. You can't run \
+it yourself; point the owner to the page and explain the results.
+- Playback for every receiver test (blend, system report, fix, all speakers): get_overview -> playback says whether \
+the Pi's HDMI is plugged in and which receiver input it's on. When it's ready use mode "hdmi" (the Pi plays the file \
+out of its HDMI port and BassBlend switches the receiver to that input, then back); otherwise "dlna" (the receiver's \
+network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 - Speaker placement (get_overview -> speaker_placement): Dolby-guideline positions for the layout, worked out from \
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. BassBlend doesn't know where the owner's speakers actually \
@@ -202,20 +212,22 @@ TOOLS = [
     _t("run_system_report", "Full-range test through the receiver: a 20 Hz-20 kHz sweep on the left speaker, "
        "the right, then both (about a minute), then the report. With auto_volume the receiver volume is set "
        "first with soft pink noise and put back afterwards.",
-       {"pos": SPOT, "mode": {"type": "string", "enum": ["dlna", "manual"],
-                              "description": "dlna = automatic over the network; manual = owner plays a file from USB"},
-        "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (dlna only)"}},
+       {"pos": SPOT, "mode": {"type": "string", "enum": ["hdmi", "dlna", "manual"],
+                              "description": "hdmi = the Pi plays it out of its HDMI port (receiver switched to that input; "
+                                             "best when connected); dlna = the receiver's network player; manual = owner plays a file from USB"},
+        "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (hdmi or dlna)"}},
        ["pos", "mode", "auto_volume"], approval=True),
     _t("fix_from_report", "Fix what BassBlend can from the latest system report at a spot: sets the receiver's "
        "subwoofer level to bring the bass to the target, runs a left+right blend test and applies the blend fix "
        "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
        "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
     _t("run_all_speakers", "Experimental: a sweep on each bed speaker in turn plus the LFE from a 7.1 test file, then "
-       "level, arrival (distance) and polarity of each against the front left. dlna = the receiver plays it over the "
-       "network in Direct mode (volume set automatically if auto_volume, restored after); manual = the owner plays the "
-       "file from an HDMI source or USB stick. About a minute of sweeps.",
-       {"pos": SPOT, "mode": {"type": "string", "enum": ["dlna", "manual"]},
-        "auto_volume": {"type": "boolean", "description": "set the receiver volume first (dlna only)"}},
+       "level, arrival (distance) and polarity of each against the front left. hdmi = the Pi plays it out of its HDMI "
+       "port, the receiver is switched to that input in Direct mode (volume set automatically if auto_volume, all "
+       "restored after; the input must have been picked on the All speakers page); manual = the owner plays the "
+       "file from another HDMI source or USB stick. About a minute of sweeps.",
+       {"pos": SPOT, "mode": {"type": "string", "enum": ["hdmi", "manual"]},
+        "auto_volume": {"type": "boolean", "description": "set the receiver volume first (hdmi only)"}},
        ["pos", "mode", "auto_volume"], approval=True),
     _t("run_headroom", "LOUD test: how loud one sub output can play cleanly at 25, 40 and 63 Hz. Tone bursts rise 3 dB "
        "at a time from quiet and stop automatically at 5-10% distortion, 3 dB compression, mic overload, 105 dB at the "
@@ -225,12 +237,13 @@ TOOLS = [
     _t("run_avr_blend", "Measure through the receiver: left speaker alone, then with subs; finds the sub "
        "timing/polarity and level that blend best with the speakers. Plays sweeps through the receiver; "
        "with auto_volume it first sets the volume to the test level (and puts it back after).",
-       {"pos": SPOT, "mode": {"type": "string", "enum": ["dlna", "manual"],
-                              "description": "dlna = automatic over the network; manual = owner plays a file from USB"},
+       {"pos": SPOT, "mode": {"type": "string", "enum": ["hdmi", "dlna", "manual"],
+                              "description": "hdmi = the Pi plays it out of its HDMI port (receiver switched to that input; "
+                                             "best when connected); dlna = the receiver's network player; manual = owner plays a file from USB"},
         "speakers": {"type": "string", "enum": ["left", "both"],
                      "description": "left = left speaker only (about 30 s); both = left then right (about 40 s), "
                                     "so the blend is balanced for both front speakers. Prefer both."},
-        "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (dlna only)"}},
+        "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (hdmi or dlna)"}},
        ["pos", "mode", "speakers", "auto_volume"], approval=True),
     _t("apply_avr_blend", "Bake the blend fix (sub delay, polarity, optional all-pass) into a new saved tune "
        "on the playing slot. Uses the all-seats answer when seats were measured with the playing tune, "
@@ -264,17 +277,18 @@ DESCRIBE = {
     "avr_control": lambda i: f"Receiver: {i['action'].replace('_', ' ')} → {i['value']}",
     "run_avr_blend": lambda i: (f"Blend test through the receiver at spot {i['pos']}, "
                                 + ("left + right speakers" if i.get("speakers") == "both" else "left speaker")
-                                + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
-                                + (", volume set automatically" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+                                + (" (Pi HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
+                                + (", volume set automatically" if i.get("auto_volume") and i["mode"] != "manual" else "")),
     "run_all_speakers": lambda i: (f"All-speakers check at spot {i['pos']}: a sweep on every speaker in turn"
-                                   + (" over the network (Direct mode)" if i["mode"] == "dlna" else " from your USB stick/HDMI source")
-                                   + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+                                   + (" from the Pi's HDMI (receiver switched to that input, Direct mode)" if i["mode"] == "hdmi"
+                                      else " from your own HDMI source or USB stick")
+                                   + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "hdmi" else "")),
     "run_headroom": lambda i: f"LOUD: headroom test on output {i['output']} (rising tone bursts, stops automatically)",
     "fix_from_report": lambda i: (f"Fix what BassBlend can at spot {i['pos']}: set the receiver's sub level, blend test + "
                                   "blend fix on the playing slot, then a new system report (several minutes of sweeps)"),
     "run_system_report": lambda i: (f"Full-range system report at spot {i['pos']}: sweeps on the left, right and both "
-                                    "front speakers" + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
-                                    + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+                                    "front speakers" + (" (Pi HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
+                                    + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] != "manual" else "")),
     "apply_avr_blend": lambda i: "Apply the blend fix (all measured seats, if any) as a new tune on the playing slot",
 }
 

@@ -29,7 +29,7 @@ def _summary(r):
             "fix": sum(f["status"] == "fix" for f in r["findings"]), "watch": sum(f["status"] == "watch" for f in r["findings"])}
 
 
-def run(pos=1, mode="dlna", log=None, status=None):
+def run(pos=1, mode="dlna", log=None, status=None, avr_input=None):
     from . import avr, avrmeasure, deepcheck
     log = log or (lambda *a, **k: event(*a, **k))
     status = status or (lambda txt: update_state(fix_status={"running": True, "text": txt, "pos": pos}))
@@ -61,7 +61,7 @@ def run(pos=1, mode="dlna", log=None, status=None):
     # 2. blend subs with the front speakers
     status("Step 2 of 3: blend test (left, right, then left with the subs)…")
     try:
-        b = avrmeasure.run(mode, pos, speakers="LR", auto_volume=(mode == "dlna"))
+        b = avrmeasure.run(mode, pos, speakers="LR", auto_volume=(mode in ("dlna", "hdmi")), avr_input=avr_input)
         gain = b["loss_now_db"] - b["loss_best_db"]
         can_dsp = b["delay_ms"] > 0 or b["invert"]
         if gain >= 0.5 and can_dsp:
@@ -84,7 +84,7 @@ def run(pos=1, mode="dlna", log=None, status=None):
 
     # 3. check the result
     status("Step 3 of 3: system report to check the result…")
-    after = deepcheck.run(mode, pos, auto_volume=(mode == "dlna"), label="after fixes")
+    after = deepcheck.run(mode, pos, auto_volume=(mode in ("dlna", "hdmi")), label="after fixes", avr_input=avr_input)
     left = [a for a in after.get("receiver_advice") or [] if a["kind"] in ("menu", "hands")]
     result = {"t": time.time(), "pos": pos, "steps": steps, "before": _summary(before), "after": _summary(after),
               "still_to_do": [a["text"] for a in left]}

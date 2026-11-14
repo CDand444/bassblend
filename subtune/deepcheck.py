@@ -739,9 +739,9 @@ def area_status(fs):
 
 
 # ---------------------------------------------------------------------- run
-def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label=""):
-    """Measure through the receiver and store the report. mode: 'dlna' | 'manual'."""
-    from . import autolevel, avr
+def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label="", avr_input=None):
+    """Measure through the receiver and store the report. mode: 'hdmi' | 'dlna' | 'manual' (see hdmi.Source)."""
+    from . import autolevel, avr, hdmi
     from .avrmeasure import SweepWatcher
     from .dsp import MiniDSP
     from .state import event, load_state, update_state
@@ -749,14 +749,14 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label=""):
     status = status or (lambda txt: update_state(deep_status={"running": True, "text": txt, "mode": mode, "pos": pos}))
     s = load_settings()
     cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
-    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     dsp = MiniDSP(s)
     o = avr.Onkyo()
+    src = hdmi.Source(mode, o, avr_input, s, log)             # checks the HDMI cable/input before anything changes
+    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     build_file()
     autolevel.build_probe()
     snap = o.snapshot()
     dsp_before = dsp.status()["master"]["source"].lower()
-    renderer = None
     level = None
     lay = {"mains_len": 0.0, "total": TOTAL}
     try:
@@ -771,30 +771,18 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label=""):
             log("avr", "system report: switched off for the test (put back afterwards): " + ", ".join(flat))
         if dsp_before == "usb":                                # subs listen to the receiver for this test
             dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")], "system report: subs on the receiver's sub out")
-        if mode == "dlna":
-            renderer = avr.DLNARenderer(o.host)
-            base = avr.MediaServer.get(avr.local_ip_for(o.host))
-
-            def play(name, title):
-                last = None
-                for _ in range(5):
-                    try:
-                        renderer.play(f"{base}/{name}", title)
-                        return
-                    except Exception as e:
-                        last = e
-                        time.sleep(2)
-                raise RuntimeError(f"The receiver couldn't fetch the test file ({last}).")
+        src.select("system report")
+        if src.auto:
             o.set_mode("00")
             if auto_volume:
-                level = autolevel.dial_in(o, rec_dev, lambda: play(autolevel.PROBE_NAME, "BassBlend level probe"),
-                                          renderer.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
+                level = autolevel.dial_in(o, rec_dev, lambda: src.play(autolevel.PROBE_NAME, "BassBlend level probe"),
+                                          src.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
                                           ceiling_setting=s.get("avr_test_max_volume"))
                 time.sleep(1.0)
 
             def start():
-                status("Sending the test to the receiver…")
-                play(MEDIA_NAME, "BassBlend full-range test")
+                status("Sending the test to the receiver…" if mode == "dlna" else "Playing from the Pi's HDMI…")
+                src.play(MEDIA_NAME, "BassBlend full-range test")
                 time.sleep(1.0)
                 o.set_mode("00")
                 status("Playing: a sweep on the left speaker, then the right, then both (about 35 s)…")
@@ -802,21 +790,17 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label=""):
             def start():
                 o.set_mode("00")
                 status(f"Press play on the receiver now ({MEDIA_NAME} on your USB stick). Listening…")
-        watcher = SweepWatcher(rec_dev, lambda: None, max_seconds=240.0 if mode != "dlna" else 90.0, lay=lay)
+        watcher = SweepWatcher(rec_dev, lambda: None, max_seconds=90.0 if src.auto else 240.0, lay=lay)
         rec, t0 = watcher.run(started=start)
         status("Analysing…")
     finally:
-        try:
-            if renderer:
-                renderer.stop()
-        except Exception:
-            pass
+        src.stop()
         try:
             if dsp_before == "usb":
                 dsp.batch([dsp.c_source("usb")], "system report done: input back to USB")
         finally:
             o.restore(snap)
-            log("avr", f"system report: receiver restored (volume {snap.get('volume')})")
+            log("avr", f"system report: receiver restored (input {snap.get('input_code')}, volume {snap.get('volume')})")
     r = analyse(rec, t0, cal, s)
     r.update({"pos": pos, "mode": mode, "level": level, "neutralised": flat,
               "avr": {k: snap.get(k) for k in ("volume", "sub_level", "input_code", "mode_code")},

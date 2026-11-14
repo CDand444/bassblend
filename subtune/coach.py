@@ -18,6 +18,16 @@ import time
 AREAS = ("setup", "safety", "hardware", "tune", "blend", "receiver", "dirac", "verify", "listen")
 
 
+def _mode():
+    """Pi HDMI when it's plugged in and its receiver input is known, else the network player."""
+    try:
+        from .config import load_settings
+        from .hdmi import HDMI_INPUTS, hdmi_port
+        return "hdmi" if hdmi_port() and load_settings().get("avr_pi_input") in HDMI_INPUTS else "dlna"
+    except Exception:
+        return "dlna"
+
+
 def _step(rank, sid, area, title, why, who="bassblend", sound=False, open=None, tool=None, inp=None, ask=None):
     return {"id": sid, "rank": rank, "area": area, "title": title, "why": why, "who": who, "sound": sound,
             "open": open, "tool": tool, "input": inp or {}, "ask": ask or f"Help me with this: {title}"}
@@ -115,11 +125,11 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
         if not b or b.get("tune_id") not in (tid, base):
             out.append(_step(9, "blend", "blend", "Blend the subs with the front speakers",
                              "Checks that subs and speakers add up around the crossover instead of cancelling.",
-                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": "dlna", "speakers": "both", "auto_volume": True}))
+                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": _mode(), "speakers": "both", "auto_volume": True}))
         elif b.get("tune_id") == base and base != tid:
             out.append(_step(9, "blend_confirm", "blend", "Re-measure the blend to confirm the fix",
                              "The playing tune already includes a blend fix; one more blend test shows how well it worked.",
-                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": "dlna", "speakers": "both", "auto_volume": True}))
+                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": _mode(), "speakers": "both", "auto_volume": True}))
         elif blend_current and b.get("loss_now_db", 0) - b.get("loss_best_db", 0) >= 0.5 and (b.get("delay_ms", 0) > 0 or b.get("invert")):
             out.append(_step(8, "blend_apply", "blend", f"Apply the blend fix ({b['loss_now_db'] - b['loss_best_db']:.1f} dB less cancellation)",
                              "The last blend test found a sub delay/polarity that makes subs and speakers add up better.",
@@ -128,7 +138,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
         if b and len(seats) < 2:
             out.append(_step(14, "blend_seats", "blend", "Measure the blend at a second and third seat",
                              "One setting that blends well at every seat beats one tuned for the MLP alone.",
-                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 2, "mode": "dlna", "speakers": "both", "auto_volume": True}))
+                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 2, "mode": _mode(), "speakers": "both", "auto_volume": True}))
 
     # ---- Dirac
     if sy.get("dirac") and tuned and not sy.get("dirac_current"):
@@ -143,7 +153,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
         out.append(_step(11, "report", "verify", "Run a system report" + (
             " (the last one is from an older BassBlend)" if old_format else " (the tune changed since the last one)" if stale else ""),
                          "A full-range check of speakers and subs as you listen, with fixes and exact receiver numbers.",
-                         sound=True, open="report", tool="run_system_report", inp={"pos": 1, "mode": "dlna", "auto_volume": True}))
+                         sound=True, open="report", tool="run_system_report", inp={"pos": 1, "mode": _mode(), "auto_volume": True}))
     if rep and not stale:
         auto = [a for a in rep.get("receiver_advice") or [] if a["kind"] == "auto"]
         if auto or any(f["status"] == "fix" and f["area"] == "bass" for f in rep["findings"]):

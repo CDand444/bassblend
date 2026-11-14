@@ -198,9 +198,9 @@ def optimise_blend(Hm, Hs, house_db=0.0, house_fc=45.0, HmR=None):
             "sub_level_change_db": round(-level_err * 2) / 2}
 
 
-def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=False):
-    """Full measurement: returns the stored result dict. mode: 'dlna' | 'manual'."""
-    from . import avr
+def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=False, avr_input=None):
+    """Full measurement: returns the stored result dict. mode: 'hdmi' | 'dlna' | 'manual' (see hdmi.Source)."""
+    from . import avr, hdmi
     from .dsp import MiniDSP
     from .state import event, load_state, update_state
     log = log or (lambda *a, **k: event(*a, **k))
@@ -211,17 +211,18 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
         raise RuntimeError("no sub outputs configured")
     cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
     dsp = MiniDSP(s)
-    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     o = avr.Onkyo()
+    src = hdmi.Source(mode, o, avr_input, s, log)             # checks the HDMI cable/input before anything changes
+    rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     lay = layout(speakers)
     build_file(speakers=lay["speakers"])
     from . import autolevel
-    if auto_volume and mode == "dlna":
+    auto_volume = auto_volume and src.auto
+    if auto_volume:
         autolevel.build_probe()
     level = {}
     dsp_before = dsp.status()["master"]["source"].lower()
     snap = o.snapshot()
-    renderer = None
     mute = lambda on: [dsp.c_out_mute(x, on) for x in subs]
     try:
         status("Getting the receiver ready…")
@@ -232,16 +233,15 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
         flat = o.neutral_for_test(snap)                       # tone, Late Night, Cinema Filter... off for the test
         if flat:
             log("avr", "AVR test: switched off for the test (put back afterwards): " + ", ".join(flat))
-        if auto_volume and mode == "dlna":
+        src.select("AVR test")
+        if auto_volume:
             # dial in the volume first with pink noise (subs on, as you listen); this needs the mic
             # before the sweep recording opens it
             dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")] + mute(False), "AVR test: setting the volume")
             o.set_mode("00")
-            probe = avr.DLNARenderer(o.host)
-            pbase = avr.MediaServer.get(avr.local_ip_for(o.host))
             level.update(autolevel.dial_in(
-                o, rec_dev, lambda: probe.play(f"{pbase}/{autolevel.PROBE_NAME}", "BassBlend level probe"),
-                probe.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
+                o, rec_dev, lambda: src.play(autolevel.PROBE_NAME, "BassBlend level probe"),
+                src.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
                 ceiling_setting=s.get("avr_test_max_volume")))
             time.sleep(1.0)
         # subs get the AVR's sub out (analog in); mute them for the mains-only sweep
@@ -251,41 +251,24 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
         watcher = SweepWatcher(rec_dev, on_gap, lay=lay)
 
         def start():
-            nonlocal renderer
-            if mode == "dlna":
-                status("Sending the test file to the receiver…")
-                renderer = avr.DLNARenderer(o.host)
-                base = avr.MediaServer.get(avr.local_ip_for(o.host))
-                last = None
-                for _ in range(5):
-                    try:
-                        renderer.play(f"{base}/{lay['file']}", "BassBlend blend test")
-                        break
-                    except Exception as e:
-                        last = e
-                        time.sleep(2)
-                else:
-                    raise RuntimeError(f"The receiver couldn't fetch the test file from this PC ({last}). "
-                                       "Windows Firewall is probably blocking it; see the AVR panel for the fix, "
-                                       "or use the USB-stick option.")
-                time.sleep(1.0)
+            if src.auto:
+                status("Sending the test file to the receiver…" if mode == "dlna" else "Playing from the Pi's HDMI…")
                 o.set_mode("00")                       # Stereo: left main + bass-managed sub
+                src.play(lay["file"], "BassBlend blend test")
+                time.sleep(1.0)
+                o.set_mode("00")
                 status("Playing: the left speaker, then the right, then left again with the subs…" if lay["right"] is not None
                        else "Playing: one sweep on the left speaker, then again with the subs…")
             else:
                 o.set_mode("00")
                 status(f"Press play on the receiver now ({lay['file']} on your USB stick). Listening…")
 
-        if mode != "dlna":
+        if not src.auto:
             watcher.max = 240.0                         # give time to press play by hand
         rec, t0 = watcher.run(started=start)
         status("Analysing…")
     finally:
-        try:
-            if renderer:
-                renderer.stop()
-        except Exception:
-            pass
+        src.stop()
         try:
             dsp.batch([dsp.c_source(dsp_before)] + mute(False), "AVR test done: subs on, input restored")
         finally:

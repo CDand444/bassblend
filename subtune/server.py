@@ -37,6 +37,34 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70)}
 
 
+def _playback(body, modes=("hdmi", "dlna", "manual")):
+    """Pick how a receiver test plays its file, and the CLI args for it. With no mode given:
+    the Pi's HDMI when it's plugged in and its receiver input is known, else the network."""
+    from .hdmi import HDMI_INPUTS, hdmi_port
+    s = load_settings()
+    mode = body.get("mode")
+    if mode not in modes:
+        ready = bool(hdmi_port()) and s.get("avr_pi_input") in HDMI_INPUTS
+        mode = "hdmi" if "hdmi" in modes and (ready or "dlna" not in modes) else "dlna" if "dlna" in modes else modes[0]
+    args = ["--mode", mode]
+    if mode == "hdmi":
+        inp = str(body.get("avr_input") or s.get("avr_pi_input") or "").upper()
+        if inp not in HDMI_INPUTS:
+            raise ValueError("pick the receiver input the Pi's HDMI is plugged into")
+        if s.get("avr_pi_input") != inp:
+            s["avr_pi_input"] = inp
+            save_settings(s)
+        args += ["--avr-input", inp]
+    return mode, args
+
+
+def _playback_info(s):
+    from .hdmi import HDMI_INPUTS, hdmi_port
+    port, inp = hdmi_port(), s.get("avr_pi_input")
+    return {"pi_hdmi_connected": bool(port), "pi_receiver_input": HDMI_INPUTS.get(inp),
+            "default_mode": "hdmi" if port and inp in HDMI_INPUTS else "dlna"}
+
+
 def _cmd_args(cmd, params=None):
     args = [sys.executable, "-m", "subtune", cmd]
     for p in ALLOWED.get(cmd, []):
@@ -148,14 +176,14 @@ class Runner:
     def start_avrblend(self, body):
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
-        mode = body.get("mode") if body.get("mode") in ("dlna", "manual") else "dlna"
+        mode, pargs = _playback(body)
         pos = int(body.get("pos", 1))
         if not 1 <= pos <= 8:
             raise ValueError("spot must be 1-8")
         update_state(avr_blend_status={"running": True, "text": "Starting…", "mode": mode})
         spk = "LR" if body.get("speakers") in ("LR", "both") else "L"
-        args = [sys.executable, "-m", "subtune", "avrblend", "--mode", mode, "--pos", str(pos), "--speakers", spk]
-        if not body.get("auto_volume") or mode != "dlna":
+        args = [sys.executable, "-m", "subtune", "avrblend", *pargs, "--pos", str(pos), "--speakers", spk]
+        if not body.get("auto_volume") or mode == "manual":
             args.append("--no-auto-volume")
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = f"avr blend ({mode})"
@@ -164,29 +192,47 @@ class Runner:
     def start_deepcheck(self, body):
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
-        mode = body.get("mode") if body.get("mode") in ("dlna", "manual") else "dlna"
+        mode, pargs = _playback(body)
         pos = int(body.get("pos", 1))
         if not 1 <= pos <= 8:
             raise ValueError("spot must be 1-8")
         update_state(deep_status={"running": True, "text": "Starting…", "mode": mode, "pos": pos})
-        args = [sys.executable, "-m", "subtune", "deepcheck", "--mode", mode, "--pos", str(pos)]
-        if body.get("auto_volume") is False or mode != "dlna":
+        args = [sys.executable, "-m", "subtune", "deepcheck", *pargs, "--pos", str(pos)]
+        if body.get("auto_volume") is False or mode == "manual":
             args.append("--no-auto-volume")
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = f"system report ({mode})"
         return self.cmd
 
-    def start_allspk(self, body):
+    def start_heights(self, body):
+        """One step of the height check: the mic records while the receiver's test tone plays (BassBlend plays nothing)."""
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
-        mode = body.get("mode") if body.get("mode") in ("dlna", "manual") else "dlna"
+        from .dirac import system as _system
+        from .heights import steps
+        step = str(body.get("step") or "")
+        if step not in steps(_system().get("heights") or 0):
+            raise ValueError("unknown step for this speaker layout (set your height speakers in Setup)")
         pos = int(body.get("pos", 1))
         if not 1 <= pos <= 8:
             raise ValueError("spot must be 1-8")
-        update_state(allspk_status={"running": True, "text": "Starting…", "mode": mode, "pos": pos})
-        args = [sys.executable, "-m", "subtune", "allspeakers", "--mode", mode, "--pos", str(pos)]
-        if body.get("auto_volume") is False or mode != "dlna":
+        update_state(heights_status={"running": True, "step": step})
+        args = [sys.executable, "-m", "subtune", "heights", "--step", step, "--pos", str(pos)]
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = f"height check ({step})"
+        return self.cmd
+
+    def start_allspk(self, body):
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        mode, pargs = _playback(body, modes=("hdmi", "manual"))
+        pos = int(body.get("pos", 1))
+        if not 1 <= pos <= 8:
+            raise ValueError("spot must be 1-8")
+        args = [sys.executable, "-m", "subtune", "allspeakers", *pargs, "--pos", str(pos)]
+        if body.get("auto_volume") is False or mode != "hdmi":
             args.append("--no-auto-volume")
+        update_state(allspk_status={"running": True, "text": "Starting…", "mode": mode, "pos": pos})
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = f"all-speakers check ({mode})"
         return self.cmd
@@ -197,8 +243,9 @@ class Runner:
         pos = int(body.get("pos", 1))
         if str(pos) not in (load_state().get("deep_reports") or {}):
             raise ValueError(f"run a system report at spot {pos} first")
+        mode, pargs = _playback(body, modes=("hdmi", "dlna"))
         update_state(fix_status={"running": True, "text": "Starting…", "pos": pos})
-        args = [sys.executable, "-m", "subtune", "fixup", "--pos", str(pos), "--mode", "dlna"]
+        args = [sys.executable, "-m", "subtune", "fixup", "--pos", str(pos), *pargs]
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = "fix what BassBlend can"
         return self.cmd
@@ -424,7 +471,7 @@ def mic_free() -> bool:
 
 
 for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup",
-              "start_allspk"):
+              "start_allspk", "start_heights"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -490,6 +537,7 @@ def build_executors():
         v = (st.get("verify") or {}).get("after") or {}
         out = {"playing": _summ_result(r), "verified_spots": sorted(v.keys()),
                "settings": {k: s.get(k) for k in SETTABLE},
+               "playback": _playback_info(s),
                "last_checkup": ck and {"t": ck["t"], "pos": ck["pos"], "noise_db": ck["noise_spl"], "snr_db": ck["snr_db"],
                                        "verdicts": {k: x["text"] for k, x in ck["verdicts"].items()},
                                        "decay_t60_s": {str(d["f"]): d["t60"] for d in ck["decay"]},
@@ -526,6 +574,12 @@ def build_executors():
             out["all_speakers_check"] = {"t": a_all["t"], "spot": a_all.get("pos"), "advice": [x["text"] for x in a_all["advice"]],
                                          "speakers": {k: {x: v[x] for x in ("level_vs_fl_db", "arrival_vs_fl_ms", "polarity", "heard")}
                                                       for k, v in a_all["speakers"].items()}}
+        hg = st.get("heights") or {}
+        if hg.get("report"):
+            out["height_check"] = {"t": hg.get("t"), "spot": hg.get("pos"), "complete": hg["report"]["complete"],
+                                   "next_step": hg["report"]["next"], "advice": [x["text"] for x in hg["report"]["advice"]],
+                                   "speakers": {k: {x: v.get(x) for x in ("receiver", "vs_fl_db", "treble_vs_fl_db", "heard")}
+                                                for k, v in hg["report"]["rows"].items()}}
         rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
         if rep:
             out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
@@ -692,7 +746,7 @@ def build_executors():
         return {"results": [{k: x[k] for k in ("f", "max_clean_spl", "thd_at_max", "limited_by")} for x in h.get("results", [])],
                 "summary": summary_text(output - 1, h.get("results", [])) if h else "no result"}
 
-    def allspk_run(pos, mode="dlna", auto_volume=True):
+    def allspk_run(pos, mode="hdmi", auto_volume=True):
         r = _measure(lambda: RUN.start_allspk({"pos": pos, "mode": mode, "auto_volume": auto_volume}), "allspk", timeout=420)
         x = (r or {}).get(str(pos)) or {}
         return {"advice": [a["text"] for a in x.get("advice", [])], "stereo_only": x.get("stereo_only", False),
@@ -1082,7 +1136,9 @@ class H(BaseHTTPRequestHandler):
             st = load_state()
             s = load_settings()
             st["settings"] = {k: s.get(k) for k in ("preset", "subs", "ref_sub", "cal_file", "sweep_dbfs",
-                                                     "restore_source", *SETTABLE)}
+                                                     "restore_source", "avr_pi_input", *SETTABLE)}
+            from .hdmi import hdmi_port
+            st["pi_hdmi"] = hdmi_port()
             from pathlib import Path
             st["settings"]["cal_ok"] = bool(s.get("cal_file")) and Path(s["cal_file"]).is_file()
             st["job"] = RUN.view()
@@ -1306,6 +1362,13 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"started": RUN.start_deepcheck(body)})
             if path == "/api/allspk":
                 return self._send(200, {"started": RUN.start_allspk(body)})
+            if path == "/api/heights":
+                if body.get("action") == "reset":
+                    if RUN.running():
+                        raise RuntimeError("another step is running")
+                    update_state(heights=None, heights_status={"running": False})
+                    return self._send(200, {"ok": True})
+                return self._send(200, {"started": RUN.start_heights(body)})
             if path == "/api/fixup":
                 return self._send(200, {"started": RUN.start_fixup(body)})
             if path == "/api/avr/apply":

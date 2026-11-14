@@ -788,7 +788,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="row" style="align-items:end">
         <label class="f" style="width:auto">How to play the test
           <div class="seg" id="blendMode" role="radiogroup">
-            <button type="button" data-m="dlna" class="on">Automatic (network)</button><button type="button" data-m="manual">USB stick</button></div></label>
+            <button type="button" data-m="hdmi">Pi HDMI</button><button type="button" data-m="dlna" class="on">Network</button><button type="button" data-m="manual">USB stick</button></div></label>
+        <label class="f piInpF" style="width:auto" id="blendInpF">Pi plugged into<select class="piInp" id="blendInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="f" style="width:auto">Speakers to test
           <div class="seg" id="blendSpk" role="radiogroup">
             <button type="button" data-s="LR" class="on">Left + right</button><button type="button" data-s="L">Left only</button></div></label>
@@ -830,7 +831,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="lead">A full-range check of your front speakers and subs, the way you listen: a 20 Hz to 20 kHz sweep on the left speaker, the right, then both. About a minute. It finds things that are hard to hear on your own (polarity, timing, reflections, resonances, how long the room rings, distortion, noise) and says what each means and what to do.</p>
       <div class="tune-controls dc-controls">
         <label class="f">Mic at<select id="dcPos"></select></label>
-        <label class="f">Playback<select id="dcMode"><option value="dlna">The receiver plays it (network)</option><option value="manual">I'll play it from a USB stick</option></select></label>
+        <label class="f">Playback<select id="dcMode"><option value="hdmi">The Pi plays it over HDMI</option><option value="dlna" selected>The receiver plays it (network)</option><option value="manual">I'll play it from a USB stick</option></select></label>
+        <label class="f piInpF" id="dcInpF">Pi plugged into<select class="piInp" id="dcInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="cb" style="max-width:260px"><input type="checkbox" id="dcAuto" checked><span>Set the receiver volume for me<small>Pink noise first, then steps the volume to the target level at the mic. Your volume is put back afterwards.</small></span></label>
         <label class="f">Target level<select id="dcSpl"><option value="70">70 dB (quiet)</option><option value="75">75 dB (standard)</option><option value="80">80 dB (louder)</option></select></label>
         <label class="f">Max volume<span class="unit" data-u="vol"><input id="dcMax" type="number" min="20" max="70" step="0.5" placeholder="auto" title="The highest receiver volume a test may use. Empty = your current volume + 12 (never above 70)."></span></label>
@@ -847,11 +849,25 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="lead">Checks every bed speaker (front, centre, surrounds, surround backs and the LFE) for level, distance and polarity against the front left, with a 7.1 test file that plays a sweep on each speaker in turn. Height speakers need Dolby Atmos content, so they aren’t covered.</p>
       <div class="tune-controls dc-controls">
         <label class="f" style="width:150px">Mic at<select id="allPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label>
-        <label class="f">Playback<select id="allMode"><option value="dlna">The receiver plays it (network)</option><option value="manual">I’ll play it (USB stick or HDMI source)</option></select></label>
+        <label class="f">Playback<select id="allMode"><option value="hdmi">The Pi plays it over HDMI</option><option value="manual">I’ll play it (another HDMI source or USB stick)</option></select></label>
+        <label class="f piInpF" id="allInpF">Pi plugged into<select class="piInp" id="allInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="cb" style="max-width:240px"><input type="checkbox" id="allAuto" checked><span>Set the receiver volume for me<small>Same as the System report; put back afterwards.</small></span></label>
         <span class="grow"></span><button class="btn primary lg" id="allRun">Run all-speakers check</button></div>
       <div id="allHow" style="margin-top:8px"></div>
       <div id="allOut" style="margin-top:14px"></div>
+    </section>
+
+    <section class="card" id="hgtCard">
+      <div class="card-h"><h2>Height speakers (Atmos)</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my height speaker check. What should I change in Level Calibration, and are my heights placed well?">Ask about this</button></div>
+      <p class="lead">Checks every height speaker against the front left: level, left/right balance and tone. Height speakers only play from Atmos content or the receiver’s own test tone, so you step through the receiver’s test tone and BassBlend measures each speaker at your seat.</p>
+      <ol class="howto">
+        <li>Mic at the seat. On the receiver open <b>Setup → Speaker → Level Calibration</b> (the test tone plays at reference level, fairly loud).</li>
+        <li>Press <b>Measure</b> on each row in order: first the room with the test tone <b>off</b>, then move the receiver’s test tone to the speaker named on the row, wait for the hiss, and press Measure.</li>
+        <li>Leave Level Calibration without changing anything until the report says what to change.</li></ol>
+      <div class="tune-controls dc-controls" style="margin-top:8px">
+        <label class="f" style="width:150px">Mic at<select id="hgtPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label>
+        <span class="grow"></span><button class="btn ghost" id="hgtReset">Start over</button></div>
+      <div id="hgtOut" style="margin-top:12px"></div>
     </section>
 
     <section class="card" id="headCard">
@@ -1814,6 +1830,23 @@ $('#chatNew').onclick = async () => { if (!confirm('Start a new conversation?'))
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#chat').hidden && $('#sheetWrap').hidden) chatOpen(false); });
 
 // ---------- receiver (AVR)
+// ---------- playback source shared by every receiver test: Pi HDMI / network / USB stick
+const piReady = () => !!S.pi_hdmi && !!(S.settings || {}).avr_pi_input;
+let playInit = false;
+function syncPlayback() {
+  const v = (S.settings || {}).avr_pi_input || '';
+  document.querySelectorAll('.piInp').forEach(x => { if (!x.dataset.touched && v) x.value = v; });
+  if (!playInit && S.settings) {            // first load: default to the Pi's HDMI when it's ready
+    playInit = true;
+    if (piReady()) { blendMode = 'hdmi'; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x.dataset.m === 'hdmi')); $('#dcMode').value = 'hdmi'; }
+  }
+}
+document.querySelectorAll('.piInp').forEach(x => x.onchange = () => {
+  document.querySelectorAll('.piInp').forEach(y => { y.value = x.value; y.dataset.touched = '1'; });
+  blendKey = null; renderBlend(); renderDeep(); renderAllSpk();
+});
+const piHint = () => S.pi_hdmi ? '<b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> BassBlend switches the receiver to the input you pick, plays the test from the Pi, and switches back afterwards.'
+  : '<b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on).';
 let AVR = {}, avrKey = null, blendMode = 'dlna', blendSpk = 'LR', blendSide = 'L', blendKey = null;
 const blendFile = () => blendSpk === 'LR' ? 'bassblend_blend_test_left_right.wav' : 'bassblend_blend_test.wav';
 const MODE_OPTS = [['00', 'Stereo'], ['01', 'Direct'], ['0C', 'All Ch Stereo'], ['11', 'Pure Audio'], ['80', 'Dolby Surround'], ['82', 'DTS:X / Neural:X'], ['FF', 'Auto Surround']];
@@ -1905,9 +1938,12 @@ function renderAvr() {
 function renderBlend() {
   const b = S.avr_blend, bs = S.avr_blend_status || {}, job = S.job || {};
   const running = bs.running && job.running;
-  $('#blendRun').disabled = !!job.running || !!S.busy || !AVR.configured;
+  syncPlayback();
+  $('#blendInpF').style.display = blendMode === 'hdmi' ? '' : 'none';
+  $('#blendRun').disabled = !!job.running || !!S.busy || !AVR.configured || (blendMode === 'hdmi' && (!S.pi_hdmi || !$('#blendInp').value));
   $('#blendRun').textContent = running ? 'Running…' : b ? 'Run again' : 'Run blend test';
-  $('#blendModeHint').innerHTML = blendMode === 'dlna'
+  $('#blendModeHint').innerHTML = blendMode === 'hdmi' ? piHint() + ((S.system || {}).dirac ? ' Keep Dirac switched on in the receiver, so the test hears what you will hear.' : '')
+    : blendMode === 'dlna'
     ? 'The receiver fetches the test file from this PC over your network. If that ever stops working, the USB stick option does the same test.' + ((S.system || {}).dirac ? ' Keep Dirac switched on in the receiver, so the test hears what you will hear.' : '')
     : `Copy <a href="/media/${blendFile()}" download>${blendFile()}</a> to a USB stick and plug it into the receiver. Press Run, then play the file from the receiver’s USB input when asked.`;
   const mm = S.avr_blend_multi, seatsInfo = S.avr_blend_seats || {};
@@ -2054,13 +2090,14 @@ document.querySelectorAll('#blendMode button').forEach(b => b.onclick = () => {
   blendMode = b.dataset.m; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x === b)); blendKey = null; renderBlend();
 });
 $('#blendRun').onclick = async () => {
-  const pos = +$('#blendPos').value, auto = $('#blendAuto').checked && blendMode === 'dlna', set = S.settings || {};
+  const pos = +$('#blendPos').value, auto = $('#blendAuto').checked && blendMode !== 'manual', set = S.settings || {};
   const tgt = Math.round(set.test_spl || 75), mx = set.avr_test_max_volume;
   if (!confirm(`Run the blend test at ${spotName(pos)}?\n\n` +
       (auto ? `First soft pink noise plays while BassBlend steps the receiver volume to ${tgt} dB at the mic (never above ${mx != null ? mx : 'your current volume + 12'}). ` : '') +
-      `The receiver ${blendMode === 'dlna' ? 'plays' : 'will play'} ${blendSpk === 'LR' ? 'three sweeps (left speaker, right speaker, then left again with the subs; about 40 seconds)' : 'two sweeps on the left speaker (about 30 seconds)'}` +
+      (blendMode === 'hdmi' ? `The receiver switches to ${$('#blendInp').selectedOptions[0].textContent} (the Pi’s HDMI). ` : '') +
+      `The receiver ${blendMode !== 'manual' ? 'plays' : 'will play'} ${blendSpk === 'LR' ? 'three sweeps (left speaker, right speaker, then left again with the subs; about 40 seconds)' : 'two sweeps on the left speaker (about 30 seconds)'}` +
       `${auto ? '' : ' at its current volume'}. Input, mode, volume and power are put back afterwards.`)) return;
-  const r = await post('/api/avr/blend', {mode: blendMode, pos, speakers: blendSpk, auto_volume: auto}); if (r.error) alert(r.error); blendKey = null; poll();
+  const r = await post('/api/avr/blend', {mode: blendMode, pos, speakers: blendSpk, auto_volume: auto, avr_input: $('#blendInp').value}); if (r.error) alert(r.error); blendKey = null; poll();
 };
 setInterval(() => { if (sheetKey === 'avr') loadAvr(); }, 5000);
 
@@ -2209,20 +2246,24 @@ $('#ckRun').onclick = async () => {
   const r = await post('/api/run', {cmd: 'checkup', pos}); if (r.error) alert(r.error); ckKey = null; poll();
 };
 
-// ---------- all speakers (experimental, manual 7.1 playback)
+// ---------- all speakers (experimental, 7.1 over the Pi's HDMI)
 let allKey = null;
 function renderAllSpk() {
   const ar = S.allspk || {}, as = S.allspk_status || {}, job = S.job || {};
   const running = !!as.running && !!job.running;
-  const manual = $('#allMode').value === 'manual';
+  const manual = $('#allMode').value === 'manual', set = S.settings || {};
+  syncPlayback();
+  $('#allInpF').style.display = manual ? 'none' : '';
   $('#allAuto').disabled = manual;
-  $('#allRun').disabled = !!job.running || !!S.busy;
+  $('#allRun').disabled = !!job.running || !!S.busy || (!manual && (!S.pi_hdmi || !$('#allInp').value));
   $('#allRun').textContent = running ? (manual ? 'Listening…' : 'Running…') : manual ? 'Start listening' : 'Run all-speakers check';
   const how = manual ? `<ol class="howto"><li>Download <a href="/media/bassblend_all_speakers_7_1.wav" download>bassblend_all_speakers_7_1.wav</a> (8 channels, about a minute) to a USB stick or an HDMI source (PC, streamer, Blu-ray player).</li>
       <li>Set the receiver to a direct or multichannel listening mode (not Stereo or an upmixer) at a normal listening volume.</li>
       <li>Put the mic at your seat, press <b>Start listening</b>, then press play.</li></ol>`
-    : '<p class="muted small" style="margin:0">BassBlend sends the file to the receiver over the network and switches it to Direct mode so every channel reaches its own speaker. If only the front left and right come through, your receiver can’t play multichannel over the network: switch Playback to the USB stick / HDMI option.</p>';
-  if ($('#allHow').dataset.k !== String(manual)) { $('#allHow').dataset.k = String(manual); $('#allHow').innerHTML = how; }
+    : (S.pi_hdmi ? `<p class="muted small" style="margin:0"><b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> ` : `<p class="small" style="margin:0"><b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug a cable from the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on). `) +
+      'This test needs HDMI: the receiver’s network player can’t play 8 channels. BassBlend switches the receiver to the input you pick, sets Direct mode so every channel reaches its own speaker, plays the file from the Pi, and puts the input, mode and volume back afterwards.</p>';
+  const hk = manual + '|' + !!S.pi_hdmi;
+  if ($('#allHow').dataset.k !== hk) { $('#allHow').dataset.k = hk; $('#allHow').innerHTML = how; }
   const latest = Object.values(ar).sort((a, b) => b.t - a.t)[0];
   const key = JSON.stringify([latest && latest.t, running, as.text, as.error]);
   if (key === allKey) return; allKey = key;
@@ -2230,7 +2271,7 @@ function renderAllSpk() {
   if (latest) {
     const sp = latest.speakers;
     const f = v => (v > 0 ? '+' : '') + v.toFixed(1);
-    if (latest.stereo_only) h += '<div class="notice warn" style="margin-bottom:10px">Only the front left and right came through over the network: your receiver played the file in stereo. Switch Playback to the USB stick / HDMI option and run it again.</div>';
+    if (latest.stereo_only) h += '<div class="notice warn" style="margin-bottom:10px">Only the front left and right came through: the receiver got or played the file as stereo. Check it’s in Direct or a multichannel mode and run it again.</div>';
     h += `<div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>Played</th><th>Level vs front left</th><th>Arrival vs front left</th><th>Polarity</th></tr></thead><tbody>
       ${Object.entries(sp).map(([k, r]) => `<tr><td>${esc(r.name)}</td><td>${r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.level_vs_fl_db) + ' dB' : '–'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.arrival_vs_fl_ms) + ' ms (' + Math.abs(r.distance_vs_fl_cm) + ' cm)' : '–'}</td><td>${r.polarity == null ? '–' : r.polarity === 'reversed' ? '<b style="color:var(--bad)">reversed</b>' : r.polarity}</td></tr>`).join('')}</tbody></table></div>
       <ul class="dc-ra" style="margin-top:10px">${latest.advice.map(a => `<li class="${a.status === 'good' ? 'auto' : ''}">${esc(a.text)}</li>`).join('')}</ul>
@@ -2240,14 +2281,62 @@ function renderAllSpk() {
 }
 $('#allMode').onchange = () => { allKey = null; renderAllSpk(); };
 $('#allRun').onclick = async () => {
-  const pos = +$('#allPos').value, mode = $('#allMode').value, auto = $('#allAuto').checked && mode === 'dlna', set = S.settings || {};
-  const msg = mode === 'dlna'
-    ? `Run the all-speakers check at ${spotName(pos)}?\n\n` + (auto ? `First soft pink noise while BassBlend sets the receiver volume to ${Math.round(set.test_spl || 75)} dB at the mic (never above ${set.avr_test_max_volume ?? 'your volume + 12'}). ` : '') +
-      'Then the receiver plays a sweep on each speaker in turn and the subs, in Direct mode (about a minute). Input, mode, volume and sound settings are put back afterwards.'
+  const pos = +$('#allPos').value, mode = $('#allMode').value, auto = $('#allAuto').checked && mode === 'hdmi', set = S.settings || {};
+  const inp = $('#allInp').value, inpName = $('#allInp').selectedOptions[0]?.textContent || inp;
+  const msg = mode === 'hdmi'
+    ? `Run the all-speakers check at ${spotName(pos)}?\n\nThe receiver switches to ${inpName} (the Pi’s HDMI). ` + (auto ? `First soft pink noise while BassBlend sets the volume to ${Math.round(set.test_spl || 75)} dB at the mic (never above ${set.avr_test_max_volume ?? 'your volume + 12'}). ` : '') +
+      'Then a sweep on each speaker in turn and the subs, in Direct mode (about a minute). Input, mode, volume and sound settings are put back afterwards.'
     : 'Start listening for the 7.1 test file?\n\nAfter you press OK, press play on the file within 5 minutes. It plays a sweep on each speaker in turn (about a minute) at your receiver’s volume.';
   if (!confirm(msg)) return;
-  const r = await post('/api/allspk', {pos, mode, auto_volume: auto}); if (r.error) alert(r.error); allKey = null; poll();
+  const r = await post('/api/allspk', {pos, mode, auto_volume: auto, avr_input: inp}); if (r.error) alert(r.error); allKey = null; poll();
 };
+
+// ---------- height speakers (receiver test tone, one speaker at a time)
+let hgtKey = null;
+const HGT_NAMES = {TFL: 'Top front left', TFR: 'Top front right', TML: 'Top middle left', TMR: 'Top middle right', TRL: 'Top rear left', TRR: 'Top rear right'};
+const HGT_SETS = {2: ['TML', 'TMR'], 4: ['TFL', 'TFR', 'TRL', 'TRR'], 6: ['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']};
+function hgtRecvName(k, n) {
+  if (k === 'FL') return 'Front left'; if (k === 'FR') return 'Front right';
+  const groups = [...new Set((HGT_SETS[n] || []).map(x => x.slice(0, 2)))];
+  return `Height ${groups.indexOf(k.slice(0, 2)) + 1} ${k.endsWith('L') ? 'L' : 'R'}`;
+}
+function renderHeights() {
+  const h = S.heights || {}, hs = S.heights_status || {}, job = S.job || {};
+  const n = +((S.system || {}).heights || 0), keys = HGT_SETS[n] || [];
+  const running = !!hs.running && !!job.running;
+  const key = JSON.stringify([h.t, Object.keys(h.meas || {}), running, hs.step, hs.error, n, !!job.running, !!S.busy]);
+  if (key === hgtKey) return; hgtKey = key;
+  if (!keys.length) { $('#hgtOut').innerHTML = empty('No height speakers set up', 'Set your speaker layout (for example 7.1.4) in Setup → Your system, then come back.'); return; }
+  const rep = h.report || {}, rows = rep.rows || {}, meas = h.meas || {}, nxt = rep.next || 'noise';
+  const busy = !!job.running || !!S.busy;
+  const f = v => (v > 0 ? '+' : '') + v.toFixed(1);
+  const steps = [['noise', 'Room (test tone off)', 'Reads the room alone, so a speaker that isn’t playing is caught.'],
+    ['FL', 'Front left', 'The reference every height is compared with.'], ['FR', 'Front right', 'A check that the reference pair matches.'],
+    ...keys.map(k => [k, `${hgtRecvName(k, n)} · ${HGT_NAMES[k].toLowerCase()}`, ''])];
+  let t = `<div class="tw"><table class="dc-tbl"><thead><tr><th>Step</th><th>Receiver test tone on</th><th>Played</th><th>Level vs front left</th><th>Treble vs front left</th><th></th></tr></thead><tbody>`;
+  steps.forEach(([k, label, hint]) => {
+    const r = rows[k], m = meas[k], now = running && hs.step === k;
+    const played = k === 'noise' ? (m ? `${m.level_db.toFixed(0)} dB room` : '–') : r ? (r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>') : '–';
+    const lvl = r && r.vs_fl_db != null && r.heard ? f(r.vs_fl_db) + ' dB' : k === 'FL' && r ? 'reference' : '–';
+    const tre = r && r.treble_vs_fl_db != null && r.heard ? f(r.treble_vs_fl_db) + ' dB' : '–';
+    const btn = now ? '<span class="spin"></span>' : `<button class="btn ${k === nxt && !m ? 'primary' : 'ghost'}" data-hstep="${k}" ${busy ? 'disabled' : ''}>${m ? 'Again' : 'Measure'}</button>`;
+    t += `<tr><td>${esc(label)}${hint ? `<div class="muted small">${hint}</div>` : ''}</td><td>${k === 'noise' ? '<i>off</i>' : esc(hgtRecvName(k, n))}</td><td>${played}</td><td>${lvl}</td><td>${tre}</td><td style="text-align:right">${btn}</td></tr>`;
+  });
+  t += '</tbody></table></div>';
+  let o = hs.error ? `<div class="notice bad" style="margin-bottom:10px">${esc(hs.error)}</div>` : '';
+  if (running) o += `<div class="notice" style="margin-bottom:10px"><span class="spin"></span>&nbsp; Measuring ${esc(hs.step === 'noise' ? 'the room' : hgtRecvName(hs.step, n))}… keep the room quiet.</div>`;
+  o += t;
+  if ((rep.advice || []).length) o += `<ul class="dc-ra" style="margin-top:10px">${rep.advice.map(a => `<li class="${a.status === 'good' ? 'auto' : ''}">${esc(a.text)}</li>`).join('')}</ul>`;
+  if (h.t) o += `<p class="muted small" style="margin:8px 0 0">${spotName(h.pos || 1)} · started ${new Date(h.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}. Levels are the 500 Hz–2 kHz band of the receiver’s test tone; treble is the 2–8 kHz balance against the front left. Distance and polarity need a sweep, so they aren’t part of this check.</p>`;
+  $('#hgtOut').innerHTML = o;
+  $('#hgtOut').querySelectorAll('[data-hstep]').forEach(b => b.onclick = async () => {
+    const step = b.dataset.hstep, pos = +$('#hgtPos').value;
+    if (step !== 'noise' && !meas.noise && !confirm('The room hasn’t been measured yet (test tone off), so BassBlend can’t tell whether this speaker is playing. Measure it anyway?')) return;
+    const r = await post('/api/heights', {step, pos}); if (r.error) alert(r.error); hgtKey = null; poll();
+  });
+}
+$('#hgtReset').onclick = async () => { if (!confirm('Forget this height check and start over?')) return; const r = await post('/api/heights', {action: 'reset'}); if (r.error) alert(r.error); hgtKey = null; poll(); };
+$('#hgtPos').onchange = () => { hgtKey = null; };
 
 // ---------- sub headroom
 let hrKey = null;
@@ -2344,7 +2433,8 @@ function renderFix(r, running) {
         (auto.length ? `1. ${auto.map(subTxt).join(', ')}.\n` : '1. Sub level: already on target, left alone.\n') +
         `2. Blend test (sweeps on the left and right speakers, volume set automatically up to ${set.avr_test_max_volume ?? 'your volume + 12'}), and if a sub delay or polarity change helps, save it as a new tune on the playing slot (never slot 1).\n` +
         `3. A new system report to compare.\n\nAbout 3 minutes of sweeps. Your volume, input and mode are put back afterwards; the new sub level stays.`)) return;
-    const res = await post('/api/fixup', {pos: r.pos}); if (res.error) alert(res.error); fixKey = null; poll();
+    const fm = $('#dcMode').value === 'hdmi' && S.pi_hdmi && $('#dcInp').value ? 'hdmi' : 'dlna';
+    const res = await post('/api/fixup', {pos: r.pos, mode: fm, avr_input: $('#dcInp').value}); if (res.error) alert(res.error); fixKey = null; poll();
   };
 }
 const DC_WORD = {good: 'Good', watch: 'Worth a look', fix: 'Fix this', info: 'For info'};
@@ -2363,10 +2453,12 @@ function renderDeep() {
   }
   const nSpots = Math.max(3, Object.keys(S.measurements || {}).length);
   if ($('#dcPos').options.length !== nSpots) $('#dcPos').innerHTML = Array.from({length: nSpots}, (_, i) => `<option value="${i + 1}">${spotName(i + 1)}</option>`).join('');
-  const manual = $('#dcMode').value === 'manual';
+  syncPlayback();
+  const manual = $('#dcMode').value === 'manual', viaHdmi = $('#dcMode').value === 'hdmi';
   $('#dcAuto').disabled = manual;
-  $('#dcFile').innerHTML = manual ? 'Copy <a href="/media/bassblend_full_range_test.wav" download>bassblend_full_range_test.wav</a> to a USB stick, plug it into the receiver, press Run, then press play on the receiver.' : '';
-  $('#dcRun').disabled = !!job.running || !!S.busy;
+  $('#dcInpF').style.display = viaHdmi ? '' : 'none';
+  $('#dcFile').innerHTML = manual ? 'Copy <a href="/media/bassblend_full_range_test.wav" download>bassblend_full_range_test.wav</a> to a USB stick, plug it into the receiver, press Run, then press play on the receiver.' : viaHdmi ? piHint() : '';
+  $('#dcRun').disabled = !!job.running || !!S.busy || (viaHdmi && (!S.pi_hdmi || !$('#dcInp').value));
   $('#dcRun').textContent = running ? 'Running…' : Object.keys(reps).length ? 'Run again' : 'Run system report';
   const latest = deepLatest();
   const comb = S.deep_combined;
@@ -2567,16 +2659,17 @@ $('#dcPrint').onclick = () => {
   setTimeout(() => window.print(), 50);
 };
 $('#dcRun').onclick = async () => {
-  const pos = +$('#dcPos').value, mode = $('#dcMode').value, auto = $('#dcAuto').checked && mode === 'dlna';
+  const pos = +$('#dcPos').value, mode = $('#dcMode').value, auto = $('#dcAuto').checked && mode !== 'manual';
   const tgt = +$('#dcSpl').value, mx = $('#dcMax').value.trim();
   const set = {test_spl: tgt}; if (mx !== '') set.avr_test_max_volume = +mx;
   const sr = await post('/api/settings', set); if (sr.error) { alert(sr.error); return; }
   if (!confirm(`Run the system report at ${spotName(pos)}?\n\n` +
       (auto ? `First soft pink noise plays while BassBlend steps the receiver volume until it reads ${tgt} dB at the mic` +
               ` (never above ${mx !== '' ? mx : 'your current volume + 12'}). ` : 'The receiver stays at its current volume. ') +
+      (mode === 'hdmi' ? `The receiver switches to ${$('#dcInp').selectedOptions[0].textContent} (the Pi’s HDMI) for the test. ` : '') +
       `Then three 8-second sweeps play: left speaker, right speaker, both (about a minute in all).\n\n` +
       `Your input, listening mode and volume are put back afterwards. Keep the mic at ear height, and the room quiet.`)) return;
-  const r = await post('/api/deepcheck', {pos, mode, auto_volume: auto});
+  const r = await post('/api/deepcheck', {pos, mode, auto_volume: auto, avr_input: $('#dcInp').value});
   if (r.error) alert(r.error); dcKey = null; poll();
 };
 
@@ -3066,6 +3159,7 @@ const MENU = [
   {grp: 'Measure', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
   {grp: 'Measure', key: 'allspk', icon: 'report', title: 'All speakers', full: 'All speakers (experimental)', el: $('#allCard'), tag: () => null},
+  {grp: 'Measure', key: 'heights', icon: 'report', title: 'Height speakers', full: 'Height speakers (Atmos)', el: $('#hgtCard'), tag: () => null},
   {grp: 'Measure', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
   {grp: 'Measure', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
@@ -3144,7 +3238,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderHeights(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     if (sheetKey && !$('#sheetNav').contains(document.activeElement)) renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);
