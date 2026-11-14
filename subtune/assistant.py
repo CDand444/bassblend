@@ -205,6 +205,11 @@ TOOLS = [
        "subwoofer level to bring the bass to the target, runs a left+right blend test and applies the blend fix "
        "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
        "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
+    _t("run_headroom", "LOUD test: how loud one sub output can play cleanly at 25, 40 and 63 Hz. Tone bursts rise 3 dB "
+       "at a time from quiet and stop automatically at 5-10% distortion, 3 dB compression, mic overload, 105 dB at the "
+       "mic or -12 dBFS. Only propose it when headroom matters (the owner listens loud, distortion or rattles, choosing "
+       "Hsu EQ1/EQ2 or port modes); warn it gets loud and ask the owner to keep ears and the mic at the seat.",
+       {"output": {"type": "integer", "description": "1-based sub output"}}, ["output"], approval=True),
     _t("run_avr_blend", "Measure through the receiver: left speaker alone, then with subs; finds the sub "
        "timing/polarity and level that blend best with the speakers. Plays sweeps through the receiver; "
        "with auto_volume it first sets the volume to the test level (and puts it back after).",
@@ -249,6 +254,7 @@ DESCRIBE = {
                                 + ("left + right speakers" if i.get("speakers") == "both" else "left speaker")
                                 + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
                                 + (", volume set automatically" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+    "run_headroom": lambda i: f"LOUD: headroom test on output {i['output']} (rising tone bursts, stops automatically)",
     "fix_from_report": lambda i: (f"Fix what BassBlend can at spot {i['pos']}: set the receiver's sub level, blend test + "
                                   "blend fix on the playing slot, then a new system report (several minutes of sweeps)"),
     "run_system_report": lambda i: (f"Full-range system report at spot {i['pos']}: sweeps on the left, right and both "
@@ -421,7 +427,7 @@ def _brief(name, inp, out):
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",
              "get_system_report": "Read the system report", "run_system_report": "Ran the system report",
              "get_tuning_plan": "Checked what to do next", "get_journal": "Read the tuning journal",
-             "fix_from_report": "Fixed what BassBlend can",
+             "fix_from_report": "Fixed what BassBlend can", "run_headroom": "Ran the headroom test",
              "apply_avr_blend": "Applied the blend fix"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):

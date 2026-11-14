@@ -25,7 +25,7 @@ _lock = threading.Lock()
 
 ALLOWED = {"status": [], "prepare": [], "discover": [], "level": [], "selftest": [],
            "measure": ["pos"], "optimize": [], "apply": [], "verify": ["pos"], "baseline": ["pos"],
-           "restore": [], "unmute": [], "checkup": ["pos"], "levelmatch": []}
+           "restore": [], "unmute": [], "checkup": ["pos"], "levelmatch": [], "headroom": ["output"]}
 
 # editable tuning settings: key -> (type, min, max)
 SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (float, 0, 10),
@@ -664,6 +664,13 @@ def build_executors():
         js = journal.recent(max(1, min(100, int(n))))
         return {"entries": js, "summary": f"{len(js)} entries"}
 
+    def headroom_run(output):
+        r = _measure(lambda: RUN.start_single("headroom", {"output": output}), "headroom", timeout=600)
+        h = (r or {}).get(str(output - 1)) or {}
+        from .headroom import summary_text
+        return {"results": [{k: x[k] for k in ("f", "max_clean_spl", "thd_at_max", "limited_by")} for x in h.get("results", [])],
+                "summary": summary_text(output - 1, h.get("results", [])) if h else "no result"}
+
     def fix_run(pos):
         r = _measure(lambda: RUN.start_fixup({"pos": pos}), "fix_result", timeout=900)
         return {**(r or {}), "summary": "; ".join(s["text"] for s in (r or {}).get("steps", []))[:300]}
@@ -699,7 +706,7 @@ def build_executors():
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "get_system_report": report_get, "run_system_report": report_run,
-            "fix_from_report": fix_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
+            "fix_from_report": fix_run, "run_headroom": headroom_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "_tune_name": tune_name}
 
 

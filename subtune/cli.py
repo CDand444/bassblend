@@ -93,6 +93,18 @@ def cmd_selftest(a):
         sys.exit(2)
 
 
+def cmd_headroom(a):
+    """How loud one sub output can play cleanly (rising tone bursts with automatic stops)."""
+    from . import headroom
+    s = load_settings()
+    out = a.output - 1
+    if out not in s.get("subs", []):
+        sys.exit(f"output {a.output} is not a sub output")
+    with busy(f"headroom test on output {a.output}"):
+        rig = _rig()
+        _restoring(rig, lambda: headroom.run(rig, out))
+
+
 def cmd_tone(a):
     s = load_settings()
     out = a.output - 1
@@ -507,6 +519,9 @@ def main(argv=None):
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_deepcheck)
+    s = sp.add_parser("headroom", help="how loud one sub can play cleanly (loud; stops automatically)")
+    s.add_argument("--output", type=int, required=True, help="1-based output")
+    s.set_defaults(fn=cmd_headroom)
     s = sp.add_parser("fixup", help="fix what BassBlend can from the latest system report, then check again")
     s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
     s.add_argument("--pos", type=int, default=1)
