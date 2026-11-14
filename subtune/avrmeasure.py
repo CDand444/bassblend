@@ -282,7 +282,8 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
     r["advice"] = advice(r, snap)
     update_state(avr_blend=r, avr_blend_status={"running": False})
     from . import blendmulti                       # keep this seat for the multi-seat blend
-    blendmulti.save_seat(pos, Hm, Hs, (load_state().get("result") or {}).get("tune_id"), HmR=HmR)
+    blendmulti.save_seat(pos, Hm, Hs, (load_state().get("result") or {}).get("tune_id"), HmR=HmR,
+                         sub_level=snap.get("sub_level"))
     try:
         blendmulti.refresh()
     except Exception as e:                         # never lose the single-seat result over this

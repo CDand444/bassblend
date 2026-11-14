@@ -1,0 +1,161 @@
+<!-- htTamer manual: shown on the Manual page and at /manual. Plain HTML fragment. -->
+<nav class="man-toc" aria-label="Contents">
+  <a href="#m-what">What htTamer does</a>
+  <a href="#m-around">Getting around</a>
+  <a href="#m-setup">First-time setup</a>
+  <a href="#m-tune">Tuning the subs</a>
+  <a href="#m-blend">Blending subs and speakers</a>
+  <a href="#m-liveeq">Live EQ</a>
+  <a href="#m-report">System report and fixes</a>
+  <a href="#m-fixes">What htTamer changed</a>
+  <a href="#m-measure">Other tests</a>
+  <a href="#m-play">How tests play through the receiver</a>
+  <a href="#m-assistant">The assistant</a>
+  <a href="#m-dirac">Dirac Live</a>
+  <a href="#m-safety">Safety</a>
+  <a href="#m-trouble">When something goes wrong</a>
+  <a href="#m-words">Words used in the app</a>
+</nav>
+
+<h2 id="m-what">What htTamer does</h2>
+<p>htTamer tunes the subwoofers of a home theater. The receiver's subwoofer output goes into a <b>miniDSP 2x4HD</b>, which feeds each sub. htTamer measures every sub with a <b>UMIK-1</b> mic at your seats and works out a gain, a delay, a polarity and EQ filters for each sub. It then writes them into one of the miniDSP's four slots.</p>
+<p>It also checks how the subs blend with your speakers through the receiver, runs a full-range system report, gives you a live EQ with a live analyzer, and has an assistant that can explain results and run tests for you.</p>
+<p>The chain is: <i>source → receiver (Dirac Live, bass management) → sub out → miniDSP → subs</i>. htTamer controls the miniDSP and some receiver settings (input, volume during tests, sub level, listening mode). It can't change Dirac Live or the receiver's speaker setup menu, so it tells you exactly what to change there.</p>
+
+<h2 id="m-around">Getting around</h2>
+<ul>
+  <li><b>Home</b>: what's playing, the next best step, and what htTamer has changed.</li>
+  <li><b>Tune</b>: the guided <i>Tune my system</i> wizard, saved tunes and slots, the blend test, <b>Live EQ</b>, the filters on the miniDSP, and manual steps.</li>
+  <li><b>Measure</b>: the system report, the all-speakers check, check-up, raw measurements, level match, sub headroom and the sound level meter.</li>
+  <li><b>Setup</b>: the checklist, the receiver, the room and subs, your speakers, speaker placement and AI analysis.</li>
+  <li><b>System</b>: the activity log, the miniDSP's live meters, the settings file and this manual.</li>
+</ul>
+<p>On a phone the sections are along the bottom and each section's pages are pills at the top. The round chat button opens the <b>assistant</b> from any page. The header shows whether htTamer is busy, the miniDSP input (AVR or USB), the mic calibration and a small sound level meter. <b>Stop</b> in the header ends whatever test is running and puts the receiver back.</p>
+
+<h2 id="m-setup">First-time setup</h2>
+<p>Work down <b>Setup → Checklist</b>. Each line turns green when it's done.</p>
+<ol>
+  <li><b>Mic calibration</b>: upload your UMIK-1's calibration file (the one for its serial number). Every measurement uses it.</li>
+  <li><b>miniDSP</b>: connected over USB to the Pi. htTamer owns one slot (slot 3 here). <b>Slot 1 keeps your original setup and htTamer never writes to it.</b></li>
+  <li><b>Receiver</b>: its network address, so htTamer can switch inputs, set the test volume and read the sub level.</li>
+  <li><b>Room and subs</b>: the room size, your seats, and each sub's model and knob settings (ports, EQ mode, Q). Some sub modes forbid EQ boost below a frequency. htTamer obeys that everywhere.</li>
+  <li><b>Speakers</b>: the model and position of each speaker. This doesn't change tuning, but the assistant uses it for advice.</li>
+  <li><b>Pi HDMI</b> (recommended): a cable from the Pi's micro-HDMI port next to the USB-C power into a free receiver HDMI input. Pick that input once on any test page. Receiver tests then play from the Pi and htTamer switches the input for you.</li>
+</ol>
+
+<h2 id="m-tune">Tuning the subs</h2>
+<p><b>Tune → Tune my system</b> walks you through it.</p>
+<ol>
+  <li><b>Auto-tune</b> measures each sub on its own at several mic spots. The first spot is your main listening position (<b>MLP</b>); move the mic when asked. Each spot is a short sweep per sub.</li>
+  <li>htTamer then works out the best gain, delay, polarity and EQ so all seats are as even and as close to your <b>goal curve</b> as possible. The goal is flat, plus the "house curve" bass lift set in the target settings.</li>
+  <li>The result is applied to htTamer's slot and saved in <b>Tunes &amp; slots</b>. Every tune you ever applied is there, so you can always go back.</li>
+  <li><b>Verify</b> plays one sweep with all subs on and compares the real result with what was expected. Within about 1 dB means the tune works as planned.</li>
+</ol>
+<p>The <b>Result</b> chart shows "how it was" (measured), "expected after" (dashed) and "actual after" (verified). The shaded band is the range being tuned.</p>
+
+<h2 id="m-blend">Blending subs and speakers</h2>
+<p>Even a perfect sub tune can fight the speakers around the crossover (typically 60-120 Hz). The <b>Blend test</b> plays sweeps through the receiver: the front speaker alone, then the subs together with it. It reports how much bass is lost where they cancel ("dB lost"); under 1 dB is great.</p>
+<ul>
+  <li>Measure at the MLP, then at 2-3 more seats. htTamer finds <b>one</b> setting that works for all measured seats, weighting the MLP more.</li>
+  <li><b>Apply to all seats</b> bakes the fix (sub delay, polarity flip, optionally a phase filter) into a new tune on the playing slot. Measure the seats again afterwards: old seats belong to the old tune.</li>
+  <li>If the subs arrive late, only the receiver can fix it: increase its <i>Subwoofer distance</i> by the amount shown.</li>
+  <li><b>Sub level</b>: the button sets an exact level worked out from the measurement ("measured at −11 dB, 2.7 dB too quiet → set −8.5 dB"). It doesn't add to whatever the receiver is set to now, so pressing it again or refreshing the page doesn't move the target. Once the receiver is there, it shows ✓.</li>
+</ul>
+
+<h2 id="m-liveeq">Live EQ</h2>
+<p>Live EQ lets you add your own EQ bands on top of the playing tune and hear (and see) the change straight away.</p>
+<h3>How it works</h3>
+<ul>
+  <li>Each sub output on the miniDSP has 10 EQ bands. A tune uses some of them (for example 5). Live EQ puts <b>your bands in the free ones at the top</b>, up to 4, and uses <b>the same bands on every sub</b>.</li>
+  <li>Only those bands are written, so a change reaches the miniDSP in under a second and the tune's own filters, gains, delays and polarity are never touched. Your bands only go to htTamer's slot, and only while it's the one playing.</li>
+  <li>Each band is a <b>peaking filter</b>: a <b>frequency</b> (where), a <b>gain</b> (how much up or down) and a <b>Q</b> (how narrow: Q 5-8 is a narrow notch for one room resonance, Q 1-2 a broad hump).</li>
+  <li><b>Bypass</b> switches your bands off and on so you can compare (A/B). <b>Turn off</b> takes them off the miniDSP but keeps them on the page. Applying any tune also switches them off, because it rewrites every band.</li>
+  <li><b>Save into a new tune</b> copies the playing tune, adds your bands to every sub's filters and applies the copy. The old tune stays in Tunes &amp; slots.</li>
+</ul>
+<h3>Using the editor</h3>
+<ul>
+  <li><b>Add band</b> creates a band. When the analyzer is running it starts on the biggest peak above your goal.</li>
+  <li>Drag a numbered dot: left and right moves the frequency, up and down sets the gain. Scroll on a dot to change its width, or type exact numbers in the table.</li>
+  <li>The shaded red area at the left is where boosting is not allowed (ported subs in their current mode). The page also warns if your bands push a sub output above 0 dB inside the miniDSP, which can clip on loud scenes.</li>
+</ul>
+<h3>The live analyzer</h3>
+<ul>
+  <li><b>Start analyzer</b> sets the volume with the guarded auto-level, then plays <b>soft bass noise (15-200 Hz)</b> through the receiver in Stereo, so bass management sends it to the subs. It plays from the Pi's HDMI or the network player.</li>
+  <li>The orange line is the live response at the mic (calibrated, 1/6-octave smoothed, about 1 second of averaging). The dotted line is your goal. Both are shown around their average, so you're looking at <i>shape</i>, not loudness.</li>
+  <li><b>Hold curve</b> keeps a copy so you can compare before and after a change. <b>Response</b> chooses how quickly the curve follows (Fast is jumpier, Slow is steadier).</li>
+  <li>It stops by itself after 10 minutes, when you leave the page, or if the mic hears it far louder than your test level. The receiver input, mode and volume are put back when it stops.</li>
+</ul>
+<h3>Auto EQ with the assistant</h3>
+<p><b>Auto EQ with the assistant</b> asks the assistant to do it for you. It starts the analyzer (you approve the sound once), finds the biggest peak above the goal, sets a cut, waits for the analyzer to settle, checks whether the curve got closer to the goal, adjusts, and moves to the next peak. It stops when nothing improves any more or the free bands are used up, then tells you the before and after. It only <b>cuts</b>: a narrow dip is usually a cancellation that boosting can't fill and that only wastes amplifier power. It won't save the bands into a tune unless you ask (and approve).</p>
+<h3>Tips</h3>
+<ul>
+  <li>Keep the mic at the seat you're EQ'ing (normally the MLP). Live EQ helps that seat most; the tune itself balances all seats.</li>
+  <li>Cut peaks, don't fill dips. A peak that moves a lot when you move the mic a little is a seat-specific room mode: be gentle with it.</li>
+  <li>If the analyzer says the noise is only a few dB above the room, raise the volume a little.</li>
+</ul>
+
+<h2 id="m-report">System report and fixes</h2>
+<p><b>Measure → System report</b> plays full-range sweeps on the left, right and both front speakers with the subs. It reports the response against your goal per range, peaks and dips and their likely cause (room resonance, wall cancellation, reflection), left/right balance and timing, reverberation, distortion, noise, and bass extension. Each finding says who can fix it: htTamer, Dirac, the receiver menu (with the exact setting), or your hands (placement, furnishings, wiring).</p>
+<p><b>Fix what htTamer can</b> does the automatic part: sets the receiver's sub level, runs a blend test and applies the blend fix, then runs the report again.</p>
+
+<h2 id="m-fixes">What htTamer changed</h2>
+<p>Home shows one log of every fix since a <b>baseline</b> (the tune and receiver sub level before the first fix) and the <b>net</b> result, for example: "Subs +1.75 ms later, polarity flipped compared with 'Single MLP'; receiver sub level −15 → −11.5 dB". htTamer stops stacking blend fixes when they stop settling: more than two, tests that contradict each other, or a sub level that bounces up and down.</p>
+<ul><li><b>Keep these changes</b>: what's playing becomes the new baseline.</li><li><b>Undo all fixes</b>: the baseline tune and sub level go back.</li></ul>
+
+<h2 id="m-measure">Other tests</h2>
+<ul>
+  <li><b>All speakers</b> (needs the Pi's HDMI): a sweep on every bed speaker and the LFE from a 7.1 file. It checks each speaker's level and arrival against the front left. Height speakers can't be tested this way.</li>
+  <li><b>Check-up</b>: a 20-second health check at a spot: room noise, distortion, bass ringing and measurement quality.</li>
+  <li><b>Measurements</b>: each sub's raw response per spot, the data tunes are built from.</li>
+  <li><b>Level match</b>: a short rumble on each sub in turn to compare their loudness.</li>
+  <li><b>Sub headroom</b>: <b>loud</b>. Rising tone bursts on one sub until it distorts or compresses, to see how loud it plays cleanly.</li>
+  <li><b>Level meter</b>: a calibrated sound level meter (C-weighted and bass-only), accurate to about ±1-2 dB.</li>
+</ul>
+
+<h2 id="m-play">How tests play through the receiver</h2>
+<ul>
+  <li><b>Pi HDMI</b> (best): the Pi plays the test file out of its HDMI port. htTamer switches the receiver to the input you picked, and back afterwards. Up to 7.1 channels.</li>
+  <li><b>Network</b>: the receiver's network player fetches the file from htTamer. Stereo only.</li>
+  <li><b>USB stick</b>: you press play yourself. The file is offered for download on the page.</li>
+</ul>
+<p><b>Set the receiver volume for me</b> plays soft pink noise first and raises the volume in small steps until the mic reads your test level (75 dB by default). It never goes above your maximum test volume (Settings), or above your current volume + 12 when none is set, and never above 70. If raising doesn't make it louder, it stops. The original volume, input, listening mode, sub level and processing (Late Night, Cinema Filter, tone) are put back afterwards, including when you press Stop.</p>
+
+<h2 id="m-assistant">The assistant</h2>
+<p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
+
+<h2 id="m-dirac">Dirac Live</h2>
+<p>Order of work: <b>sub tune first</b>, then Dirac Live with htTamer's target curve (the Dirac step gives you the file), then the blend test with Dirac on, then verify and a system report. While Dirac is measuring, close htTamer's level meter and don't start an htTamer test: both use the same mic. A new sub tune means Dirac should be run again.</p>
+
+<h2 id="m-safety">Safety</h2>
+<ul>
+  <li>Nothing plays unless you start it (or approve it in the chat).</li>
+  <li>Slot 1 (your original setup) is never written.</li>
+  <li>The receiver volume is only raised by the guarded auto-level and is always put back.</li>
+  <li>No EQ boost where a sub's port mode can be damaged, and the forbidden knob combinations are flagged on Home.</li>
+  <li>Tests stop on overload (mic clipping or far above the test level).</li>
+</ul>
+
+<h2 id="m-trouble">When something goes wrong</h2>
+<ul>
+  <li><b>A test hears nothing</b>: is the receiver on, unmuted and on the right input? For Pi HDMI, the receiver should show a PCM signal while the test plays.</li>
+  <li><b>"Another step is running"</b>: wait, or press Stop in the header.</li>
+  <li><b>Live EQ won't send</b>: the miniDSP must be playing htTamer's slot (Tunes &amp; slots), and nothing else may be running.</li>
+  <li><b>The sub level changed by itself</b>: on Onkyo, a sub level set over the network is temporary and resets when the input changes. htTamer sets it again after its own tests.</li>
+  <li><b>The result doesn't match what was expected</b>: the mic sat differently, a sub knob moved, or a door was open. Verify again; re-measure if it persists.</li>
+  <li>Everything htTamer does is in <b>System → Activity</b>.</li>
+</ul>
+
+<h2 id="m-words">Words used in the app</h2>
+<dl>
+  <dt>MLP</dt><dd>Main listening position: the seat that matters most.</dd>
+  <dt>Slot</dt><dd>One of the miniDSP's four presets. htTamer uses slot 3; slot 1 is your original.</dd>
+  <dt>Goal / target curve</dt><dd>The response htTamer aims for: flat, plus a bass lift (house curve) below a corner frequency.</dd>
+  <dt>PEQ band</dt><dd>One parametric EQ filter: frequency, gain and Q.</dd>
+  <dt>Q</dt><dd>How narrow a band is. Higher means narrower.</dd>
+  <dt>Room mode</dt><dd>A resonance set by the room's dimensions: a peak at some seats and a dip at others.</dd>
+  <dt>Crossover</dt><dd>Where the receiver hands bass from the speakers to the subs (often 80 Hz).</dd>
+  <dt>Blend / dB lost</dt><dd>How well subs and speakers add up around the crossover. Lost dB is bass cancelled there.</dd>
+  <dt>Polarity</dt><dd>Whether a driver pushes or pulls on the same signal. Flipping a sub's polarity can fix a cancellation.</dd>
+  <dt>All-pass filter</dt><dd>A filter that shifts phase around one frequency without changing level, used to line up subs and speakers.</dd>
+  <dt>Headroom</dt><dd>How much louder something can go before it distorts or clips.</dd>
+</dl>

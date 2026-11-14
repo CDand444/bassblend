@@ -31,10 +31,14 @@ AP_MIN_GAIN = 0.2                      # dB an all-pass must improve on the plai
 
 
 # ---------------------------------------------------------------- seat storage
-def save_seat(pos, Hm, Hs, tune_id=None, HmR=None):
-    """Hm: left speaker alone, Hs: subs alone, HmR: right speaker alone (optional)."""
+def save_seat(pos, Hm, Hs, tune_id=None, HmR=None, sub_level=None):
+    """Hm: left speaker alone, Hs: subs alone, HmR: right speaker alone (optional).
+    sub_level: the receiver's subwoofer level while this seat was measured, so the level
+    advice is an absolute target from the measurement, not a change to whatever is set now."""
     SEAT_DIR.mkdir(parents=True, exist_ok=True)
     extra = {"HmR": np.asarray(HmR, complex)} if HmR is not None else {}
+    if sub_level is not None:
+        extra["sub_level"] = float(sub_level)
     np.savez(SEAT_DIR / f"seat{int(pos)}.npz", Hm=np.asarray(Hm, complex), Hs=np.asarray(Hs, complex),
              t=time.time(), tune_id=str(tune_id or ""), **extra)
 
@@ -45,7 +49,8 @@ def load_seats():
         for p in sorted(SEAT_DIR.glob("seat*.npz")):
             z = np.load(p)
             out[int(p.stem[4:])] = {"Hm": z["Hm"], "Hs": z["Hs"], "t": float(z["t"]), "tune_id": str(z["tune_id"]),
-                                    "HmR": z["HmR"] if "HmR" in z.files else None}
+                                    "HmR": z["HmR"] if "HmR" in z.files else None,
+                                    "sub_level": float(z["sub_level"]) if "sub_level" in z.files else None}
     return out
 
 
@@ -153,7 +158,12 @@ def optimise_multi(seats: dict, mlp_weight=2.0, house_db=0.0, house_fc=45.0):
         if HmR is not None:
             curves[str(p)].update({"mains_r": r(HmR), "now_r": r(HmR + Hs), "dsp_r": r(HmR + mult[idsp] * Hs)})
     level_err = float(wt @ np.array(errs))
+    # absolute target: each seat's sub level during its measurement minus what that seat read too loud
+    lvls = [seats[p].get("sub_level") for p in pos]
+    level_to = (round(float(wt @ (np.array(lvls, float) - np.array(errs))) * 2) / 2
+                if all(v is not None for v in lvls) else None)
     return {"seats": [str(p) for p in pos], "now_db": round(now_score, 2),
+            "sub_level_measured": {str(p): v for p, v in zip(pos, lvls)}, "sub_level_to": level_to,
             "now_seats": {str(p): round(float(now[k]), 2) for k, p in enumerate(pos)},
             "best": best, "dsp_only": dsp_only,
             "level_err_db": round(level_err, 1), "sub_level_change_db": round(-level_err * 2) / 2,
@@ -184,11 +194,19 @@ def advice(m):
             ft = abs(b["delay_ms"]) * 0.343 / 0.3048
             out.append({"kind": "avr", "text": f"Better still ({b['score_db']:.1f} dB): the subs arrive {abs(b['delay_ms']):.2f} ms late. "
                         f"Increase the receiver's Subwoofer distance by about {ft:.1f} ft, then re-measure the seats."})
-    lv = m["sub_level_change_db"]
+    lv, to = m["sub_level_change_db"], m.get("sub_level_to")
+    meas = sorted({v for v in (m.get("sub_level_measured") or {}).values() if v is not None})
     if abs(lv) >= 1:
-        out.append({"kind": "avr_level", "text": f"Across seats the subs are {abs(m['level_err_db']):.1f} dB "
-                    f"{'too loud' if lv < 0 else 'too quiet'} for your target. Change the receiver's sub level by {lv:+.1f} dB.",
-                    "change_db": lv})
+        if to is not None:
+            at = f"{meas[0]:+g} dB" if len(meas) == 1 else "sub levels " + ", ".join(f"{v:+g}" for v in meas) + " dB"
+            out.append({"kind": "avr_level", "text": f"Across seats the subs measured {abs(m['level_err_db']):.1f} dB "
+                        f"{'too loud' if lv < 0 else 'too quiet'} for your target (measured at {at}). "
+                        f"Set the receiver's sub level to {to:+.1f} dB.", "change_db": lv, "sub_level_to": to})
+        else:
+            out.append({"kind": "avr_level", "text": f"Across seats the subs are {abs(m['level_err_db']):.1f} dB "
+                        f"{'too loud' if lv < 0 else 'too quiet'} for your target. Some seats were measured before htTamer "
+                        "recorded the receiver's sub level, so it can't give an exact setting: run the blend test at "
+                        "those seats again.", "change_db": lv, "sub_level_to": None})
     worst = max(d["seats"], key=d["seats"].get)
     if d["seats"][worst] > 2:
         out.append({"kind": "warn", "text": f"Seat {worst} still loses {d['seats'][worst]:.1f} dB near the crossover. "
@@ -204,6 +222,10 @@ def refresh(update=True):
     res = load_state().get("result") or {}
     tid = str(res.get("tune_id") or "")
     seats = load_seats()
+    last = load_state().get("avr_blend") or {}              # seats saved before the sub level was stored:
+    lp, lv = last.get("pos"), (last.get("avr_before") or {}).get("sub_level")   # the latest run still knows it
+    if lp in seats and seats[lp].get("sub_level") is None and lv is not None and abs(seats[lp]["t"] - last.get("t", 0)) < 300:
+        seats[lp]["sub_level"] = float(lv)
     cur = {p: v for p, v in seats.items() if v["tune_id"] == tid}
     stale = sorted(set(seats) - set(cur))
     m = None

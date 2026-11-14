@@ -240,6 +240,33 @@ class Runner:
         self.cmd = "undo fixes"
         return self.cmd
 
+    def start_liveeq(self, body):
+        """The live EQ page's analyzer: bass noise through the receiver until stopped."""
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        mode, pargs = _playback(body, modes=("hdmi", "dlna"))
+        speed = body.get("speed") if body.get("speed") in ("fast", "normal", "slow") else "normal"
+        args = [sys.executable, "-m", "subtune", "liveeq", *pargs, "--speed", speed]
+        if body.get("auto_volume") is False:
+            args.append("--no-auto-volume")
+        from . import liveeq
+        liveeq.touch_poll()
+        update_state(live_rta_status={"running": True, "text": "Starting…", "mode": mode, "started": time.time()})
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = f"live analyzer ({mode})"
+        return self.cmd
+
+    def analyzer_running(self):
+        return self.proc is not None and self.proc.poll() is None and str(self.cmd or "").startswith("live analyzer")
+
+    def start_liveeq_bake(self):
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("stop the analyzer (or wait for the current step) first")
+        args = [sys.executable, "-m", "subtune", "liveeq-bake"]
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = "save live EQ into a tune"
+        return self.cmd
+
     def start_avrapply(self, multi=None):
         st = load_state()
         if self.running() or st.get("busy"):
@@ -271,9 +298,9 @@ class Runner:
         p = self.proc
         killed = False
         if p is not None and p.poll() is None:
-            p.terminate()
+            p.terminate()                         # the job puts the receiver back on its way out
             try:
-                p.wait(timeout=5)
+                p.wait(timeout=20)
             except subprocess.TimeoutExpired:
                 p.kill()
             killed = True
@@ -461,7 +488,7 @@ def mic_free() -> bool:
 
 
 for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup",
-              "start_allspk"):
+              "start_allspk", "start_liveeq"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -472,6 +499,99 @@ for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start
             MIC["held"] = False
             raise
     setattr(Runner, _name, _wrapped)
+
+
+class LiveWriter:
+    """Sends the live EQ to the miniDSP in the background, newest change only: a slider
+    dragged quickly sends many changes, and only the last one matters."""
+
+    def __init__(self):
+        self.io = threading.Lock()
+        self.pending = None
+        self.ev = threading.Event()
+        self.err = None
+        self.last = None
+        self.preset_t = 0.0
+        self.thread = None
+
+    @staticmethod
+    def _allowed():
+        if load_state().get("busy") or (RUN.running() and not RUN.analyzer_running()):
+            raise RuntimeError("wait for the current step to finish")
+
+    def submit(self, bands, bypass=False):
+        from . import liveeq
+        self._allowed()
+        cur, _ = liveeq.target_slot()
+        bands = liveeq.clean_bands(bands, cur)          # bad input is answered right away
+        liveeq.commands(bands, cur)
+        self.pending = (bands, bool(bypass))
+        if not self.thread or not self.thread.is_alive():
+            self.thread = threading.Thread(target=self._loop, daemon=True)
+            self.thread.start()
+        self.ev.set()
+        return {"bands": bands, "peak_db": liveeq.peak_gain(cur, bands)}
+
+    def _loop(self):
+        from . import liveeq
+        while True:
+            self.ev.wait()
+            self.ev.clear()
+            job, self.pending = self.pending, None
+            if not job:
+                continue
+            with self.io:
+                check = time.time() - self.preset_t > 15
+                try:
+                    self.last = liveeq.write(*job, check_preset=check)
+                    self.err = None
+                    if check:
+                        self.preset_t = time.time()
+                except Exception as e:                  # noqa: BLE001
+                    self.err, self.preset_t = str(e), 0.0
+                    try:                                # keep the owner's bands; they just aren't on the miniDSP
+                        liveeq._save(bands=job[0], bypass=job[1], active=False)
+                    except Exception:                   # noqa: BLE001
+                        pass
+
+    def clear(self):
+        from . import liveeq
+        self._allowed()
+        self.pending = None
+        with self.io:
+            out = liveeq.clear()
+        self.err = None
+        return out
+
+    def view(self):
+        return {"writing": self.pending is not None or self.io.locked(), "error": self.err}
+
+
+LIVE_EQ = LiveWriter()
+
+
+def liveeq_view():
+    from . import liveeq
+    from .config import PEQ_BANDS
+    st = load_state()
+    cur = st.get("result") or {}
+    le = liveeq.get(st)
+    try:
+        liveeq.target_slot(st)
+        why_not = None
+    except RuntimeError as e:
+        why_not = str(e)
+    slots = liveeq.slots_for(cur) if cur.get("subs") else []
+    return {"eq": le, "slots": len(slots), "max_bands": liveeq.MAX_BANDS, "used_bands": liveeq.used_bands(cur),
+            "peq_bands": PEQ_BANDS, "protect_hz": liveeq.protect_hz(cur) if cur.get("subs") else None,
+            "peak_db": liveeq.peak_gain(cur, le["bands"]) if cur.get("subs") and le["bands"] else None,
+            "tune": {"id": cur.get("tune_id"), "name": cur.get("tune_name"), "slot": cur.get("slot")},
+            "unavailable": why_not, "writer": LIVE_EQ.view(), "rta": liveeq.read_rta(),
+            "rta_status": st.get("live_rta_status") or {}, "analyzer": RUN.analyzer_running(),
+            "ranges": {"fc": liveeq.FC_RANGE, "q": liveeq.Q_RANGE, "gain": liveeq.GAIN_RANGE},
+            "playback": _playback_info(load_settings())}
+
+
 _ai = {"thread": None}
 _avr = {"t": 0, "data": None, "err": None, "obj": None}
 
@@ -809,6 +929,74 @@ def build_executors():
             raise RuntimeError(err)
         return {"slots": library.slots(), "summary": "blend fix applied"}
 
+    # ---- live EQ
+    def leq_get(wait_s=0):
+        from . import liveeq
+        import numpy as np
+        time.sleep(max(0.0, min(8.0, float(wait_s or 0))))      # let the analyzer settle after a change
+        liveeq.touch_poll()
+        v = liveeq_view()
+        out = {k: v[k] for k in ("eq", "slots", "max_bands", "protect_hz", "peak_db", "tune", "unavailable", "analyzer", "ranges")}
+        out["writer_error"] = v["writer"]["error"]
+        out["analyzer_status"] = (v["rta_status"] or {}).get("text") or (v["rta_status"] or {}).get("error")
+        r = v["rta"]
+        if r and r.get("db"):
+            f, d, g = np.array(r["f"]), np.array(r["db"]), np.array(r["goal"])
+            pts = np.geomspace(15, 250, 49)                      # 1/12 octave
+            dev = np.interp(np.log(pts), np.log(f), d - g)
+            band = r["band"]
+            inb = (f >= band[0]) & (f <= band[1])
+            e = (d - g)[inb]
+            out["analyzer"] = {"age_s": round(time.time() - r["t"], 1), "snr_db": r.get("snr_db"),
+                               "level_c_db": (r.get("level") or {}).get("c"), "tuned_band_hz": band,
+                               "rms_vs_goal_db": round(float(np.sqrt(np.mean(e ** 2))), 2),
+                               "vs_goal_db": [[round(float(x), 1), round(float(y), 1)] for x, y in zip(pts, dev)]}
+        else:
+            out["analyzer"] = None if not v["analyzer"] else {"status": "starting, no curve yet"}
+        return out
+
+    def leq_set(bands, bypass=False):
+        from . import liveeq
+        r = LIVE_EQ.submit(bands, bool(bypass))
+        t0 = time.time()
+        while time.time() - t0 < 15 and LIVE_EQ.view()["writing"]:
+            time.sleep(0.1)
+        if LIVE_EQ.err:
+            raise RuntimeError(LIVE_EQ.err)
+        from . import journal
+        journal.add("tune", "The assistant set the live EQ: " + liveeq.describe(r["bands"]) + (" (bypassed)" if bypass else ""))
+        return {"bands": r["bands"], "peak_db": r["peak_db"], "on_minidsp": True,
+                "summary": liveeq.describe(r["bands"]) + (f"; peak +{r['peak_db']:g} dB, may clip" if r["peak_db"] > 0 else "")}
+
+    def leq_start(mode="hdmi", auto_volume=True):
+        RUN.start_liveeq({"mode": mode, "auto_volume": bool(auto_volume)})
+        t0 = time.time()
+        from . import liveeq
+        while time.time() - t0 < 90:                           # volume first, then the first curve
+            liveeq.touch_poll()
+            time.sleep(1)
+            if not RUN.analyzer_running():
+                raise RuntimeError((load_state().get("live_rta_status") or {}).get("error") or "the analyzer stopped")
+            if liveeq.read_rta():
+                time.sleep(3)
+                return {"summary": "analyzer running; read it with get_live_eq", **{"analyzer": leq_get()["analyzer"]}}
+        return {"summary": "analyzer started but no curve yet; try get_live_eq in a few seconds"}
+
+    def leq_stop():
+        if RUN.analyzer_running():
+            RUN.stop()
+        return {"summary": "analyzer stopped, receiver put back"}
+
+    def leq_save():
+        t0 = time.time()
+        RUN.start_liveeq_bake()
+        _wait_job(120)
+        err = _last_error_since(t0)
+        if err:
+            raise RuntimeError(err)
+        r = load_state().get("result") or {}
+        return {"summary": f"saved: slot {r.get('slot')} now plays '{r.get('tune_name')}'"}
+
     def tune_name(tid):
         try:
             return library.get(tid)["name"]
@@ -823,6 +1011,8 @@ def build_executors():
             "get_equipment": equipment, "update_speakers": speakers_set, "update_room": room_set,
             "update_system": system_set, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
+            "get_live_eq": leq_get, "set_live_eq": leq_set, "start_live_analyzer": leq_start,
+            "stop_live_analyzer": leq_stop, "save_live_eq": leq_save,
             "_tune_name": tune_name}
 
 
@@ -1171,6 +1361,22 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, self._setup_status())
         if u.path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):
             return self._send(200, (WEB_DIR / "logo.svg").read_bytes(), "image/svg+xml")
+        if u.path == "/manual.html":                    # the manual as a fragment, for the Manual page
+            return self._send(200, (WEB_DIR / "manual.html").read_bytes(), "text/html; charset=utf-8")
+        if u.path == "/manual":                         # the same manual as its own page (print, new tab)
+            body = (WEB_DIR / "manual.html").read_text(encoding="utf-8")
+            page = ("<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content='width=device-width,initial-scale=1'>"
+                    "<title>htTamer manual</title><link rel=icon href=/logo.svg><style>"
+                    ":root{color-scheme:light dark;--t:#1d1d1b;--m:#6b6a65;--a:#2a78d6;--bg:#fbfaf7;--line:#e5e3dd}"
+                    "@media (prefers-color-scheme:dark){:root{--t:#ecebe6;--m:#a3a29c;--a:#5b9cf0;--bg:#191917;--line:#2f2f2c}}"
+                    "body{margin:0;background:var(--bg);color:var(--t);font:15px/1.6 system-ui,-apple-system,'Segoe UI',sans-serif}"
+                    "main{max-width:780px;margin:0 auto;padding:24px 16px 64px}h1{font-size:26px;margin:0 0 12px}"
+                    "h2{font-size:19px;margin:32px 0 8px;padding-top:12px;border-top:1px solid var(--line)}h3{font-size:15px;margin:18px 0 4px}"
+                    "a{color:var(--a)}.man-toc{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px}dt{font-weight:600;margin-top:8px}dd{margin:0 0 0 0;color:var(--m)}"
+                    "@media print{.man-toc{display:none}}</style></head><body><main>"
+                    "<h1><img src=/logo.svg alt='' width=28 height=28 style='vertical-align:-5px;margin-right:8px'>htTamer manual</h1>"
+                    + body + "</main></body></html>")
+            return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
         if u.path in ("/", "/index.html"):
             return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
         if u.path == "/api/state":
@@ -1238,6 +1444,10 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, _live_levels())
         if u.path == "/api/spl":
             return self._send(200, METER.read())
+        if u.path == "/api/liveeq":
+            from . import liveeq
+            liveeq.touch_poll()                          # the analyzer stops when nobody is looking
+            return self._send(200, liveeq_view())
         if u.path == "/api/avr":
             return self._send(200, avr_status(force="force" in q))
         if u.path == "/api/chat":
@@ -1422,6 +1632,21 @@ class H(BaseHTTPRequestHandler):
                 if body.get("action") == "revert":
                     return self._send(200, {"started": RUN.start_fixes_revert()})
                 raise ValueError("action must be accept or revert")
+            if path == "/api/liveeq":
+                act = body.get("action")
+                if act == "set":
+                    return self._send(200, LIVE_EQ.submit(body.get("bands") or [], body.get("bypass") is True))
+                if act == "clear":
+                    return self._send(200, LIVE_EQ.clear())
+                if act == "bake":
+                    return self._send(200, {"started": RUN.start_liveeq_bake()})
+                if act == "start":
+                    return self._send(200, {"started": RUN.start_liveeq(body)})
+                if act == "stop":
+                    if RUN.analyzer_running():
+                        threading.Thread(target=RUN.stop, daemon=True).start()   # it takes a few seconds to put the receiver back
+                    return self._send(200, {"ok": True})
+                raise ValueError("action must be set, clear, bake, start or stop")
             if path == "/api/allspk":
                 return self._send(200, {"started": RUN.start_allspk(body)})
             if path == "/api/fixup":

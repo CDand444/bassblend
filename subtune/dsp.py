@@ -123,11 +123,13 @@ class MiniDSP:
             raise DSPError(p.stderr.strip() or p.stdout.strip())
         return p.stdout
 
-    def batch(self, cmds: list[str], why: str = "") -> None:
-        """Send several commands in one USB session, journaling each one."""
+    def batch(self, cmds: list[str], why: str = "", quiet: bool = False) -> None:
+        """Send several commands in one USB session, journaling each one (quiet: not in the
+        activity log, for the live EQ's many small writes while a slider moves)."""
         if not cmds:
             return
-        event("dsp", why or f"{len(cmds)} DSP commands", cmds=cmds)
+        if not quiet:
+            event("dsp", why or f"{len(cmds)} DSP commands", cmds=cmds)
         self._run(["-f", "-"], stdin="\n".join(cmds) + "\n")
 
     def status(self) -> dict:

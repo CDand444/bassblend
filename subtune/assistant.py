@@ -117,7 +117,8 @@ update_speakers / update_room / update_system (they only change the fields you g
 for the owner to see), then say in one line what you saved. Ask only for what you can't infer; don't invent models \
 or positions. When speakers_missing isn't empty and the owner is setting up, offer to fill them in together.
 - Running tests: you can run every test yourself when the owner asks (run_measurement, run_checkup, run_verify, \
-level_match, run_avr_blend, run_system_report, run_all_speakers, run_headroom, fix_from_report, start_autotune). \
+level_match, run_avr_blend, run_system_report, run_all_speakers, run_headroom, fix_from_report, start_autotune, \
+start_live_analyzer). \
 Each one asks the owner to approve it first because it plays sound; pick sensible inputs (spot, playback mode from \
 get_overview -> playback) instead of asking, and after it finishes explain the result and the next step.
 - Fixes and re-applying (get_overview -> changes_since_baseline): htTamer keeps one log of every fix since a \
@@ -128,6 +129,19 @@ when this is available, and don't speculate about whether fixes stacked: the log
 don't propose another blend fix or sub level nudge; offer exactly two ways out: keep_fixes (accept what's \
 playing) or undo_fixes and then measure the blend at 2-3 seats. If "Receiver sub level now" differs from what \
 htTamer set, say plainly the receiver changed it (an input change resets a temporary sub level on Onkyo).
+- Live EQ (get_live_eq, set_live_eq, start_live_analyzer, stop_live_analyzer, save_live_eq): the owner's own bands \
+in the miniDSP bands the playing tune leaves free, applied to every sub, sent in under a second. When asked to EQ \
+automatically ("auto EQ", "fix that peak", "tune it by ear with the mic"): (1) if the analyzer isn't running, start it \
+(approval; mic at the MLP unless told otherwise); (2) get_live_eq with wait_s 0; check snr_db >= 10 (else ask the \
+owner to raise the volume a little); (3) cut the biggest peak above the goal inside the tuned band: fc = the peak, \
+gain = minus most of the excess (cuts only, -1 to -10 dB), Q 3-8 for a narrow room mode, 1-2 for a broad hump; \
+(4) set_live_eq with ALL bands (it replaces the list), then get_live_eq with wait_s 4 and compare rms_vs_goal_db; \
+nudge fc/gain/Q of the band you just set, or keep it and move to the next peak. Stop when rms_vs_goal_db stops \
+improving by 0.2 dB, the bands are used up, or after about 8 changes. Rules: cut, don't boost (never boost a dip \
+narrower than an octave: those are cancellations EQ can't fill; at most +3 dB for a broad shelf-like shortfall, \
+never below protect_hz); keep peak_db at or below 0; don't chase below 20 Hz or above the tuned band. Report in \
+two or three lines: what you set and the before/after rms. Then offer to save_live_eq (approval) or to leave the \
+bands live for listening, and stop the analyzer when done (no approval needed).
 - Playback for every receiver test (blend, system report, fix, all speakers): get_overview -> playback says whether \
 the Pi's HDMI is plugged in and which receiver input it's on. When it's ready use mode "hdmi" (the Pi plays the file \
 out of its HDMI port and htTamer switches the receiver to that input, then back); otherwise "dlna" (the receiver's \
@@ -289,6 +303,31 @@ TOOLS = [
        "baseline that later fixes are compared with. No sound.", approval=True),
     _t("undo_fixes", "Undo every fix since the baseline: the baseline sub tune goes back on the playing slot and the "
        "receiver sub level goes back to where it was. No sound.", approval=True),
+    _t("get_live_eq", "The live EQ: the owner's own bands on top of the playing tune (free miniDSP bands, same on every "
+       "sub), whether they're on the miniDSP, the no-boost limit, peak gain, and, while the live analyzer runs, the "
+       "mic's response minus the goal at 1/12-octave points (vs_goal_db: [Hz, dB]; positive = too loud), its RMS over "
+       "the tuned band and the signal-to-noise. wait_s: seconds to wait first so the analyzer settles after a change "
+       "(use 4 after set_live_eq).",
+       {"wait_s": {"type": "number", "description": "0-8 seconds"}}),
+    _t("set_live_eq", "Replace the live EQ bands and send them to the miniDSP at once (well under a second). Only the "
+       "free bands change; the tune's own filters, gain and delay are untouched, and the owner can bypass or turn them "
+       "off on the Live EQ page. bands: up to the free count, each {fc 15-250 Hz, q 0.3-12, gain_db -15..+6, on}. "
+       "An empty list removes them all. No sound of its own.",
+       {"bands": {"type": "array", "items": {"type": "object", "additionalProperties": False,
+                                             "properties": {"fc": {"type": "number"}, "q": {"type": "number"},
+                                                            "gain_db": {"type": "number"}, "on": {"type": "boolean"}},
+                                             "required": ["fc", "q", "gain_db", "on"]}},
+        "bypass": {"type": "boolean", "description": "true = keep the bands but switch them off (A/B)"}},
+       ["bands", "bypass"]),
+    _t("start_live_analyzer", "Start the live analyzer: plays soft bass noise (15-200 Hz) through the receiver until "
+       "stopped (max 10 minutes), after setting the volume with the guarded auto-level; the mic's response then shows "
+       "in get_live_eq. Needs the mic at the seat being EQ'd (normally the MLP).",
+       {"mode": {"type": "string", "enum": ["hdmi", "dlna"], "description": "hdmi = from the Pi's HDMI (preferred when "
+                                                                             "get_overview -> playback says it's ready)"},
+        "auto_volume": {"type": "boolean"}}, ["mode", "auto_volume"], approval=True),
+    _t("stop_live_analyzer", "Stop the live analyzer's noise and put the receiver back. The live bands stay on."),
+    _t("save_live_eq", "Bake the live EQ bands into a copy of the playing tune and apply it to the same slot (the "
+       "old tune stays in the library). Do this only when the owner is happy with the result.", approval=True),
 ]
 APPROVAL = {t["name"] for t in TOOLS if t["approval"]}
 REQUIRED = {t["name"]: t["input_schema"]["required"] for t in TOOLS}
@@ -347,6 +386,10 @@ DESCRIBE = {
     "keep_fixes": lambda i: "Keep the current fixes: make what's playing the new starting point",
     "run_measurement": lambda i: f"Measure every sub at spot {i['pos']} (a sweep on each sub, about a minute)",
     "undo_fixes": lambda i: "Undo all fixes: put the starting tune and receiver sub level back",
+    "start_live_analyzer": lambda i: ("Start the live analyzer: soft bass noise through the receiver until stopped (max 10 min)"
+                                      + (" from the Pi's HDMI" if i["mode"] == "hdmi" else " from the network player")
+                                      + (", volume set automatically and put back after" if i.get("auto_volume") else "")),
+    "save_live_eq": lambda i: "Save the live EQ bands into a new tune and apply it to the playing slot",
 }
 
 
@@ -515,6 +558,9 @@ def _brief(name, inp, out):
              "get_tuning_plan": "Checked what to do next", "get_journal": "Read the tuning journal",
              "fix_from_report": "Fixed what htTamer can", "run_headroom": "Ran the headroom test",
              "run_all_speakers": "Ran the all-speakers check",
+             "get_live_eq": "Read the live analyzer", "set_live_eq": "Set the live EQ",
+             "start_live_analyzer": "Started the live analyzer", "stop_live_analyzer": "Stopped the live analyzer",
+             "save_live_eq": "Saved the live EQ into a tune",
              "apply_avr_blend": "Applied the blend fix"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):

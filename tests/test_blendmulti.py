@@ -106,6 +106,20 @@ def test_curves_and_shape():
         assert all(len(v) == len(GRID) and np.isfinite(v).all() for v in c.values())
 
 
+def test_sub_level_target_is_absolute_from_the_measurement():
+    s = three_seats(-1.0)
+    m0 = bm.optimise_multi(s)
+    assert m0["sub_level_to"] is None, "unknown measured level: no exact setting"
+    for v in s.values():
+        v["sub_level"] = -6.0
+    m = bm.optimise_multi(s)
+    want = round((-6.0 - m["level_err_db"]) * 2) / 2
+    assert abs(m["sub_level_to"] - want) <= 0.5, (m["sub_level_to"], want)
+    m["advice"] = bm.advice(m)
+    lv = [a for a in m["advice"] if a["kind"] == "avr_level"]
+    assert not lv or lv[0]["sub_level_to"] == m["sub_level_to"], "the button uses the measured target, not today's level"
+
+
 def test_single_seat_works():
     m = bm.optimise_multi({1: seat(10, 7)})
     assert m["seats"] == ["1"] and m["dsp_only"]["score_db"] <= m["now_db"]

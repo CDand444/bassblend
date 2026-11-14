@@ -213,6 +213,8 @@ def cmd_apply(a):
             verify.pop("after", None)
             meta = {}
         update_state(result=cur, verify=verify, verify_meta=meta)
+        from . import liveeq
+        liveeq.tune_applied()                              # every band was rewritten: the live EQ is off
         event("config", f"slot {slot0 + 1} now holds '{saved['name']}' and is the active preset")
         from . import journal
         ma = (cur.get("metrics") or {}).get("after") or {}
@@ -253,6 +255,23 @@ def cmd_deepcheck(a):
     except Exception as e:
         update_state(deep_status={"running": False, "error": str(e)})
         raise
+
+
+def cmd_liveeq(a):
+    """Live analyzer for the live EQ page; runs until stopped (or the time limit)."""
+    from . import liveeq
+    try:
+        liveeq.run_rta(a.mode, a.avr_input, auto_volume=not a.no_auto_volume, minutes=a.minutes, speed=a.speed)
+    except BaseException as e:
+        if not (isinstance(e, SystemExit) and str(e) == "stopped"):
+            update_state(live_rta_status={"running": False, "error": str(e) or type(e).__name__})
+        raise
+
+
+def cmd_liveeq_bake(a):
+    from . import liveeq
+    with busy("save live EQ into a tune"):
+        print(json.dumps(liveeq.bake()))
 
 
 def cmd_fixup(a):
@@ -630,8 +649,31 @@ def main(argv=None):
     s = sp.add_parser("import-config", help="load a settings file saved by export-config or the dashboard")
     s.add_argument("file")
     s.set_defaults(fn=cmd_import_config)
+    s = sp.add_parser("liveeq", help="live analyzer: bass noise through the receiver, the mic's response live")
+    s.add_argument("--mode", choices=["hdmi", "dlna"], default="hdmi")
+    s.add_argument("--avr-input", default=None, help="receiver input the Pi's HDMI is plugged into (hdmi mode)")
+    s.add_argument("--minutes", type=float, default=10.0)
+    s.add_argument("--speed", choices=["fast", "normal", "slow"], default="normal")
+    s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
+    s.set_defaults(fn=cmd_liveeq)
+    s = sp.add_parser("liveeq-bake", help="save the live EQ bands into a new tune and apply it")
+    s.set_defaults(fn=cmd_liveeq_bake)
     a = p.parse_args(argv)
+    _stop_cleanly()
     a.fn(a)
+
+
+def _stop_cleanly():
+    """Stop (SIGTERM from the dashboard) unwinds like an error, so every test's `finally`
+    puts the receiver, the miniDSP input and the volume back before the process ends."""
+    import signal
+    if hasattr(signal, "SIGTERM"):
+        def _term(*_):
+            raise SystemExit("stopped")
+        try:
+            signal.signal(signal.SIGTERM, _term)
+        except ValueError:                                  # not the main thread (tests)
+            pass
 
 
 if __name__ == "__main__":
