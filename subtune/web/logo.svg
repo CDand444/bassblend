@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="htTamer">
+  <title>htTamer</title>
+  <defs>
+    <linearGradient id="ht-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#3d8df0"/>
+      <stop offset="1" stop-color="#1b4c9e"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#ht-bg)"/>
+  <!-- a wild room-bass swing settling into a flat, tamed line -->
+  <path d="M9 33C12.5 12 16.5 12 19 33S25 52 28 33S33.5 22 36 33S41 40 43 33S47 30.5 49 33H55"
+        fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

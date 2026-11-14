@@ -1,4 +1,4 @@
-"""Tuning coach: the next best steps, worked out from everything BassBlend knows.
+"""Tuning coach: the next best steps, worked out from everything htTamer knows.
 
 No AI needed: plain rules over the setup, the sub hardware settings, the tune,
 its verification, the blend, Dirac, the system report and the receiver. The
@@ -51,10 +51,10 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
                          "Without it every measurement is off by the mic's own error (several dB in the bass and treble).",
                          who="owner", open="setup"))
     if not settings.get("avr_host"):
-        out.append(_step(2, "receiver", "setup", "Connect BassBlend to your receiver",
+        out.append(_step(2, "receiver", "setup", "Connect htTamer to your receiver",
                          "The blend test, the system report and the automatic fixes all go through it.", who="owner", open="avr"))
     if not sub_outs:
-        out.append(_step(2, "subs", "setup", "Tell BassBlend which outputs drive subs", "Nothing can be tuned until it knows.",
+        out.append(_step(2, "subs", "setup", "Tell htTamer which outputs drive subs", "Nothing can be tuned until it knows.",
                          who="owner", open="setup"))
     if live_dsp is not None and not live_dsp.get("master"):
         out.append(_step(3, "dsp", "setup", "Reconnect the miniDSP", "It isn't answering over USB.", who="owner", open="setup"))
@@ -83,7 +83,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
             kinds.setdefault(f"{c['brand']} {c['model']}", [x["label"] for x in c["controls"][:4]])
         what = "; ".join(f"{m}: {', '.join(lbl)}" for m, lbl in kinds.items())
         out.append(_step(5, "hw_record", "hardware", f"Record how your subs are set ({outs})",
-                         f"Their knobs and switches change how they play ({what}). Once BassBlend knows them it can protect "
+                         f"Their knobs and switches change how they play ({what}). Once htTamer knows them it can protect "
                          "the drivers, spot conflicts and suggest better settings. Room & subs → Controls on the sub.",
                          who="owner", open="room"))
     if rep and rep.get("lr", {}).get("polarity") == "reversed":
@@ -106,7 +106,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
     # ---- the sub tune
     if sub_outs and not tuned:
         out.append(_step(6, "autotune", "tune", "Tune the subs (auto-tune)",
-                         "BassBlend measures each sub at your seats and writes delay, gain, polarity and EQ to the miniDSP.",
+                         "htTamer measures each sub at your seats and writes delay, gain, polarity and EQ to the miniDSP.",
                          sound=True, open="wiz:tune", tool="start_autotune", inp={"spots": 3, "prechecks": True}))
     verified = (st.get("verify") or {}).get("after") or {}
     vmeta = st.get("verify_meta") or {}
@@ -142,22 +142,22 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
 
     # ---- Dirac
     if sy.get("dirac") and tuned and not sy.get("dirac_current"):
-        out.append(_step(10, "dirac", "dirac", "Run Dirac Live with BassBlend's target",
+        out.append(_step(10, "dirac", "dirac", "Run Dirac Live with htTamer's target",
                          "The sub tune changed since Dirac last measured, so its correction no longer fits.",
-                         who="dirac", open="wiz:dirac", ask="Walk me through running Dirac Live with BassBlend's target curve."))
+                         who="dirac", open="wiz:dirac", ask="Walk me through running Dirac Live with htTamer's target curve."))
 
     # ---- system report and what it found
     old_format = rep and "bass_vs_target_db" not in rep          # made before the fixes and receiver advice existed
     stale = rep and ((tuned and res.get("applied") and rep["t"] < res["applied"]) or old_format)
     if tuned and settings.get("avr_host") and (not rep or stale):
         out.append(_step(11, "report", "verify", "Run a system report" + (
-            " (the last one is from an older BassBlend)" if old_format else " (the tune changed since the last one)" if stale else ""),
+            " (the last one is from an older htTamer)" if old_format else " (the tune changed since the last one)" if stale else ""),
                          "A full-range check of speakers and subs as you listen, with fixes and exact receiver numbers.",
                          sound=True, open="report", tool="run_system_report", inp={"pos": 1, "mode": _mode(), "auto_volume": True}))
     if rep and not stale:
         auto = [a for a in rep.get("receiver_advice") or [] if a["kind"] == "auto"]
         if auto or any(f["status"] == "fix" and f["area"] == "bass" for f in rep["findings"]):
-            out.append(_step(12, "fixup", "receiver", "Fix what BassBlend can from the report",
+            out.append(_step(12, "fixup", "receiver", "Fix what htTamer can from the report",
                              (auto[0]["text"] if auto else "The bass is off target.") + " Then a blend fix and a re-check, automatically.",
                              sound=True, open="report", tool="fix_from_report", inp={"pos": rep["pos"]}))
         for a in rep.get("receiver_advice") or []:

@@ -54,7 +54,7 @@ DEFAULTS = {
     "minidsp_url": None,          # cached HID path (probe is slow)
     "device_kind": "m2x4hd",      # forced: this unit reports dsp_version 99
     "cal_file": None,             # UMIK-1 calibration file
-    "preset": None,               # 0-based preset slot BassBlend owns
+    "preset": None,               # 0-based preset slot htTamer owns
     "subs": [],                   # output indices (0-based) that drive subs
     "ref_sub": None,              # timing reference sub (default: first in subs)
     "restore_source": None,       # source to restore after measuring

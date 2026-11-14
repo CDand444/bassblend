@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Build the BassBlend SD card image with pi-gen, inside Docker.
+# Build the htTamer SD card image with pi-gen, inside Docker.
 # Works from Linux, macOS, or Git Bash on Windows with Docker Desktop running.
 #
 #   deploy/pi-gen/build-image.sh            # result: dist/bassblend-<version>.img.xz
 #   BASSBLEND_SETTINGS=my-settings.json deploy/pi-gen/build-image.sh
 #                                           # also put a settings file on the card: imported on first boot
-#   RESUME=1 deploy/pi-gen/build-image.sh   # after a failed BassBlend stage: reuse the finished
+#   RESUME=1 deploy/pi-gen/build-image.sh   # after a failed htTamer stage: reuse the finished
 #                                           # Raspberry Pi OS stages (saves ~35 minutes)
 #
 # Takes 1-2 hours (most of it is building for the Pi's ARM processor through emulation).
-# The image contains the BassBlend files as they are in this folder right now
+# The image contains the htTamer files as they are in this folder right now
 # (tracked files, including uncommitted edits), never your data/ folder or keys.
 set -euo pipefail
 # Git Bash on Windows rewrites arguments that look like Unix paths. Container paths
@@ -50,8 +50,8 @@ if [ "$RESUME" = "1" ]; then                    # the Raspberry Pi OS stages are
   for st in stage0 stage1 stage2; do touch "$WORK/$st/SKIP"; done
 fi
 
-say "Adding the BassBlend stage and settings"
-rm -f "$WORK/stage2/EXPORT_IMAGE"              # only export the finished BassBlend image
+say "Adding the htTamer stage and settings"
+rm -f "$WORK/stage2/EXPORT_IMAGE"              # only export the finished htTamer image
 cp "$HERE/config" "$WORK/config"
 echo "BASSBLEND_VERSION=\"$VERSION\"" >> "$WORK/config"
 rm -rf "$WORK/stage-bassblend"
@@ -77,7 +77,7 @@ dk build -q --build-arg BASE_IMAGE=docker.io/debian:trixie -t pi-gen "$(hostpath
 
 if [ "$RESUME" = "1" ]; then
   RUN_AS="${NAME}_cont"; RUN_OPTS="--rm --volumes-from=$NAME"
-  say "Resuming: building only the BassBlend stage. Progress: docker logs -f $RUN_AS"
+  say "Resuming: building only the htTamer stage. Progress: docker logs -f $RUN_AS"
 else
   RUN_AS="$NAME"; RUN_OPTS=""
   say "Building the image (1-2 hours). Progress: docker logs -f $NAME"

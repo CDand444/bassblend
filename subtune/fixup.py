@@ -1,7 +1,7 @@
-"""'Fix what BassBlend can': act on a system report, then check the result.
+"""'Fix what htTamer can': act on a system report, then check the result.
 
 Steps (each logged; the receiver and miniDSP are only changed in the guarded ways
-BassBlend always uses):
+htTamer always uses):
   1. Subwoofer level: the receiver's sub level moves by the report's bass-vs-target
      error (rounded to 0.5 dB; at most +3 dB up in one go).
   2. Blend: a left+right blend test (volume set automatically), and if a sub delay
@@ -11,7 +11,7 @@ BassBlend always uses):
   3. A fresh system report at the same spot, labelled "after fixes", so the page
      can show before and after.
 Speaker distances and levels (receiver menu), Dirac Live and anything physical are
-listed for the owner; BassBlend can't change those.
+listed for the owner; htTamer can't change those.
 """
 from __future__ import annotations
 
@@ -90,7 +90,7 @@ def run(pos=1, mode="dlna", log=None, status=None, avr_input=None):
               "still_to_do": [a["text"] for a in left]}
     update_state(fix_result=result, fix_status={"running": False})
     from . import journal
-    journal.add("fix", "Fix what BassBlend can: " + " ".join(s["text"] for s in steps)
+    journal.add("fix", "Fix what htTamer can: " + " ".join(s["text"] for s in steps)
                 + f" Bass vs target {result['before']['bass_vs_target_db']:+.1f} → {result['after']['bass_vs_target_db']:+.1f} dB.", pos=pos)
     log("measure", f"fixes at spot {pos}: " + "; ".join(s["step"] + (" done" if s["done"] else " skipped") for s in steps)
         + f"; bass vs target {result['before']['bass_vs_target_db']:+.1f} -> {result['after']['bass_vs_target_db']:+.1f} dB")

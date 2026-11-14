@@ -10,7 +10,7 @@ Supported:
 The assistant keeps its conversation in one format (content blocks: text,
 tool_use, tool_result); this module translates it to and from each provider,
 including tool calls. Models are chosen from the provider's own live list, so
-BassBlend never relies on model names that go out of date.
+htTamer never relies on model names that go out of date.
 
 Keys live in the config folder (one owner-only file per provider), never in the
 data folder, a settings file (unless asked) or git. They're only ever sent to

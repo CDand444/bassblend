@@ -1,4 +1,4 @@
-# BassBlend on a Raspberry Pi
+# htTamer on a Raspberry Pi
 
 Status: the code runs on Linux and has a setup script, but it has **not been tried on a real Pi
 yet**. Expect a first session of small fixes, ideally with Claude connected to the Pi (below).
@@ -11,14 +11,14 @@ yet**. Expect a first session of small fixes, ideally with Claude connected to t
 ## First install
 1. Write Raspberry Pi OS Lite (64-bit) to the SD card with **Raspberry Pi Imager**. In its settings,
    set the hostname to `bassblend`, create your user, turn on **SSH**, and add Wi-Fi if needed.
-2. Boot the Pi and copy the BassBlend folder to it, e.g. with git:
+2. Boot the Pi and copy the htTamer folder to it, e.g. with git:
    `git clone <your repo> ~/bassblend` (or copy the folder over).
 3. On the Pi:
    ```
    cd ~/bassblend
    sudo ./deploy/linux/install.sh
    ```
-   It installs everything and starts BassBlend.
+   It installs everything and starts htTamer.
 4. Open **http://bassblend.local:8765** on your phone or PC. The first visit opens a short
    **setup guide**: choose your PIN, add the mic calibration file, find the receiver, and
    (optionally) add your AI key. Do this straight away: until a PIN is chosen, anyone on your
@@ -60,7 +60,7 @@ next refresh. If the new version doesn't start within 30 seconds, the previous o
 The version shows at the bottom of the Settings file page.
 
 ## Developing with Claude on the Pi (live changes)
-Use the **dev** install, which runs BassBlend straight from your checkout as your own user, so edits
+Use the **dev** install, which runs htTamer straight from your checkout as your own user, so edits
 take effect after a restart:
 ```
 cd ~/bassblend

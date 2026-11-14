@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Send this folder's BassBlend code to the Pi over SSH (an over-the-air update from your laptop).
+# Send this folder's htTamer code to the Pi over SSH (an over-the-air update from your laptop).
 #
 #   deploy/push-update.sh            # push once
 #   deploy/push-update.sh --watch    # keep pushing whenever a file changes (Ctrl+C to stop)

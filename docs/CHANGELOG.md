@@ -1,10 +1,10 @@
-# BassBlend changelog
+# htTamer changelog
 
 ## Nov 14, 2026 (overnight) - pro views, placement, headroom, all speakers, offline helper
 
 Built and tested offline (simulations and the browser); nothing played on the real system.
 
-- **Offline helper**: with no AI provider, the chat answers from BassBlend's own data (next steps,
+- **Offline helper**: with no AI provider, the chat answers from htTamer's own data (next steps,
   latest report, sub settings with warnings, receiver processing, playing tune) and a glossary.
 - **Settings files** carry system reports, report history, the last fixes and the tuning journal.
 - **System report pro views**: phase, group delay, impulse and step response, bass waterfall
@@ -33,7 +33,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
   listen); each says why, who does it, whether it plays sound and the tool to use. Shown as a
   "Next steps" card on the main page (no AI needed) and given to the assistant. Never offers a
   blend fix the playing tune already contains; asks for a fresh report when the last one predates
-  the current BassBlend.
+  the current htTamer.
 - **Tuning journal** (`subtune/journal.py`): knob changes, tunes applied, receiver level and
   processing changes, Dirac runs, target changes, verifications, reports and fixes with their key
   numbers; on the main page and in the assistant's overview.
@@ -58,7 +58,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
   Music Optimizer, dialogue enhance, dimmer) plus temperature and input signal, all confirmed
   supported by the TX-RZ50's own capability list. Tests switch the colouring processing off and
   restore it afterwards.
-- **Fix what BassBlend can** (System report): receiver sub level to the target (max +3 dB up),
+- **Fix what htTamer can** (System report): receiver sub level to the target (max +3 dB up),
   left+right blend test with the blend fix applied when it helps (never slot 1), then a new report
   with before/after. Receiver advice with exact menu numbers (distance, level) and Dirac notes.
 - **Report history** with a before/after overlay; Dirac target "Matched to your speakers" (the
@@ -98,7 +98,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
   calibration and (by default) tunes, slot contents, the current result and measurements to one
   `.json`. PIN (as its hash) and API key only when ticked. Import it from the same page, the
   first-boot setup page, or `subtune import-config`. Machine-specific settings (USB path, audio
-  device names) are never carried, so a Windows file works on the Pi. A file can't give BassBlend
+  device names) are never carried, so a Windows file works on the Pi. A file can't give htTamer
   slot 1, and only known data files are written.
 - **First boot**: `bassblend-config.json` on a fresh card's boot drive is imported automatically
   and removed from the boot drive. `BASSBLEND_SETTINGS=` bakes one into an image build.
@@ -115,10 +115,10 @@ Built and tested offline (simulations and the browser); nothing played on the re
 
 ## Nov 13, 2026 — first-boot setup in the browser (for a ready-made SD card)
 
-- A fresh BassBlend in network mode (no PIN yet) shows a **setup guide** instead of the dashboard:
+- A fresh htTamer in network mode (no PIN yet) shows a **setup guide** instead of the dashboard:
   1. choose a PIN, 2. add the mic calibration file, 3. find the receiver (automatic search, or by
   hand), 4. add the AI key (optional). Steps can be skipped or changed later; "Finish later and
-  open BassBlend" lands on the Setup checklist.
+  open htTamer" lands on the Setup checklist.
 - The first PIN can only be chosen once; after that the page needs signing in, and someone else
   on the network can't replace it. Until setup is finished, signed-in visits to the dashboard
   come back to the guide once.
@@ -147,17 +147,17 @@ Built and tested offline (simulations and the browser); nothing played on the re
 ## Nov 13, 2026 — speaker layout and working alongside Dirac Live (silent)
 
 - **Your speakers** (Receiver screen): choose the layout (set to 7.3.4), crossover, and whether you
-  use Dirac Live and its Bass Control. BassBlend only uses this to guide you; it changes nothing in
+  use Dirac Live and its Bass Control. htTamer only uses this to guide you; it changes nothing in
   the receiver. Includes a "Receiver settings to check once" list built from the layout.
 - **Dirac Live step in the wizard** (shown when you use Dirac): what to check first, a download of
-  BassBlend's target as a Dirac target-curve file (Flat / Gentle / Warm treble, with a small graph),
+  htTamer's target as a Dirac target-curve file (Flat / Gentle / Warm treble, with a small graph),
   seven plain steps for running Dirac, and an "I've run Dirac Live" button.
-- BassBlend remembers which sub tune Dirac was run with. A blend fix keeps it valid (it only shifts
+- htTamer remembers which sub tune Dirac was run with. A blend fix keeps it valid (it only shifts
   timing); a new sub tune asks you to run Dirac again. Marking Dirac as run clears older blend
   measurements, since the speakers then sound different.
 - Setup checklist has a "Speakers and Dirac Live" line; the system map shows the layout and Dirac state.
 - The assistant knows the layout, the Dirac order of steps, and that it can't operate Dirac itself.
-- Fixes: the system map could show "Not set by BassBlend" until the slot names loaded.
+- Fixes: the system map could show "Not set by htTamer" until the slot names loaded.
 - New offline tests: `tests/test_dirac.py` (6 checks: file layout, curve shape, layout names, when
   Dirac needs re-running). All 23 offline checks pass.
 - Not verified: Dirac Live actually importing the file. Dirac publishes no format spec; the file
@@ -188,7 +188,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
 - AI analysis: `*italic*` text now renders instead of showing asterisks.
 
 **Polish**
-- The Ask BassBlend button shrinks to an icon on narrower windows so it doesn't cover the page.
+- The Ask htTamer button shrinks to an icon on narrower windows so it doesn't cover the page.
 - Plain names on the result tiles: Average unevenness, Difference between seats, Biggest swing,
   Turned down for EQ (same names in the tunes comparison).
 - "Slot" everywhere instead of a mix of "preset" and "slot"; the tune step names the real slot.

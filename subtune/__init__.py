@@ -1,4 +1,4 @@
-"""BassBlend: automatic multi-sub tuning for the miniDSP 2x4HD."""
+"""htTamer: automatic multi-sub tuning for the miniDSP 2x4HD."""
 from functools import lru_cache
 from pathlib import Path
 

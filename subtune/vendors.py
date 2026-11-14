@@ -1,7 +1,7 @@
-"""What BassBlend knows about specific subwoofers: their physical controls,
+"""What htTamer knows about specific subwoofers: their physical controls,
 operating modes and the maker's own guidance.
 
-The owner records where each knob and switch is set (Room & subs). BassBlend
+The owner records where each knob and switch is set (Room & subs). htTamer
 then knows, for each sub:
   * which operating mode it is in (e.g. Hsu "Ported Max Extension") and what
     that mode is for;
@@ -11,9 +11,9 @@ then knows, for each sub:
   * how far down it is safe to boost with EQ in that mode (used by the
     optimiser), and suggestions with reasons for the assistant.
 
-BassBlend can't turn these knobs: it says which one to change and why, then
+htTamer can't turn these knobs: it says which one to change and why, then
 measures again. Facts are tagged with where they come from: the maker's manual
-or spec sheet, or "bassblend" for BassBlend's own conservative choices.
+or spec sheet, or "bassblend" for htTamer's own conservative choices.
 """
 from __future__ import annotations
 
@@ -76,7 +76,7 @@ CATALOG = {
             "Hsu: with a receiver doing bass management, set the crossover switch to Out and let the receiver "
             "cross over. If the bass sounds boomy, In at 90 Hz is worth a try.",
             "Hsu: try the phase switch at 180° and keep whichever setting is louder in the crossover region "
-            "(30-90 Hz) at the seat; then re-check the level. (BassBlend's measurements can decide this for you.)",
+            "(30-90 Hz) at the seat; then re-check the level. (htTamer's measurements can decide this for you.)",
             "Hsu: when running an auto-EQ (Audyssey, Dirac), use one port open, EQ1, Q 0.7: it counters the auto-EQ's "
             "habit of over-boosting very low frequencies. Afterwards any mode can be chosen.",
             "Hsu: EQ should cut peaks, not raise dips, to avoid damaging the speaker.",
@@ -126,8 +126,8 @@ CATALOG = {
         "tips": [
             "SVS: Standard (ports open) for maximum output; Sealed (both ports plugged, app set to Sealed) for the best "
             "transient response, preferred for mostly music.",
-            "With a receiver doing bass management, leave the app's low-pass off (LFE) and let the receiver and BassBlend "
-            "handle crossover and timing; keep the app's PEQ and room gain off so they don't fight BassBlend's EQ.",
+            "With a receiver doing bass management, leave the app's low-pass off (LFE) and let the receiver and htTamer "
+            "handle crossover and timing; keep the app's PEQ and room gain off so they don't fight htTamer's EQ.",
             "The app's three presets are a handy way to switch between a Standard and a Sealed setup: re-measure after switching.",
         ],
         "auto_eq": {"lpf": "off", "room_gain": "off", "peq": "0"},
@@ -157,10 +157,10 @@ CATALOG = {
             "Rythmik: try 20 Hz with all three damping settings; if you can't hear a difference, use 20 Hz / medium.",
             "Rythmik: 14 Hz / high damping for medium playback levels; 28 Hz / low damping with the rumble filter on for high SPL.",
             "Rythmik (F12/PEQ3 guide): 14 Hz / high damping for articulate sound, 14 Hz / low damping for full-bodied home "
-            "theatre. With room EQ (like BassBlend or Dirac), start from rumble off, 14 Hz, low damping.",
+            "theatre. With room EQ (like htTamer or Dirac), start from rumble off, 14 Hz, low damping.",
             "Rythmik: with a receiver, use the 12 dB / AVR low-pass setting and turn the crossover knob to maximum so the "
             "receiver does the crossover.",
-            "Rythmik: the phase control is an all-pass filter (up to 180°), not a true delay; BassBlend's miniDSP delay does that.",
+            "Rythmik: the phase control is an all-pass filter (up to 180°), not a true delay; htTamer's miniDSP delay does that.",
         ],
         "auto_eq": {"rumble": "off", "extension": "14", "damping": "low", "lpf_mode": "avr"},
     },
@@ -179,7 +179,7 @@ CATALOG = {
         "forbidden": [],
         "q_guide": "",
         "tips": [
-            "SVS: with a receiver, set the low-pass to LFE/off and phase to 0°, then let the receiver (or BassBlend) "
+            "SVS: with a receiver, set the low-pass to LFE/off and phase to 0°, then let the receiver (or htTamer) "
             "set level and timing.",
             "Sealed subs roll off gently, so EQ boost in the deep bass is safer than on a ported sub, within the amp's limits.",
         ],
@@ -260,7 +260,7 @@ def check(cid: str, st: dict, avr_crossover_hz=None) -> list[dict]:
 
 
 def protect_hz(cid: str | None, st: dict) -> float | None:
-    """Below this, BassBlend won't boost this sub (port unloading in ported modes)."""
+    """Below this, htTamer won't boost this sub (port unloading in ported modes)."""
     if not cid:
         return None
     m = mode_of(cid, {**defaults(cid), **(st or {})})

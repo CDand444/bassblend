@@ -7,7 +7,7 @@ guidelines (angles seen from the main seat):
   top front          30-55 deg elevation, in front, in line with the front L/R
   top middle         65-100 deg elevation (2 heights)            top rear: 125-150 deg
 
-Coordinates as everywhere in BassBlend: metres, x from the left wall, y from the
+Coordinates as everywhere in htTamer: metres, x from the left wall, y from the
 front (screen) wall, z from the floor. The result gives each speaker an ideal
 spot, the acceptable range, and notes when the room can't reach the ideal (a
 seat against the back wall, a low ceiling).

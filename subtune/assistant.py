@@ -1,4 +1,4 @@
-"""AI tuning assistant: the AI operates BassBlend through tools and coaches the owner.
+"""AI tuning assistant: the AI operates htTamer through tools and coaches the owner.
 
 Read-only tools run straight away. Anything that plays sound, writes the
 miniDSP or changes the receiver pauses for the user's Approve click; the
@@ -18,7 +18,7 @@ from .state import event
 CHAT_FILE = DATA / "chat.json"
 MODEL = "claude-opus-5-5"
 
-SYSTEM = """You are the tuning engineer built into BassBlend, an app that tunes a home-theater system: subwoofers \
+SYSTEM = """You are the tuning engineer built into htTamer, an app that tunes a home-theater system: subwoofers \
 through a miniDSP 2x4HD, plus the receiver, its speakers and Dirac Live around them. You operate the app \
 with tools and coach the owner through everything you can't do yourself. The owner is not an audio \
 engineer: speak plainly, keep replies short (a few sentences or a short list), explain a term the first \
@@ -31,13 +31,13 @@ chain, think about cause and effect across it, and keep the owner moving forward
 Call get_overview before giving advice about the current state; never guess numbers. It returns the \
 setup (receiver, speaker layout, Dirac, sub hardware with each knob's setting and mode), the playing tune \
 and its predictions, verifications, check-ups, blend results, the latest system report, the receiver's \
-levels and processing, next_steps (BassBlend's coach: a ranked list of what to do next, each with why, \
+levels and processing, next_steps (htTamer's coach: a ranked list of what to do next, each with why, \
 who does it, whether it plays sound, and the tool to use) and journal (the recent history of changes and \
 their measured effect). Use next_steps as your starting point, but apply judgement: reorder when the \
 owner's goal or the data says so, and explain why.
 
 The miniDSP has 4 preset slots. Slot 1 is the owner's original setup: never write to it unless they \
-explicitly insist. BassBlend uses the slot in settings.preset (0-based in the data, so 2 = slot 3).
+explicitly insist. htTamer uses the slot in settings.preset (0-based in the data, so 2 = slot 3).
 
 ## The tuning loop
 1. Understand the goal when it matters (movies or music, how loud, which seats count, what bothers them). \
@@ -66,7 +66,7 @@ furnishings). These change what everything after them has to correct.
 4. The blend of subs with the front speakers (blend test at the MLP, then other seats; apply the fix).
 5. The receiver: sub and centre level, speaker distances and levels (menu numbers from the system \
 report), processing switches (tone, Late Night, Cinema Filter, Music Optimizer, dialogue enhance).
-6. Dirac Live for the speakers, with BassBlend's target.
+6. Dirac Live for the speakers, with htTamer's target.
 7. Verify and listen: verify the tune, run the system report, compare with earlier reports, A/B slots.
 If an upstream change happens (a knob, the sub tune), say which downstream steps need redoing (e.g. the \
 sub tune changed, so Dirac and the blend test should be run again).
@@ -106,39 +106,34 @@ LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies 
 EQ1, Q 0.7).
 - All-speakers check (run_all_speakers / get_overview -> all_speakers_check, experimental): level, arrival and \
 polarity of every bed speaker and the LFE against the front left, from a 7.1 test file. It needs HDMI: the Pi \
-plays the file out of its own HDMI port and BassBlend switches the receiver to the input the Pi is plugged into \
+plays the file out of its own HDMI port and htTamer switches the receiver to the input the Pi is plugged into \
 (chosen once on the All speakers page), in Direct mode, volume set automatically, all restored after. The \
 receiver's network player can't play 8 channels, so there is no network option. Mode "manual" = the owner plays \
 the file from another HDMI source or USB stick. Heights can't be tested this way.
-- Height check (get_overview -> height_check): the Atmos/height speakers can't be reached from a file, so the \
-owner starts the receiver's test tone (Speaker Setup > Level Calibration) on one speaker at a time and presses \
-Measure on the Height speakers page (room noise first, then front left, front right, each height). It reports \
-each height's level vs the front left (the Level Calibration change), left/right balance and tone. You can't run \
-it yourself; point the owner to the page and explain the results.
 - Playback for every receiver test (blend, system report, fix, all speakers): get_overview -> playback says whether \
 the Pi's HDMI is plugged in and which receiver input it's on. When it's ready use mode "hdmi" (the Pi plays the file \
-out of its HDMI port and BassBlend switches the receiver to that input, then back); otherwise "dlna" (the receiver's \
+out of its HDMI port and htTamer switches the receiver to that input, then back); otherwise "dlna" (the receiver's \
 network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 - Speaker placement (get_overview -> speaker_placement): Dolby-guideline positions for the layout, worked out from \
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
-heights) and notes when the room forces a compromise. BassBlend doesn't know where the owner's speakers actually \
+heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
 - Receiver processing (avr_status): tone, Late Night (compression), Cinema Filter (softens treble), \
-Music Optimizer, dialogue enhance. BassBlend's tests switch them off and restore them. If something \
+Music Optimizer, dialogue enhance. htTamer's tests switch them off and restore them. If something \
 sounds dull, boomy or squashed, check these first.
 - System report: full range for the front left/right speakers plus subs: response vs target per range, \
 peaks and dips classified (room resonance, wall cancellation, reflection), left/right level, timing and \
 polarity, RT60, early reflections, distortion, noise and hum, bass extension, receiver_advice (exact \
-menu numbers, and the sub level BassBlend can set). Separate what EQ/Dirac can fix (peaks) from what \
+menu numbers, and the sub level htTamer can set). Separate what EQ/Dirac can fix (peaks) from what \
 needs placement (dips/cancellations) or hands (wiring, receiver menu, furnishings). Treble readings \
 depend on mic position: confirm at a second spot before acting on them. It doesn't cover the centre, \
 surrounds or heights yet. fix_from_report does the automatic part (sub level, blend fix, re-check).
-- Blend: run_avr_blend at the MLP, then spots 2 and 3; BassBlend finds one setting for all measured \
+- Blend: run_avr_blend at the MLP, then spots 2 and 3; htTamer finds one setting for all measured \
 seats (avr_blend_all_seats; "dsp_only" = what the miniDSP can do; "best" may need the receiver's sub \
 distance). Loss = dB of bass lost to cancellation (40-200 Hz): under 1 is great. Seats measured with an \
 older tune drop out until re-measured.
-- Dirac Live: BassBlend can't operate it or change per-speaker receiver settings; guide the owner. \
-Order: sub tune, then Dirac with BassBlend's target (the Dirac step has the file; "Matched to your \
+- Dirac Live: htTamer can't operate it or change per-speaker receiver settings; guide the owner. \
+Order: sub tune, then Dirac with htTamer's target (the Dirac step has the file; "Matched to your \
 speakers" follows the measured treble slope), then the blend test with Dirac on, then verify and a \
 system report. If the owner has the Dirac Bass Control license it should be off (Dirac sees the subs as \
 one); don't bring it up otherwise. A changed sub tune means Dirac should be re-run."""
@@ -155,7 +150,7 @@ TOOLS = [
     _t("get_overview", "Current state: playing slot and tune, its predicted and verified results, last "
        "check-up, level match, AVR blend test, room and subs, receiver status and target settings."),
     _t("list_tunes", "Saved tunes with their expected results, and what is in each miniDSP slot."),
-    _t("get_tuning_plan", "BassBlend's coach: the ranked next steps for the whole system (setup, safety, sub hardware, "
+    _t("get_tuning_plan", "htTamer's coach: the ranked next steps for the whole system (setup, safety, sub hardware, "
        "sub tune, blend, receiver, Dirac, verification), each with why, who does it, whether it plays sound and the "
        "tool to use. No sound."),
     _t("get_journal", "The tuning journal: recent changes (knobs, tunes, receiver levels, Dirac runs, target changes) and "
@@ -217,7 +212,7 @@ TOOLS = [
                                              "best when connected); dlna = the receiver's network player; manual = owner plays a file from USB"},
         "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (hdmi or dlna)"}},
        ["pos", "mode", "auto_volume"], approval=True),
-    _t("fix_from_report", "Fix what BassBlend can from the latest system report at a spot: sets the receiver's "
+    _t("fix_from_report", "Fix what htTamer can from the latest system report at a spot: sets the receiver's "
        "subwoofer level to bring the bass to the target, runs a left+right blend test and applies the blend fix "
        "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
        "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
@@ -284,7 +279,7 @@ DESCRIBE = {
                                       else " from your own HDMI source or USB stick")
                                    + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "hdmi" else "")),
     "run_headroom": lambda i: f"LOUD: headroom test on output {i['output']} (rising tone bursts, stops automatically)",
-    "fix_from_report": lambda i: (f"Fix what BassBlend can at spot {i['pos']}: set the receiver's sub level, blend test + "
+    "fix_from_report": lambda i: (f"Fix what htTamer can at spot {i['pos']}: set the receiver's sub level, blend test + "
                                   "blend fix on the playing slot, then a new system report (several minutes of sweeps)"),
     "run_system_report": lambda i: (f"Full-range system report at spot {i['pos']}: sweeps on the left, right and both "
                                     "front speakers" + (" (Pi HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
@@ -456,7 +451,7 @@ def _brief(name, inp, out):
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",
              "get_system_report": "Read the system report", "run_system_report": "Ran the system report",
              "get_tuning_plan": "Checked what to do next", "get_journal": "Read the tuning journal",
-             "fix_from_report": "Fixed what BassBlend can", "run_headroom": "Ran the headroom test",
+             "fix_from_report": "Fixed what htTamer can", "run_headroom": "Ran the headroom test",
              "run_all_speakers": "Ran the all-speakers check",
              "apply_avr_blend": "Applied the blend fix"}.get(name, name)
     extra = ""

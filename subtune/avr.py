@@ -1,16 +1,16 @@
 """Onkyo / Integra / Pioneer network AVR control (eISCP) plus DLNA playback.
 
 eISCP: TCP 60128, packets "ISCP" + 16-byte header + "!1CMDvalue\\r".
-DLNA:  the receiver is a UPnP MediaRenderer; BassBlend serves a WAV from this
+DLNA:  the receiver is a UPnP MediaRenderer; htTamer serves a WAV from this
        PC and asks the receiver to play it (SetAVTransportURI + Play).
 
 Safety rules (enforced here, not just in the UI):
-  * volume is never raised above the level it had before BassBlend touched it,
+  * volume is never raised above the level it had before htTamer touched it,
     and never above VOLUME_CAP; an explicit raise is limited to +RAISE_STEP;
   * only power, input, listening mode, volume, mute, subwoofer/centre level and
     the sound-processing switches (tone, Late Night, Cinema Filter, Music
     Optimizer, dialogue enhance, dimmer) are touched: no setup menus, no room
-    correction settings. During BassBlend's tests the processing that colours the
+    correction settings. During htTamer's tests the processing that colours the
     sound is set flat/off, then put back exactly as it was.
 """
 from __future__ import annotations
@@ -420,7 +420,7 @@ class DLNARenderer:
     def __init__(self, host: str, port: int = 8888, control="/Control/oap/AVTransport"):
         self.url = f"http://{host}:{port}{control}"
 
-    def play(self, media_url: str, title="BassBlend sweep"):
+    def play(self, media_url: str, title="htTamer sweep"):
         from xml.sax.saxutils import escape
         didl = ('<DIDL-Lite xmlns="urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/" '
                 'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:upnp="urn:schemas-upnp-org:metadata-1-0/upnp/">'

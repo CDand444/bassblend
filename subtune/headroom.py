@@ -12,7 +12,7 @@ the FIRST of:
   * the highest digital level allowed (-12 dBFS by default)
 
 The result per frequency: the loudest clean level and what limited it. It is
-the loudest thing BassBlend does, so it only ever runs when the owner starts it.
+the loudest thing htTamer does, so it only ever runs when the owner starts it.
 """
 from __future__ import annotations
 

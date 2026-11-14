@@ -1,6 +1,6 @@
 """Thin wrapper over the minidsp-rs CLI for the miniDSP 2x4HD over USB HID.
 
-The 2x4HD cannot report its PEQ/gain/delay settings back, so BassBlend owns
+The 2x4HD cannot report its PEQ/gain/delay settings back, so htTamer owns
 one preset slot and always writes every parameter it relies on.
 """
 from __future__ import annotations

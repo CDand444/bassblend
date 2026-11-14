@@ -74,7 +74,7 @@ def _cmd_args(cmd, params=None):
 
 # --------------------------------------------------------------- job runner
 class Runner:
-    """One BassBlend process at a time: either a single step or the guided
+    """One htTamer process at a time: either a single step or the guided
     auto-tune sequence. Auto-tune state is exposed to the page."""
 
     def __init__(self):
@@ -204,24 +204,6 @@ class Runner:
         self.cmd = f"system report ({mode})"
         return self.cmd
 
-    def start_heights(self, body):
-        """One step of the height check: the mic records while the receiver's test tone plays (BassBlend plays nothing)."""
-        if self.running() or load_state().get("busy"):
-            raise RuntimeError("another step is running")
-        from .dirac import system as _system
-        from .heights import steps
-        step = str(body.get("step") or "")
-        if step not in steps(_system().get("heights") or 0):
-            raise ValueError("unknown step for this speaker layout (set your height speakers in Setup)")
-        pos = int(body.get("pos", 1))
-        if not 1 <= pos <= 8:
-            raise ValueError("spot must be 1-8")
-        update_state(heights_status={"running": True, "step": step})
-        args = [sys.executable, "-m", "subtune", "heights", "--step", step, "--pos", str(pos)]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        self.cmd = f"height check ({step})"
-        return self.cmd
-
     def start_allspk(self, body):
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
@@ -247,7 +229,7 @@ class Runner:
         update_state(fix_status={"running": True, "text": "Starting…", "pos": pos})
         args = [sys.executable, "-m", "subtune", "fixup", "--pos", str(pos), *pargs]
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        self.cmd = "fix what BassBlend can"
+        self.cmd = "fix what htTamer can"
         return self.cmd
 
     def start_avrapply(self, multi=None):
@@ -471,7 +453,7 @@ def mic_free() -> bool:
 
 
 for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup",
-              "start_allspk", "start_heights"):
+              "start_allspk"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -574,12 +556,6 @@ def build_executors():
             out["all_speakers_check"] = {"t": a_all["t"], "spot": a_all.get("pos"), "advice": [x["text"] for x in a_all["advice"]],
                                          "speakers": {k: {x: v[x] for x in ("level_vs_fl_db", "arrival_vs_fl_ms", "polarity", "heard")}
                                                       for k, v in a_all["speakers"].items()}}
-        hg = st.get("heights") or {}
-        if hg.get("report"):
-            out["height_check"] = {"t": hg.get("t"), "spot": hg.get("pos"), "complete": hg["report"]["complete"],
-                                   "next_step": hg["report"]["next"], "advice": [x["text"] for x in hg["report"]["advice"]],
-                                   "speakers": {k: {x: v.get(x) for x in ("receiver", "vs_fl_db", "treble_vs_fl_db", "heard")}
-                                                for k, v in hg["report"]["rows"].items()}}
         rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
         if rep:
             out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
@@ -963,7 +939,7 @@ def sub_hardware(room=None):
             out[str(int(k) + 1)] = vendors.describe(cid, d.get("controls") or {})
         elif d.get("model"):
             out[str(int(k) + 1)] = {"make_model": d["model"], "catalog": None,
-                                    "note": "not in BassBlend's catalog yet: use the owner's notes and general knowledge"}
+                                    "note": "not in htTamer's catalog yet: use the owner's notes and general knowledge"}
     return out
 
 
@@ -1034,7 +1010,7 @@ LOOPBACK = ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
 
 class H(BaseHTTPRequestHandler):
-    server_version = "BassBlend"
+    server_version = "htTamer"
     sys_version = ""
 
     def log_message(self, *a):
@@ -1077,6 +1053,8 @@ class H(BaseHTTPRequestHandler):
     def _gate(self, path) -> bool:
         """True if the request may go on; otherwise answers it (setup, sign-in page or 401)."""
         from . import auth
+        if path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):   # the app logo: public, on every page
+            return True
         setup = self._setup_needed()
         if path == "/setup":
             if setup or self._authed():
@@ -1088,7 +1066,7 @@ class H(BaseHTTPRequestHandler):
             return True
         if setup:
             if path.startswith(("/api/", "/media/")):
-                self._send(401, {"error": "finish setting up BassBlend first", "setup": "/setup"})
+                self._send(401, {"error": "finish setting up htTamer first", "setup": "/setup"})
             else:
                 self._redirect("/setup")
             return False
@@ -1130,6 +1108,8 @@ class H(BaseHTTPRequestHandler):
             return
         if u.path == "/api/setup/status":
             return self._send(200, self._setup_status())
+        if u.path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):
+            return self._send(200, (WEB_DIR / "logo.svg").read_bytes(), "image/svg+xml")
         if u.path in ("/", "/index.html"):
             return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
         if u.path == "/api/state":
@@ -1217,7 +1197,7 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"tunes": library.list_tunes(), "slots": library.slots(),
                                     "original_slot": library.ORIGINAL_SLOT + 1,
                                     "owned_slot": (load_settings().get("preset") or 3) + 1})
-        if u.path == "/api/dirac/targetcurve":           # BassBlend's target as a Dirac Live target-curve file
+        if u.path == "/api/dirac/targetcurve":           # htTamer's target as a Dirac Live target-curve file
             from . import dirac
             name, text, pts = dirac.target_file(q.get("treble", [None])[0])
             if q.get("preview"):
@@ -1362,13 +1342,6 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"started": RUN.start_deepcheck(body)})
             if path == "/api/allspk":
                 return self._send(200, {"started": RUN.start_allspk(body)})
-            if path == "/api/heights":
-                if body.get("action") == "reset":
-                    if RUN.running():
-                        raise RuntimeError("another step is running")
-                    update_state(heights=None, heights_status={"running": False})
-                    return self._send(200, {"ok": True})
-                return self._send(200, {"started": RUN.start_heights(body)})
             if path == "/api/fixup":
                 return self._send(200, {"started": RUN.start_fixup(body)})
             if path == "/api/avr/apply":
@@ -1553,8 +1526,8 @@ def serve(port=8765, lan=False):
     if lan:
         import socket
         name = socket.gethostname()
-        print(f"BassBlend dashboard on your network: http://{name}.local:{port}  "
+        print(f"htTamer dashboard on your network: http://{name}.local:{port}  "
               + ("(PIN required)" if auth.pin_set() else "(first boot: open it to choose a PIN)"), flush=True)
     else:
-        print(f"BassBlend dashboard: http://127.0.0.1:{port}", flush=True)
+        print(f"htTamer dashboard: http://127.0.0.1:{port}", flush=True)
     srv.serve_forever()

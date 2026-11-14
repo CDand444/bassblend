@@ -1,6 +1,6 @@
-# BassBlend on your phone: plan
+# htTamer on your phone: plan
 
-**Goal:** run BassBlend from your phone while you sit at the listening position: start a tune,
+**Goal:** run htTamer from your phone while you sit at the listening position: start a tune,
 answer "move the mic" prompts, switch slots for A/B listening, set AVR levels with the meter,
 and install it on the home screen like an app.
 
@@ -33,7 +33,7 @@ automatic gain, so its readings would be wrong.
 1. **Web app manifest:** name, icons (192/512 px plus maskable), theme colours matching
    the dashboard, `display: standalone`, so it opens full-screen from the home screen.
 2. **Service worker:** caches the app shell so it opens instantly, and shows a friendly
-   "Can't reach your BassBlend PC" page when the PC is off. Measurements and DSP writes always
+   "Can't reach your htTamer PC" page when the PC is off. Measurements and DSP writes always
    go live to the PC, never from a cache.
 3. **HTTPS is required.** Phones only allow installing, service workers and wake lock on
    secure pages, and a plain `http://192.168.x.x` address doesn't count. Options:

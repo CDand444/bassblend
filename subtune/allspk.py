@@ -1,11 +1,11 @@
 """All-speakers check (experimental): level, distance and polarity of every bed speaker.
 
 A 7.1 WAV file with a sweep on one channel at a time. The Pi plays it out of its
-own HDMI port into the receiver, which BassBlend switches to that input and to
+own HDMI port into the receiver, which htTamer switches to that input and to
 Direct mode, with the volume set automatically and everything restored
 afterwards. (The receiver's network player won't play 8-channel files, so this
 test needs HDMI.) The owner can also play the file from another HDMI source or a
-USB stick while BassBlend listens. Sweep order:
+USB stick while htTamer listens. Sweep order:
 
     FL, FR, C, SL, SR, SBL, SBR (20 Hz-20 kHz), then LFE (15-150 Hz)
 
@@ -183,8 +183,8 @@ HDMI_MEDIA_NAME = "bassblend_all_speakers_hdmi.wav"
 
 def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=None):
     """mode 'hdmi': the Pi plays the 7.1 file out of its own HDMI port into the receiver, which
-    BassBlend switches to that input in Direct mode, sets the volume, and restores afterwards.
-    mode 'manual': the owner plays it from another HDMI source or a USB stick while BassBlend listens."""
+    htTamer switches to that input in Direct mode, sets the volume, and restores afterwards.
+    mode 'manual': the owner plays it from another HDMI source or a USB stick while htTamer listens."""
     from . import autolevel, avr
     from .avrmeasure import SweepWatcher
     from .dsp import MiniDSP

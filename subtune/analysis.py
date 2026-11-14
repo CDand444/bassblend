@@ -1,6 +1,6 @@
 """AI analysis of the room, sub placement and measurements.
 
-build_context() gathers everything BassBlend knows into a compact JSON
+build_context() gathers everything htTamer knows into a compact JSON
 document. run_claude() sends it to Claude (needs ANTHROPIC_API_KEY or an
 `ant auth login` profile). The same context can be printed with
 `subtune analysis-context` so Claude Code can write the analysis instead,
@@ -295,7 +295,7 @@ SUGGEST_SYSTEM = """You are an experienced subwoofer-integration engineer. From 
 ("user_goals"), the room, the listening positions, the subwoofers on each miniDSP output and any \
 measurements, recommend how to set the system up.
 
-How the chain works: AVR sub/LFE out -> miniDSP 2x4HD analog input -> one output per sub. BassBlend's \
+How the chain works: AVR sub/LFE out -> miniDSP 2x4HD analog input -> one output per sub. htTamer's \
 optimiser sets each output's delay, gain, polarity and PEQ automatically after measuring, so the \
 physical controls on each sub should normally be set to stay out of its way (phase at 0, the sub's own \
 low-pass bypassed or at maximum/LFE, any built-in room EQ or boost features off) unless you have a \
@@ -314,7 +314,7 @@ what can change instead.
 - If measurements exist, use each sub's measured level at the MLP ("level_dB_rel") to give gain-knob \
 changes in dB and approximate knob positions (e.g. "about 1-2 hours clockwise, aim for +6 dB").
 - Use feet and inches for distances (the JSON stores metres).
-- Give the starting gain as a concrete instruction (e.g. "start at 11 o'clock; BassBlend trims the rest").
+- Give the starting gain as a concrete instruction (e.g. "start at 11 o'clock; htTamer trims the rest").
 - dsp_target values must be within: fmin 10-40 Hz, fmax 60-200 Hz, house_db 0-10 dB, house_fc 20-100 Hz, \
 max_boost_db 0-6 dB.
 - Keep each text field short: one or two sentences."""

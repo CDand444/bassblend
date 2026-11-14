@@ -104,7 +104,7 @@ def export(include_history: bool = True, include_pin: bool = False, include_key:
         if keys:
             secrets["ai_keys"] = keys
             if keys.get("anthropic"):
-                secrets["ai_key"] = keys["anthropic"]           # older BassBlend reads this one
+                secrets["ai_key"] = keys["anthropic"]           # older htTamer reads this one
     if secrets:
         b["secrets"] = secrets
     return b
@@ -154,9 +154,9 @@ def save_cal(name: str, text: str) -> dict:
 
 def _check(b) -> dict:
     if not isinstance(b, dict) or b.get("format") != FORMAT:
-        raise ValueError("that isn't a BassBlend settings file")
+        raise ValueError("that isn't a htTamer settings file")
     if int(b.get("version") or 0) > VERSION:
-        raise ValueError("that settings file is from a newer BassBlend; update this one first")
+        raise ValueError("that settings file is from a newer htTamer; update this one first")
     return b
 
 
@@ -185,7 +185,7 @@ def import_bundle(b, keep_sessions: bool = True) -> dict:
             continue                                   # wrong type for a known number: skip it
         s[k] = v
         n += 1
-    if s.get("preset") == 0:                           # slot 1 is the owner's original: never BassBlend's
+    if s.get("preset") == 0:                           # slot 1 is the owner's original: never htTamer's
         s["preset"] = None
     save_settings(s)
     done.append(f"{n} settings")
@@ -291,11 +291,11 @@ def import_bundle(b, keep_sessions: bool = True) -> dict:
 
 def loads(text: str) -> dict:
     if len(text) > MAX_BYTES:
-        raise ValueError("that file is too big to be a BassBlend settings file")
+        raise ValueError("that file is too big to be a htTamer settings file")
     try:
         return json.loads(text)
     except ValueError:
-        raise ValueError("that isn't a BassBlend settings file (not valid JSON)")
+        raise ValueError("that isn't a htTamer settings file (not valid JSON)")
 
 
 def import_pending() -> dict | None:

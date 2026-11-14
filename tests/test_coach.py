@@ -78,7 +78,7 @@ def test_old_report_asks_for_a_fresh_one():
     rep = {"t": 3000.0, "pos": 1, "lr": {"polarity": "same"}, "findings": [{"status": "fix", "area": "bass"}]}   # no bass_vs_target_db
     got = coach.plan(dict(TUNED, deep_reports={"1": rep}), SET, dict(ROOM, room={}), {}, LIVE)
     r = next(s for s in got if s["id"] == "report")
-    assert "older BassBlend" in r["title"] and "fixup" not in ids(got)
+    assert "older htTamer" in r["title"] and "fixup" not in ids(got)
 
 
 def test_record_step_names_that_models_controls():

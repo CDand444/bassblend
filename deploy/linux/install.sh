@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# BassBlend setup for Linux (Raspberry Pi OS 64-bit, Debian 12+, Ubuntu 22.04+).
+# htTamer setup for Linux (Raspberry Pi OS 64-bit, Debian 12+, Ubuntu 22.04+).
 #
-# Turns a fresh install into a BassBlend box: installs what it needs, the
+# Turns a fresh install into a htTamer box: installs what it needs, the
 # minidsp-rs control tool, a USB permission rule for the miniDSP, and a service
 # that starts the dashboard at boot on your home network (PIN protected).
 #
-#   sudo ./deploy/linux/install.sh            # normal: copies BassBlend to /opt/bassblend
+#   sudo ./deploy/linux/install.sh            # normal: copies htTamer to /opt/bassblend
 #   sudo ./deploy/linux/install.sh --dev      # development: runs straight from this folder,
 #                                             # as your own user, so edits apply after a restart
 # Options:
@@ -51,7 +51,7 @@ if [ "$IMAGE" -eq 1 ]; then
 fi
 live() { [ "$IMAGE" -eq 0 ]; }                 # false while building an SD card image
 SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-[ -f "$SRC/subtune/__main__.py" ] || [ -f "$SRC/subtune/cli.py" ] || die "run this from inside the BassBlend folder"
+[ -f "$SRC/subtune/__main__.py" ] || [ -f "$SRC/subtune/cli.py" ] || die "run this from inside the htTamer folder"
 case "$PORT" in ''|*[!0-9]*) die "--port must be a number" ;; esac
 
 if [ "$DEV" -eq 1 ]; then
@@ -87,7 +87,7 @@ if [ "$DEV" -eq 0 ]; then
   id -u bassblend >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin bassblend
   usermod -a -G audio,plugdev bassblend
 
-  say "Copying BassBlend to $APP"
+  say "Copying htTamer to $APP"
   mkdir -p "$APP"
   rsync -a --delete --exclude '.git/' --exclude 'data/' --exclude 'tools/' --exclude 'venv/' \
         --exclude '__pycache__/' --exclude '.claude/' "$SRC/" "$APP/"
@@ -117,15 +117,15 @@ if [ ! -x "$MD_DIR/minidsp" ] || ! "$MD_DIR/minidsp" --version 2>/dev/null | gre
   rm -rf "$tmp"
 fi
 [ "$DEV" -eq 1 ] && chown -R "$RUN_USER:" "$APP/tools"
-# BassBlend talks to the miniDSP directly; minidsp-rs's own background service would hold the USB device.
+# htTamer talks to the miniDSP directly; minidsp-rs's own background service would hold the USB device.
 if systemctl list-unit-files minidspd.service >/dev/null 2>&1; then
   if live; then systemctl disable --now minidspd.service >/dev/null 2>&1 || true
   else systemctl disable minidspd.service >/dev/null 2>&1 || true; fi
 fi
 
-say "Letting BassBlend use the miniDSP over USB without root"
+say "Letting htTamer use the miniDSP over USB without root"
 cat > /etc/udev/rules.d/60-bassblend-minidsp.rules <<'RULES'
-# miniDSP (USB vendor 2752): control access for the plugdev group (BassBlend's account is in it)
+# miniDSP (USB vendor 2752): control access for the plugdev group (htTamer's account is in it)
 SUBSYSTEM=="usb", ATTRS{idVendor}=="2752", MODE="0660", GROUP="plugdev"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2752", MODE="0660", GROUP="plugdev"
 RULES
@@ -146,7 +146,7 @@ if [ -n "$NEW_HOSTNAME" ]; then
   systemctl restart avahi-daemon || true
 fi
 
-say "Installing the BassBlend service"
+say "Installing the htTamer service"
 HARDEN="NoNewPrivileges=yes
 ProtectSystem=strict
 ReadWritePaths=$DATA
@@ -156,7 +156,7 @@ ProtectHome=yes"
 PrivateTmp=yes"
 cat > /etc/systemd/system/bassblend.service <<UNIT
 [Unit]
-Description=BassBlend dashboard
+Description=htTamer dashboard
 After=network-online.target sound.target
 Wants=network-online.target
 
@@ -184,13 +184,13 @@ systemctl enable bassblend.service >/dev/null
 pin_is_set() { [ -s "$CONF/auth.json" ] && grep -q pin_hash "$CONF/auth.json"; }
 if [ "$SET_PIN" -eq 1 ] && ! pin_is_set; then
   say "Choose a PIN for the dashboard"
-  echo "Anyone on your network who opens BassBlend will need it. Use 6 or more characters."
+  echo "Anyone on your network who opens htTamer will need it. Use 6 or more characters."
   sudo -u "$RUN_USER" env BASSBLEND_DATA="$DATA" BASSBLEND_CONFIG="$CONF" \
       bash -c "cd '$APP' && '$VENV/bin/python' -m subtune set-pin"
 fi
 
 if ! live; then
-  say "BassBlend is installed in the image; it starts on first boot"
+  say "htTamer is installed in the image; it starts on first boot"
   exit 0
 fi
 systemctl restart bassblend.service
@@ -199,10 +199,10 @@ systemctl is-active --quiet bassblend.service || die "the service didn't start. 
 say "Done"
 echo "Open:  http://$(hostname).local:$PORT   (or http://$(hostname -I | awk '{print $1}'):$PORT)"
 if ! pin_is_set; then
-  echo "The first time you open it, BassBlend asks you to choose a PIN. Do that straight away:"
+  echo "The first time you open it, htTamer asks you to choose a PIN. Do that straight away:"
   echo "until a PIN is chosen, anyone on your network who opens the page could choose it."
 fi
 echo
-echo "Your tunes and settings live in $DATA. To bring them over from another BassBlend,"
+echo "Your tunes and settings live in $DATA. To bring them over from another htTamer,"
 echo "download a settings file there (menu: Settings file) and import it here."
 echo "Logs:  journalctl -u bassblend -f      Restart:  sudo systemctl restart bassblend"

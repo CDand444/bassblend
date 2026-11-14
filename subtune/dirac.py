@@ -1,9 +1,9 @@
 """Working alongside Dirac Live, and the speaker layout.
 
-BassBlend can't write per-speaker correction into the receiver; Dirac Live can.
-So the two split the job: BassBlend tunes the subs (Dirac only ever sees them as
+htTamer can't write per-speaker correction into the receiver; Dirac Live can.
+So the two split the job: htTamer tunes the subs (Dirac only ever sees them as
 one sub) and the sub/speaker blend, Dirac Live corrects the speakers. To keep
-them pulling the same way, BassBlend exports its target (the "house curve" the
+them pulling the same way, htTamer exports its target (the "house curve" the
 subs were tuned to) as a Dirac Live target-curve file.
 
 File format (.targetcurve, plain text; Dirac publishes no spec, this follows
@@ -117,7 +117,7 @@ def dirac_current(sy=None, res=None) -> bool:
 
 # ---------------------------------------------------------------- target curve
 def target_points(house_db: float, house_fc: float, treble: str = "gentle", tilt: float | None = None) -> list[tuple[float, float]]:
-    """(frequency, dB) breakpoints: BassBlend's bass rise, flat mids, optional
+    """(frequency, dB) breakpoints: htTamer's bass rise, flat mids, optional
     gentle fall in the treble. 0 dB is the midrange."""
     tilt = TREBLE.get(treble, TREBLE["gentle"]) if tilt is None else float(tilt)
     pts = []
@@ -128,11 +128,11 @@ def target_points(house_db: float, house_fc: float, treble: str = "gentle", tilt
     return pts
 
 
-def serialize(name: str, pts, device: str = "BassBlend", lo: float = 20, hi: float = 20000) -> str:
+def serialize(name: str, pts, device: str = "htTamer", lo: float = 20, hi: float = 20000) -> str:
     pts = sorted(pts)
     if len(pts) < 2 or any(b[0] <= a[0] for a, b in zip(pts, pts[1:])):
         raise ValueError("breakpoints must be at least two, strictly increasing in frequency")
-    name = " ".join(str(name).split())[:60] or "BassBlend"
+    name = " ".join(str(name).split())[:60] or "htTamer"
     lines = ["NAME", name, "DEVICENAME", device, "BREAKPOINTS"]
     lines += [f"{f:.6g} {g:.6g}" for f, g in pts]
     lines += ["LOWLIMITHZ", f"{lo:.6g}", "HIGHLIMITHZ", f"{hi:.6g}"]
@@ -150,7 +150,7 @@ def measured_tilt():
 
 
 def target_file(treble: str | None = None) -> tuple[str, str, list]:
-    """(file name, file text, points) for the current BassBlend target."""
+    """(file name, file text, points) for the current htTamer target."""
     s = load_settings()
     sy = system()
     hd, fc = float(s.get("house_db", 0)), float(s.get("house_fc", 45))
@@ -159,9 +159,9 @@ def target_file(treble: str | None = None) -> tuple[str, str, list]:
         if tilt is None:
             raise ValueError("run a system report first: the measured treble comes from it")
         pts = target_points(hd, fc, tilt=tilt)
-        name = f"BassBlend +{hd:g} dB bass, your treble ({tilt:+.1f} dB at 20k)"
-        return "BassBlend_target_measured.targetcurve", serialize(name, pts), pts
+        name = f"htTamer +{hd:g} dB bass, your treble ({tilt:+.1f} dB at 20k)"
+        return "htTamer_target_measured.targetcurve", serialize(name, pts), pts
     treble = treble if treble in TREBLE else sy.get("treble", "gentle")
     pts = target_points(hd, fc, treble)
-    name = f"BassBlend +{hd:g} dB bass, {treble} treble"
-    return f"BassBlend_target_{treble}.targetcurve", serialize(name, pts), pts
+    name = f"htTamer +{hd:g} dB bass, {treble} treble"
+    return f"htTamer_target_{treble}.targetcurve", serialize(name, pts), pts

@@ -1,4 +1,4 @@
-"""Offline tests for 'Fix what BassBlend can', receiver advice and the measured
+"""Offline tests for 'Fix what htTamer can', receiver advice and the measured
 Dirac target. The receiver, the blend test and the system report are stand-ins:
 no hardware, no sound.
 
@@ -103,7 +103,7 @@ def test_receiver_advice_numbers():
 def test_measured_dirac_target_follows_the_report():
     update_state(deep_reports={"1": report()})
     name, text, pts = dirac.target_file("measured")
-    assert name == "BassBlend_target_measured.targetcurve" and "your treble (-4.5 dB at 20k)" in text
+    assert name == "htTamer_target_measured.targetcurve" and "your treble (-4.5 dB at 20k)" in text
     top = dict(pts)[max(f for f, _ in pts)]
     assert abs(top - (-4.5)) < 0.6, top                       # the curve ends at the measured tilt (plus no bass lift up there)
     assert "measured" not in dirac.TREBLE                      # the presets stay as they were

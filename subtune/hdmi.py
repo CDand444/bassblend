@@ -2,11 +2,11 @@
 
 The Pi 4 has two micro-HDMI ports (vc4hdmi0 next to the USB-C power, vc4hdmi1).
 aplay plays a WAV on the `hdmi:` ALSA device, which does the IEC958 framing.
-BassBlend switches the receiver to the input the Pi is plugged into (the owner
+htTamer switches the receiver to the input the Pi is plugged into (the owner
 picks it once; saved as `avr_pi_input`), and Onkyo.restore() puts the input back.
 
 `Source` hides how a test file reaches the receiver, so every test can offer:
-  dlna    the receiver's network player fetches it from BassBlend (2 channels only)
+  dlna    the receiver's network player fetches it from htTamer (2 channels only)
   hdmi    the Pi plays it out of its HDMI port (up to 7.1 LPCM)
   manual  the owner presses play on a USB stick or another source
 """
@@ -19,7 +19,7 @@ import time
 # Receiver inputs that take HDMI on Onkyo/Integra/Pioneer models like the TX-RZ50
 HDMI_INPUTS = {"10": "BD/DVD", "01": "CBL/SAT", "11": "STRM BOX", "02": "GAME", "05": "PC", "03": "AUX (front)"}
 MODES = ("hdmi", "dlna", "manual")
-AUTO_MODES = ("hdmi", "dlna")          # BassBlend starts playback itself (so it can also set the volume)
+AUTO_MODES = ("hdmi", "dlna")          # htTamer starts playback itself (so it can also set the volume)
 DRM = pathlib.Path("/sys/class/drm")
 
 
@@ -117,7 +117,7 @@ class Source:
             self.renderer = avr.DLNARenderer(self.o.host)
             self.base = avr.MediaServer.get(avr.local_ip_for(self.o.host))
 
-    def play(self, name, title="BassBlend test", chmap=None):
+    def play(self, name, title="htTamer test", chmap=None):
         from .avr import MEDIA
         if self.mode == "hdmi":
             self.player.play(MEDIA / name, chmap)

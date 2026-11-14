@@ -2,7 +2,7 @@
 
 A tune is a complete optimiser result (gains, delays, polarity, biquads,
 curves, metrics) plus a name. Slots 1-4 are the 2x4HD's presets; since the
-DSP can't report its settings, slots.json records what BassBlend last wrote
+DSP can't report its settings, slots.json records what htTamer last wrote
 where. Slot 1 is the owner's original setup unless they overwrite it.
 """
 from __future__ import annotations

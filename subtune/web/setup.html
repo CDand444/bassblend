@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Set up BassBlend</title>
+<title>Set up htTamer</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
 :root {
   color-scheme: light;
@@ -84,8 +85,8 @@ select { height: 42px; border: 1px solid var(--border); border-radius: 9px; back
 <body>
 <main>
   <header>
-    <div class="brand">BassBlend</div>
-    <h1 id="title">Welcome. Let’s set up BassBlend.</h1>
+    <div class="brand"><img src="/logo.svg" alt="" width="26" height="26" style="vertical-align:-7px;margin-right:8px">htTamer</div>
+    <h1 id="title">Welcome. Let’s set up htTamer.</h1>
     <p class="lead" id="lead">Four short steps, about five minutes. Nothing here makes a sound, and you can change any of it later from the Setup checklist.</p>
     <div class="progress" id="progress" aria-hidden="true"></div>
   </header>
@@ -98,8 +99,8 @@ try { const t = localStorage.getItem('subtune-theme'); if (t) document.documentE
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 const post = (u, b) => fetch(u, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(b || {})})
-  .then(async r => ({status: r.status, ...(await r.json().catch(() => ({error: 'BassBlend is not answering'})))}))
-  .catch(() => ({error: 'BassBlend is not answering. Is it still switched on?'}));
+  .then(async r => ({status: r.status, ...(await r.json().catch(() => ({error: 'htTamer is not answering'})))}))
+  .catch(() => ({error: 'htTamer is not answering. Is it still switched on?'}));
 let ST = null, open = null, skipped = {};
 const busy = {};
 
@@ -136,37 +137,37 @@ function render() {
   const allDone = !cur;
   const pinOk = list[0].done;
   $('#imp').innerHTML = pinOk && !allDone
-    ? `<div class="imp"><span class="grow"><b>Set up BassBlend before?</b> Load your settings file (Settings file → Download, on the other device) and skip the rest.</span>
+    ? `<div class="imp"><span class="grow"><b>Set up htTamer before?</b> Load your settings file (Settings file → Download, on the other device) and skip the rest.</span>
         <label class="btn">Import settings file<input type="file" id="impFile" accept=".json,application/json" hidden></label>
         <p class="msg" id="impMsg" role="alert" style="flex-basis:100%;margin:0"></p></div>`
     : '';
   $('#finish').innerHTML = pinOk
-    ? `<button class="btn ${allDone ? 'primary' : ''}" id="go">${allDone ? 'Open BassBlend' : 'Finish later and open BassBlend'}</button>
+    ? `<button class="btn ${allDone ? 'primary' : ''}" id="go">${allDone ? 'Open htTamer' : 'Finish later and open htTamer'}</button>
        <span class="state" style="font-size:13px;color:var(--text-3)">${allDone ? 'Next: plug in the miniDSP and mic, then “Tune my system”.' : 'Anything left shows in the Setup checklist.'}</span>`
     : '';
-  if (allDone) { $('#title').textContent = 'All set.'; $('#lead').textContent = 'BassBlend is ready. Your next step is the “Tune my system” guide on the main screen.'; }
+  if (allDone) { $('#title').textContent = 'All set.'; $('#lead').textContent = 'htTamer is ready. Your next step is the “Tune my system” guide on the main screen.'; }
   wire();
   const f = document.querySelector('.step.cur input:not([type=file])'); if (f && !document.activeElement.closest('.step')) f.focus();
 }
 
 // ---------- step bodies
 function pinBody() {
-  return `<p>Anyone on your home network can open BassBlend, and it can play loud test sweeps and change your miniDSP. A PIN keeps it to you.</p>
+  return `<p>Anyone on your home network can open htTamer, and it can play loud test sweeps and change your miniDSP. A PIN keeps it to you.</p>
     <label class="f">PIN (6 or more characters)<input type="password" id="pin1" autocomplete="new-password"></label>
     <label class="f">Same PIN again<input type="password" id="pin2" autocomplete="new-password"></label>
     <div class="row"><button class="btn primary" id="pinSave">Save PIN</button></div>
     <p class="msg" id="pinMsg" role="alert"></p>
-    <div class="note">Write it down somewhere safe. If you forget it, BassBlend can only be reset from a computer connected to it.</div>`;
+    <div class="note">Write it down somewhere safe. If you forget it, htTamer can only be reset from a computer connected to it.</div>`;
 }
 function micBody() {
-  return `<p>Your UMIK-1 came with a small text file that corrects its readings. BassBlend needs it for accurate measurements.</p>
+  return `<p>Your UMIK-1 came with a small text file that corrects its readings. htTamer needs it for accurate measurements.</p>
     <div class="note">Don’t have it? Get it from miniDSP’s UMIK-1 page by entering the serial number printed on the mic (7 digits). Use the file ending in <b>_90deg.txt</b> if there are two.</div>
     <div class="row"><label class="btn primary">Choose file<input type="file" id="calFile" accept=".txt,.cal,.frd,text/plain" hidden></label>
       <button class="btn link" data-skip="mic">Skip for now</button></div>
     <p class="msg" id="calMsg" role="alert"></p>`;
 }
 function avrBody() {
-  return `<p>BassBlend works with your receiver over the network: it reads its settings and plays the blend test through it. Make sure the receiver is plugged in and on the same network (it can be in standby).</p>
+  return `<p>htTamer works with your receiver over the network: it reads its settings and plays the blend test through it. Make sure the receiver is plugged in and on the same network (it can be in standby).</p>
     <div class="row"><button class="btn primary" id="avrFind">Find my receiver</button><button class="btn link" data-skip="avr">Skip for now</button></div>
     <div id="avrOut" style="margin-top:12px"></div>
     <details style="margin-top:6px"><summary style="cursor:pointer;font-size:13.5px;color:var(--text-2)">Enter it by hand instead</summary>
@@ -179,7 +180,7 @@ function avrBody() {
 }
 function aiBody() {
   return `<p>The assistant explains results in plain words and can run tests for you (it always asks first). It needs an AI provider: an API key (billed by that provider per use), or a model you run yourself on another computer.</p>
-    <div class="note">Claude works best with BassBlend. Keys: console.anthropic.com (Claude), platform.openai.com (OpenAI) or aistudio.google.com (Gemini). BassBlend keeps the key on this device only, sends it only to that provider, and picks a suitable model for you (you can change it later).</div>
+    <div class="note">Claude works best with htTamer. Keys: console.anthropic.com (Claude), platform.openai.com (OpenAI) or aistudio.google.com (Gemini). htTamer keeps the key on this device only, sends it only to that provider, and picks a suitable model for you (you can change it later).</div>
     <label class="f">AI provider<select id="aiProv">
       <option value="anthropic">Anthropic (Claude), recommended</option><option value="openai">OpenAI</option>
       <option value="gemini">Google Gemini</option><option value="local">A local model on my network (Ollama, LM Studio)</option></select></label>
@@ -258,7 +259,7 @@ function wire() {
     const f = imf.files[0], m = $('#impMsg'); if (!f) return;
     let b = null;
     try { b = JSON.parse(await f.text()); } catch (e) {}
-    if (!b || b.format !== 'bassblend-config') { m.className = 'msg bad'; m.textContent = 'That isn’t a BassBlend settings file.'; imf.value = ''; return; }
+    if (!b || b.format !== 'bassblend-config') { m.className = 'msg bad'; m.textContent = 'That isn’t a htTamer settings file.'; imf.value = ''; return; }
     m.className = 'msg'; m.textContent = 'Importing…';
     const r = await post('/api/config/import', {bundle: b});
     if (r.error) { m.className = 'msg bad'; m.textContent = r.error; imf.value = ''; return; }

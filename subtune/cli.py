@@ -1,4 +1,4 @@
-"""BassBlend (command: subtune) - automatic multi-sub tuning for the miniDSP 2x4HD.
+"""htTamer (command: subtune) - automatic multi-sub tuning for the miniDSP 2x4HD.
 
 Typical run (Claude drives this; the dashboard shows each step live):
   subtune setup --cal <file> --preset 4 --subs 1,2,3,4
@@ -114,22 +114,6 @@ def cmd_headroom(a):
     with busy(f"headroom test on output {a.output}"):
         rig = _rig()
         _restoring(rig, lambda: headroom.run(rig, out))
-
-
-def cmd_heights(a):
-    """Height speaker check: measure one step (the room, or the speaker the receiver's test tone is on)."""
-    from . import heights
-    if a.reset:
-        update_state(heights=None, heights_status={"running": False})
-        return
-    try:
-        with busy(f"height check: {a.step}"):
-            update_state(heights_status={"running": True, "step": a.step})
-            heights.measure(a.step, a.pos)
-        update_state(heights_status={"running": False})
-    except Exception as e:
-        update_state(heights_status={"running": False, "error": str(e)})
-        raise
 
 
 def cmd_tone(a):
@@ -532,7 +516,7 @@ def main(argv=None):
     sp.add_parser("optimize").set_defaults(fn=cmd_optimize)
     s = sp.add_parser("apply"); s.add_argument("--lpf", type=float, help="optional LR4 low-pass Hz")
     s.add_argument("--tune", help="library tune id (default: current result)")
-    s.add_argument("--slot", type=int, help="DSP slot 1-4 (default: the preset BassBlend owns)")
+    s.add_argument("--slot", type=int, help="DSP slot 1-4 (default: the preset htTamer owns)")
     s.add_argument("--allow-original", action="store_true", help="allow overwriting slot 1")
     s.set_defaults(fn=cmd_apply)
     s = sp.add_parser("slot"); s.add_argument("--n", type=int, required=True); s.set_defaults(fn=cmd_slot)
@@ -557,15 +541,10 @@ def main(argv=None):
     s.add_argument("--avr-input", default=None, help="receiver input code the Pi's HDMI is plugged into (e.g. 10 = BD/DVD)")
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_allspeakers)
-    s = sp.add_parser("heights", help="height speaker check with the receiver's test tone (one step at a time)")
-    s.add_argument("--step", default="noise", help="noise, FL, FR, or a height (TFL TFR TML TMR TRL TRR)")
-    s.add_argument("--pos", type=int, default=1)
-    s.add_argument("--reset", action="store_true", help="forget the current height check")
-    s.set_defaults(fn=cmd_heights)
     s = sp.add_parser("headroom", help="how loud one sub can play cleanly (loud; stops automatically)")
     s.add_argument("--output", type=int, required=True, help="1-based output")
     s.set_defaults(fn=cmd_headroom)
-    s = sp.add_parser("fixup", help="fix what BassBlend can from the latest system report, then check again")
+    s = sp.add_parser("fixup", help="fix what htTamer can from the latest system report, then check again")
     s.add_argument("--mode", choices=["hdmi", "dlna", "manual"], default="dlna",
                    help="hdmi = the Pi plays it out of its HDMI port; dlna = the receiver's network player; manual = USB stick")
     s.add_argument("--avr-input", default=None, help="receiver input the Pi's HDMI is plugged into (hdmi mode)")

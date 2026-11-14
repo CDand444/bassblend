@@ -3,7 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>BassBlend</title>
+<title>htTamer</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
 :root {
   color-scheme: light;
@@ -54,8 +55,10 @@ button, input, select { font: inherit; }
 header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--surface) 92%, transparent);
   backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); }
 .hbar { max-width: 1440px; margin: 0 auto; padding: 10px 24px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.brand { display: flex; align-items: baseline; gap: 8px; margin-right: 8px; }
-.brand b { font-size: 16px; letter-spacing: -.01em; }
+.brand { display: flex; align-items: center; gap: 9px; margin-right: 8px; color: inherit; text-decoration: none; }
+.brand img { width: 28px; height: 28px; flex: none; display: block; }
+.brand b { font-size: 17px; letter-spacing: -.015em; font-weight: 750; }
+.brand b i { font-style: normal; font-weight: 500; color: var(--text-2); }
 .brand span { color: var(--text-3); font-size: 12.5px; }
 .pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 999px;
   background: var(--surface-2); color: var(--text-2); font-size: 12.5px; white-space: nowrap; }
@@ -80,49 +83,63 @@ header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, v
 .spl-pill.clip b { color: var(--bad); }
 @media (max-width: 560px) { .spl-mini { display: none; } }
 
-/* ---------- layout */
-main { max-width: 1080px; margin: 0 auto; padding: 20px 24px 48px; display: block; }
+/* ---------- app shell: side navigation (desktop), tab bar + section pills (phone) */
+.shell { display: grid; grid-template-columns: 236px minmax(0, 1fr); max-width: 1400px; margin: 0 auto; }
+.side { position: sticky; top: var(--hbar-h, 53px); align-self: start; height: calc(100vh - var(--hbar-h, 53px)); overflow-y: auto;
+  padding: 14px 10px 28px; border-right: 1px solid var(--border); scrollbar-width: thin; }
+.nav .grp { display: flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 700; color: var(--text-3); padding: 16px 10px 5px;
+  text-transform: uppercase; letter-spacing: .06em; }
+.nav .grp:first-child { padding-top: 2px; }
+.nav button { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; border: 0; background: transparent;
+  color: var(--text-2); padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: 13.5px; line-height: 1.25; margin: 1px 0; }
+.nav button svg { flex: none; width: 16px; height: 16px; color: var(--text-3); }
+.nav button .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav button .tag, .subnav .tag { flex: none; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.nav button .tag.alert, .subnav .tag.alert { color: #fff; background: var(--warn); padding: 1px 6px; border-radius: 999px; font-weight: 650; }
+.nav button .tag.live, .subnav .tag.live { color: var(--good); font-weight: 650; }
+.nav button:hover { background: var(--surface-2); color: var(--text); }
+.nav button.on { background: var(--accent-soft); color: var(--text); font-weight: 600; }
+.nav button.on svg { color: var(--accent); }
+.nav button.home { font-weight: 600; }
+main { min-width: 0; padding: 22px 32px 64px; }
+.view { max-width: 1000px; margin: 0 auto; }
+.view-head { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; min-height: 32px; flex-wrap: wrap; }
+.view-head h1 { font-size: 21px; font-weight: 720; margin: 0; letter-spacing: -.015em; }
+.view-head .crumb { color: var(--text-3); font-size: 12.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; flex-basis: 100%; margin-bottom: -6px; }
 .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 aside.col { display: none; }
-
-/* ---------- menu sheet */
-.sheet-wrap { position: fixed; inset: 0; z-index: 50; }
-.sheet-backdrop { position: absolute; inset: 0; background: rgba(10,10,9,.45); animation: fade .15s ease-out; }
-.sheet { position: absolute; top: 0; left: 0; bottom: 0; width: min(1040px, 100vw); display: grid;
-  grid-template-columns: 210px minmax(0, 1fr); background: var(--bg); border-right: 1px solid var(--border);
-  box-shadow: 12px 0 40px rgba(0,0,0,.18); animation: slide .18s ease-out; }
-@keyframes slide { from { transform: translateX(-24px); opacity: 0; } }
-@keyframes fade { from { opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sheet, .sheet-backdrop { animation: none; } }
-.sheet-nav { background: var(--surface); border-right: 1px solid var(--border); padding: 12px 8px; overflow-y: auto; }
-.sheet-nav .grp { font-size: 11px; font-weight: 650; color: var(--text-3); padding: 12px 10px 4px; text-transform: uppercase; letter-spacing: .05em; }
-.sheet-nav .grp:first-child { padding-top: 2px; }
-.sheet-nav button { display: flex; align-items: center; gap: 9px; width: 100%; text-align: left; border: 0; background: transparent;
-  color: var(--text-2); padding: 7px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; line-height: 1.2; }
-.sheet-nav button svg { flex: none; width: 16px; height: 16px; color: var(--text-3); }
-.sheet-nav button .lbl { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sheet-nav button .tag { flex: none; font-size: 11px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-.sheet-nav button .tag.alert { color: #fff; background: var(--warn); padding: 1px 6px; border-radius: 999px; font-weight: 650; }
-.sheet-nav button .tag.live { color: var(--good); font-weight: 650; }
-.sheet-nav button:hover { background: var(--surface-2); color: var(--text); }
-.sheet-nav button.on { background: var(--accent-soft); color: var(--text); font-weight: 600; }
-.sheet-nav button.on svg { color: var(--accent); }
-.sheet-main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.sheet-top { display: flex; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid var(--border); background: var(--surface); }
-.sheet-top h2 { margin: 0; font-size: 16px; font-weight: 650; }
-.sheet-body { flex: 1; overflow-y: auto; padding: 20px; }
-.sheet-body > .card { box-shadow: none; }
-.sheet-body > .card > .card-h:first-child h2, .sheet-body > details.card > summary { display: none; }
-.sheet-body > .card > .card-h:first-child:has(> h2:only-child) { display: none; }
-@media (max-width: 720px) {
-  .sheet { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
-  .sheet-nav { border-right: 0; border-bottom: 1px solid var(--border); padding: 8px; display: flex; gap: 4px; overflow-x: auto; }
-  .sheet-nav .grp { display: none; }
-  .sheet-nav button { width: auto; white-space: nowrap; flex: none; }
-  .sheet-nav button .tag { display: none; }
-  .sheet-body { padding: 14px 12px; }
+.view-body > .card { box-shadow: none; }
+.view-body > .card > .card-h:first-child h2, .view-body > details.card > summary { display: none; }
+.view-body > .card > .card-h:first-child:has(> h2:only-child) { display: none; }
+.subnav { display: none; }
+.tabbar { display: none; }
+@media (max-width: 900px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .side { display: none; }
+  main { padding: 14px 16px calc(96px + env(safe-area-inset-bottom)); }
+  .view-head h1 { font-size: 19px; }
+  .subnav { display: flex; gap: 6px; overflow-x: auto; margin: -4px -16px 14px; padding: 2px 16px; scrollbar-width: none; }
+  .subnav::-webkit-scrollbar { display: none; }
+  .subnav button { flex: none; height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+    color: var(--text-2); font-size: 13px; display: inline-flex; gap: 6px; align-items: center; cursor: pointer; white-space: nowrap; }
+  .subnav button svg { width: 15px; height: 15px; flex: none; }
+  .subnav button.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  .subnav button.on .tag { color: inherit; }
+  .tabbar { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
+    background: color-mix(in srgb, var(--surface) 94%, transparent); backdrop-filter: blur(10px); border-top: 1px solid var(--border);
+    padding: 4px 6px calc(4px + env(safe-area-inset-bottom)); }
+  .tabbar button { border: 0; background: transparent; color: var(--text-3); display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 11px; padding: 6px 0 4px; border-radius: 10px; position: relative; cursor: pointer; }
+  .tabbar button svg { width: 21px; height: 21px; }
+  .tabbar button.on { color: var(--accent); font-weight: 650; }
+  .tabbar .bdg { position: absolute; top: 3px; left: calc(50% + 7px); width: 8px; height: 8px; border-radius: 50%; background: var(--warn);
+    box-shadow: 0 0 0 2px var(--surface); }
+  .chat-fab { bottom: calc(74px + env(safe-area-inset-bottom)) !important; }
 }
-@media (max-width: 600px) { main { padding: 14px 16px 32px; gap: 14px; } .hbar { padding: 8px 16px; } .col { gap: 14px; } }
+@media (max-width: 600px) {
+  .hbar { padding: 8px 16px; flex-wrap: nowrap; } .col { gap: 14px; }
+  #inputSeg, #micPill, #dspPill { display: none; }   /* still shown on the Setup checklist and the Home system map */
+}
 
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; box-shadow: var(--shadow); min-width: 0; }
 .card-h { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-height: 28px; }
@@ -632,9 +649,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <body>
 <header>
   <div class="hbar">
-    <button class="btn icon" id="menuBtn" aria-haspopup="dialog" aria-controls="sheet" aria-label="Open menu" title="Menu">
-      <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
-    <div class="brand"><b>BassBlend</b><span>miniDSP 2x4HD</span></div>
+    <a class="brand" href="#/home" aria-label="htTamer home"><img src="/logo.svg" alt=""><b><i>ht</i>Tamer</b><span>home theater tuning</span></a>
     <span class="pill"><span class="dot" id="busyDot"></span><span id="busyTxt">Connecting…</span></span>
     <span class="pill" id="dspPill">DSP: waiting</span>
     <div class="seg" id="inputSeg" role="radiogroup" aria-label="DSP input" title="What feeds the subs: your AVR (analog) or this PC (USB, used for test sweeps)">
@@ -651,8 +666,14 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   </div>
 </header>
 
+<div class="shell">
+<nav class="side nav" id="sideNav" aria-label="Sections"></nav>
 <main>
-  <div class="col">
+  <div class="view">
+  <div class="view-head" id="viewHead"><span class="crumb" id="viewCrumb"></span><h1 id="viewTitle">Home</h1></div>
+  <nav class="subnav" id="subNav" aria-label="Pages in this section"></nav>
+  <div class="view-body" id="viewBody"></div>
+  <div class="col" id="homeView">
     <!-- SYSTEM MAP + HEALTH -->
     <section class="card" id="mapCard">
       <div class="card-h"><h2>Your system</h2><span class="sub" id="mapSub"></span><span class="grow"></span>
@@ -735,7 +756,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- SETUP CHECKLIST (menu) -->
     <section class="card" id="setupCard">
       <div class="card-h"><h2>Setup</h2></div>
-      <p class="lead" style="margin-bottom:10px">Everything BassBlend needs, in one place.</p>
+      <p class="lead" style="margin-bottom:10px">Everything htTamer needs, in one place.</p>
       <div id="setupList"></div>
     </section>
 
@@ -784,7 +805,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- BLEND TEST (shown in the wizard and the menu) -->
     <section class="card" id="blendCard">
       <div class="card-h"><h2>Blend the subs with your speakers</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my blend test result and what I should do about it.">Ask about this</button></div>
-      <p class="lead" style="margin-bottom:10px">Plays a test through the receiver: first your front speakers on their own, then again with the subs. BassBlend works out whether subs and speakers add up or cancel around the crossover, and how to fix the timing and level. Volume stays where you set it; everything is put back afterwards.</p>
+      <p class="lead" style="margin-bottom:10px">Plays a test through the receiver: first your front speakers on their own, then again with the subs. htTamer works out whether subs and speakers add up or cancel around the crossover, and how to fix the timing and level. Volume stays where you set it; everything is put back afterwards.</p>
       <div class="row" style="align-items:end">
         <label class="f" style="width:auto">How to play the test
           <div class="seg" id="blendMode" role="radiogroup">
@@ -857,20 +878,6 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="allOut" style="margin-top:14px"></div>
     </section>
 
-    <section class="card" id="hgtCard">
-      <div class="card-h"><h2>Height speakers (Atmos)</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my height speaker check. What should I change in Level Calibration, and are my heights placed well?">Ask about this</button></div>
-      <p class="lead">Checks every height speaker against the front left: level, left/right balance and tone. Height speakers only play from Atmos content or the receiver’s own test tone, so you step through the receiver’s test tone and BassBlend measures each speaker at your seat.</p>
-      <div class="notice warn" style="margin-bottom:8px"><b>BassBlend doesn’t play anything in this check.</b> You run the receiver’s own test tone from its on-screen menu (on your TV) or remote, and move it to each speaker; BassBlend only listens.</div>
-      <ol class="howto">
-        <li>Mic at the seat. On the receiver open <b>Setup → Speaker → Level Calibration</b> (the test tone plays at reference level, fairly loud).</li>
-        <li>Press <b>Measure</b> on each row in order: first the room with the test tone <b>off</b>, then move the receiver’s test tone to the speaker named on the row, wait for the hiss, and press Measure.</li>
-        <li>Leave Level Calibration without changing anything until the report says what to change.</li></ol>
-      <div class="tune-controls dc-controls" style="margin-top:8px">
-        <label class="f" style="width:150px">Mic at<select id="hgtPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label>
-        <span class="grow"></span><button class="btn ghost" id="hgtReset">Start over</button></div>
-      <div id="hgtOut" style="margin-top:12px"></div>
-    </section>
-
     <section class="card" id="headCard">
       <div class="card-h"><h2>Sub headroom</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my sub headroom results. Is any sub holding the others back, and what would give more clean output?">Ask about this</button></div>
       <p class="lead">How loud each sub can play cleanly in your room. Tone bursts at 25, 40 and 63 Hz start quiet and rise 3 dB at a time; the test stops by itself at the first sign of strain (distortion, the sub no longer getting louder, the mic close to overload, or 105 dB at the mic). <b>It gets loud.</b></p>
@@ -898,7 +905,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         </div>
       </div>
       <div id="splSpark" class="spl-spark" aria-hidden="true"></div>
-      <p class="muted" style="margin:10px 0 0">Calibrated with your UMIK-1 file, accurate to about ±1–2 dB. The meter switches itself off when you close the menu or start a measurement.</p>
+      <p class="muted" style="margin:10px 0 0">Calibrated with your UMIK-1 file, accurate to about ±1–2 dB. The meter switches itself off when you leave this page or start a measurement.</p>
     </section>
 
     <!-- TOOLS: LEVEL MATCH -->
@@ -1017,12 +1024,15 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="muted small" style="margin:14px 0 0" id="cfgTip"></p>
     </section>
   </aside>
+  </div>
 </main>
+</div>
+<nav class="tabbar" id="tabBar" aria-label="Sections"></nav>
 
 <button class="chat-fab" id="chatFab" aria-controls="chat" aria-expanded="false">
   <svg viewBox="0 0 16 16" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg>
-  <span class="lbl">Ask BassBlend</span><span class="chat-dot" id="chatDot" hidden></span></button>
-<aside class="chat" id="chat" role="dialog" aria-label="BassBlend assistant" hidden>
+  <span class="lbl">Ask htTamer</span><span class="chat-dot" id="chatDot" hidden></span></button>
+<aside class="chat" id="chat" role="dialog" aria-label="htTamer assistant" hidden>
   <div class="chat-top"><b>Assistant</b><span class="muted small" id="chatState"></span><span class="grow"></span>
     <button class="btn ghost" id="chatNew" style="height:28px">New chat</button>
     <button class="btn icon ghost" id="chatClose" aria-label="Close assistant">✕</button></div>
@@ -1033,17 +1043,6 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   </form>
 </aside>
 <div id="store" hidden></div>
-<div class="sheet-wrap" id="sheetWrap" hidden>
-  <div class="sheet-backdrop" id="sheetBackdrop"></div>
-  <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-label="Menu">
-    <nav class="sheet-nav" id="sheetNav" aria-label="Menu sections"></nav>
-    <div class="sheet-main">
-      <div class="sheet-top"><h2 id="sheetTitle"></h2><span class="grow"></span>
-        <button class="btn icon ghost" id="sheetClose" aria-label="Close menu">✕</button></div>
-      <div class="sheet-body" id="sheetBody"></div>
-    </div>
-  </div>
-</div>
 <script>
 // network mode: if the sign-in has expired, go to the sign-in page instead of failing quietly
 { const f0 = window.fetch.bind(window);
@@ -1492,7 +1491,7 @@ function avrProcessing(st) {
       <div class="avrbox"><span class="k">Display</span><select data-p="dimmer">${opt(DIMMER, st.dimmer)}</select>
         ${st.temp_c != null ? `<span class="muted small">Receiver at ${st.temp_c} °C${st.temp_c >= 60 ? ': running hot, check its ventilation' : ''}</span>` : ''}</div>
     </div>
-    ${colouring.length ? `<div class="notice warn" style="margin-top:8px">On now: ${esc(colouring.join(', '))}. These change the sound on top of your tuning. BassBlend switches them off during its tests and puts them back afterwards.</div>` : '<p class="muted small" style="margin:8px 0 0">Tone flat and processing off: the receiver plays your tuning as measured.</p>'}
+    ${colouring.length ? `<div class="notice warn" style="margin-top:8px">On now: ${esc(colouring.join(', '))}. These change the sound on top of your tuning. htTamer switches them off during its tests and puts them back afterwards.</div>` : '<p class="muted small" style="margin:8px 0 0">Tone flat and processing off: the receiver plays your tuning as measured.</p>'}
     ${st.audio_in ? `<p class="muted small" style="margin:6px 0 0">Input signal: ${esc(st.audio_in)}</p>` : ''}`;
 }
 // ---- vendor-aware sub controls (knobs, switches, port plugs the owner sets by hand)
@@ -1509,7 +1508,7 @@ function hwBlock(o, s) {
 }
 function hwControls(cid, ctl) {
   const c = (VENDORS || {})[cid];
-  if (!c) return '<p class="muted small" style="margin:6px 0 0">Pick your model to record its knobs and switches, so BassBlend and the assistant can use them. Not listed? Put them in Notes.</p>';
+  if (!c) return '<p class="muted small" style="margin:6px 0 0">Pick your model to record its knobs and switches, so htTamer and the assistant can use them. Not listed? Put them in Notes.</p>';
   const v = k => ctl[k] ?? c.controls.find(x => x.key === k).default;
   const w = c.controls.map(x => `<label class="f" ${x.only_if ? `data-only='${JSON.stringify(x.only_if)}'` : ''}>${esc(x.label)}${x.kind === 'choice'
       ? `<select data-c="${x.key}">${x.options.map(([val, lab]) => `<option value="${esc(val)}" ${String(v(x.key)) === String(val) ? 'selected' : ''}>${esc(lab)}</option>`).join('')}</select>`
@@ -1531,7 +1530,7 @@ function hwCheck(card) {
   const notes = [];
   (c.forbidden || []).filter(f => match(f.when)).forEach(f => notes.push([f.level, f.text]));
   const m = (c.modes || []).find(x => Object.keys(x.when).length && match(x.when));
-  if (m) notes.push(['info', `${m.name} mode${m.ext_hz ? ` (±2 dB to ${m.ext_hz} Hz)` : ''}: for ${m.for}` + (m.protect_hz ? ` BassBlend won't boost this sub below ${m.protect_hz} Hz.` : '')]);
+  if (m) notes.push(['info', `${m.name} mode${m.ext_hz ? ` (±2 dB to ${m.ext_hz} Hz)` : ''}: for ${m.for}` + (m.protect_hz ? ` htTamer won't boost this sub below ${m.protect_hz} Hz.` : '')]);
   if (st.xover === 'in') notes.push(['warn', 'Crossover switch is In while the receiver also crosses over: the filters stack. Out is recommended with a receiver.']);
   if (st.lpf && st.lpf !== 'lfe' && st.lpf !== 'off') notes.push(['warn', `Low-pass at ${st.lpf} Hz while the receiver also crosses over: the filters stack. LFE/off is recommended.`]);
   if (st.lpf_mode === '80' || st.lpf_mode === '50') notes.push(['warn', `Low-pass at ${st.lpf_mode} Hz / 24 dB while the receiver also crosses over: the filters stack. The 12 dB / AVR setting is recommended.`]);
@@ -1788,7 +1787,7 @@ function renderChat() {
   const log = $('#chatLog');
   let h = '';
   if (!CHAT.display.length) h = `<div class="msg assistant"><p>${S.ai_key ? 'Hi! I can run checks, try tune ideas offline, compare tunes, and control the receiver. I’ll always ask before playing sound or changing anything.'
-    : 'Hi! I’m BassBlend’s built-in helper. With no AI provider set up I can still explain your results, your subs and receiver settings, and what to do next. Add an AI provider in Menu → AI analysis for a full assistant that can run tests for you.'}</p></div>
+    : 'Hi! I’m htTamer’s built-in helper. With no AI provider set up I can still explain your results, your subs and receiver settings, and what to do next. Add an AI provider in Setup → AI analysis for a full assistant that can run tests for you.'}</p></div>
     <div class="chips2">${SUGGEST.map(s => `<button type="button" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
   CHAT.display.forEach(d => {
     if (d.role === 'user') h += `<div class="msg user">${esc(d.text)}</div>`;
@@ -1828,7 +1827,7 @@ $('#chatClose').onclick = () => chatOpen(false);
 $('#chatForm').onsubmit = e => { e.preventDefault(); chatSend($('#chatText').value); };
 $('#chatText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend($('#chatText').value); } });
 $('#chatNew').onclick = async () => { if (!confirm('Start a new conversation?')) return; const r = await post('/api/chat/reset'); if (r.error) alert(r.error); else { CHAT = r; chatKey = null; renderChat(); } };
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#chat').hidden && $('#sheetWrap').hidden) chatOpen(false); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#chat').hidden) chatOpen(false); });
 
 // ---------- receiver (AVR)
 // ---------- playback source shared by every receiver test: Pi HDMI / network / USB stick
@@ -1846,7 +1845,7 @@ document.querySelectorAll('.piInp').forEach(x => x.onchange = () => {
   document.querySelectorAll('.piInp').forEach(y => { y.value = x.value; y.dataset.touched = '1'; });
   blendKey = null; renderBlend(); renderDeep(); renderAllSpk();
 });
-const piHint = () => S.pi_hdmi ? '<b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> BassBlend switches the receiver to the input you pick, plays the test from the Pi, and switches back afterwards.'
+const piHint = () => S.pi_hdmi ? '<b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> htTamer switches the receiver to the input you pick, plays the test from the Pi, and switches back afterwards.'
   : '<b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on).';
 let AVR = {}, avrKey = null, blendMode = 'dlna', blendSpk = 'LR', blendSide = 'L', blendKey = null;
 const blendFile = () => blendSpk === 'LR' ? 'bassblend_blend_test_left_right.wav' : 'bassblend_blend_test.wav';
@@ -1892,7 +1891,7 @@ function renderAvr() {
     if (!AVR.configured && !st) h = `<div class="notice">No receiver set up yet. Enter its IP address above, or <button class="btn" id="avrFind">Find my receiver</button></div>`;
     else if (!st) h = `<div class="notice bad">Can't reach the receiver at ${esc(AVR.host || '?')}${AVR.error ? ': ' + esc(AVR.error) : ''}. Is it plugged in and on the network?</div>`;
     else if (!st.power) h = `<div class="row"><span class="pill"><span class="dot"></span>${esc(st.model)} · standby</span><span class="grow"></span><button class="btn primary" data-a="power" data-v="1">Turn on</button></div>
-      <p class="muted small" style="margin:10px 0 0">The receiver is in standby. Turn it on to see and change its input, listening mode, volume and subwoofer level. BassBlend never raises the volume by itself.</p>`;
+      <p class="muted small" style="margin:10px 0 0">The receiver is in standby. Turn it on to see and change its input, listening mode, volume and subwoofer level. htTamer never raises the volume by itself.</p>`;
     else {
       const sel = (opts, cur, a) => `<select data-sel="${a}">${opts.map(([v, n]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${n}</option>`).join('')}${opts.some(([v]) => v === cur) ? '' : `<option selected value="${cur}">${esc(a === 'mode' ? st.mode : st.input)}</option>`}</select>`;
       h = `<div class="row" style="margin-bottom:10px"><span class="pill"><span class="dot ok"></span>${esc(st.model)} · on</span><span class="muted small">${esc(st.host)}</span><span class="grow"></span><button class="btn ghost" data-a="power" data-v="0">Standby</button></div>
@@ -1907,7 +1906,7 @@ function renderAvr() {
           <div class="row"><button class="btn" data-a="center_level" data-d="-1">−1</button><button class="btn" data-a="center_level" data-d="-0.5">−½</button><button class="btn" data-a="center_level" data-d="0.5">+½</button><button class="btn" data-a="center_level" data-d="1">+1</button></div></div>
       </div>
       ${avrProcessing(st)}
-      <p class="muted small" style="margin:8px 0 0">BassBlend raises the volume only for its tests (up to your max, then puts it back); “+” here asks first and is limited to small steps. Speaker setup and Dirac are left alone.</p>`;
+      <p class="muted small" style="margin:8px 0 0">htTamer raises the volume only for its tests (up to your max, then puts it back); “+” here asks first and is limited to small steps. Speaker setup and Dirac are left alone.</p>`;
     }
     $('#avrCtl').innerHTML = h;
     $('#avrCtl').querySelectorAll('[data-p]').forEach(el => el.onchange = el.onclick = async e => {
@@ -1959,7 +1958,7 @@ function renderBlend() {
   if (!running) h += multiHtml(mm, seatsInfo);
   if (b && !running) {
     h += `<details class="lastone"${mm ? '' : ' open'}><summary>Last single test: ${spotName(b.pos)}, ${fmtWhen(b.t)}</summary>`;
-    const kindLbl = {dsp: 'BassBlend can do this', avr: 'Receiver setting (you)', avr_level: 'Receiver level', ok: 'All good', warn: 'Worth knowing'};
+    const kindLbl = {dsp: 'htTamer can do this', avr: 'Receiver setting (you)', avr_level: 'Receiver level', ok: 'All good', warn: 'Worth knowing'};
     h += `<div class="cktiles" style="margin-top:${h ? 12 : 0}px">
       <div class="cktile"><div class="top"><span class="light ${b.loss_now_db < 1 ? 'good' : b.loss_now_db < 3 ? 'warn' : 'bad'}"></span>Blend now</div>
         <div class="val">${b.loss_now_db.toFixed(1)}<small>dB lost to cancellation</small></div><p>How much the subs and speakers cancel each other around the crossover (40–200 Hz). Under 1 dB is great.</p></div>
@@ -2006,7 +2005,7 @@ function multiHtml(m, info) {
   const next = [1, 2, 3].find(p => !measured.has(String(p)));
   let h = `<div class="multi"><div class="mhead"><h3>All seats</h3>
       <span class="grow"></span>${measured.size || stale.size ? `<button type="button" class="btn ghost" data-clearseats>Clear seats</button>` : ''}
-      <span class="muted small" style="flex-basis:100%">Measure up to 3 seats. BassBlend finds one setting that blends well at all of them, with the MLP counting most.</span></div>
+      <span class="muted small" style="flex-basis:100%">Measure up to 3 seats. htTamer finds one setting that blends well at all of them, with the MLP counting most.</span></div>
     <div class="seatchips">${chips}${next && measured.size ? `<button type="button" class="btn ghost" data-nextseat="${next}">Mic at ${spotName(next)} next</button>` : ''}</div>`;
   if (!m) return h + `<p class="muted small" style="margin:10px 0 0">${stale.size
     ? 'The playing tune changed since these seats were measured, so they are left out. Run the test again at each seat.'
@@ -2020,7 +2019,7 @@ function multiHtml(m, info) {
       <div class="cktile"><div class="top"><span class="light ${light(m.now_db)}"></span>Now, ${m.seats.length > 1 ? 'all ' + m.seats.length + ' seats' : '1 seat'}</div>
         <div class="val">${m.now_db.toFixed(1)}<small>dB lost</small></div><p>Bass lost where subs and speakers cancel (40–200 Hz), averaged over seats, with extra weight on the worst one. Under 1 dB is great.</p></div>
       <div class="cktile"><div class="top"><span class="light ${light(d.score_db)}"></span>With the miniDSP fix</div>
-        <div class="val">${d.score_db.toFixed(1)}<small>dB</small></div><p>${esc(what[0].toUpperCase() + what.slice(1))}. BassBlend can apply this itself.</p></div>
+        <div class="val">${d.score_db.toFixed(1)}<small>dB</small></div><p>${esc(what[0].toUpperCase() + what.slice(1))}. htTamer can apply this itself.</p></div>
       ${recv ? `<div class="cktile"><div class="top"><span class="light ${light(b.score_db)}"></span>Plus a receiver change</div>
         <div class="val">${b.score_db.toFixed(1)}<small>dB</small></div><p>The subs arrive ${Math.abs(b.delay_ms).toFixed(2)} ms late. Fixing that is a receiver setting (sub distance).</p></div>` : ''}
     </div>
@@ -2077,10 +2076,10 @@ function wireMulti(m) {
 
 function firewallHelp() {
   const py = AVR.python || 'C:\\path\\to\\python.exe', host = AVR.host || '<receiver IP>', port = AVR.media_port || 8790;
-  const cmd = `# Run in PowerShell as Administrator. Lets ONLY your receiver (${host}) fetch BassBlend's test file on port ${port}.
+  const cmd = `# Run in PowerShell as Administrator. Lets ONLY your receiver (${host}) fetch htTamer's test file on port ${port}.
 Get-NetFirewallApplicationFilter | Where-Object Program -eq '${py}' | Get-NetFirewallRule | Where-Object Action -eq 'Block' | Disable-NetFirewallRule
-New-NetFirewallRule -DisplayName 'BassBlend: receiver fetches test file' -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress ${host} -Program '${py}'`;
-  return `<details style="margin-top:10px" open><summary class="small" style="cursor:pointer"><b>How to let the receiver reach BassBlend</b></summary>
+New-NetFirewallRule -DisplayName 'htTamer: receiver fetches test file' -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress ${host} -Program '${py}'`;
+  return `<details style="margin-top:10px" open><summary class="small" style="cursor:pointer"><b>How to let the receiver reach htTamer</b></summary>
     <p class="small" style="margin:8px 0 0">Windows Firewall is blocking Python from accepting connections. This keeps everything blocked except your receiver, on one port:</p>
     <pre class="cmd">${esc(cmd)}</pre><p class="muted small" style="margin:0">Or skip this and use the USB stick option.</p></details>`;
 }
@@ -2094,7 +2093,7 @@ $('#blendRun').onclick = async () => {
   const pos = +$('#blendPos').value, auto = $('#blendAuto').checked && blendMode !== 'manual', set = S.settings || {};
   const tgt = Math.round(set.test_spl || 75), mx = set.avr_test_max_volume;
   if (!confirm(`Run the blend test at ${spotName(pos)}?\n\n` +
-      (auto ? `First soft pink noise plays while BassBlend steps the receiver volume to ${tgt} dB at the mic (never above ${mx != null ? mx : 'your current volume + 12'}). ` : '') +
+      (auto ? `First soft pink noise plays while htTamer steps the receiver volume to ${tgt} dB at the mic (never above ${mx != null ? mx : 'your current volume + 12'}). ` : '') +
       (blendMode === 'hdmi' ? `The receiver switches to ${$('#blendInp').selectedOptions[0].textContent} (the Pi’s HDMI). ` : '') +
       `The receiver ${blendMode !== 'manual' ? 'plays' : 'will play'} ${blendSpk === 'LR' ? 'three sweeps (left speaker, right speaker, then left again with the subs; about 40 seconds)' : 'two sweeps on the left speaker (about 30 seconds)'}` +
       `${auto ? '' : ' at its current volume'}. Input, mode, volume and power are put back afterwards.`)) return;
@@ -2110,7 +2109,7 @@ function slotLabel(n) {
   const s = TUNES.slots[String(n)];
   if (s) return s.name;
   if (n === TUNES.original_slot) return 'Your original setup';
-  return 'Not set by BassBlend';
+  return 'Not set by htTamer';
 }
 function renderTunes() {
   const job = S.job || {}, busy = !!job.running || !!S.busy, active = liveMaster ? liveMaster.preset + 1 : null;
@@ -2160,12 +2159,12 @@ function renderTunes() {
       const act = b.dataset.act;
       if (act === 'view') {
         await post('/api/tunes', {action: (S.preview || {}).tune_id === id ? 'unview' : 'view', id});
-        await poll(); if ((S.preview || {}).tune_id === id) closeSheet();      // jump to the graph
+        await poll(); if ((S.preview || {}).tune_id === id) openSheet('home');      // jump to the graph
       } else if (act === 'apply') {
         const slot = +card.querySelector('[data-slot]').value, body = {tune: id, slot};
         const cur = slotLabel(slot);
         if (slot === TUNES.original_slot && !TUNES.slots[String(slot)]) {
-          if (!confirm(`Slot ${slot} holds your ORIGINAL miniDSP setup.\n\nApplying here replaces it for good. The miniDSP can't hand its settings back, so BassBlend can't restore it.\n\nOverwrite slot ${slot}?`)) return;
+          if (!confirm(`Slot ${slot} holds your ORIGINAL miniDSP setup.\n\nApplying here replaces it for good. The miniDSP can't hand its settings back, so htTamer can't restore it.\n\nOverwrite slot ${slot}?`)) return;
           body.confirm_original = true;
         } else if (!confirm(`Apply “${t.name}” to slot ${slot}?\n\nSlot ${slot} currently holds: ${cur}.\nThe whole slot is rewritten and becomes the one playing.`)) return;
         else if (slot === TUNES.original_slot) body.confirm_original = true;
@@ -2176,7 +2175,7 @@ function renderTunes() {
         const nt = prompt('Notes (optional)', t.notes || '');
         await post('/api/tunes', {action: 'rename', id, name: nm, notes: nt ?? t.notes}); loadTunes();
       } else if (act === 'delete') {
-        if (!confirm(`Delete “${t.name}”? This only removes it from BassBlend, not from the DSP.`)) return;
+        if (!confirm(`Delete “${t.name}”? This only removes it from htTamer, not from the DSP.`)) return;
         const r = await post('/api/tunes', {action: 'delete', id}); if (r.error) alert(r.error); loadTunes();
       }
     });
@@ -2262,7 +2261,7 @@ function renderAllSpk() {
       <li>Set the receiver to a direct or multichannel listening mode (not Stereo or an upmixer) at a normal listening volume.</li>
       <li>Put the mic at your seat, press <b>Start listening</b>, then press play.</li></ol>`
     : (S.pi_hdmi ? `<p class="muted small" style="margin:0"><b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> ` : `<p class="small" style="margin:0"><b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug a cable from the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on). `) +
-      'This test needs HDMI: the receiver’s network player can’t play 8 channels. BassBlend switches the receiver to the input you pick, sets Direct mode so every channel reaches its own speaker, plays the file from the Pi, and puts the input, mode and volume back afterwards.</p>';
+      'This test needs HDMI: the receiver’s network player can’t play 8 channels. htTamer switches the receiver to the input you pick, sets Direct mode so every channel reaches its own speaker, plays the file from the Pi, and puts the input, mode and volume back afterwards.</p>';
   const hk = manual + '|' + !!S.pi_hdmi;
   if ($('#allHow').dataset.k !== hk) { $('#allHow').dataset.k = hk; $('#allHow').innerHTML = how; }
   const latest = Object.values(ar).sort((a, b) => b.t - a.t)[0];
@@ -2285,60 +2284,12 @@ $('#allRun').onclick = async () => {
   const pos = +$('#allPos').value, mode = $('#allMode').value, auto = $('#allAuto').checked && mode === 'hdmi', set = S.settings || {};
   const inp = $('#allInp').value, inpName = $('#allInp').selectedOptions[0]?.textContent || inp;
   const msg = mode === 'hdmi'
-    ? `Run the all-speakers check at ${spotName(pos)}?\n\nThe receiver switches to ${inpName} (the Pi’s HDMI). ` + (auto ? `First soft pink noise while BassBlend sets the volume to ${Math.round(set.test_spl || 75)} dB at the mic (never above ${set.avr_test_max_volume ?? 'your volume + 12'}). ` : '') +
+    ? `Run the all-speakers check at ${spotName(pos)}?\n\nThe receiver switches to ${inpName} (the Pi’s HDMI). ` + (auto ? `First soft pink noise while htTamer sets the volume to ${Math.round(set.test_spl || 75)} dB at the mic (never above ${set.avr_test_max_volume ?? 'your volume + 12'}). ` : '') +
       'Then a sweep on each speaker in turn and the subs, in Direct mode (about a minute). Input, mode, volume and sound settings are put back afterwards.'
     : 'Start listening for the 7.1 test file?\n\nAfter you press OK, press play on the file within 5 minutes. It plays a sweep on each speaker in turn (about a minute) at your receiver’s volume.';
   if (!confirm(msg)) return;
   const r = await post('/api/allspk', {pos, mode, auto_volume: auto, avr_input: inp}); if (r.error) alert(r.error); allKey = null; poll();
 };
-
-// ---------- height speakers (receiver test tone, one speaker at a time)
-let hgtKey = null;
-const HGT_NAMES = {TFL: 'Top front left', TFR: 'Top front right', TML: 'Top middle left', TMR: 'Top middle right', TRL: 'Top rear left', TRR: 'Top rear right'};
-const HGT_SETS = {2: ['TML', 'TMR'], 4: ['TFL', 'TFR', 'TRL', 'TRR'], 6: ['TFL', 'TFR', 'TML', 'TMR', 'TRL', 'TRR']};
-function hgtRecvName(k, n) {
-  if (k === 'FL') return 'Front left'; if (k === 'FR') return 'Front right';
-  const groups = [...new Set((HGT_SETS[n] || []).map(x => x.slice(0, 2)))];
-  return `Height ${groups.indexOf(k.slice(0, 2)) + 1} ${k.endsWith('L') ? 'L' : 'R'}`;
-}
-function renderHeights() {
-  const h = S.heights || {}, hs = S.heights_status || {}, job = S.job || {};
-  const n = +((S.system || {}).heights || 0), keys = HGT_SETS[n] || [];
-  const running = !!hs.running && !!job.running;
-  const key = JSON.stringify([h.t, Object.keys(h.meas || {}), running, hs.step, hs.error, n, !!job.running, !!S.busy]);
-  if (key === hgtKey) return; hgtKey = key;
-  if (!keys.length) { $('#hgtOut').innerHTML = empty('No height speakers set up', 'Set your speaker layout (for example 7.1.4) in Setup → Your system, then come back.'); return; }
-  const rep = h.report || {}, rows = rep.rows || {}, meas = h.meas || {}, nxt = rep.next || 'noise';
-  const busy = !!job.running || !!S.busy;
-  const f = v => (v > 0 ? '+' : '') + v.toFixed(1);
-  const steps = [['noise', 'Room (test tone off)', 'Reads the room alone, so a speaker that isn’t playing is caught.'],
-    ['FL', 'Front left', 'The reference every height is compared with.'], ['FR', 'Front right', 'A check that the reference pair matches.'],
-    ...keys.map(k => [k, `${hgtRecvName(k, n)} · ${HGT_NAMES[k].toLowerCase()}`, ''])];
-  let t = `<div class="tw"><table class="dc-tbl"><thead><tr><th>Step</th><th>Receiver test tone on</th><th>Played</th><th>Level vs front left</th><th>Treble vs front left</th><th></th></tr></thead><tbody>`;
-  const order = steps.map(x => x[0]), nxtIdx = nxt ? order.indexOf(nxt) : order.length;
-  steps.forEach(([k, label, hint], i) => {
-    const r = rows[k], m = meas[k], now = running && hs.step === k, later = i > nxtIdx;
-    const played = k === 'noise' ? (m ? `${m.level_db.toFixed(0)} dB room` : '–') : r ? (r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>') : '–';
-    const lvl = r && r.vs_fl_db != null && r.heard ? f(r.vs_fl_db) + ' dB' : k === 'FL' && r ? 'reference' : '–';
-    const tre = r && r.treble_vs_fl_db != null && r.heard ? f(r.treble_vs_fl_db) + ' dB' : '–';
-    const btn = now ? '<span class="spin"></span>' : `<button class="btn ${k === nxt && !m ? 'primary' : 'ghost'}" data-hstep="${k}" ${busy || later ? 'disabled' : ''} ${later ? 'title="Do the steps above first"' : ''}>${m ? 'Again' : 'Measure'}</button>`;
-    t += `<tr><td>${esc(label)}${hint ? `<div class="muted small">${hint}</div>` : ''}</td><td>${k === 'noise' ? '<i>off</i>' : esc(hgtRecvName(k, n))}</td><td>${played}</td><td>${lvl}</td><td>${tre}</td><td style="text-align:right">${btn}</td></tr>`;
-  });
-  t += '</tbody></table></div>';
-  let o = hs.error ? `<div class="notice bad" style="margin-bottom:10px">${esc(hs.error)}</div>` : '';
-  if (running) o += `<div class="notice" style="margin-bottom:10px"><span class="spin"></span>&nbsp; Measuring ${esc(hs.step === 'noise' ? 'the room' : hgtRecvName(hs.step, n))}… keep the room quiet.</div>`;
-  o += t;
-  if ((rep.advice || []).length) o += `<ul class="dc-ra" style="margin-top:10px">${rep.advice.map(a => `<li class="${a.status === 'good' ? 'auto' : ''}">${esc(a.text)}</li>`).join('')}</ul>`;
-  if (h.t) o += `<p class="muted small" style="margin:8px 0 0">${spotName(h.pos || 1)} · started ${new Date(h.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}. Levels are the 500 Hz–2 kHz band of the receiver’s test tone; treble is the 2–8 kHz balance against the front left. Distance and polarity need a sweep, so they aren’t part of this check.</p>`;
-  $('#hgtOut').innerHTML = o;
-  $('#hgtOut').querySelectorAll('[data-hstep]').forEach(b => b.onclick = async () => {
-    const step = b.dataset.hstep, pos = +$('#hgtPos').value;
-    if (step !== 'noise' && !meas.noise && !confirm('The room hasn’t been measured yet (test tone off), so BassBlend can’t tell whether this speaker is playing. Measure it anyway?')) return;
-    const r = await post('/api/heights', {step, pos}); if (r.error) alert(r.error); hgtKey = null; poll();
-  });
-}
-$('#hgtReset').onclick = async () => { if (!confirm('Forget this height check and start over?')) return; const r = await post('/api/heights', {action: 'reset'}); if (r.error) alert(r.error); hgtKey = null; poll(); };
-$('#hgtPos').onchange = () => { hgtKey = null; };
 
 // ---------- sub headroom
 let hrKey = null;
@@ -2388,9 +2339,9 @@ function renderPlacement() {
       <p class="muted small" style="margin:10px 0 0">Angles are seen from the main seat. Distances are to the front of each speaker. Source: ${esc(p.source)}.</p></div></div>`;
 }
 
-// ---------- coach: next best steps (computed by BassBlend, no AI needed)
+// ---------- coach: next best steps (computed by htTamer, no AI needed)
 let coachKey = null;
-const WHO = {bassblend: 'BassBlend does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};
+const WHO = {bassblend: 'htTamer does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};
 function renderCoach() {
   const steps = (S.coach || []).slice(0, 3), jr = S.journal || [];
   const key = JSON.stringify([steps.map(x => x.id + x.title), jr.length && jr[jr.length - 1].t]);
@@ -2417,7 +2368,7 @@ function renderFix(r, running) {
   const auto = (r.receiver_advice || []).filter(a => a.kind === 'auto');
   if (fixing) h = `<div class="notice"><span class="spin"></span>&nbsp; ${esc(fs.text || 'Working…')}</div>`;
   else {
-    h = `<div class="dc-fixbar"><div><b>Fix what BassBlend can</b><span class="muted small">${auto.length ? esc(auto.map(subTxt).join('; ')) + ', then checks' : 'Checks'} the blend of subs and speakers and applies a fix if it helps, then runs a new report to compare.</span></div>
+    h = `<div class="dc-fixbar"><div><b>Fix what htTamer can</b><span class="muted small">${auto.length ? esc(auto.map(subTxt).join('; ')) + ', then checks' : 'Checks'} the blend of subs and speakers and applies a fix if it helps, then runs a new report to compare.</span></div>
       <button class="btn primary" id="fixRun" ${job.running || S.busy ? 'disabled' : ''}>Fix it for me</button></div>`;
     if (fs.error) h += `<div class="notice bad" style="margin-top:8px">The fixes stopped: ${esc(fs.error)}</div>`;
     if (fr && fr.pos === r.pos) {
@@ -2431,7 +2382,7 @@ function renderFix(r, running) {
   el.innerHTML = h;
   const b = $('#fixRun'); if (b) b.onclick = async () => {
     const set = S.settings || {};
-    if (!confirm(`Fix what BassBlend can, at ${spotName(r.pos)}?\n\n` +
+    if (!confirm(`Fix what htTamer can, at ${spotName(r.pos)}?\n\n` +
         (auto.length ? `1. ${auto.map(subTxt).join(', ')}.\n` : '1. Sub level: already on target, left alone.\n') +
         `2. Blend test (sweeps on the left and right speakers, volume set automatically up to ${set.avr_test_max_volume ?? 'your volume + 12'}), and if a sub delay or polarity change helps, save it as a new tune on the playing slot (never slot 1).\n` +
         `3. A new system report to compare.\n\nAbout 3 minutes of sweeps. Your volume, input and mode are put back afterwards; the new sub level stays.`)) return;
@@ -2489,7 +2440,7 @@ function renderDeep() {
   h += `<p class="hint muted small" style="margin:0 0 6px" id="dcViewHint">${esc(DC_HINT[dcView])}</p>
     <div class="legend" id="dcLegend"></div><div class="chart dc-chart" id="dcChart"></div>`;
   const ra = r.receiver_advice || [];
-  if (ra.length) h += `<h3 class="dc-h" style="margin-top:18px">Receiver settings</h3><ul class="dc-ra">${ra.map(a => `<li class="${a.kind}"><span class="tag">${a.kind === 'auto' ? 'BassBlend can do this' : a.kind === 'menu' ? 'Receiver menu' : 'By hand'}</span>${esc(a.text)}</li>`).join('')}</ul>`;
+  if (ra.length) h += `<h3 class="dc-h" style="margin-top:18px">Receiver settings</h3><ul class="dc-ra">${ra.map(a => `<li class="${a.kind}"><span class="tag">${a.kind === 'auto' ? 'htTamer can do this' : a.kind === 'menu' ? 'Receiver menu' : 'By hand'}</span>${esc(a.text)}</li>`).join('')}</ul>`;
   const fs = r.findings, order = ['fix', 'watch', 'info', 'good'];
   h += `<h3 class="dc-h" style="margin-top:18px">What we found</h3><ul class="dc-fd">${order.flatMap(st => fs.filter(x => x.status === st)).map(x => `<li><details>
     <summary><span class="light ${DC_LIGHT[x.status]}"></span><span><b>${esc(x.title)}</b><small>${esc(x.found)}</small></span><span class="tag">${esc((r.areas[x.area] || {}).label || '')} · ${DC_WORD[x.status]}</span></summary>
@@ -2531,7 +2482,7 @@ function renderDeep() {
     <dt>Early reflection</dt><dd>A bounce off a nearby surface (floor, table, side wall) arriving a few milliseconds after the direct sound. Strong ones blur the image.</dd>
     <dt>RT60</dt><dd>How long a sound takes to fade by 60 dB. Too long: echoey and boomy. Too short: dead and closed-in.</dd>
     <dt>Distortion (THD)</dt><dd>Extra tones the system adds that weren't in the signal. Rattles and straining drivers show up here.</dd>
-    <dt>Target curve</dt><dd>The tonal balance you're aiming for: BassBlend's bass lift plus your chosen treble. It's the dashed line.</dd>
+    <dt>Target curve</dt><dd>The tonal balance you're aiming for: htTamer's bass lift plus your chosen treble. It's the dashed line.</dd>
     <dt>Signal-to-noise</dt><dd>How far the test was above the room's background noise. Below 15 dB, that part of the result isn't trustworthy.</dd></dl></details>`;
   $('#dcOut').innerHTML = h;
   if ($('#dcSpots')) tabs($('#dcSpots'), Object.keys(reps).sort().concat(comb ? ['all'] : []), dcSel, k => k === 'all' ? 'All spots (average)' : spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
@@ -2641,7 +2592,7 @@ $('#dcPrint').onclick = () => {
   const theme = document.documentElement.dataset.theme;
   const sy = S.system || {}, set = S.settings || {};
   const head = document.createElement('div'); head.className = 'pr-head';
-  head.innerHTML = `<h1>BassBlend system report</h1><p>${esc(spotName(r.pos))} · ${new Date(r.t * 1000).toLocaleString([], {dateStyle: 'long', timeStyle: 'short'})}` +
+  head.innerHTML = `<h1>htTamer system report</h1><p>${esc(spotName(r.pos))} · ${new Date(r.t * 1000).toLocaleString([], {dateStyle: 'long', timeStyle: 'short'})}` +
     `${sy.label ? ' · ' + esc(sy.label) : ''}${set.avr_model ? '' : ''} · target: +${set.house_db ?? 0} dB bass lift below ${set.house_fc ?? 45} Hz</p>`;
   document.documentElement.dataset.theme = 'light';
   const ch = $('#dcChart'); ch.style.width = '680px'; drawDeepChart(r);   // draw at page width while it can be measured
@@ -2666,7 +2617,7 @@ $('#dcRun').onclick = async () => {
   const set = {test_spl: tgt}; if (mx !== '') set.avr_test_max_volume = +mx;
   const sr = await post('/api/settings', set); if (sr.error) { alert(sr.error); return; }
   if (!confirm(`Run the system report at ${spotName(pos)}?\n\n` +
-      (auto ? `First soft pink noise plays while BassBlend steps the receiver volume until it reads ${tgt} dB at the mic` +
+      (auto ? `First soft pink noise plays while htTamer steps the receiver volume until it reads ${tgt} dB at the mic` +
               ` (never above ${mx !== '' ? mx : 'your current volume + 12'}). ` : 'The receiver stays at its current volume. ') +
       (mode === 'hdmi' ? `The receiver switches to ${$('#dcInp').selectedOptions[0].textContent} (the Pi’s HDMI) for the test. ` : '') +
       `Then three 8-second sweeps play: left speaker, right speaker, both (about a minute in all).\n\n` +
@@ -2803,7 +2754,7 @@ function setupItems() {
      detail: cal && set.cal_ok === false ? `The file ${cal} isn't on this device any more. Upload it again.`
        : cal ? `UMIK-1 · ${cal}` : 'No calibration file. Measurements will be less accurate.'},
     {key: 'layout', ok: !!(sy.beds && sy.dirac != null), title: 'Speakers and Dirac Live', open: 'avr',
-     detail: sy.beds && sy.dirac != null ? `${sy.label} system · crossover ${sy.crossover_hz} Hz · ${sy.dirac ? 'Dirac Live' + (sy.dlbc ? ' (Bass Control is on: turn it off)' : sy.dlbc_license ? ' + Bass Control (off)' : '') : 'no Dirac Live'}` : 'Tell BassBlend how many speakers you have and whether you use Dirac Live'},
+     detail: sy.beds && sy.dirac != null ? `${sy.label} system · crossover ${sy.crossover_hz} Hz · ${sy.dirac ? 'Dirac Live' + (sy.dlbc ? ' (Bass Control is on: turn it off)' : sy.dlbc_license ? ' + Bass Control (off)' : '') : 'no Dirac Live'}` : 'Tell htTamer how many speakers you have and whether you use Dirac Live'},
     {key: 'avr', ok: !!(AVR.status), title: 'Receiver connected', open: 'avr',
      detail: AVR.status ? `${AVR.make || ''} ${AVR.model || ''} at ${AVR.host} · ${AVR.status.power ? 'on' : 'standby'}` : AVR.configured ? `No answer from ${AVR.host}` : 'Enter its IP address'},
     {key: 'room', ok: !!(rm.length_m && rm.width_m && placed >= 1), title: 'Room and subs described', open: 'room',
@@ -2837,8 +2788,8 @@ $('#cfgFile').onchange = async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   const out = $('#cfgOut');
   let b;
-  try { b = JSON.parse(await f.text()); } catch (err) { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a BassBlend settings file.</span>'; return; }
-  if (!b || b.format !== 'bassblend-config') { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a BassBlend settings file.</span>'; return; }
+  try { b = JSON.parse(await f.text()); } catch (err) { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a htTamer settings file.</span>'; return; }
+  if (!b || b.format !== 'bassblend-config') { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a htTamer settings file.</span>'; return; }
   const extras = [b.tunes && b.tunes.length ? `${b.tunes.length} tune${b.tunes.length > 1 ? 's' : ''}` : '', b.secrets && b.secrets.pin ? 'the PIN' : '', b.secrets && b.secrets.ai_key ? 'the AI key' : ''].filter(Boolean);
   if (!confirm(`Load the settings saved on ${b.from || 'another device'} (${b.exported || 'unknown date'})?
 
@@ -2852,7 +2803,7 @@ $('#cfgFile').onchange = async e => {
   setupKey = null; poll(); if (sheetKey === 'tunes') loadTunes();
 };
 function renderCfgTip() {
-  const t = `BassBlend ${S.version || ''}` + ((S.net || {}).lan
+  const t = `htTamer ${S.version || ''}` + ((S.net || {}).lan
     ? ' · New SD card: copy a settings file onto the card’s boot drive as <code>bassblend-config.json</code> before the first start and it loads by itself.'
     : '');
   if ($('#cfgTip').dataset.t !== t) { $('#cfgTip').dataset.t = t; $('#cfgTip').innerHTML = t; }
@@ -2903,7 +2854,7 @@ function renderHome() {
     (a ? (a.power ? [`${esc(a.input || '')} · ${esc(a.mode || '')}`, `Volume ${a.volume != null ? a.volume.toFixed(1) : '–'} · sub ${a.sub_level != null ? (a.sub_level > 0 ? '+' : '') + a.sub_level.toFixed(1) + ' dB' : '–'}`] : ['Standby'])
       : ['Not connected']).concat(sy.dirac ? [sy.dirac_current ? 'Dirac Live · run with this tune' : 'Dirac Live · not run with this tune yet'] : []), a ? (a.power ? 'ok' : '') : 'busy');
   const dspNode = node('tunes', 'miniDSP 2x4HD', lm ? `Slot ${lm.preset + 1}` : 'miniDSP',
-    lm ? [esc((TUNES.slots[String(lm.preset + 1)] || {}).name || (lm.preset === 0 ? 'Your original setup' : 'Not set by BassBlend')),
+    lm ? [esc((TUNES.slots[String(lm.preset + 1)] || {}).name || (lm.preset === 0 ? 'Your original setup' : 'Not set by htTamer')),
           `Input: ${String(lm.source).toLowerCase() === 'usb' ? 'USB (this PC)' : 'AVR'}${lm.mute ? ' · muted' : ''}`] : ['Not connected'], lm ? 'ok' : 'busy');
   const subNodes = subOuts.map(o => { const s = subs[o] || {}, t = tuned[o];
     return node('room', `Out ${o + 1}${s.role === 'nearfield' ? ' · nearfield' : ''}`, (s.model || 'Sub').replace(/^Hsu Research /, 'Hsu '),
@@ -2960,9 +2911,9 @@ function renderWizard() {
   }
   renderWizVerify(steps.map(x => x.done)); renderDirac(); renderSystem();
 }
-document.addEventListener('click', e => { const g = e.target.closest('[data-goto]'); if (g) { wizStep = g.dataset.goto; wizPicked = true; wizKey = null; renderWizard(); $('#wizCard').scrollIntoView({block: 'start', behavior: 'smooth'}); } });
+document.addEventListener('click', e => { const g = e.target.closest('[data-goto]'); if (g) { wizStep = g.dataset.goto; wizPicked = true; wizKey = null; openSheet('wizard'); renderWizard(); } });
 
-// ---------- speakers with Dirac Live (wizard step; the owner runs Dirac, BassBlend guides)
+// ---------- speakers with Dirac Live (wizard step; the owner runs Dirac, htTamer guides)
 let diracKey = null, diracTreble = null;
 const TREBLE = {flat: ['Flat', 0, 'Bright, detailed rooms with soft furnishings'], gentle: ['Gentle', -3, 'A safe choice for most rooms'], warm: ['Warm', -6, 'Softer, for bright rooms or long listening']};
 function targetSvg(hd, fc, tilt) {
@@ -2994,17 +2945,17 @@ function renderDirac() {
   const step = (n, state, title, body) => `<div class="gstep ${state}"><span class="n">${state === 'done' ? '✓' : n}</span><div class="gb"><h4>${title}</h4>${body}</div></div>`;
   const ready = tuned && onAvr;
   el.innerHTML = `
-    <div class="row" style="align-items:flex-start;margin-bottom:12px"><p class="lead" style="margin:0">Dirac Live corrects your ${nSpk ? nSpk + ' speakers' : 'speakers'}; it is the only thing that can write per-speaker settings into the receiver. BassBlend has already made your ${sy.subs || ''} subs behave as one good sub, which is what Dirac will see. You run Dirac Live; BassBlend gives it the right target and checks the result afterwards.</p>
-      <span class="grow"></span><button class="btn ghost ask" data-ask="Walk me through running Dirac Live with BassBlend's target curve, one step at a time. Ask me what I see on screen as we go.">Ask about this</button></div>
+    <div class="row" style="align-items:flex-start;margin-bottom:12px"><p class="lead" style="margin:0">Dirac Live corrects your ${nSpk ? nSpk + ' speakers' : 'speakers'}; it is the only thing that can write per-speaker settings into the receiver. htTamer has already made your ${sy.subs || ''} subs behave as one good sub, which is what Dirac will see. You run Dirac Live; htTamer gives it the right target and checks the result afterwards.</p>
+      <span class="grow"></span><button class="btn ghost ask" data-ask="Walk me through running Dirac Live with htTamer's target curve, one step at a time. Ask me what I see on screen as we go.">Ask about this</button></div>
     ${done && !cur ? `<div class="notice warn" style="margin-bottom:12px"><b>Dirac Live needs running again.</b> It was last run with “${esc(done.tune_name || 'an earlier tune')}”, and the sub tune has changed since. Dirac measured the old sub response, so its correction no longer fits.</div>` : ''}
     <div class="gsteps">
     ${step(1, ready ? 'done' : 'todo', 'Before you open Dirac Live', `<ul class="chk">
         ${li(tuned, tuned ? `Sub tune applied: “${esc(res.tune_name || 'Tune')}”` : 'No sub tune applied yet. Finish “Tune the subs” first.', tuned ? '' : `<button class="btn" data-goto="tune">Go to step 2</button>`)}
         ${li(onAvr, !liveMaster ? 'miniDSP not connected' : onAvr ? 'The subs are listening to the receiver' : 'The subs are listening to this PC (USB), so Dirac would not hear them', onAvr || !liveMaster ? '' : `<button class="btn" id="diracAvr">Switch to receiver</button>`)}
-        ${li(true, 'Close BassBlend’s level meter and don’t start a BassBlend measurement while Dirac is working: both use the same mic.')}
+        ${li(true, 'Close htTamer’s level meter and don’t start a htTamer measurement while Dirac is working: both use the same mic.')}
         ${autoEq.length ? li(true, `Hsu’s advice for auto-EQ: while Dirac measures, set your Hsu sub${autoEq.length > 1 ? 's' : ''} (out ${autoEq.map(([k]) => +k + 1).join(' and ')}) to <b>one port open (4″), EQ1, Q 0.7</b>. Afterwards you can switch back to the mode you prefer (record it in Room & subs).`) : ''}
       </ul>`)}
-    ${step(2, 'todo', 'Download BassBlend’s target curve', `
+    ${step(2, 'todo', 'Download htTamer’s target curve', `
       <p>A target curve tells Dirac what “right” should sound like. This one has the same bass rise your subs were tuned to (+${set.house_db ?? 0} dB below about ${set.house_fc ?? 45} Hz), so Dirac leaves the sub tune alone instead of fighting it.</p>
       <div class="row" style="align-items:end;gap:12px"><label class="f" style="width:auto">Treble
         <div class="seg" id="dTreble" role="radiogroup">${Object.entries(TRE).map(([k, [name]]) => `<button type="button" data-k="${k}" class="${k === treble ? 'on' : ''}" title="${TRE[k][2]}">${name}</button>`).join('')}</div></label>
@@ -3017,18 +2968,18 @@ function renderDirac() {
         <li><b>Afterwards:</b> run the System report again and compare it with the one from before (the report page overlays them).</li></ul></details>`)}
     ${step(3, 'todo', 'Run Dirac Live', `<ol class="howto">
         <li><b>Open Dirac Live</b> on your computer with the receiver switched on, and pick the ${esc(AVR.model || 'receiver')}.</li>
-        <li><b>Choose the mic.</b> Select the UMIK-1 and load its calibration file${cal ? ` (<code>${esc(cal)}</code>, the same one BassBlend uses)` : ''}.</li>
+        <li><b>Choose the mic.</b> Select the UMIK-1 and load its calibration file${cal ? ` (<code>${esc(cal)}</code>, the same one htTamer uses)` : ''}.</li>
         <li><b>Set levels</b> when Dirac asks: play each speaker’s test noise and raise the volume until the meters sit in the green. Leave the sub gain knobs alone.</li>
-        <li><b>Measure.</b> Put the mic at the MLP for the first position, the same spot you used for BassBlend. Then follow Dirac’s positions, including the seats you measured as Spot 2 and Spot 3.</li>
+        <li><b>Measure.</b> Put the mic at the MLP for the first position, the same spot you used for htTamer. Then follow Dirac’s positions, including the seats you measured as Spot 2 and Spot 3.</li>
         <li><b>Load the target</b> in Filter Design, for every group${groups.length ? ` (${groups.map(esc).join(', ')}, and the subwoofer)` : ' and the subwoofer'}: open the ⋮ menu → <i>Load target curve</i> → the file from step 2.</li>
-        ${sy.dlbc_license ? `<li><b>Leave Bass Control off.</b> Dirac sees your ${sy.subs || 'three'} subs as one, so it can’t time them individually. BassBlend has done that job.</li>` : ''}
-        <li><b>Export</b> the filter to a slot on the receiver (name it “BassBlend”), and make sure Dirac is switched on in the receiver afterwards.</li>
+        ${sy.dlbc_license ? `<li><b>Leave Bass Control off.</b> Dirac sees your ${sy.subs || 'three'} subs as one, so it can’t time them individually. htTamer has done that job.</li>` : ''}
+        <li><b>Export</b> the filter to a slot on the receiver (name it “htTamer”), and make sure Dirac is switched on in the receiver afterwards.</li>
       </ol>
       <p class="muted small" style="margin:8px 0 0">Dirac sets each speaker’s distance and level itself. If Dirac refuses the target file, tell the assistant what it says: the file follows the layout Dirac Live 2 and 3 accept, but Dirac publishes no official format.</p>`)}
-    ${step(4, cur ? 'done' : 'todo', 'Tell BassBlend it’s done', cur
+    ${step(4, cur ? 'done' : 'todo', 'Tell htTamer it’s done', cur
       ? `<p>Marked done ${fmtWhen(done.t)} with “${esc(done.tune_name || 'this tune')}”. Next, the blend test checks how the subs and the corrected speakers add up.</p>
          <div class="row"><button class="btn ghost" id="diracUndo">Undo</button><span class="grow"></span><button class="btn primary" data-goto="blend">Next: blend with speakers</button></div>`
-      : `<p>Press this once Dirac has exported its filter. BassBlend then clears earlier blend measurements, because your speakers now sound different, and moves on to the blend test.</p>
+      : `<p>Press this once Dirac has exported its filter. htTamer then clears earlier blend measurements, because your speakers now sound different, and moves on to the blend test.</p>
          <div class="row"><span class="grow"></span><button class="btn primary" id="diracDone" ${tuned ? '' : 'disabled'}>I’ve run Dirac Live</button></div>`)}
     </div>`;
   el.querySelectorAll('#dTreble [data-k]').forEach(b => b.onclick = async () => { diracTreble = b.dataset.k; diracKey = null; renderDirac(); post('/api/system', {treble: diracTreble}); });
@@ -3057,12 +3008,12 @@ function renderSystem() {
     `<b>Subwoofer:</b> Yes, one subwoofer. The receiver’s single sub output feeds the miniDSP, which runs your ${sy.subs || ''} subs`,
     '<b>Low-pass for the movie bass channel (LPF of LFE):</b> 120 Hz',
     '<b>Double Bass:</b> Off, so bass isn’t sent to both the speakers and the subs',
-    sy.dirac ? '<b>Dirac Live:</b> On, using the slot with BassBlend’s target' + (sy.dlbc_license ? '. <b>Bass Control:</b> Off' : '') : '<b>Speaker distances and levels:</b> as set by the receiver’s own setup (AccuEQ) or by tape measure and its test tone',
-    '<b>Subwoofer level and distance:</b> leave where ' + (sy.dirac ? 'Dirac' : 'the receiver’s setup') + ' and BassBlend’s blend test put them',
+    sy.dirac ? '<b>Dirac Live:</b> On, using the slot with htTamer’s target' + (sy.dlbc_license ? '. <b>Bass Control:</b> Off' : '') : '<b>Speaker distances and levels:</b> as set by the receiver’s own setup (AccuEQ) or by tape measure and its test tone',
+    '<b>Subwoofer level and distance:</b> leave where ' + (sy.dirac ? 'Dirac' : 'the receiver’s setup') + ' and htTamer’s blend test put them',
   ];
   el.innerHTML = `<div class="sysbox">
     <div class="row" style="align-items:baseline;gap:10px"><h3 style="margin:0">Your speakers</h3><span class="muted small">${known ? esc(sy.label) + ' system' : 'Not set yet'}</span></div>
-    <p class="muted small" style="margin:4px 0 10px">BassBlend can’t see how many speakers you have, so tell it here. It uses this to guide you through the right steps; it doesn’t change anything in the receiver.</p>
+    <p class="muted small" style="margin:4px 0 10px">htTamer can’t see how many speakers you have, so tell it here. It uses this to guide you through the right steps; it doesn’t change anything in the receiver.</p>
     <div class="grid g3">
       <label class="f">Speakers at ear level<select id="syBeds">${opt('', sy.beds || '', 'Choose…')}${[[2, '2 (stereo)'], [3, '3 (with center)'], [5, '5 (surrounds)'], [7, '7 (+ rears)'], [9, '9 (+ wides)']].map(([v, t]) => opt(v, sy.beds, t)).join('')}</select></label>
       <label class="f">Height or ceiling speakers<select id="syHeights">${opt('', sy.heights ?? '', 'Choose…')}${[[0, 'None'], [2, '2'], [4, '4'], [6, '6']].map(([v, t]) => opt(v, sy.heights, t)).join('')}</select></label>
@@ -3074,10 +3025,10 @@ function renderSystem() {
       ${sy.dirac && sy.dlbc_license ? `<label class="f" style="width:auto" id="syDlbcWrap">Is Bass Control switched on?${seg('syDlbc', sy.dlbc, 'Yes', 'No')}</label>` : ''}
       <span class="grow"></span><span class="muted small" id="syMsg"></span><button class="btn primary" id="sySave">Save</button>
     </div>
-    ${sy.dirac && sy.dlbc ? `<div class="notice warn" style="margin-top:10px"><b>Turn Bass Control off in Dirac Live.</b> It sees your ${sy.subs || 'three'} subs as a single sub, so it can’t time them one by one, and it would undo part of BassBlend’s tune.</div>` : ''}
+    ${sy.dirac && sy.dlbc ? `<div class="notice warn" style="margin-top:10px"><b>Turn Bass Control off in Dirac Live.</b> It sees your ${sy.subs || 'three'} subs as a single sub, so it can’t time them one by one, and it would undo part of htTamer’s tune.</div>` : ''}
     ${sy.dirac === null ? `<p class="muted small" style="margin:8px 0 0">Not sure? Dirac Live is the room correction built into the TX-RZ50; you run it from the Dirac Live app on a computer or phone. If you only ever used the receiver’s own setup mic (AccuEQ), choose No.</p>` : ''}
     ${known ? `<details class="rxcheck"><summary>Receiver settings to check once (${esc(sy.label)})</summary>
-      <p class="muted small" style="margin:8px 0 6px">BassBlend can’t read or change these. Look in the receiver’s Speaker setup menu:</p>
+      <p class="muted small" style="margin:8px 0 6px">htTamer can’t read or change these. Look in the receiver’s Speaker setup menu:</p>
       <ul>${checks.map(c => `<li>${c}</li>`).join('')}</ul></details>` : ''}
   </div>`;
   const pick = {dirac: sy.dirac, dlbc: sy.dlbc};
@@ -3127,7 +3078,7 @@ function renderWizVerify(done) {
   };
 }
 
-// ---------- menu: secondary sections live in a slide-in panel
+// ---------- navigation: sections in the side bar (desktop) or tab bar + pills (phone); #/key routes
 const card = sel => document.querySelector(sel).closest('.card');
 // 16px line icons (stroke = currentColor)
 const IC = {
@@ -3146,6 +3097,13 @@ const IC = {
   log: '<path d="M5.5 4h8.5M5.5 8h8.5M5.5 12h8.5"/><path d="M2 4h.5M2 8h.5M2 12h.5"/>',
   manual: '<path d="M4.5 3l8 5-8 5z"/>',
   file: '<path d="M4 2h5l3 3v9H4z"/><path d="M9 2v3h3M6 9h4M6 11.5h4"/>',
+  home: '<path d="M2 7.5L8 2.5l6 5"/><path d="M3.5 6.5V14h9V6.5"/><path d="M6.5 14v-3.5h3V14"/>',
+  wand: '<path d="M2.5 13.5l7-7"/><path d="M10.5 2v2.5M9.25 3.25h2.5M13 5.5v2M12 6.5h2"/>',
+  tune: '<path d="M2 4.5h7M12 4.5h2M2 11.5h2M7 11.5h7"/><circle cx="10.5" cy="4.5" r="1.5"/><circle cx="5.5" cy="11.5" r="1.5"/>',
+  gear: '<circle cx="8" cy="8" r="2.2"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+  chip: '<rect x="4" y="4" width="8" height="8" rx="1.2"/><path d="M6.5 1.5v2.5M9.5 1.5v2.5M6.5 12v2.5M9.5 12v2.5M1.5 6.5H4M1.5 9.5H4M12 6.5h2.5M12 9.5h2.5"/>',
+  speakers: '<rect x="2" y="2.5" width="5" height="11" rx="1"/><rect x="9" y="2.5" width="5" height="11" rx="1"/><circle cx="4.5" cy="9.5" r="1.4"/><circle cx="11.5" cy="9.5" r="1.4"/>',
+  place: '<circle cx="8" cy="8" r="1.6"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/><circle cx="8" cy="8" r="5"/>',
 };
 const icon = k => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
 let seenErrors = 0;
@@ -3155,82 +3113,120 @@ try {   // first visit: count only errors from now on, not old history
 } catch (e) { seenErrors = Date.now() / 1000; }
 // short label in the list, full title at the top of the panel, and a small status tag: [text, class]
 // grouped by what you're doing; `home` is where a card lives when the menu closes
+const SECTIONS = [
+  {grp: 'Home', icon: 'home', first: 'home'},
+  {grp: 'Tune', icon: 'tune', first: 'wizard'},
+  {grp: 'Measure', icon: 'report', first: 'report'},
+  {grp: 'Setup', icon: 'gear', first: 'setup'},
+  {grp: 'System', icon: 'chip', first: 'activity'},
+];
 const MENU = [
+  {grp: 'Home', key: 'home', icon: 'home', title: 'Home', full: 'Home', el: $('#homeView'), tag: () => null},
+  {grp: 'Tune', key: 'wizard', icon: 'wand', title: 'Tune my system', full: 'Tune my system', el: $('#wizCard'), tag: () => null},
   {grp: 'Tune', key: 'tunes', icon: 'tunes', title: 'Tunes & slots', full: 'Saved tunes & DSP slots', el: $('#tunesCard'),
    tag: () => liveMaster ? [`slot ${liveMaster.preset + 1}`, ''] : null},
+  {grp: 'Tune', key: 'blend', icon: 'avr', title: 'Blend test', full: 'Blend the subs with your speakers', el: $('#blendCard'), home: $('#wizBlend'),
+   tag: () => (S.avr_blend_status || {}).running ? ['…', ''] : S.avr_blend ? [S.avr_blend.loss_now_db < 1 ? '✓' : '!', S.avr_blend.loss_now_db < 1 ? '' : 'alert'] : null},
+  {grp: 'Tune', key: 'filters', icon: 'filters', title: 'Filters', full: 'Filters on the DSP', el: card('#filters'),
+   tag: () => S.result && S.result.slot ? [`slot ${S.result.slot}`, ''] : null},
+  {grp: 'Tune', key: 'manual', icon: 'manual', title: 'Manual steps', full: 'Manual steps', el: $('#manualCard'), tag: () => null},
   {grp: 'Measure', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
-  {grp: 'Measure', key: 'allspk', icon: 'report', title: 'All speakers', full: 'All speakers (experimental)', el: $('#allCard'), tag: () => null},
-  {grp: 'Measure', key: 'heights', icon: 'report', title: 'Height speakers', full: 'Height speakers (Atmos)', el: $('#hgtCard'), tag: () => null},
-  {grp: 'Measure', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
+  {grp: 'Measure', key: 'allspk', icon: 'speakers', title: 'All speakers', full: 'All speakers', el: $('#allCard'), tag: () => null},
   {grp: 'Measure', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
      const bad = Object.values(c.verdicts).filter(v => v.status !== 'good').length; return bad ? [String(bad), 'alert'] : ['✓', '']; }},
-  {grp: 'Measure', key: 'blend', icon: 'avr', title: 'Blend test', full: 'Blend the subs with your speakers', el: $('#blendCard'), home: $('#wizBlend'),
-   tag: () => (S.avr_blend_status || {}).running ? ['…', ''] : S.avr_blend ? [S.avr_blend.loss_now_db < 1 ? '✓' : '!', S.avr_blend.loss_now_db < 1 ? '' : 'alert'] : null},
-  {grp: 'Measure', key: 'spl', icon: 'spl', title: 'Level meter', full: 'Sound level meter', el: $('#splCard'),
-   tag: () => splState.running ? [`● ${splState.reading ? splState.reading.c.toFixed(0) + ' dB' : 'live'}`, 'live'] : null},
-  {grp: 'Measure', key: 'levels-match', icon: 'match', title: 'Level match', full: 'Sub level match', el: $('#lmCard'), tag: () => null},
   {grp: 'Measure', key: 'measured', icon: 'measured', title: 'Measurements', full: 'Each sub, as measured', el: card('#chartA'),
    tag: () => { const n = Object.keys(S.measurements || {}).length; return n ? [`${n} spots`, ''] : null; }},
-  {grp: 'Setup', key: 'setup', icon: 'filters', title: 'Setup checklist', full: 'Setup', el: $('#setupCard'),
+  {grp: 'Measure', key: 'levels-match', icon: 'match', title: 'Level match', full: 'Sub level match', el: $('#lmCard'), tag: () => null},
+  {grp: 'Measure', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
+  {grp: 'Measure', key: 'spl', icon: 'spl', title: 'Level meter', full: 'Sound level meter', el: $('#splCard'),
+   tag: () => splState.running ? [`● ${splState.reading ? splState.reading.c.toFixed(0) + ' dB' : 'live'}`, 'live'] : null},
+  {grp: 'Setup', key: 'setup', icon: 'gear', title: 'Checklist', full: 'Setup checklist', el: $('#setupCard'),
    tag: () => { const n = setupItems().filter(i => !i.ok && !i.optional).length; return n ? [String(n), 'alert'] : ['✓', '']; }},
   {grp: 'Setup', key: 'avr', icon: 'avr', title: 'Receiver', full: 'Receiver', el: $('#avrCard'),
    tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
   {grp: 'Setup', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
    tag: () => { const n = Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
-  {grp: 'Setup', key: 'place', icon: 'room', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
+  {grp: 'Setup', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
   {grp: 'Setup', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
    tag: () => (S.analysis_status || {}).running || (S.suggest_status || {}).running ? ['…', ''] : null},
-  {grp: 'More', key: 'filters', icon: 'filters', title: 'Filters', full: 'Filters on the DSP', el: card('#filters'),
-   tag: () => S.result && S.result.slot ? [`slot ${S.result.slot}`, ''] : null},
-  {grp: 'More', key: 'levels', icon: 'meters', title: 'DSP meters', full: 'Live DSP meters', el: card('#meters'), tag: () => null},
-  {grp: 'More', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
+  {grp: 'System', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
    tag: () => { const e = events.filter(x => x.kind === 'error' && x.t > seenErrors).length; return e ? [String(e), 'alert'] : null; }},
-  {grp: 'More', key: 'manual', icon: 'manual', title: 'Manual steps', full: 'Manual steps', el: $('#manualCard'), tag: () => null},
-  {grp: 'More', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
+  {grp: 'System', key: 'levels', icon: 'meters', title: 'DSP meters', full: 'Live DSP meters', el: card('#meters'), tag: () => null},
+  {grp: 'System', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
 ];
 const homeOf = m => m.home || $('#store');
-MENU.forEach(m => homeOf(m).appendChild(m.el));               // off the main page (or into the wizard)
+MENU.forEach(m => { if (m.key !== 'home') homeOf(m).appendChild(m.el); });   // pages wait off-screen until opened
 $('#wizTune').appendChild($('#tuneCard'));                    // auto-tune lives in wizard step 2
 $('#manualCard').open = true;
-let sheetKey = null, lastFocus = null;
+let sheetKey = 'home', lastInSection = {};
+try { lastInSection = JSON.parse(localStorage.getItem('httamer-last') || '{}') || {}; } catch (e) {}
+const safeTag = m => { try { return m.tag(); } catch (e) { return null; } };
+const navBtn = (m, cls = '') => { const t = safeTag(m);
+  return `<button type="button" data-k="${m.key}" class="${cls}${m.key === sheetKey ? ' on' : ''}" ${m.key === sheetKey ? 'aria-current="page"' : ''} title="${esc(m.full)}">${icon(m.icon)}<span class="lbl">${esc(m.title)}</span>${t ? `<span class="tag ${t[1]}">${esc(t[0])}</span>` : ''}</button>`; };
 function renderMenu() {
-  let grp = '', h = '';
-  MENU.forEach(m => { if (m.grp !== grp) { grp = m.grp; h += `<div class="grp">${grp}</div>`; }
-    const t = m.tag();
-    h += `<button type="button" data-k="${m.key}" class="${m.key === sheetKey ? 'on' : ''}" ${m.key === sheetKey ? 'aria-current="page"' : ''} title="${esc(m.full)}">${icon(m.icon)}<span class="lbl">${esc(m.title)}</span>${t ? `<span class="tag ${t[1]}">${esc(t[0])}</span>` : ''}</button>`; });
-  if ((S.net || {}).signed_in) h += `<div class="grp">Signed in</div><button type="button" id="signOut" title="Sign out of BassBlend on this device">${icon('chat').replace(/<path[^>]*>/, '<path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"/>')}<span class="lbl">Sign out</span></button>`;
-  $('#sheetNav').innerHTML = h;
-  $('#sheetNav').querySelectorAll('button[data-k]').forEach(b => b.onclick = () => openSheet(b.dataset.k));
+  const cur = MENU.find(x => x.key === sheetKey) || MENU[0];
+  // side bar: every page, grouped by section
+  let h = '', grp = '';
+  MENU.forEach(m => {
+    if (m.key === 'home') { h += navBtn(m, 'home'); return; }
+    if (m.grp !== grp) { grp = m.grp; h += `<div class="grp">${grp}</div>`; }
+    h += navBtn(m);
+  });
+  if ((S.net || {}).signed_in) h += `<div class="grp">Account</div><button type="button" id="signOut" title="Sign out of htTamer on this device">${icon('chat').replace(/<path[^>]*>/, '<path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"/>')}<span class="lbl">Sign out</span></button>`;
+  if (!$('#sideNav').contains(document.activeElement)) $('#sideNav').innerHTML = h;
+  // phone: the five sections along the bottom, this section's pages as pills
+  $('#tabBar').innerHTML = SECTIONS.map(sec => {
+    const alert = MENU.some(m => m.grp === sec.grp && (safeTag(m) || [])[1] === 'alert');
+    return `<button type="button" data-sec="${sec.grp}" class="${cur.grp === sec.grp ? 'on' : ''}" ${cur.grp === sec.grp ? 'aria-current="true"' : ''}>${icon(sec.icon)}<span>${sec.grp}</span>${alert ? '<i class="bdg" aria-label="needs attention"></i>' : ''}</button>`; }).join('');
+  const pages = MENU.filter(m => m.grp === cur.grp);
+  const sub = pages.length > 1 ? pages.map(m => navBtn(m)).join('') : '';
+  if ($('#subNav').dataset.k !== cur.grp + sheetKey + sub) {
+    const moved = !($('#subNav').dataset.k || '').startsWith(cur.grp + sheetKey);
+    $('#subNav').dataset.k = cur.grp + sheetKey + sub; $('#subNav').innerHTML = sub;
+    const on = $('#subNav .on'); if (on && moved) $('#subNav').scrollLeft = on.offsetLeft - 16;
+  }
+  $('#subNav').hidden = !sub;
   const so = $('#signOut'); if (so) so.onclick = async () => { await post('/api/logout'); location.href = '/login'; };
 }
-function openSheet(key) {
+document.addEventListener('click', e => {
+  const b = e.target.closest('#sideNav button[data-k], #subNav button[data-k]'); if (b) { openSheet(b.dataset.k); return; }
+  const t = e.target.closest('#tabBar button[data-sec]'); if (t) {
+    const sec = SECTIONS.find(x => x.grp === t.dataset.sec), cur = MENU.find(x => x.key === sheetKey) || MENU[0];
+    openSheet(cur.grp === sec.grp ? sec.first : (lastInSection[sec.grp] || sec.first));
+  }
+});
+function openSheet(key, fromHash = false) {
   const m = MENU.find(x => x.key === key) || MENU[0];
   if (sheetKey === 'spl' && m.key !== 'spl') splStop();
-  if (sheetKey) { const p = MENU.find(x => x.key === sheetKey); homeOf(p).appendChild(p.el); }
+  const prev = MENU.find(x => x.key === sheetKey);
+  if (prev && prev.key !== 'home' && prev.key !== m.key) homeOf(prev).appendChild(prev.el);
   sheetKey = m.key;
-  $('#sheetBody').innerHTML = ''; $('#sheetBody').appendChild(m.el); $('#sheetBody').scrollTop = 0;
-  $('#sheetTitle').textContent = m.full || m.title;
+  lastInSection[m.grp] = m.key; try { localStorage.setItem('httamer-last', JSON.stringify(lastInSection)); } catch (e) {}
+  $('#homeView').hidden = m.key !== 'home';
+  if (m.key !== 'home' && !$('#viewBody').contains(m.el)) { $('#viewBody').innerHTML = ''; $('#viewBody').appendChild(m.el); }
+  if (m.key === 'home') $('#viewBody').innerHTML = '';
+  $('#viewTitle').textContent = m.key === 'home' ? 'Home' : (m.full || m.title);
+  $('#viewCrumb').textContent = m.key === 'home' ? '' : m.grp;
+  document.title = m.key === 'home' ? 'htTamer' : `${m.title} · htTamer`;
   if (m.key === 'activity') { seenErrors = Date.now() / 1000; try { localStorage.setItem('subtune-seen-errors', String(seenErrors)); } catch (e) {} }
-  if ($('#sheetWrap').hidden) { lastFocus = document.activeElement; $('#sheetWrap').hidden = false; document.body.style.overflow = 'hidden'; }
-  try { localStorage.setItem('subtune-sheet', m.key); } catch (e) {}
+  if (!fromHash && location.hash !== '#/' + m.key) history.pushState(null, '', '#/' + m.key);
   if (m.key === 'tunes') loadTunes();
-  if (m.key === 'avr' || m.key === 'blend' || m.key === 'setup') loadAvr(true);
+  if (m.key === 'avr' || m.key === 'blend' || m.key === 'setup' || m.key === 'wizard') loadAvr(true);
   renderMenu();
-  requestAnimationFrame(() => { render(); renderPlan(roomInit ? readRoom() : null); $('#sheetNav .on').focus(); });
+  window.scrollTo(0, 0);
+  requestAnimationFrame(() => { render(); renderPlan(roomInit ? readRoom() : null); });
 }
-function closeSheet() {
-  if ($('#sheetWrap').hidden) return;
-  if (sheetKey === 'spl') splStop();
-  if (sheetKey) { const p = MENU.find(x => x.key === sheetKey); homeOf(p).appendChild(p.el); }
-  sheetKey = null; $('#sheetWrap').hidden = true; document.body.style.overflow = '';
-  if (lastFocus) lastFocus.focus();
-}
-$('#menuBtn').onclick = () => { let k = null; try { k = localStorage.getItem('subtune-sheet'); } catch (e) {} openSheet(k || 'room'); };
-$('#sheetClose').onclick = closeSheet;
-$('#sheetBackdrop').onclick = closeSheet;
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#sheetWrap').hidden) closeSheet(); });
+const closeSheet = () => openSheet('home');
+const routeKey = () => (location.hash.match(/^#\/?([\w-]+)/) || [])[1];
+addEventListener('popstate', () => openSheet(routeKey() || 'home', true));
+addEventListener('hashchange', () => { if (routeKey() !== sheetKey) openSheet(routeKey() || 'home', true); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && $('#chat').hidden && sheetKey !== 'home' && !e.target.closest('input, textarea, select')) openSheet('home');
+});
+new ResizeObserver(() => document.documentElement.style.setProperty('--hbar-h', $('header').offsetHeight + 'px')).observe($('header'));
+openSheet(routeKey() || 'home', true);
 
 // ---------- polling
 async function poll() {
@@ -3240,8 +3236,8 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderHeights(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
-    if (sheetKey && !$('#sheetNav').contains(document.activeElement)) renderMenu();
+    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);
   } catch (e) { $('#busyDot').className = 'dot'; $('#busyTxt').textContent = 'Dashboard server not reachable'; }

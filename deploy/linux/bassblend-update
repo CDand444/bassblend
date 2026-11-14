@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install a new BassBlend version sent over SSH, with automatic rollback.
+# Install a new htTamer version sent over SSH, with automatic rollback.
 #
 #   tar -czf - <source files> | ssh pi@bassblend sudo bassblend-update <version>
 #
@@ -18,7 +18,7 @@ WORK=/var/lib/bassblend-ota
 VER="${1:-unknown}"
 die() { echo "bassblend-update: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "run with sudo"
-[ -x "$APP/venv/bin/python" ] || die "BassBlend isn't installed in $APP (run deploy/linux/install.sh first)"
+[ -x "$APP/venv/bin/python" ] || die "htTamer isn't installed in $APP (run deploy/linux/install.sh first)"
 exec 9>/run/bassblend-update.lock
 flock -n 9 || die "another update is running"
 case "$VER" in *[!A-Za-z0-9._+-]*) die "bad version name: $VER" ;; esac
@@ -26,7 +26,7 @@ case "$VER" in *[!A-Za-z0-9._+-]*) die "bad version name: $VER" ;; esac
 mkdir -p "$WORK"; chmod 700 "$WORK"
 rm -rf "$WORK/new"; mkdir "$WORK/new"
 tar -xzf - -C "$WORK/new" --no-same-owner --no-same-permissions
-[ -f "$WORK/new/subtune/cli.py" ] && [ -f "$WORK/new/subtune/server.py" ] || die "that isn't a BassBlend source bundle"
+[ -f "$WORK/new/subtune/cli.py" ] && [ -f "$WORK/new/subtune/server.py" ] || die "that isn't a htTamer source bundle"
 printf '%s\n' "$VER" > "$WORK/new/VERSION"
 "$APP/venv/bin/python" -m compileall -q "$WORK/new/subtune" >/dev/null \
   || die "the new code doesn't compile on the Pi; nothing changed"
@@ -67,7 +67,7 @@ if printf '%s\n' "$FILES" | grep -qvE '^(subtune/web/|docs/|tests/|deploy/pi-gen
   systemctl restart bassblend
   for _ in $(seq 1 30); do
     if curl -fs -o /dev/null "http://127.0.0.1:${PORT:-8765}/api/setup/status"; then
-      echo "Restarted; BassBlend $VER is running"; exit 0
+      echo "Restarted; htTamer $VER is running"; exit 0
     fi
     systemctl is-failed --quiet bassblend && break
     sleep 1

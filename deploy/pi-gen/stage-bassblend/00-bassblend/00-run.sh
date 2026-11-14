@@ -1,7 +1,7 @@
 #!/bin/bash -e
-# Install BassBlend into the image with the same script used on a running Pi,
+# Install htTamer into the image with the same script used on a running Pi,
 # in --image mode (nothing is started; the service comes up on first boot).
-# build-image.sh puts a clean copy of the BassBlend source in files/bassblend.
+# build-image.sh puts a clean copy of the htTamer source in files/bassblend.
 # (Not /tmp: pi-gen mounts an empty tmpfs over the image's /tmp while it works.)
 install -d "${ROOTFS_DIR}/opt/bassblend-src"
 cp -a files/bassblend/. "${ROOTFS_DIR}/opt/bassblend-src/"
@@ -21,12 +21,12 @@ if [ -f files/bassblend-config.json ]; then     # settings baked into this image
   install -m 0644 files/bassblend-config.json "${ROOTFS_DIR}/boot/firmware/bassblend-config.json"
 fi
 cat > "${ROOTFS_DIR}/boot/firmware/BASSBLEND.txt" << EOF
-BassBlend ${BB_VERSION}
+htTamer ${BB_VERSION}
 Plug the Pi into your network with a cable, power it on, wait about two minutes,
 then open http://bassblend.local:8765 on your phone or computer.
 The first visit walks you through choosing a PIN.
 
-Already set BassBlend up somewhere else? Copy your settings file (dashboard menu:
+Already set htTamer up somewhere else? Copy your settings file (dashboard: System ->
 Settings file -> Download) onto this drive as bassblend-config.json before the
 first start: it is loaded automatically, then removed from this drive.
 EOF

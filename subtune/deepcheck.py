@@ -6,7 +6,7 @@ bass management, exactly as you listen):
     [lead-in: room noise]  LEFT sweep  [gap]  RIGHT sweep  [gap]  BOTH sweep  [tail]
 
 Each sweep runs 20 Hz - 20 kHz. From the one recording (the sweeps' timing is
-exact, so they share one time base) BassBlend works out:
+exact, so they share one time base) htTamer works out:
 
   * frequency response of left, right and both, against your target curve,
     split into deep bass / bass / low mids / mids / upper mids / highs;
@@ -418,7 +418,7 @@ def combine(reports: list[dict]) -> dict | None:
                  f"Bass varies {seat:.1f} dB between your spots",
                  f"From spot to spot the bass (30-120 Hz) differs by about ±{seat:.1f} dB on average.",
                  "The more even, the more every seat sounds like the best one.",
-                 "" if seat < 3 else "Measure the blend at each seat and let BassBlend find one setting for all; sub placement "
+                 "" if seat < 3 else "Measure the blend at each seat and let htTamer find one setting for all; sub placement "
                                      "changes this the most."))
     out = {"t": max(r["t"] for r in reps), "spots": sorted(r["pos"] for r in reps), "grid": grid.tolist(),
            "curves": {k: v.round(1).tolist() for k, v in norm.items() if k != "avg"}, "target": tgt.tolist(),
@@ -436,7 +436,7 @@ def rew_text(r, ch="both"):
     g2 = pro.get("grid2") or grid
     ph = (pro.get("phase_deg") or {}).get(ch)
     phase = np.interp(np.log(grid), np.log(g2), ph) if ph else np.zeros(len(grid))
-    lines = [f"* BassBlend system report, {ch} speaker(s), spot {r.get('pos', 1)}",
+    lines = [f"* htTamer system report, {ch} speaker(s), spot {r.get('pos', 1)}",
              f"* Measured {time.strftime('%Y-%m-%d %H:%M', time.localtime(r['t']))}; 1/6-octave smoothed; calibrated mic",
              "* Freq(Hz) SPL(dB) Phase(degrees)"]
     lines += [f"{f:.3f} {s:.2f} {p:.1f}" for f, s, p in zip(grid, spl, phase)]
@@ -444,7 +444,7 @@ def rew_text(r, ch="both"):
 
 
 def receiver_advice(r, sub_level=None, dirac_on=False):
-    """Concrete receiver changes: what BassBlend can do itself, and exact numbers for the menu."""
+    """Concrete receiver changes: what htTamer can do itself, and exact numbers for the menu."""
     out = []
     lr = r["lr"]
     if dirac_on:
@@ -468,7 +468,7 @@ def receiver_advice(r, sub_level=None, dirac_on=False):
         to = None if sub_level is None else max(-15.0, min(12.0, sub_level + change))
         out.append({"kind": "auto", "what": "sub_level", "change_db": change, "to": to,
                     "text": f"Subwoofer level {change:+.1f} dB" + (f" (from {sub_level:+.1f} to {to:+.1f} dB)" if to is not None else "")
-                            + " to bring the bass to your target. BassBlend can do this."})
+                            + " to bring the bass to your target. htTamer can do this."})
     if lr["polarity"] == "reversed":
         out.append({"kind": "hands", "what": "wiring",
                     "text": "Swap the red and black wires on one front speaker (it's wired backwards), then run the report again."})
@@ -516,7 +516,7 @@ def peaks_dips(dev, norm):
             title = f"Boom at {_hz(f)} (+{mag:.0f} dB)"
             found = f"The room adds {mag:.0f} dB around {_hz(f)}. That's a room resonance (a 'mode'): sound bouncing between two walls reinforces itself at that pitch."
             why = "Bass notes near this pitch sound louder and ring longer than the rest, so bass lines sound uneven and boomy."
-            todo = ("BassBlend's sub tune can pull it down if it's in the subs' range; Dirac Live corrects it for the speakers. "
+            todo = ("htTamer's sub tune can pull it down if it's in the subs' range; Dirac Live corrects it for the speakers. "
                     "Peaks EQ well; moving the subs or the seat changes which pitch booms.")
         elif sign < 0 and f < 400:
             if both_sides and 60 <= f <= 400:
@@ -619,7 +619,7 @@ def _more_findings(out, r, dev, norm):
                       f"The left speaker's deepest bass reads {gap_lo:.0f} dB below the right's, but the subs play the same bass "
                       "for both: the receiver most likely skipped the first moments of the file.",
                       "Ignore the left speaker's reading below 35 Hz in this report; everything else is unaffected.",
-                      "Run the report again. If it keeps happening, tell BassBlend: the lead-in can be made longer."))
+                      "Run the report again. If it keeps happening, tell htTamer: the lead-in can be made longer."))
     # left / right
     lr = r["lr"]
     if lr["polarity"] == "reversed":
@@ -775,14 +775,14 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label="", a
         if src.auto:
             o.set_mode("00")
             if auto_volume:
-                level = autolevel.dial_in(o, rec_dev, lambda: src.play(autolevel.PROBE_NAME, "BassBlend level probe"),
+                level = autolevel.dial_in(o, rec_dev, lambda: src.play(autolevel.PROBE_NAME, "htTamer level probe"),
                                           src.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
                                           ceiling_setting=s.get("avr_test_max_volume"))
                 time.sleep(1.0)
 
             def start():
                 status("Sending the test to the receiver…" if mode == "dlna" else "Playing from the Pi's HDMI…")
-                src.play(MEDIA_NAME, "BassBlend full-range test")
+                src.play(MEDIA_NAME, "htTamer full-range test")
                 time.sleep(1.0)
                 o.set_mode("00")
                 status("Playing: a sweep on the left speaker, then the right, then both (about 35 s)…")

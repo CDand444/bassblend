@@ -151,7 +151,7 @@ def clear_cookie() -> str:
 
 
 LOGIN_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>BassBlend · Sign in</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>htTamer · Sign in</title><link rel="icon" href="/logo.svg" type="image/svg+xml">
 <style>
 :root{--bg:#f4f3ef;--surface:#fcfcfa;--text:#1d1d1b;--text-2:#55544f;--border:#dddcd6;--accent:#2a78d6;--bad:#c4372e}
 @media (prefers-color-scheme:dark){:root{--bg:#141413;--surface:#1f1f1d;--text:#ecebe6;--text-2:#a8a7a0;--border:#34332f;--accent:#3987e5;--bad:#e5564b}}
@@ -164,7 +164,7 @@ input:focus{outline:2px solid var(--accent);outline-offset:1px}
 button{width:100%;height:42px;margin-top:12px;border:0;border-radius:9px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer}
 .err{color:var(--bad);font-size:13px;margin:10px 0 0;min-height:1.2em}
 </style></head><body>
-<form id="f"><h1>BassBlend</h1><p>Enter the PIN you chose when BassBlend was set up on this device.</p>
+<form id="f"><img src="/logo.svg" alt="" width="44" height="44" style="display:block;margin-bottom:12px"><h1>htTamer</h1><p>Enter the PIN you chose when htTamer was set up on this device.</p>
 <label for="pin" style="font-size:12.5px;color:var(--text-2)">PIN</label>
 <input id="pin" name="pin" type="password" inputmode="text" autocomplete="current-password" autofocus required>
 <button type="submit">Sign in</button><div class="err" id="err" role="alert"></div></form>
@@ -172,7 +172,7 @@ button{width:100%;height:42px;margin-top:12px;border:0;border-radius:9px;backgro
 document.getElementById('f').onsubmit = async e => {
   e.preventDefault(); const err = document.getElementById('err'); err.textContent = '';
   const r = await fetch('/api/login', {method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({pin: document.getElementById('pin').value})}).then(r => r.json()).catch(() => ({error: 'BassBlend is not answering'}));
+    body: JSON.stringify({pin: document.getElementById('pin').value})}).then(r => r.json()).catch(() => ({error: 'htTamer is not answering'}));
   if (r.ok) location.href = '/'; else { err.textContent = r.error || 'That PIN is not right.'; document.getElementById('pin').select(); }
 };
 </script></body></html>"""

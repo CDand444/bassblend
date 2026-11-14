@@ -129,14 +129,14 @@ def test_rejects_bad_files_and_protects_slot_1():
     bad = TMP / "bad.json"
     bad.write_text('{"format": "something-else"}')
     r = cli(pi, "import-config", str(bad))
-    assert r.returncode != 0 and "isn't a BassBlend settings file" in (r.stderr + r.stdout)
+    assert r.returncode != 0 and "isn't a htTamer settings file" in (r.stderr + r.stdout)
     b = {"format": "bassblend-config", "version": 1, "settings": {"preset": 0, "house_db": "loud", "../x": 1},
          "tunes": [{"id": "../../etc/passwd", "result": {}}], "files": {"measurements/../../x.npz": "AAAA"}}
     bad.write_text(json.dumps(b))
     assert cli(pi, "import-config", str(bad)).returncode == 0
     data = pathlib.Path(pi["BASSBLEND_DATA"])
     s = json.loads((data / "settings.json").read_text())
-    assert s["preset"] is None, "a file can't hand slot 1 to BassBlend"
+    assert s["preset"] is None, "a file can't hand slot 1 to htTamer"
     assert s["house_db"] != "loud" and "../x" not in s
     assert not list(TMP.glob("**/passwd*")) and not (data.parent / "x.npz").exists()
 

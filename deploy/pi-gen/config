@@ -1,10 +1,10 @@
-# pi-gen settings for the BassBlend SD card image (Raspberry Pi OS Lite 64-bit + BassBlend).
+# pi-gen settings for the htTamer SD card image (Raspberry Pi OS Lite 64-bit + htTamer).
 IMG_NAME=bassblend
-PI_GEN_RELEASE="BassBlend"
+PI_GEN_RELEASE="htTamer"
 RELEASE=trixie
 TARGET_HOSTNAME=bassblend
 # No password is baked in. Raspberry Pi Imager's "OS customisation" (cloud-init) can add a
-# user, SSH and Wi-Fi when writing the card; BassBlend itself needs none of them.
+# user, SSH and Wi-Fi when writing the card; htTamer itself needs none of them.
 FIRST_USER_NAME=pi
 ENABLE_SSH=0
 LOCALE_DEFAULT=en_US.UTF-8

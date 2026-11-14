@@ -3,7 +3,7 @@
 One test file holds two identical sweeps on the LEFT channel:
     [lead-in] sweep A [gap] sweep B [tail]
 During sweep A the subs are muted at the miniDSP, so the mic hears the left
-main speaker alone; during the gap BassBlend unmutes them, so sweep B is left
+main speaker alone; during the gap htTamer unmutes them, so sweep B is left
 main + subs through the AVR's bass management. Both sweeps are in one
 recording, so their timing relative to each other is exact:
     H_subs = H_B - H_A          (complex, same time base)
@@ -240,7 +240,7 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
             dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")] + mute(False), "AVR test: setting the volume")
             o.set_mode("00")
             level.update(autolevel.dial_in(
-                o, rec_dev, lambda: src.play(autolevel.PROBE_NAME, "BassBlend level probe"),
+                o, rec_dev, lambda: src.play(autolevel.PROBE_NAME, "htTamer level probe"),
                 src.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
                 ceiling_setting=s.get("avr_test_max_volume")))
             time.sleep(1.0)
@@ -254,7 +254,7 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
             if src.auto:
                 status("Sending the test file to the receiver…" if mode == "dlna" else "Playing from the Pi's HDMI…")
                 o.set_mode("00")                       # Stereo: left main + bass-managed sub
-                src.play(lay["file"], "BassBlend blend test")
+                src.play(lay["file"], "htTamer blend test")
                 time.sleep(1.0)
                 o.set_mode("00")
                 status("Playing: the left speaker, then the right, then left again with the subs…" if lay["right"] is not None
@@ -293,13 +293,13 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
 
 
 def advice(r, snap):
-    """Plain-language steps; what BassBlend can do itself vs what needs the AVR menu."""
+    """Plain-language steps; what htTamer can do itself vs what needs the AVR menu."""
     out = []
     d = r["delay_ms"]
     if r["loss_now_db"] - r["loss_best_db"] < 0.5 and abs(d) < 1:
         out.append({"kind": "ok", "text": "Subs and mains already add up well around the crossover. No timing change needed."})
     elif d > 0:
-        out.append({"kind": "dsp", "text": f"The subs are {d:.1f} ms early. BassBlend can delay all subs by {d:.1f} ms in the miniDSP "
+        out.append({"kind": "dsp", "text": f"The subs are {d:.1f} ms early. htTamer can delay all subs by {d:.1f} ms in the miniDSP "
                     f"(a new saved tune, applied to the playing slot).", "delay_ms": d})
     else:
         ft = abs(d) * 0.343 / 0.3048
@@ -307,7 +307,7 @@ def advice(r, snap):
                     f"Subwoofer distance by about {ft:.1f} ft ({abs(d) * 0.343:.2f} m), then run this test again. "
                     "(The miniDSP can only add delay, so this one is a receiver setting.)"})
     if r["invert"]:
-        out.append({"kind": "dsp", "text": "Flipping the subs' polarity blends better. BassBlend can do this in the miniDSP."})
+        out.append({"kind": "dsp", "text": "Flipping the subs' polarity blends better. htTamer can do this in the miniDSP."})
     lv = r["sub_level_change_db"]
     if abs(lv) >= 1:
         cur = snap.get("sub_level")
