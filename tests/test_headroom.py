@@ -59,6 +59,32 @@ def test_spl_cap_and_mic_overload_stop_the_test():
     assert "overload" in r2["limited_by"]
 
 
+def _room(play, f, rumble=3e-4):
+    """Add steady room rumble at 2f and 3f (what fooled the first real run)."""
+    def p(x):
+        t = np.arange(len(x)) / FS
+        return play(x) + rumble * (np.sin(2 * np.pi * 2 * f * t) + np.sin(2 * np.pi * 3 * f * t + 1))
+    return p
+
+
+def test_room_noise_is_not_mistaken_for_distortion():
+    f = 25.0
+    play = _room(sub(clip_at=10.0, gain=1.0), f)
+    noise = hr.harmonics(play(np.zeros(int(hr.BURST_S * FS))), f)
+    r = hr.run_freq(play, f, OFF, spl_cap=200, noise=noise)
+    assert r["limited_by"] == "reached the highest test level", (r["limited_by"], r["steps"][:2])
+    assert not r["steps"][0]["judged"], "the first quiet step sits in the rumble and isn't judged"
+    assert r["max_clean_spl"] is not None
+
+
+def test_silent_sub_is_reported_as_such():
+    f = 40.0
+    play = _room(lambda x: 1e-5 * np.random.default_rng(1).standard_normal(len(x)), f)
+    noise = hr.harmonics(play(np.zeros(int(hr.BURST_S * FS))), f)
+    r = hr.run_freq(play, f, OFF, spl_cap=200, noise=noise)
+    assert r["max_clean_spl"] is None and "room noise" in r["limited_by"], r["limited_by"]
+
+
 def test_summary_text():
     txt = hr.summary_text(0, [{"f": 25.0, "max_clean_spl": 98.4, "limited_by": "distortion passed 10%"},
                               {"f": 40.0, "max_clean_spl": None, "limited_by": "the mic was close to overload"}])

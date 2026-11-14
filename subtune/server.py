@@ -25,7 +25,7 @@ _lock = threading.Lock()
 
 ALLOWED = {"status": [], "prepare": [], "discover": [], "level": [], "selftest": [],
            "measure": ["pos"], "optimize": [], "apply": [], "verify": ["pos"], "baseline": ["pos"],
-           "restore": [], "unmute": [], "checkup": ["pos"], "levelmatch": [], "headroom": ["output"], "allspeakers": ["pos"]}
+           "restore": [], "unmute": [], "checkup": ["pos"], "levelmatch": [], "headroom": ["output"]}
 
 # editable tuning settings: key -> (type, min, max)
 SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (float, 0, 10),
@@ -174,6 +174,21 @@ class Runner:
             args.append("--no-auto-volume")
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = f"system report ({mode})"
+        return self.cmd
+
+    def start_allspk(self, body):
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        mode = body.get("mode") if body.get("mode") in ("dlna", "manual") else "dlna"
+        pos = int(body.get("pos", 1))
+        if not 1 <= pos <= 8:
+            raise ValueError("spot must be 1-8")
+        update_state(allspk_status={"running": True, "text": "Starting…", "mode": mode, "pos": pos})
+        args = [sys.executable, "-m", "subtune", "allspeakers", "--mode", mode, "--pos", str(pos)]
+        if body.get("auto_volume") is False or mode != "dlna":
+            args.append("--no-auto-volume")
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = f"all-speakers check ({mode})"
         return self.cmd
 
     def start_fixup(self, body):
@@ -408,7 +423,8 @@ def mic_free() -> bool:
     return True
 
 
-for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup"):  # noqa: E501
+for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup",
+              "start_allspk"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -676,6 +692,14 @@ def build_executors():
         return {"results": [{k: x[k] for k in ("f", "max_clean_spl", "thd_at_max", "limited_by")} for x in h.get("results", [])],
                 "summary": summary_text(output - 1, h.get("results", [])) if h else "no result"}
 
+    def allspk_run(pos, mode="dlna", auto_volume=True):
+        r = _measure(lambda: RUN.start_allspk({"pos": pos, "mode": mode, "auto_volume": auto_volume}), "allspk", timeout=420)
+        x = (r or {}).get(str(pos)) or {}
+        return {"advice": [a["text"] for a in x.get("advice", [])], "stereo_only": x.get("stereo_only", False),
+                "speakers": {k: {f: v[f] for f in ("level_vs_fl_db", "arrival_vs_fl_ms", "polarity", "heard")}
+                             for k, v in (x.get("speakers") or {}).items()},
+                "summary": "; ".join(a["text"] for a in x.get("advice", []))[:300]}
+
     def fix_run(pos):
         r = _measure(lambda: RUN.start_fixup({"pos": pos}), "fix_result", timeout=900)
         return {**(r or {}), "summary": "; ".join(s["text"] for s in (r or {}).get("steps", []))[:300]}
@@ -711,7 +735,7 @@ def build_executors():
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "get_system_report": report_get, "run_system_report": report_run,
-            "fix_from_report": fix_run, "run_headroom": headroom_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
+            "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "_tune_name": tune_name}
 
 
@@ -1280,6 +1304,8 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"started": RUN.start_avrblend(body)})
             if path == "/api/deepcheck":
                 return self._send(200, {"started": RUN.start_deepcheck(body)})
+            if path == "/api/allspk":
+                return self._send(200, {"started": RUN.start_allspk(body)})
             if path == "/api/fixup":
                 return self._send(200, {"started": RUN.start_fixup(body)})
             if path == "/api/avr/apply":

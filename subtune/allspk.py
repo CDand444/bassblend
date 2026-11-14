@@ -1,10 +1,11 @@
 """All-speakers check (experimental): level, distance and polarity of every bed speaker.
 
-The TX-RZ50's network player only takes 1-2 channel PCM, and the receiver has no
-network command to play one speaker at a time, so this test uses a 7.1 WAV file
-the owner plays from an HDMI source (PC, streamer, Blu-ray player) or a USB stick,
-with the receiver in a direct/multichannel mode (no upmixing). BassBlend listens
-for the sweeps, which play one channel at a time in a fixed order:
+A 7.1 WAV file with a sweep on one channel at a time. By default the receiver
+plays it over the network (DLNA) in Direct mode, with the volume set automatically
+and everything restored afterwards. The TX-RZ50's player only lists 1-2 channel
+PCM explicitly (it also accepts generic WAV), so if only the front pair comes
+through, the result says so and the owner uses the other option: play the file
+from an HDMI source or a USB stick while BassBlend listens. Sweep order:
 
     FL, FR, C, SL, SR, SBL, SBR (20 Hz-20 kHz), then LFE (15-150 Hz)
 
@@ -155,28 +156,101 @@ def advice(out):
     return tips
 
 
-def run(pos=1, log=None, status=None):
-    """Manual playback: the owner starts the 7.1 file; BassBlend listens and analyses."""
+def stereo_only(out) -> bool:
+    """Only the front pair came through: the receiver downmixed or played just two channels."""
+    sp = out["speakers"]
+    return sp["FL"]["heard"] and sp["FR"]["heard"] and not any(sp[c]["heard"] for c in ("C", "SL", "SR", "SBL", "SBR"))
+
+
+def run(pos=1, mode="dlna", auto_volume=True, log=None, status=None):
+    """mode 'dlna': the receiver plays the 7.1 file over the network (Direct mode, volume set
+    automatically, everything restored afterwards). mode 'manual': the owner plays it from an
+    HDMI source or USB stick while BassBlend listens."""
+    from . import autolevel, avr
     from .avrmeasure import SweepWatcher
+    from .dsp import MiniDSP
     from .state import event, load_state, update_state
     log = log or (lambda *a, **k: event(*a, **k))
-    status = status or (lambda txt: update_state(allspk_status={"running": True, "text": txt, "pos": pos}))
+    status = status or (lambda txt: update_state(allspk_status={"running": True, "text": txt, "pos": pos, "mode": mode}))
     s = load_settings()
     cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
     rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     build_file()
-    status(f"Press play on {MEDIA_NAME} now (HDMI source or USB stick, receiver in a direct or multichannel mode). Listening…")
-    watcher = SweepWatcher(rec_dev, lambda: None, max_seconds=300.0, lay={"mains_len": 0.0, "total": TOTAL})
-    rec, t0 = watcher.run()
+    lay = {"mains_len": 0.0, "total": TOTAL}
+    level = None
+    if mode != "dlna":
+        status(f"Press play on {MEDIA_NAME} now (HDMI source or USB stick, receiver in a direct or multichannel mode). Listening…")
+        rec, t0 = SweepWatcher(rec_dev, lambda: None, max_seconds=300.0, lay=lay).run()
+    else:
+        dsp = MiniDSP(s)
+        o = avr.Onkyo()
+        autolevel.build_probe()
+        snap = o.snapshot()
+        dsp_before = dsp.status()["master"]["source"].lower()
+        renderer = None
+        try:
+            status("Getting the receiver ready…")
+            if snap.get("power") is False:
+                o.power(True)
+                time.sleep(3)
+                snap.update({k: v for k, v in o.snapshot().items() if k != "power"})
+            flat = o.neutral_for_test(snap)
+            if flat:
+                log("avr", "all-speakers check: switched off for the test (put back afterwards): " + ", ".join(flat))
+            if dsp_before == "usb":                       # the subs listen to the receiver (LFE)
+                dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")], "all-speakers check: subs on the receiver's sub out")
+            renderer = avr.DLNARenderer(o.host)
+            base = avr.MediaServer.get(avr.local_ip_for(o.host))
+
+            def play(name, title):
+                last = None
+                for _ in range(5):
+                    try:
+                        renderer.play(f"{base}/{name}", title)
+                        return
+                    except Exception as e:
+                        last = e
+                        time.sleep(2)
+                raise RuntimeError(f"The receiver couldn't fetch the test file ({last}).")
+            if auto_volume:
+                o.set_mode("00")                          # the stereo probe plays in Stereo
+                level = autolevel.dial_in(o, rec_dev, lambda: play(autolevel.PROBE_NAME, "BassBlend level probe"),
+                                          renderer.stop, status, log, target=float(s.get("test_spl") or autolevel.TARGET_DEFAULT),
+                                          ceiling_setting=s.get("avr_test_max_volume"))
+                time.sleep(1.0)
+
+            def start():
+                status("Sending the 7.1 test to the receiver…")
+                play(MEDIA_NAME, "BassBlend all-speakers test")
+                time.sleep(1.0)
+                o.set_mode("01")                          # Direct: every channel to its own speaker, no upmix or downmix
+                status("Playing: a sweep on each speaker in turn, then the subs (about a minute)…")
+            rec, t0 = SweepWatcher(rec_dev, lambda: None, max_seconds=120.0, lay=lay).run(started=start)
+        finally:
+            try:
+                if renderer:
+                    renderer.stop()
+            except Exception:
+                pass
+            try:
+                if dsp_before == "usb":
+                    dsp.batch([dsp.c_source("usb")], "all-speakers check done: input back to USB")
+            finally:
+                o.restore(snap)
+                log("avr", f"all-speakers check: receiver restored (volume {snap.get('volume')})")
     status("Analysing…")
     r = analyse(rec, t0, cal)
-    r["pos"] = pos
+    r.update({"pos": pos, "mode": mode, "level": level})
+    if mode == "dlna" and stereo_only(r):
+        r["advice"].insert(0, {"ch": "", "status": "fix", "text": "Only the front left and right came through: the receiver played the "
+                               "file over the network in stereo. Use the USB stick / HDMI option for this test instead."})
+        r["stereo_only"] = True
     st = load_state()
     allr = st.get("allspk") or {}
     allr[str(pos)] = r
     update_state(allspk=allr, allspk_status={"running": False})
     from . import journal
-    journal.add("allspk", "All-speakers check: " + "; ".join(t["text"].split(":")[0] + (" " + t["status"] if t["ch"] else "")
-                                                            for t in r["advice"])[:300], pos=pos)
+    journal.add("allspk", "All-speakers check" + (" (network)" if mode == "dlna" else " (USB/HDMI)") + ": "
+                + "; ".join(t["text"].split(":")[0] for t in r["advice"])[:300], pos=pos)
     log("measure", f"all-speakers check at spot {pos}: {len(r['advice'])} notes")
     return r

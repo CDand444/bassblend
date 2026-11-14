@@ -30,10 +30,13 @@ SPL_CAP = 105.0
 BURST_S = 1.5
 
 
-def analyse_burst(rec: np.ndarray, f: float, spl_off: float, fs=FS) -> dict:
-    """Fundamental level (dB SPL), THD (%) from the 2nd/3rd harmonics, and the recording's peak."""
+JUDGE_SNR_DB = 30.0          # distortion is only judged once the tone is this far above the room noise
+
+
+def harmonics(rec: np.ndarray, f: float, fs=FS):
+    """Amplitudes at f, 2f and 3f (steady middle part, Hann window)."""
     n = len(rec)
-    seg = rec[int(0.35 * n): int(0.85 * n)]                 # steady middle part
+    seg = rec[int(0.35 * n): int(0.85 * n)]
     w = np.hanning(len(seg))
     nfft = 1 << int(np.ceil(np.log2(len(seg) * 4)))
     X = np.abs(np.fft.rfft(seg * w, nfft)) * 2 / np.sum(w)
@@ -42,19 +45,31 @@ def analyse_burst(rec: np.ndarray, f: float, spl_off: float, fs=FS) -> dict:
     def amp(x):
         m = (fq > x * 0.94) & (fq < x * 1.06)
         return float(X[m].max()) if m.any() else 0.0
+    return amp(f), amp(2 * f), amp(3 * f)
 
-    a1, a2, a3 = amp(f), amp(2 * f), amp(3 * f)
+
+def analyse_burst(rec: np.ndarray, f: float, spl_off: float, fs=FS, noise=None) -> dict:
+    """Fundamental level (dB SPL), THD (%) from the 2nd/3rd harmonics, and the recording's peak.
+    noise: (n1, n2, n3) amplitudes of the room alone at f, 2f, 3f. Harmonics are corrected for it,
+    and THD only counts ("judged") once the tone is JUDGE_SNR_DB above the noise; below that the
+    room's own rumble would read as distortion."""
+    a1, a2, a3 = harmonics(rec, f, fs)
+    n1, n2, n3 = noise or (0.0, 0.0, 0.0)
+    h2, h3 = np.sqrt(max(a2 ** 2 - n2 ** 2, 0.0)), np.sqrt(max(a3 ** 2 - n3 ** 2, 0.0))
     spl = 20 * np.log10(max(a1, 1e-12)) + spl_off
-    thd = 100 * np.sqrt(a2 ** 2 + a3 ** 2) / max(a1, 1e-12)
-    return {"spl": round(float(spl), 1), "thd_pct": round(float(thd), 2), "peak": round(float(np.max(np.abs(rec))), 3)}
+    thd = 100 * np.sqrt(h2 ** 2 + h3 ** 2) / max(a1, 1e-12)
+    snr = 20 * np.log10(max(a1, 1e-12) / max(n1, n2, n3, 1e-9)) if noise else 99.0
+    return {"spl": round(float(spl), 1), "thd_pct": round(float(thd), 2), "peak": round(float(np.max(np.abs(rec))), 3),
+            "snr_db": round(float(snr), 1), "judged": bool(snr >= JUDGE_SNR_DB)}
 
 
 def thd_limit(f: float) -> float:
     return 10.0 if f < 40 else 5.0
 
 
-def run_freq(play_record, f: float, spl_off: float, max_dbfs=MAX_DBFS, spl_cap=SPL_CAP, log=lambda *a: None) -> dict:
-    """Step one frequency up until something limits it. play_record(signal) -> recording."""
+def run_freq(play_record, f: float, spl_off: float, max_dbfs=MAX_DBFS, spl_cap=SPL_CAP, log=lambda *a: None, noise=None) -> dict:
+    """Step one frequency up until something limits it. play_record(signal) -> recording.
+    noise: the room alone at f/2f/3f (from a silent recording), so quiet steps aren't misjudged."""
     steps, first = [], None
     lvl = START_DBFS
     reason = "reached the highest test level"
@@ -62,24 +77,26 @@ def run_freq(play_record, f: float, spl_off: float, max_dbfs=MAX_DBFS, spl_cap=S
         t = np.arange(int(BURST_S * FS)) / FS
         fade = np.minimum(1, np.minimum(t, t[::-1]) / 0.08)
         x = np.sin(2 * np.pi * f * t) * fade * 10 ** (lvl / 20)
-        m = analyse_burst(play_record(x), f, spl_off)
+        m = analyse_burst(play_record(x), f, spl_off, noise=noise)
         m["dbfs"] = lvl
-        if first is None:
-            first = m
-        m["compression_db"] = round((lvl - first["dbfs"]) - (m["spl"] - first["spl"]), 1)
+        if first is None and m["judged"]:
+            first = m                             # compression is measured from the first clearly audible step
+        m["compression_db"] = round((lvl - first["dbfs"]) - (m["spl"] - first["spl"]), 1) if first else 0.0
         steps.append(m)
         log(f"{f:g} Hz at {lvl:g} dBFS: {m['spl']:.1f} dB, {m['thd_pct']:.1f}% THD, {m['compression_db']:+.1f} dB compression")
         if m["peak"] > 0.7:
             reason = "the mic was close to overload"; break
-        if m["thd_pct"] > thd_limit(f):
+        if m["judged"] and m["thd_pct"] > thd_limit(f):
             reason = f"distortion passed {thd_limit(f):g}%"; break
         if m["compression_db"] >= 3:
             reason = "the sub stopped getting louder (3 dB compression)"; break
         if m["spl"] >= spl_cap:
             reason = f"the level at the mic reached the {spl_cap:g} dB cap"; break
         lvl += STEP_DB
-    clean = [s for s in steps if s["thd_pct"] <= thd_limit(f) and s["compression_db"] < 2 and s["peak"] <= 0.7]
+    clean = [s for s in steps if s["judged"] and s["thd_pct"] <= thd_limit(f) and s["compression_db"] < 2 and s["peak"] <= 0.7]
     best = clean[-1] if clean else None
+    if not any(s["judged"] for s in steps):
+        reason = "never rose clearly above the room noise: is this sub on and connected?"
     return {"f": f, "max_clean_spl": best and best["spl"], "at_dbfs": best and best["dbfs"],
             "thd_at_max": best and best["thd_pct"], "limited_by": reason, "steps": steps}
 
@@ -97,13 +114,15 @@ def run(rig, out: int, freqs=None, log=None) -> dict:
     log = log or (lambda msg: event("measure", msg))
     freqs = freqs or FREQS
     d = rig.dsp
-    d.batch([d.c_preset(rig.s["preset"]), d.c_source("usb")] + rig.mute_except([out]),
-            f"headroom test: output {out + 1} only, rising tone bursts")
     off = spl_offset(rig.cal)
     res = []
     try:
+        rig.wake()                                # subs with auto-standby ignore quiet bursts until woken
+        d.batch([d.c_preset(rig.s["preset"]), d.c_source("usb")] + rig.mute_except([out]),
+                f"headroom test: output {out + 1} only, rising tone bursts")
+        quiet = _playrec(rig, np.zeros(int(BURST_S * FS)))          # the room alone, for the noise reference
         for f in freqs:
-            res.append(run_freq(lambda x: _playrec(rig, x), f, off, log=log))
+            res.append(run_freq(lambda x: _playrec(rig, x), f, off, log=log, noise=harmonics(quiet, f)))
     finally:
         d.batch(rig.mute_except(rig.subs), "headroom test done: all subs unmuted")
     st = load_state()

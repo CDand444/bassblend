@@ -104,9 +104,11 @@ output, ask the owner to record the change in Room & subs, then re-measure. Port
 below their safe limit (no_boost_below_hz). Prefer the receiver doing the crossover (sub crossover Out / \
 LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies (Hsu: one port open, \
 EQ1, Q 0.7).
-- All-speakers check (get_overview -> all_speakers_check, experimental): level, arrival and polarity of every bed \
-speaker against the front left, from a 7.1 file the owner plays from an HDMI source or USB stick (the receiver's \
-network player is stereo-only). Heights can't be tested this way. The owner starts it from Measure → All speakers.
+- All-speakers check (run_all_speakers / get_overview -> all_speakers_check, experimental): level, arrival and \
+polarity of every bed speaker and the LFE against the front left, from a 7.1 test file. By default the receiver \
+plays it over the network in Direct mode (volume set automatically, restored after); if only the front pair \
+comes through (stereo_only), the receiver can't do multichannel over the network: suggest mode "manual" (the \
+owner plays the file from an HDMI source or USB stick). Heights can't be tested this way.
 - Speaker placement (get_overview -> speaker_placement): Dolby-guideline positions for the layout, worked out from \
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. BassBlend doesn't know where the owner's speakers actually \
@@ -208,6 +210,13 @@ TOOLS = [
        "subwoofer level to bring the bass to the target, runs a left+right blend test and applies the blend fix "
        "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
        "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
+    _t("run_all_speakers", "Experimental: a sweep on each bed speaker in turn plus the LFE from a 7.1 test file, then "
+       "level, arrival (distance) and polarity of each against the front left. dlna = the receiver plays it over the "
+       "network in Direct mode (volume set automatically if auto_volume, restored after); manual = the owner plays the "
+       "file from an HDMI source or USB stick. About a minute of sweeps.",
+       {"pos": SPOT, "mode": {"type": "string", "enum": ["dlna", "manual"]},
+        "auto_volume": {"type": "boolean", "description": "set the receiver volume first (dlna only)"}},
+       ["pos", "mode", "auto_volume"], approval=True),
     _t("run_headroom", "LOUD test: how loud one sub output can play cleanly at 25, 40 and 63 Hz. Tone bursts rise 3 dB "
        "at a time from quiet and stop automatically at 5-10% distortion, 3 dB compression, mic overload, 105 dB at the "
        "mic or -12 dBFS. Only propose it when headroom matters (the owner listens loud, distortion or rattles, choosing "
@@ -257,6 +266,9 @@ DESCRIBE = {
                                 + ("left + right speakers" if i.get("speakers") == "both" else "left speaker")
                                 + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
                                 + (", volume set automatically" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+    "run_all_speakers": lambda i: (f"All-speakers check at spot {i['pos']}: a sweep on every speaker in turn"
+                                   + (" over the network (Direct mode)" if i["mode"] == "dlna" else " from your USB stick/HDMI source")
+                                   + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
     "run_headroom": lambda i: f"LOUD: headroom test on output {i['output']} (rising tone bursts, stops automatically)",
     "fix_from_report": lambda i: (f"Fix what BassBlend can at spot {i['pos']}: set the receiver's sub level, blend test + "
                                   "blend fix on the playing slot, then a new system report (several minutes of sweeps)"),
@@ -431,6 +443,7 @@ def _brief(name, inp, out):
              "get_system_report": "Read the system report", "run_system_report": "Ran the system report",
              "get_tuning_plan": "Checked what to do next", "get_journal": "Read the tuning journal",
              "fix_from_report": "Fixed what BassBlend can", "run_headroom": "Ran the headroom test",
+             "run_all_speakers": "Ran the all-speakers check",
              "apply_avr_blend": "Applied the blend fix"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):

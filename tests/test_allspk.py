@@ -79,6 +79,59 @@ def test_wav_header_is_7_1_extensible():
     assert abs(len(b) - 44 - 22 - 16 * 0 - A.file_signal().size * 2) < 200
 
 
+def test_stereo_only_detection():
+    stereo = A.analyse(*record({"FL": ir(6), "FR": ir(6), "LFE": ir(9)}))
+    assert A.stereo_only(stereo) and not A.stereo_only(R)
+
+
+def test_network_run_uses_direct_mode_and_restores():
+    from subtune import autolevel, avr, avrmeasure, dsp
+    calls = []
+
+    class Rx:
+        host = "x"
+        def snapshot(self): calls.append("snapshot"); return {"power": True, "volume": 60.0, "input_code": "2B", "mode_code": "00"}
+        def neutral_for_test(self, snap): calls.append("neutral"); return []
+        def set_mode(self, m): calls.append("mode " + m)
+        def restore(self, snap): calls.append("restore")
+
+    class Renderer:
+        def __init__(self, host): pass
+        def play(self, url, title): calls.append("play " + url.rsplit("/", 1)[-1])
+        def stop(self): calls.append("stop")
+
+    class Dsp:
+        def __init__(self, s): pass
+        def status(self): return {"master": {"source": "I2S"}}
+
+    stereo_rec = record({"FL": ir(6), "FR": ir(6), "LFE": ir(9)})
+
+    class Watcher:
+        def __init__(self, *a, **k): pass
+        def run(self, started=None):
+            if started:
+                started()
+            return stereo_rec
+
+    saved = (avr.Onkyo, avr.DLNARenderer, avr.MediaServer.get, avr.local_ip_for, avrmeasure.SweepWatcher, dsp.MiniDSP,
+             autolevel.dial_in, A.audio.find_device, autolevel.build_probe)
+    avr.Onkyo, avr.DLNARenderer = (lambda *a, **k: Rx()), Renderer
+    avr.MediaServer.get = classmethod(lambda cls, ip, port=8790: "http://pi:8790")
+    avr.local_ip_for = lambda h: "1.2.3.4"
+    avrmeasure.SweepWatcher, dsp.MiniDSP = Watcher, Dsp
+    autolevel.dial_in = lambda *a, **k: calls.append("dial_in") or {"start": 60.0, "volume": 64.0, "spl": 75.0}
+    autolevel.build_probe = lambda: None
+    A.audio.find_device = lambda *a, **k: 0
+    try:
+        r = A.run(1, "dlna", auto_volume=True, log=lambda *a, **k: None, status=lambda t: None)
+    finally:
+        (avr.Onkyo, avr.DLNARenderer, avr.MediaServer.get, avr.local_ip_for, avrmeasure.SweepWatcher, dsp.MiniDSP,
+         autolevel.dial_in, A.audio.find_device, autolevel.build_probe) = saved
+    order = [c for c in calls if c.startswith(("neutral", "dial_in", "play bassblend_all", "mode 01", "restore"))]
+    assert order == ["neutral", "dial_in", "play bassblend_all_speakers_7_1.wav", "mode 01", "restore"], calls
+    assert r["stereo_only"] and "stereo" in r["advice"][0]["text"] and r["mode"] == "dlna"
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

@@ -98,7 +98,7 @@ def cmd_allspeakers(a):
     from . import allspk
     try:
         with busy(f"all-speakers check at spot {a.pos}"):
-            allspk.run(a.pos)
+            allspk.run(a.pos, a.mode, auto_volume=not a.no_auto_volume)
     except Exception as e:
         update_state(allspk_status={"running": False, "error": str(e)})
         raise
@@ -530,8 +530,10 @@ def main(argv=None):
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_deepcheck)
-    s = sp.add_parser("allspeakers", help="experimental: check every bed speaker with a 7.1 file you play")
+    s = sp.add_parser("allspeakers", help="experimental: check every bed speaker with a 7.1 test file")
     s.add_argument("--pos", type=int, default=1)
+    s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_allspeakers)
     s = sp.add_parser("headroom", help="how loud one sub can play cleanly (loud; stops automatically)")
     s.add_argument("--output", type=int, required=True, help="1-based output")
