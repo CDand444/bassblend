@@ -112,8 +112,14 @@ def measure(step: str, pos: int = 1, rec=None, log=None) -> dict:
     h["meas"][step] = m
     h["n_heights"] = n_h
     h["report"] = report(h["meas"], n_h, dirac=bool(_system().get("dirac")))
-    update_state(heights=h)
     what = "room noise" if step == "noise" else receiver_name(step, n_h)
+    row = h["report"]["rows"].get(step)
+    h["silent"] = step if row and not row["heard"] else None
+    update_state(heights=h)
+    if h["silent"]:
+        raise RuntimeError(f"No test tone heard on {what}: the mic read the room's own level ({m['level_db']:.0f} dB). "
+                           f"On the receiver open Setup → Speaker → Level Calibration and move the test tone to {what} "
+                           "(you should hear a steady hiss from that speaker), then press Measure again.")
     log("measure", f"height check at spot {pos}: {what} {m['level_db']:.1f} dB (500 Hz-2 kHz), {m['spl_c']:.1f} dB C")
     if h["report"]["complete"] and step != "noise":
         from . import journal
@@ -178,7 +184,8 @@ def report(meas: dict, n_heights, dirac=False) -> dict:
     if complete and not any(a["status"] == "fix" or a["ch"] not in ("FL", "FR", "") for a in advice):
         advice.append({"ch": "", "status": "good", "text": f"All {len(hk)} height speakers play, match the front left within "
                        f"{LEVEL_OK:g} dB, are balanced left to right and sound like the fronts."})
-    nxt = next((k for k in ["noise", "FL", "FR"] + hk if k not in meas), None)
+    # the next step to do: the first one not measured yet, or one that heard nothing (do it again)
+    nxt = next((k for k in ["noise", "FL", "FR"] + hk if k not in meas or (k in rows and not rows[k]["heard"])), None)
     return {"rows": rows, "advice": advice, "complete": complete, "next": nxt, "curve_f": CURVE_F.round(0).tolist()}
 
 

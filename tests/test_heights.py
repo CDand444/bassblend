@@ -79,6 +79,24 @@ def test_same_speaker_twice_is_flagged():
     assert any("Did the receiver move" in x["text"] for x in r["advice"])
 
 
+def test_a_silent_step_stops_with_a_clear_message():
+    from subtune import dirac, state
+    saved = dirac.system
+    dirac.system = lambda: {"heights": 4, "dirac": False}
+    try:
+        H.measure("noise", 1, rec=room())
+        try:
+            H.measure("FL", 1, rec=room(3)); assert False, "should have stopped"
+        except RuntimeError as e:
+            assert "No test tone heard on Front left" in str(e) and "Level Calibration" in str(e), e
+        h = state.load_state()["heights"]
+        assert h["silent"] == "FL" and h["report"]["next"] == "FL"
+        h = H.measure("FL", 1, rec=pink(0, seed=4) + room(5))
+        assert h["silent"] is None and h["report"]["next"] == "FR"
+    finally:
+        dirac.system = saved
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

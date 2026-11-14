@@ -860,6 +860,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <section class="card" id="hgtCard">
       <div class="card-h"><h2>Height speakers (Atmos)</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my height speaker check. What should I change in Level Calibration, and are my heights placed well?">Ask about this</button></div>
       <p class="lead">Checks every height speaker against the front left: level, left/right balance and tone. Height speakers only play from Atmos content or the receiver’s own test tone, so you step through the receiver’s test tone and BassBlend measures each speaker at your seat.</p>
+      <div class="notice warn" style="margin-bottom:8px"><b>BassBlend doesn’t play anything in this check.</b> You run the receiver’s own test tone from its on-screen menu (on your TV) or remote, and move it to each speaker; BassBlend only listens.</div>
       <ol class="howto">
         <li>Mic at the seat. On the receiver open <b>Setup → Speaker → Level Calibration</b> (the test tone plays at reference level, fairly loud).</li>
         <li>Press <b>Measure</b> on each row in order: first the room with the test tone <b>off</b>, then move the receiver’s test tone to the speaker named on the row, wait for the hiss, and press Measure.</li>
@@ -2314,12 +2315,13 @@ function renderHeights() {
     ['FL', 'Front left', 'The reference every height is compared with.'], ['FR', 'Front right', 'A check that the reference pair matches.'],
     ...keys.map(k => [k, `${hgtRecvName(k, n)} · ${HGT_NAMES[k].toLowerCase()}`, ''])];
   let t = `<div class="tw"><table class="dc-tbl"><thead><tr><th>Step</th><th>Receiver test tone on</th><th>Played</th><th>Level vs front left</th><th>Treble vs front left</th><th></th></tr></thead><tbody>`;
-  steps.forEach(([k, label, hint]) => {
-    const r = rows[k], m = meas[k], now = running && hs.step === k;
+  const order = steps.map(x => x[0]), nxtIdx = nxt ? order.indexOf(nxt) : order.length;
+  steps.forEach(([k, label, hint], i) => {
+    const r = rows[k], m = meas[k], now = running && hs.step === k, later = i > nxtIdx;
     const played = k === 'noise' ? (m ? `${m.level_db.toFixed(0)} dB room` : '–') : r ? (r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>') : '–';
     const lvl = r && r.vs_fl_db != null && r.heard ? f(r.vs_fl_db) + ' dB' : k === 'FL' && r ? 'reference' : '–';
     const tre = r && r.treble_vs_fl_db != null && r.heard ? f(r.treble_vs_fl_db) + ' dB' : '–';
-    const btn = now ? '<span class="spin"></span>' : `<button class="btn ${k === nxt && !m ? 'primary' : 'ghost'}" data-hstep="${k}" ${busy ? 'disabled' : ''}>${m ? 'Again' : 'Measure'}</button>`;
+    const btn = now ? '<span class="spin"></span>' : `<button class="btn ${k === nxt && !m ? 'primary' : 'ghost'}" data-hstep="${k}" ${busy || later ? 'disabled' : ''} ${later ? 'title="Do the steps above first"' : ''}>${m ? 'Again' : 'Measure'}</button>`;
     t += `<tr><td>${esc(label)}${hint ? `<div class="muted small">${hint}</div>` : ''}</td><td>${k === 'noise' ? '<i>off</i>' : esc(hgtRecvName(k, n))}</td><td>${played}</td><td>${lvl}</td><td>${tre}</td><td style="text-align:right">${btn}</td></tr>`;
   });
   t += '</tbody></table></div>';
