@@ -842,6 +842,16 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="dcOut" style="margin-top:16px"></div>
     </section>
 
+    <section class="card" id="allCard">
+      <div class="card-h"><h2>All speakers <span class="muted small" style="font-weight:500">experimental</span></h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my all-speakers check. What should I change in the receiver, and what can Dirac fix?">Ask about this</button></div>
+      <p class="lead">Checks every bed speaker (front, centre, surrounds, surround backs and the LFE) for level, distance and polarity against the front left. Your receiver’s network player only plays 2 channels, so this test uses a 7.1 file that <b>you</b> play from an HDMI source (a PC, streamer or Blu-ray player) or a USB stick. Height speakers need Dolby Atmos content, so they aren’t covered.</p>
+      <ol class="howto"><li>Download <a href="/media/bassblend_all_speakers_7_1.wav" download>bassblend_all_speakers_7_1.wav</a> (8 channels, about a minute) to the player.</li>
+        <li>Set the receiver to a direct/multichannel listening mode (not Stereo or an upmixer), at a normal listening volume.</li>
+        <li>Put the mic at your seat, press <b>Start listening</b> here, then press play.</li></ol>
+      <div class="row"><label class="f" style="width:150px">Mic at<select id="allPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label><span class="grow"></span><button class="btn primary lg" id="allRun">Start listening</button></div>
+      <div id="allOut" style="margin-top:14px"></div>
+    </section>
+
     <section class="card" id="headCard">
       <div class="card-h"><h2>Sub headroom</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my sub headroom results. Is any sub holding the others back, and what would give more clean output?">Ask about this</button></div>
       <p class="lead">How loud each sub can play cleanly in your room. Tone bursts at 25, 40 and 63 Hz start quiet and rise 3 dB at a time; the test stops by itself at the first sign of strain (distortion, the sub no longer getting louder, the mic close to overload, or 105 dB at the mic). <b>It gets loud.</b></p>
@@ -2196,6 +2206,33 @@ $('#ckRun').onclick = async () => {
   const r = await post('/api/run', {cmd: 'checkup', pos}); if (r.error) alert(r.error); ckKey = null; poll();
 };
 
+// ---------- all speakers (experimental, manual 7.1 playback)
+let allKey = null;
+function renderAllSpk() {
+  const ar = S.allspk || {}, as = S.allspk_status || {}, job = S.job || {};
+  const running = !!as.running && !!job.running;
+  $('#allRun').disabled = !!job.running || !!S.busy;
+  $('#allRun').textContent = running ? 'Listening…' : 'Start listening';
+  const latest = Object.values(ar).sort((a, b) => b.t - a.t)[0];
+  const key = JSON.stringify([latest && latest.t, running, as.text, as.error]);
+  if (key === allKey) return; allKey = key;
+  let h = running ? `<div class="notice"><span class="spin"></span>&nbsp; ${esc(as.text || 'Listening…')}</div>` : as.error ? `<div class="notice bad">${esc(as.error)}</div>` : '';
+  if (latest) {
+    const sp = latest.speakers;
+    const f = v => (v > 0 ? '+' : '') + v.toFixed(1);
+    h += `<div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>Played</th><th>Level vs front left</th><th>Arrival vs front left</th><th>Polarity</th></tr></thead><tbody>
+      ${Object.entries(sp).map(([k, r]) => `<tr><td>${esc(r.name)}</td><td>${r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.level_vs_fl_db) + ' dB' : '–'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.arrival_vs_fl_ms) + ' ms (' + Math.abs(r.distance_vs_fl_cm) + ' cm)' : '–'}</td><td>${r.polarity == null ? '–' : r.polarity === 'reversed' ? '<b style="color:var(--bad)">reversed</b>' : r.polarity}</td></tr>`).join('')}</tbody></table></div>
+      <ul class="dc-ra" style="margin-top:10px">${latest.advice.map(a => `<li class="${a.status === 'good' ? 'auto' : ''}">${esc(a.text)}</li>`).join('')}</ul>
+      <p class="muted small" style="margin:8px 0 0">${spotName(latest.pos || 1)} · ${new Date(latest.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}. The LFE row is the subs’ arrival through the LFE channel.</p>`;
+  } else if (!running) h += empty('Not checked yet', 'Follow the three steps above.');
+  $('#allOut').innerHTML = h;
+}
+$('#allRun').onclick = async () => {
+  const pos = +$('#allPos').value;
+  if (!confirm('Start listening for the 7.1 test file?\n\nAfter you press OK, press play on the file within 5 minutes. It plays a sweep on each speaker in turn (about a minute) at your receiver’s volume.')) return;
+  const r = await post('/api/run', {cmd: 'allspeakers', pos}); if (r.error) alert(r.error); allKey = null; poll();
+};
+
 // ---------- sub headroom
 let hrKey = null;
 function renderHeadroom() {
@@ -3012,6 +3049,7 @@ const MENU = [
    tag: () => liveMaster ? [`slot ${liveMaster.preset + 1}`, ''] : null},
   {grp: 'Measure', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
+  {grp: 'Measure', key: 'allspk', icon: 'report', title: 'All speakers', full: 'All speakers (experimental)', el: $('#allCard'), tag: () => null},
   {grp: 'Measure', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
   {grp: 'Measure', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
@@ -3090,7 +3128,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderPlacement(); renderHeadroom(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     if (sheetKey && !$('#sheetNav').contains(document.activeElement)) renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);

@@ -25,7 +25,7 @@ _lock = threading.Lock()
 
 ALLOWED = {"status": [], "prepare": [], "discover": [], "level": [], "selftest": [],
            "measure": ["pos"], "optimize": [], "apply": [], "verify": ["pos"], "baseline": ["pos"],
-           "restore": [], "unmute": [], "checkup": ["pos"], "levelmatch": [], "headroom": ["output"]}
+           "restore": [], "unmute": [], "checkup": ["pos"], "levelmatch": [], "headroom": ["output"], "allspeakers": ["pos"]}
 
 # editable tuning settings: key -> (type, min, max)
 SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (float, 0, 10),
@@ -408,7 +408,7 @@ def mic_free() -> bool:
     return True
 
 
-for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup"):
+for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup"):  # noqa: E501
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -505,6 +505,11 @@ def build_executors():
                                         "speakers": [{k: x[k] for k in ("name", "x_ft", "y_ft", "z_ft") if k in x}
                                                      | {"angle_deg": x.get("azimuth", x.get("elevation")), "dolby_range": x["range"]}
                                                      for x in pl["speakers"]]}
+        a_all = max((st.get("allspk") or {}).values(), key=lambda r: r["t"], default=None)
+        if a_all:
+            out["all_speakers_check"] = {"t": a_all["t"], "spot": a_all.get("pos"), "advice": [x["text"] for x in a_all["advice"]],
+                                         "speakers": {k: {x: v[x] for x in ("level_vs_fl_db", "arrival_vs_fl_ms", "polarity", "heard")}
+                                                      for k, v in a_all["speakers"].items()}}
         rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
         if rep:
             out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
@@ -1114,9 +1119,11 @@ class H(BaseHTTPRequestHandler):
             for spk in ("L", "LR"):                    # make the blend test files on first download
                 if name == avrmeasure.layout(spk)["file"] and not f.exists():
                     avrmeasure.build_file(speakers=spk)
-            from . import deepcheck
+            from . import allspk, deepcheck
             if name == deepcheck.MEDIA_NAME and not f.exists():
                 deepcheck.build_file()
+            if name == allspk.MEDIA_NAME and not f.exists():
+                allspk.build_file()
             if "/" in name or "\\" in name or ".." in name or not name.endswith(".wav") or not f.exists():
                 return self._send(404, {"error": "not found"})
             self.send_response(200)

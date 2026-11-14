@@ -104,6 +104,9 @@ output, ask the owner to record the change in Room & subs, then re-measure. Port
 below their safe limit (no_boost_below_hz). Prefer the receiver doing the crossover (sub crossover Out / \
 LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies (Hsu: one port open, \
 EQ1, Q 0.7).
+- All-speakers check (get_overview -> all_speakers_check, experimental): level, arrival and polarity of every bed \
+speaker against the front left, from a 7.1 file the owner plays from an HDMI source or USB stick (the receiver's \
+network player is stereo-only). Heights can't be tested this way. The owner starts it from Measure → All speakers.
 - Speaker placement (get_overview -> speaker_placement): Dolby-guideline positions for the layout, worked out from \
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. BassBlend doesn't know where the owner's speakers actually \

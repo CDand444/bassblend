@@ -93,6 +93,17 @@ def cmd_selftest(a):
         sys.exit(2)
 
 
+def cmd_allspeakers(a):
+    """Experimental: level, distance and polarity of every bed speaker from a 7.1 file the owner plays."""
+    from . import allspk
+    try:
+        with busy(f"all-speakers check at spot {a.pos}"):
+            allspk.run(a.pos)
+    except Exception as e:
+        update_state(allspk_status={"running": False, "error": str(e)})
+        raise
+
+
 def cmd_headroom(a):
     """How loud one sub output can play cleanly (rising tone bursts with automatic stops)."""
     from . import headroom
@@ -519,6 +530,9 @@ def main(argv=None):
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_deepcheck)
+    s = sp.add_parser("allspeakers", help="experimental: check every bed speaker with a 7.1 file you play")
+    s.add_argument("--pos", type=int, default=1)
+    s.set_defaults(fn=cmd_allspeakers)
     s = sp.add_parser("headroom", help="how loud one sub can play cleanly (loud; stops automatically)")
     s.add_argument("--output", type=int, required=True, help="1-based output")
     s.set_defaults(fn=cmd_headroom)
