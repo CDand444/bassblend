@@ -39,7 +39,8 @@ PENDING = DATA / "import-pending.json"        # dropped here by the first-boot i
 MACHINE_KEYS = {"minidsp_url", "play_device", "rec_device", "hostapi", "cal_file", "onboarded"}
 # Parts of the dashboard state that are results worth keeping (not busy flags or live readings).
 STATE_KEYS = ("result", "measurements", "grid", "verify", "verify_meta", "checkups", "level_match",
-              "analysis", "suggestion", "tone_tests", "avr_blend", "avr_blend_multi", "avr_blend_seats")
+              "analysis", "suggestion", "tone_tests", "avr_blend", "avr_blend_multi", "avr_blend_seats",
+              "deep_reports", "deep_history", "fix_result")
 # Data files carried with history: folder -> filename pattern.
 FILE_DIRS = {"measurements": r"pos\d{1,2}\.npz", "blend": r"seat\d{1,2}\.npz"}
 JSON_FILES = ("result.json", "slots.json", "room.json")
@@ -80,6 +81,9 @@ def export(include_history: bool = True, include_pin: bool = False, include_key:
         hist = DATA / "applied_history.jsonl"
         if hist.exists():
             b["applied_history"] = hist.read_text(encoding="utf-8")
+        from . import journal
+        if journal.FILE.exists():
+            b["journal"] = journal.FILE.read_text(encoding="utf-8")
         files = {}
         for d, pat in FILE_DIRS.items():
             if (DATA / d).exists():
@@ -214,6 +218,13 @@ def import_bundle(b, keep_sessions: bool = True) -> dict:
         done.append("slot contents")
     if isinstance(b.get("applied_history"), str):
         (DATA / "applied_history.jsonl").write_text(b["applied_history"], encoding="utf-8")
+    if isinstance(b.get("journal"), str) and b["journal"].strip():
+        from . import journal
+        lines = [ln for ln in b["journal"].splitlines() if ln.strip().startswith("{")][-journal.KEEP:]
+        if lines:
+            DATA.mkdir(parents=True, exist_ok=True)
+            journal.FILE.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            done.append(f"tuning journal ({len(lines)} entries)")
     files = b.get("files") or {}
     k = 0
     for rel, data in files.items() if isinstance(files, dict) else ():
@@ -231,6 +242,8 @@ def import_bundle(b, keep_sessions: bool = True) -> dict:
             update_state(**keep)
             if keep.get("result"):
                 done.append("current result")
+            if keep.get("deep_reports"):
+                done.append(f"{len(keep['deep_reports'])} system report{'s' * (len(keep['deep_reports']) != 1)}")
     # secrets
     sec = b.get("secrets") or {}
     pin = sec.get("pin") if isinstance(sec, dict) else None

@@ -141,6 +141,23 @@ def test_rejects_bad_files_and_protects_slot_1():
     assert not list(TMP.glob("**/passwd*")) and not (data.parent / "x.npz").exists()
 
 
+def test_reports_history_and_journal_travel():
+    env = device("pc2")
+    data = pathlib.Path(env["BASSBLEND_DATA"])
+    (data / "state.json").write_text(json.dumps({"deep_reports": {"1": {"t": 5, "pos": 1}}, "deep_history": [{"t": 4}],
+                                                 "fix_result": {"t": 6}}))
+    (data / "journal.jsonl").write_text('{"t": 1, "kind": "tune", "text": "Applied X"}\n{"t": 2, "kind": "report", "text": "Report"}\n')
+    b, out = export(env)
+    assert set(b["state"]) >= {"deep_reports", "deep_history", "fix_result"} and "Applied X" in b["journal"]
+    pi = device("pi5")
+    r = cli(pi, "import-config", str(out))
+    assert r.returncode == 0, r.stderr
+    pd = pathlib.Path(pi["BASSBLEND_DATA"])
+    st = json.loads((pd / "state.json").read_text())
+    assert st["deep_reports"]["1"]["t"] == 5 and st["fix_result"]["t"] == 6
+    assert (pd / "journal.jsonl").read_text().count("\n") == 2
+
+
 def test_first_boot_pending_file():
     _, out = export(SRC, "--include-pin")
     pi = device("pi4")

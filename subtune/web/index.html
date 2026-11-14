@@ -1728,8 +1728,8 @@ $('#aiBtn').onclick = async () => { const r = await post('/api/analyze', {questi
 
 // ---------- assistant chat
 let CHAT = {display: []}, chatKey = null, chatTimer = null;
-const SUGGEST = ['Is everything working properly?', 'Why does 31 Hz ring, and can we fix it?', 'Compare my saved tunes for me',
-                 'Get the SB-1000 to contribute more', 'Blend the subs with my speakers'];
+const SUGGEST = ['What should I do next?', 'Explain my latest system report', 'How are my subs set?',
+                 'Is my receiver colouring the sound?', 'What does a room mode mean?'];
 async function chatLoad() { try { CHAT = await fetch('/api/chat').then(r => r.json()); } catch (e) {} renderChat(); chatSchedule(); }
 function chatSchedule() {
   const busy = CHAT.running || CHAT.pending;
@@ -1744,7 +1744,8 @@ function renderChat() {
   if (key === chatKey) return; chatKey = key;
   const log = $('#chatLog');
   let h = '';
-  if (!CHAT.display.length) h = `<div class="msg assistant"><p>Hi! I can run checks, try tune ideas offline, compare tunes, and control the receiver. I'll always ask before playing sound or changing anything.</p></div>
+  if (!CHAT.display.length) h = `<div class="msg assistant"><p>${S.ai_key ? 'Hi! I can run checks, try tune ideas offline, compare tunes, and control the receiver. I’ll always ask before playing sound or changing anything.'
+    : 'Hi! I’m BassBlend’s built-in helper. With no AI provider set up I can still explain your results, your subs and receiver settings, and what to do next. Add an AI provider in Menu → AI analysis for a full assistant that can run tests for you.'}</p></div>
     <div class="chips2">${SUGGEST.map(s => `<button type="button" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
   CHAT.display.forEach(d => {
     if (d.role === 'user') h += `<div class="msg user">${esc(d.text)}</div>`;

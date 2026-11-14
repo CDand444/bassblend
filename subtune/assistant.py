@@ -295,6 +295,16 @@ class Assistant:
             self.save()
         threading.Thread(target=self._loop, daemon=True).start()
 
+    def offline(self, text: str, reply: str):
+        """No AI provider: show the built-in helper's answer (kept out of the AI conversation)."""
+        with self.lock:
+            if self.running or self.pending:
+                raise RuntimeError("the assistant is busy" if self.running else "answer the pending approval first")
+            now = time.time()
+            self.display.append({"role": "user", "text": text, "t": now})
+            self.display.append({"role": "assistant", "text": reply, "t": now + 0.001, "offline": True})
+            self.save()
+
     def answer(self, pid: str, approve: bool):
         with self.lock:
             p = self.pending

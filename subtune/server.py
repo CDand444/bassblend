@@ -1210,11 +1210,17 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, avr_action(body))
             if path == "/api/chat":
                 from .analysis import key_source
-                if not key_source():
-                    raise RuntimeError("save an Anthropic API key first (Menu → AI analysis)")
                 text = str(body.get("message") or "").strip()[:2000]
                 if not text:
                     raise ValueError("empty message")
+                if not key_source():                      # no AI provider: the built-in helper answers
+                    from . import coach, helper
+                    from .room import load_room
+                    st, s, room = load_state(), load_settings(), load_room()
+                    a = _avr.get("data") or {}
+                    steps = coach.plan(st, {**s, "cal_ok": bool(s.get("cal_file"))}, room, a, _live.get("data"))
+                    assistant().offline(text, helper.answer(text, st, s, room, a, steps))
+                    return self._send(200, assistant().view())
                 assistant().send(text)
                 return self._send(200, assistant().view())
             if path == "/api/chat/answer":
