@@ -1,5 +1,22 @@
 # BassBlend changelog
 
+## Nov 14, 2026 - tuning coach, journal and a holistic assistant
+
+- **Tuning coach** (`subtune/coach.py`): ranked next steps from all the data, in the order the
+  chain depends on (safety and wiring, sub hardware, sub tune, blend, receiver, Dirac, verify and
+  listen); each says why, who does it, whether it plays sound and the tool to use. Shown as a
+  "Next steps" card on the main page (no AI needed) and given to the assistant. Never offers a
+  blend fix the playing tune already contains; asks for a fresh report when the last one predates
+  the current BassBlend.
+- **Tuning journal** (`subtune/journal.py`): knob changes, tunes applied, receiver level and
+  processing changes, Dirac runs, target changes, verifications, reports and fixes with their key
+  numbers; on the main page and in the assistant's overview.
+- **Assistant rewritten** as a tuning engineer: live system facts instead of a hard-coded
+  description, an explicit loop (assess, propose one step, act, measure, compare, keep or undo),
+  work ordered across the chain, a concrete next suggestion in every reply, a quiet mode for "no
+  sound now", and new tools `get_tuning_plan` and `get_journal`.
+- Tests: `test_coach.py` (12).
+
 ## Nov 13, 2026 (evening) - vendor-aware subs, AI providers, receiver control and fixes
 
 - **Vendor-aware subs**: Room & subs shows each catalog model's own controls. Hsu VTF-3 MK5 HP

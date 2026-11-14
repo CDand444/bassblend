@@ -362,6 +362,18 @@ a.btn { text-decoration: none; }
 .hwtips { margin-top: 8px; } .hwtips ul { margin: 6px 0; padding-left: 18px; color: var(--text-2); } .hwtips li { margin: 3px 0; }
 .ai-grid { max-width: 640px; }
 .avr-h { font-size: 13px; font-weight: 650; margin: 16px 0 8px; }
+.coach { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; counter-reset: step; }
+.coach li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; align-items: start; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); counter-increment: step; }
+.coach li::before { content: counter(step); width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.coach li.safety::before { background: color-mix(in srgb, var(--bad) 18%, var(--surface)); color: var(--bad); }
+.coach b { font-size: 13.5px; font-weight: 650; } .coach p { margin: 2px 0 0; font-size: 12.5px; color: var(--text-2); }
+.coach .who { display: inline-block; margin-top: 4px; font-size: 11px; color: var(--text-3); }
+.coach .acts { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 600px) { .coach li { grid-template-columns: 26px minmax(0, 1fr); } .coach .acts { grid-column: 2; justify-content: flex-start; } }
+.journal { list-style: none; margin: 8px 0 0; padding: 0; font-size: 12.5px; color: var(--text-2); display: grid; gap: 4px; }
+.journal time { color: var(--text-3); margin-right: 6px; font-variant-numeric: tabular-nums; }
 .cfg-h { font-size: 13px; font-weight: 650; margin: 16px 0 8px; color: var(--text-1); }
 #cfgCard .cb { margin-bottom: 8px; }
 .chk { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
@@ -647,6 +659,14 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <button class="btn ghost ask" data-ask="Give me a quick health check of my whole system in plain words.">Ask about this</button></div>
       <div class="sysmap" id="sysmap"></div>
       <div class="health" id="health"></div>
+    </section>
+
+    <!-- COACH: next best steps -->
+    <section class="card" id="coachCard">
+      <div class="card-h"><h2>Next steps</h2><span class="sub">What would improve your system most, in order</span><span class="grow"></span>
+        <button class="btn ghost ask" data-ask="Look at my whole system and tell me the single most valuable next step, and why. Then let's do it.">Plan with the assistant</button></div>
+      <ol class="coach" id="coachList"></ol>
+      <details id="journalBox" style="margin-top:10px"><summary class="muted small" style="cursor:pointer">Tuning journal</summary><ul class="journal" id="journalList"></ul></details>
     </section>
 
     <!-- WIZARD -->
@@ -2162,6 +2182,22 @@ $('#ckRun').onclick = async () => {
   const r = await post('/api/run', {cmd: 'checkup', pos}); if (r.error) alert(r.error); ckKey = null; poll();
 };
 
+// ---------- coach: next best steps (computed by BassBlend, no AI needed)
+let coachKey = null;
+const WHO = {bassblend: 'BassBlend does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};
+function renderCoach() {
+  const steps = (S.coach || []).slice(0, 3), jr = S.journal || [];
+  const key = JSON.stringify([steps.map(x => x.id + x.title), jr.length && jr[jr.length - 1].t]);
+  if (key === coachKey) return; coachKey = key;
+  $('#coachList').innerHTML = steps.map(x => {
+    const go = x.open ? (x.open.startsWith('wiz:') ? `<button class="btn" data-goto="${x.open.slice(4)}">Open</button>` : `<button class="btn" data-open="${x.open}">Open</button>`) : '';
+    return `<li class="${x.area}"><div><b>${esc(x.title)}</b><p>${esc(x.why)}</p><span class="who">${WHO[x.who] || ''}${x.sound ? ' · plays test sounds' : ''}</span></div>
+      <div class="acts">${go}<button class="btn ghost ask" data-ask="${esc('Let’s do this next: ' + x.title + '. Explain briefly what will happen, then go ahead when I approve.')}">Ask the assistant</button></div></li>`;
+  }).join('') || '<li><div><b>Nothing to suggest right now</b></div></li>';
+  $('#journalList').innerHTML = jr.slice().reverse().map(j => `<li><time>${esc(new Date(j.t * 1000).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}))}</time>${esc(j.text)}</li>`).join('')
+    || '<li class="muted">Changes and measurements show up here as you tune.</li>';
+}
+
 // ---------- system report (full range, through the receiver)
 let dcKey = null, dcSel = null, dcInit = false, dcCmp = '', fixKey = null;
 const subTxt = a => `Receiver subwoofer level ${a.change_db > 0 ? '+' : ''}${a.change_db.toFixed(1)} dB${a.to != null ? ` (to ${a.to > 0 ? '+' : ''}${a.to.toFixed(1)} dB)` : ''}`;
@@ -2906,7 +2942,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCoach(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     if (sheetKey && !$('#sheetNav').contains(document.activeElement)) renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);

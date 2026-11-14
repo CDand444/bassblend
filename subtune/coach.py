@@ -1,0 +1,179 @@
+"""Tuning coach: the next best steps, worked out from everything BassBlend knows.
+
+No AI needed: plain rules over the setup, the sub hardware settings, the tune,
+its verification, the blend, Dirac, the system report and the receiver. The
+dashboard shows the top steps; the assistant gets the full list so its advice
+stays grounded and holistic (physical things first, then the sub tune, the
+blend, the receiver, Dirac, and finally checking and listening).
+
+Each step: id, rank (lower = do first), area, title, why, who (bassblend |
+owner | receiver_menu | dirac), sound (plays audio?), open (dashboard page),
+tool + input (what the assistant would call), and ask (a question to start a
+chat about it).
+"""
+from __future__ import annotations
+
+import time
+
+AREAS = ("setup", "safety", "hardware", "tune", "blend", "receiver", "dirac", "verify", "listen")
+
+
+def _step(rank, sid, area, title, why, who="bassblend", sound=False, open=None, tool=None, inp=None, ask=None):
+    return {"id": sid, "rank": rank, "area": area, "title": title, "why": why, "who": who, "sound": sound,
+            "open": open, "tool": tool, "input": inp or {}, "ask": ask or f"Help me with this: {title}"}
+
+
+def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp: dict | None = None) -> list[dict]:
+    from . import vendors
+    out = []
+    res = st.get("result") or {}
+    tuned = bool(res.get("applied"))
+    tid = res.get("tune_id")
+    sy = st.get("system") or {}
+    reports = st.get("deep_reports") or {}
+    rep = max(reports.values(), key=lambda r: r["t"]) if reports else None
+    subs_room = room.get("subs") or {}
+    sub_outs = settings.get("subs") or []
+
+    # ---- setup gaps
+    if not settings.get("cal_file") or settings.get("cal_ok") is False:
+        out.append(_step(1, "mic_cal", "setup", "Add your mic's calibration file",
+                         "Without it every measurement is off by the mic's own error (several dB in the bass and treble).",
+                         who="owner", open="setup"))
+    if not settings.get("avr_host"):
+        out.append(_step(2, "receiver", "setup", "Connect BassBlend to your receiver",
+                         "The blend test, the system report and the automatic fixes all go through it.", who="owner", open="avr"))
+    if not sub_outs:
+        out.append(_step(2, "subs", "setup", "Tell BassBlend which outputs drive subs", "Nothing can be tuned until it knows.",
+                         who="owner", open="setup"))
+    if live_dsp is not None and not live_dsp.get("master"):
+        out.append(_step(3, "dsp", "setup", "Reconnect the miniDSP", "It isn't answering over USB.", who="owner", open="setup"))
+
+    # ---- safety / hardware
+    unrecorded = []
+    for k, d in subs_room.items():
+        cid = d.get("catalog") or vendors.find(d.get("model", ""))
+        if not cid or int(k) not in sub_outs:
+            continue
+        ctl = d.get("controls") or {}
+        for n in vendors.check(cid, ctl):
+            if n["level"] == "danger":
+                out.append(_step(0, f"hw_danger_{k}", "safety", f"Out {int(k) + 1}: change a setting on the sub now", n["text"],
+                                 who="owner", open="room"))
+            elif n["level"] == "warn":
+                out.append(_step(4, f"hw_warn_{k}", "hardware", f"Out {int(k) + 1}: {n['text'].split(':')[0]}", n["text"],
+                                 who="owner", open="room"))
+        if not ctl:
+            unrecorded.append((int(k), vendors.CATALOG[cid]))
+    if unrecorded:                                  # one step for all of them, naming each model's own controls
+        outs = " and ".join(f"out {o + 1}" for o, _ in unrecorded) if len(unrecorded) < 3 else \
+            ", ".join(f"out {o + 1}" for o, _ in unrecorded[:-1]) + f" and out {unrecorded[-1][0] + 1}"
+        kinds = {}
+        for _, c in unrecorded:
+            kinds.setdefault(f"{c['brand']} {c['model']}", [x["label"] for x in c["controls"][:4]])
+        what = "; ".join(f"{m}: {', '.join(lbl)}" for m, lbl in kinds.items())
+        out.append(_step(5, "hw_record", "hardware", f"Record how your subs are set ({outs})",
+                         f"Their knobs and switches change how they play ({what}). Once BassBlend knows them it can protect "
+                         "the drivers, spot conflicts and suggest better settings. Room & subs → Controls on the sub.",
+                         who="owner", open="room"))
+    if rep and rep.get("lr", {}).get("polarity") == "reversed":
+        out.append(_step(0, "polarity", "safety", "One front speaker is wired backwards",
+                         "Swap red and black on one front speaker, then run the system report again.", who="owner", open="report"))
+
+    # ---- hardware suggestions grounded in the maker's guidance and the room
+    rm = room.get("room") or {}
+    vol = (rm.get("length_m") or 0) * (rm.get("width_m") or 0) * (rm.get("height_m") or 0)
+    for k, d in subs_room.items():
+        if d.get("catalog") != "hsu-vtf3-mk5-hp" or not d.get("controls") or int(k) not in sub_outs:
+            continue
+        ctl = {**vendors.defaults("hsu-vtf3-mk5-hp"), **d["controls"]}
+        if vol and vol < 85 and str(ctl.get("q")) == "0.7":
+            out.append(_step(8, f"hsu_q_{k}", "hardware", f"Try Q 0.3 or 0.5 on out {int(k) + 1}",
+                             f"Your room is about {vol * 35.3:.0f} cu ft (small to medium). Hsu: Q 0.3 gives the flattest deep bass in "
+                             "small-to-medium rooms and the most headroom; 0.7 suits large rooms. Change it, record it, then re-measure.",
+                             who="owner", open="room", sound=False))
+
+    # ---- the sub tune
+    if sub_outs and not tuned:
+        out.append(_step(6, "autotune", "tune", "Tune the subs (auto-tune)",
+                         "BassBlend measures each sub at your seats and writes delay, gain, polarity and EQ to the miniDSP.",
+                         sound=True, open="wiz:tune", tool="start_autotune", inp={"spots": 3, "prechecks": True}))
+    verified = (st.get("verify") or {}).get("after") or {}
+    vmeta = st.get("verify_meta") or {}
+    if tuned and (not verified or (vmeta.get("tune_id") and vmeta.get("tune_id") != tid)):
+        out.append(_step(7, "verify", "verify", "Verify the playing tune at the MLP",
+                         "One sweep confirms the miniDSP does what the tune predicted (catches a knob that moved or a sub that's off).",
+                         sound=True, open="wiz:verify", tool="run_verify", inp={"pos": 1}))
+
+    # ---- blend with the speakers
+    b = st.get("avr_blend") or {}
+    base = res.get("base_tune_id") or tid
+    # measured on the playing tune itself, and its fix not used yet (a tune built on top of the measured
+    # one, i.e. base_tune_id == the blend's tune, already contains a blend fix: never offer it twice)
+    blend_current = b and b.get("tune_id") == tid and not b.get("applied_as")
+    if tuned and settings.get("avr_host"):
+        if not b or b.get("tune_id") not in (tid, base):
+            out.append(_step(9, "blend", "blend", "Blend the subs with the front speakers",
+                             "Checks that subs and speakers add up around the crossover instead of cancelling.",
+                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": "dlna", "speakers": "both", "auto_volume": True}))
+        elif b.get("tune_id") == base and base != tid:
+            out.append(_step(9, "blend_confirm", "blend", "Re-measure the blend to confirm the fix",
+                             "The playing tune already includes a blend fix; one more blend test shows how well it worked.",
+                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": "dlna", "speakers": "both", "auto_volume": True}))
+        elif blend_current and b.get("loss_now_db", 0) - b.get("loss_best_db", 0) >= 0.5 and (b.get("delay_ms", 0) > 0 or b.get("invert")):
+            out.append(_step(8, "blend_apply", "blend", f"Apply the blend fix ({b['loss_now_db'] - b['loss_best_db']:.1f} dB less cancellation)",
+                             "The last blend test found a sub delay/polarity that makes subs and speakers add up better.",
+                             open="blend", tool="apply_avr_blend"))
+        seats = (st.get("avr_blend_seats") or {}).get("measured") or []
+        if b and len(seats) < 2:
+            out.append(_step(14, "blend_seats", "blend", "Measure the blend at a second and third seat",
+                             "One setting that blends well at every seat beats one tuned for the MLP alone.",
+                             sound=True, open="blend", tool="run_avr_blend", inp={"pos": 2, "mode": "dlna", "speakers": "both", "auto_volume": True}))
+
+    # ---- Dirac
+    if sy.get("dirac") and tuned and not sy.get("dirac_current"):
+        out.append(_step(10, "dirac", "dirac", "Run Dirac Live with BassBlend's target",
+                         "The sub tune changed since Dirac last measured, so its correction no longer fits.",
+                         who="dirac", open="wiz:dirac", ask="Walk me through running Dirac Live with BassBlend's target curve."))
+
+    # ---- system report and what it found
+    old_format = rep and "bass_vs_target_db" not in rep          # made before the fixes and receiver advice existed
+    stale = rep and ((tuned and res.get("applied") and rep["t"] < res["applied"]) or old_format)
+    if tuned and settings.get("avr_host") and (not rep or stale):
+        out.append(_step(11, "report", "verify", "Run a system report" + (
+            " (the last one is from an older BassBlend)" if old_format else " (the tune changed since the last one)" if stale else ""),
+                         "A full-range check of speakers and subs as you listen, with fixes and exact receiver numbers.",
+                         sound=True, open="report", tool="run_system_report", inp={"pos": 1, "mode": "dlna", "auto_volume": True}))
+    if rep and not stale:
+        auto = [a for a in rep.get("receiver_advice") or [] if a["kind"] == "auto"]
+        if auto or any(f["status"] == "fix" and f["area"] == "bass" for f in rep["findings"]):
+            out.append(_step(12, "fixup", "receiver", "Fix what BassBlend can from the report",
+                             (auto[0]["text"] if auto else "The bass is off target.") + " Then a blend fix and a re-check, automatically.",
+                             sound=True, open="report", tool="fix_from_report", inp={"pos": rep["pos"]}))
+        for a in rep.get("receiver_advice") or []:
+            if a["kind"] == "menu":
+                out.append(_step(13, f"menu_{a['what']}", "receiver", a["text"].split(" in the receiver")[0].split(" in Speaker")[0],
+                                 a["text"], who="receiver_menu", open="report"))
+    # ---- receiver processing that colours listening
+    a = avr or {}
+    if a.get("cinema_filter"):
+        out.append(_step(15, "cinema_filter", "receiver", "Cinema Filter is on", "It softens the treble on everything. Turn it off unless "
+                         "you like it for bright movie mixes.", who="bassblend", open="avr", tool="avr_control", inp={"action": "cinema_filter", "value": "0"}))
+    if a.get("tone_bass") or a.get("tone_treble"):
+        out.append(_step(15, "tone", "receiver", "The receiver's tone controls aren't flat",
+                         f"Bass {a.get('tone_bass'):+d} dB, treble {a.get('tone_treble'):+d} dB on top of your tuning.",
+                         open="avr"))
+    if not st.get("checkups"):
+        out.append(_step(16, "checkup", "verify", "Run a check-up", "Room noise, distortion and how long bass rings: 20 seconds.",
+                         sound=True, open="checkup", tool="run_checkup", inp={"pos": 1}))
+    if not out:
+        out.append(_step(20, "listen", "listen", "Listen and compare",
+                         "Everything measured is in good shape. Switch slots to compare tunes by ear, or try target tweaks offline "
+                         "(no sound) with the assistant.", who="owner", open="tunes",
+                         ask="Everything looks good. What could still make it better? Try ideas offline first."))
+    out.sort(key=lambda s: (s["rank"], s["id"]))
+    return out
+
+
+def summary(steps: list[dict], n: int = 3) -> str:
+    return "; ".join(f"{s['title']} ({s['who']})" for s in steps[:n])

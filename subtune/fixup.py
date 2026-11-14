@@ -89,6 +89,9 @@ def run(pos=1, mode="dlna", log=None, status=None):
     result = {"t": time.time(), "pos": pos, "steps": steps, "before": _summary(before), "after": _summary(after),
               "still_to_do": [a["text"] for a in left]}
     update_state(fix_result=result, fix_status={"running": False})
+    from . import journal
+    journal.add("fix", "Fix what BassBlend can: " + " ".join(s["text"] for s in steps)
+                + f" Bass vs target {result['before']['bass_vs_target_db']:+.1f} → {result['after']['bass_vs_target_db']:+.1f} dB.", pos=pos)
     log("measure", f"fixes at spot {pos}: " + "; ".join(s["step"] + (" done" if s["done"] else " skipped") for s in steps)
         + f"; bass vs target {result['before']['bass_vs_target_db']:+.1f} -> {result['after']['bass_vs_target_db']:+.1f} dB")
     return result

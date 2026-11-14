@@ -191,6 +191,12 @@ def cmd_apply(a):
             meta = {}
         update_state(result=cur, verify=verify, verify_meta=meta)
         event("config", f"slot {slot0 + 1} now holds '{saved['name']}' and is the active preset")
+        from . import journal
+        ma = (cur.get("metrics") or {}).get("after") or {}
+        journal.add("tune", f"Applied '{saved['name']}' to slot {slot0 + 1}"
+                    + (f": predicted MLP flatness ±{ma['mlp_flat_rms_db']:.1f} dB, all seats ±{ma['flat_rms_db']:.1f} dB"
+                       if ma.get("mlp_flat_rms_db") is not None and ma.get("flat_rms_db") is not None else ""),
+                    tune_id=saved["id"], slot=slot0 + 1)
         try:                                               # seats measured with the old tune go stale
             from . import blendmulti
             blendmulti.refresh()
@@ -340,6 +346,8 @@ def cmd_verify(a):
         before = rig.dsp.status()["master"]["source"].lower() if a.restore else None
         try:
             rig.measure_combined("after", a.pos)
+            from . import journal
+            journal.add("verify", f"Verified the playing tune at spot {a.pos} (measured with all subs on)")
         finally:
             if before and before != "usb":             # hand the subs back to the AVR
                 rig.dsp.batch([rig.dsp.c_source(before)] + rig.mute_except(rig.subs),

@@ -487,7 +487,21 @@ def build_executors():
                "avr_blend_seats_status": st.get("avr_blend_seats"),
                "room": load_room(), "room_modes_hz": [m["f"] for m in (modal_report(load_room()) or {}).get("axial", [])[:10]],
                "receiver": avr_status()["status"], "measured_spots": len(st.get("measurements") or {}),
-               "speaker_system": _system_brief(), "sub_hardware": sub_hardware()}
+               "speaker_system": _system_brief(), "sub_hardware": sub_hardware(),
+               "receiver_settings_slot": (s.get("preset") or 0) + 1}
+        from . import coach, journal
+        try:
+            out["next_steps"] = [{k: x[k] for k in ("title", "why", "who", "sound", "tool", "input", "area")}
+                                 for x in coach.plan(st, {**s, "cal_ok": bool(s.get("cal_file"))}, load_room(),
+                                                     (avr_status()["status"] or {}), _live.get("data"))[:8]]
+        except Exception as e:                           # noqa: BLE001
+            out["next_steps"] = [{"title": f"(coach unavailable: {e})"}]
+        out["journal"] = [{k: v for k, v in j.items() if k in ("t", "kind", "text")} for j in journal.recent(15)]
+        rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
+        if rep:
+            out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
+                                           "areas": {k: v["status"] for k, v in rep["areas"].items()},
+                                           "top_findings": [f["title"] for f in rep["findings"] if f["status"] in ("fix", "watch")][:6]}
         out["summary"] = f"slot {r and r.get('slot')} playing {r and r.get('tune_name')}"
         return out
 
@@ -631,6 +645,17 @@ def build_executors():
                 "receiver_advice": [a["text"] for a in r.get("receiver_advice") or []], "label": r.get("label"),
                 "summary": ", ".join(f"{v['label']} {v['status']}" for v in r["areas"].values())}
 
+    def plan_get():
+        from . import coach
+        st, s = load_state(), load_settings()
+        steps = coach.plan(st, {**s, "cal_ok": bool(s.get("cal_file"))}, load_room(), (avr_status()["status"] or {}), _live.get("data"))
+        return {"steps": steps, "summary": coach.summary(steps)}
+
+    def journal_get(n=30):
+        from . import journal
+        js = journal.recent(max(1, min(100, int(n))))
+        return {"entries": js, "summary": f"{len(js)} entries"}
+
     def fix_run(pos):
         r = _measure(lambda: RUN.start_fixup({"pos": pos}), "fix_result", timeout=900)
         return {**(r or {}), "summary": "; ".join(s["text"] for s in (r or {}).get("steps", []))[:300]}
@@ -666,7 +691,7 @@ def build_executors():
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "get_system_report": report_get, "run_system_report": report_run,
-            "fix_from_report": fix_run,
+            "fix_from_report": fix_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "_tune_name": tune_name}
 
 
@@ -787,6 +812,9 @@ def avr_action(body):
     else:
         raise ValueError("unknown receiver action")
     event("config", f"receiver: {act}{'' if val is None else ' ' + str(val)}")
+    if act in ("sub_level", "center_level", "bass", "treble", "late_night", "cinema_filter", "music_optimizer", "dialog"):
+        from . import journal
+        journal.add("receiver", f"Receiver {act.replace('_', ' ')} set to {val}")
     return avr_status(force=True)
 
 
@@ -875,6 +903,7 @@ def set_target_slot(slot) -> int:
 
 def _apply_settings(body):
     body = dict(body)
+    _journal_target = {k: v for k, v in body.items() if k in ("house_db", "house_fc", "fmin", "fmax", "max_boost_db", "mlp_weight")}
     if "slot" in body:
         set_target_slot(body.pop("slot"))
         if not body:
@@ -896,6 +925,9 @@ def _apply_settings(body):
         raise ValueError("shared + per-sub bands must be 10 or fewer")
     save_settings(s)
     event("config", "tuning settings changed", **changed)
+    if _journal_target:
+        from . import journal
+        journal.add("target", "Tuning target changed: " + ", ".join(f"{k} {v}" for k, v in _journal_target.items()))
     return changed
 
 
@@ -1027,6 +1059,15 @@ class H(BaseHTTPRequestHandler):
             st["ai_key"] = key_source()          # "environment" | "saved" | "local" | None (never the key)
             from . import ai
             st["ai_provider"] = ai.status()
+            from . import coach
+            try:
+                st["coach"] = coach.plan(st, {**s, "cal_ok": st["settings"].get("cal_ok")}, room,
+                                         _avr.get("data") or {}, _live.get("data"))
+            except Exception as e:                       # noqa: BLE001 - never break the dashboard over advice
+                st["coach"] = []
+                print(f"[coach] {e}", flush=True)
+            from . import journal
+            st["journal"] = journal.recent(25)
             st["ai_api"] = st["ai_key"] is not None
             from . import version
             st["version"] = version()
@@ -1275,13 +1316,24 @@ class H(BaseHTTPRequestHandler):
                                  avr_blend_seats={"stale": [], "measured": []})
                 event("config", "speaker layout / Dirac settings saved"
                       + (": Dirac Live marked as run" if body.get("dirac_done") else ""))
+                if body.get("dirac_done"):
+                    from . import journal
+                    journal.add("dirac", "Dirac Live run with the playing tune")
                 return self._send(200, {"ok": True, "system": sy})
             if path == "/api/settings":
                 return self._send(200, {"changed": _apply_settings(body)})
             if path == "/api/room":
-                from .room import save_room
+                from .room import load_room, save_room
+                before = load_room().get("subs") or {}
                 r = save_room(body)
                 event("config", "room & subwoofer details saved")
+                from . import journal, vendors
+                for k, d in (r.get("subs") or {}).items():
+                    old, new = (before.get(k) or {}).get("controls") or {}, d.get("controls") or {}
+                    diff = [f"{c} {old.get(c, '?')} → {new[c]}" for c in new if str(old.get(c)) != str(new[c])]
+                    if diff and d.get("catalog"):
+                        m = vendors.mode_of(d["catalog"], {**vendors.defaults(d["catalog"]), **new})
+                        journal.add("hardware", f"Out {int(k) + 1} settings: " + ", ".join(diff) + (f" ({m['name']})" if m else ""), output=int(k) + 1)
                 return self._send(200, {"ok": True, "room": r})
             if path == "/api/ai":                         # choose provider / model, save a key, list models, test
                 from . import ai

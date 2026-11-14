@@ -688,4 +688,8 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label=""):
     update_state(deep_reports=reports, deep_history=hist, deep_status={"running": False})
     n = r["areas"]
     log("measure", f"system report at spot {pos}: " + ", ".join(f"{v['label']} {v['status']}" for v in n.values()))
+    from . import journal
+    journal.add("report", f"System report at spot {pos}{' (' + label + ')' if label else ''}: bass {r['bass_vs_target_db']:+.1f} dB vs "
+                f"target, {sum(f['status'] == 'fix' for f in r['findings'])} to fix, {sum(f['status'] == 'watch' for f in r['findings'])} "
+                f"to look at, L/R timing {r['lr']['timing_ms']:+.2f} ms", pos=pos)
     return r
