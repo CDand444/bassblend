@@ -1,4 +1,4 @@
-"""Biquad design (RBJ cookbook) and evaluation at the DSP's 96 kHz rate.
+"""Biquad design (RBJ cookbook) and evaluation at the DSP's rate (config.DSP_FS, 48 kHz).
 
 Standard form:  H(z) = (b0 + b1 z^-1 + b2 z^-2) / (1 + a1 z^-1 + a2 z^-2)
 miniDSP form:   [b0, b1, b2, -a1, -a2]   (feedback terms sign-flipped)
