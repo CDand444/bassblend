@@ -81,6 +81,37 @@ def test_spectrum_reads_pink_noise_flat():
     assert abs(np.mean(d[(liveeq.F_OUT >= 20) & (liveeq.F_OUT <= 120)])) < 1e-6
 
 
+def _room():
+    f = liveeq.F_OUT
+    peaks = [{"fc": 42.0, "q": 5.0, "gain_db": 8.0, "on": True}, {"fc": 75.0, "q": 3.0, "gain_db": 5.0, "on": True}]
+    return f, liveeq.response_db(peaks, f) + 3.0, np.zeros_like(f)       # a level offset the fit must ignore
+
+
+def test_autofit_cuts_the_peaks():
+    f, db, goal = _room()
+    r = liveeq.autofit(f, db, goal, (20, 120), 4)
+    fcs = [b["fc"] for b in r["bands"]]
+    assert any(abs(x - 42) < 3 for x in fcs) and any(abs(x - 75) < 6 for x in fcs), r["bands"]
+    assert all(b["gain_db"] < 0 for b in r["bands"]), "cuts only"
+    assert r["rms_before"] > 2 and r["rms_after"] < 0.8, r
+    assert len(r["bands"]) <= 4
+
+
+def test_autofit_again_refines_instead_of_stacking():
+    f, db, goal = _room()
+    first = liveeq.autofit(f, db, goal, (20, 120), 4)
+    heard = db + liveeq.response_db(first["bands"], f)                     # what the mic hears with them on
+    again = liveeq.autofit(f, heard, goal, (20, 120), 4, live_now=first["bands"])
+    assert abs(len(again["bands"]) - len(first["bands"])) <= 1, (first["bands"], again["bands"])
+    assert again["measured_rms"] < 0.8 and again["rms_before"] > 2, again
+
+
+def test_autofit_leaves_a_flat_room_alone():
+    f = liveeq.F_OUT
+    r = liveeq.autofit(f, np.zeros_like(f), np.zeros_like(f), (20, 120), 4)
+    assert r["bands"] == [] and r["rms_after"] == 0.0
+
+
 def test_noise_file_is_bass_only_and_loops():
     import wave
     p = liveeq.build_noise(pathlib.Path(TMP) / "n.wav")

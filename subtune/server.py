@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -968,6 +969,14 @@ def build_executors():
         return {"bands": r["bands"], "peak_db": r["peak_db"], "on_minidsp": True,
                 "summary": liveeq.describe(r["bands"]) + (f"; peak +{r['peak_db']:g} dB, may clip" if r["peak_db"] > 0 else "")}
 
+    def leq_fit():
+        from . import liveeq
+        fit = liveeq.fit_now()
+        out = leq_set(fit["bands"], False) if fit["bands"] else {"bands": [], "summary": "nothing worth cutting"}
+        return {**fit, "peak_db": out.get("peak_db"),
+                "summary": f"{liveeq.describe(fit['bands'])}; expected ±{fit['measured_rms']:g} → ±{fit['rms_after']:g} dB "
+                           "against the goal. Check with get_live_eq wait_s 4."}
+
     def leq_start(mode="hdmi", auto_volume=True):
         RUN.start_liveeq({"mode": mode, "auto_volume": bool(auto_volume)})
         t0 = time.time()
@@ -1011,7 +1020,7 @@ def build_executors():
             "get_equipment": equipment, "update_speakers": speakers_set, "update_room": room_set,
             "update_system": system_set, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
-            "get_live_eq": leq_get, "set_live_eq": leq_set, "start_live_analyzer": leq_start,
+            "get_live_eq": leq_get, "set_live_eq": leq_set, "fit_live_eq": leq_fit, "start_live_analyzer": leq_start,
             "stop_live_analyzer": leq_stop, "save_live_eq": leq_save,
             "_tune_name": tune_name}
 
@@ -1378,7 +1387,15 @@ class H(BaseHTTPRequestHandler):
                     + body + "</main></body></html>")
             return self._send(200, page.encode("utf-8"), "text/html; charset=utf-8")
         if u.path in ("/", "/index.html"):
-            return self._send(200, (WEB_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
+            from . import version
+            v = re.sub(r"[^\w.-]", "", str(version()))[:40] or "0"   # new scripts after every update, not a cached copy
+            return self._send(200, (WEB_DIR / "index.html").read_bytes().replace(b"__V__", v.encode()),
+                              "text/html; charset=utf-8")
+        if re.fullmatch(r"/js/[a-z][a-z0-9-]{0,30}\.js", u.path):     # the page's own scripts
+            f = WEB_DIR / "js" / u.path[4:]
+            if f.is_file():
+                return self._send(200, f.read_bytes(), "text/javascript; charset=utf-8")
+            return self._send(404, {"error": "not found"})
         if u.path == "/api/state":
             st = load_state()
             s = load_settings()
@@ -1632,12 +1649,26 @@ class H(BaseHTTPRequestHandler):
                 if body.get("action") == "revert":
                     return self._send(200, {"started": RUN.start_fixes_revert()})
                 raise ValueError("action must be accept or revert")
+            if path == "/api/smoke":                   # silent hardware check
+                from . import smoke
+                r = smoke.run(mic_busy=not mic_free() or METER.running)
+                update_state(smoke=r)
+                event("config", f"hardware check: {r['status']} (" + ", ".join(f"{c['name']} {c['status']}" for c in r["checks"]) + ")")
+                return self._send(200, r)
             if path == "/api/liveeq":
                 act = body.get("action")
                 if act == "set":
                     return self._send(200, LIVE_EQ.submit(body.get("bands") or [], body.get("bypass") is True))
                 if act == "clear":
                     return self._send(200, LIVE_EQ.clear())
+                if act == "fit":                         # built-in auto-fit from the live curve, sent at once
+                    from . import liveeq
+                    LIVE_EQ._allowed()
+                    fit = liveeq.fit_now()
+                    sent = LIVE_EQ.submit(fit["bands"], False)
+                    event("config", f"live EQ auto-fit: {liveeq.describe(fit['bands'])}; predicted ±{fit['measured_rms']:g} → "
+                                    f"±{fit['rms_after']:g} dB against the goal")
+                    return self._send(200, dict(fit, peak_db=sent["peak_db"]))
                 if act == "bake":
                     return self._send(200, {"started": RUN.start_liveeq_bake()})
                 if act == "start":

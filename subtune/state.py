@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import time
 from contextlib import contextmanager
 
@@ -27,9 +28,35 @@ json_dumps = lambda obj, **kw: _dumps(obj, default=_np, **kw)
 
 def _atomic_write(path, text):
     DATA.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    # a temp name per process and thread: two writers never share (and clobber) one temp file
+    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.{threading.get_ident()}.tmp")
     tmp.write_text(text)
     os.replace(tmp, path)
+
+
+_LOCK = threading.RLock()
+
+
+@contextmanager
+def _state_lock():
+    """The server, test jobs and the live EQ all update state.json. Each update is
+    read-modify-write, so without a lock two near-simultaneous updates lose one of
+    them. A thread lock covers this process, a file lock the others (Linux; on
+    Windows only one process writes at a time in practice)."""
+    with _LOCK:
+        f = None
+        try:
+            import fcntl
+            DATA.mkdir(parents=True, exist_ok=True)
+            f = open(DATA / ".state.lock", "a")
+            fcntl.flock(f, fcntl.LOCK_EX)
+        except (ImportError, OSError):
+            f = None
+        try:
+            yield
+        finally:
+            if f:
+                f.close()
 
 
 def load_state() -> dict:
@@ -42,11 +69,22 @@ def load_state() -> dict:
 
 
 def update_state(**kw) -> dict:
-    st = load_state()
-    st.update(kw)
-    st["updated"] = time.time()
-    _atomic_write(STATE_FILE, json_dumps(st))
+    with _state_lock():
+        st = load_state()
+        st.update(kw)
+        st["updated"] = time.time()
+        _atomic_write(STATE_FILE, json_dumps(st))
     return st
+
+
+def modify_state(key, fn):
+    """Read-modify-write one key under the lock: fn(old value) -> new value."""
+    with _state_lock():
+        st = load_state()
+        st[key] = fn(st.get(key))
+        st["updated"] = time.time()
+        _atomic_write(STATE_FILE, json_dumps(st))
+    return st[key]
 
 
 def event(kind: str, msg: str, **data) -> None:

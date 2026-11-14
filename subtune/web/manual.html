@@ -15,6 +15,7 @@
   <a href="#m-safety">Safety</a>
   <a href="#m-trouble">When something goes wrong</a>
   <a href="#m-words">Words used in the app</a>
+  <a href="#m-license">License</a>
 </nav>
 
 <h2 id="m-what">What htTamer does</h2>
@@ -85,8 +86,11 @@
   <li><b>Hold curve</b> keeps a copy so you can compare before and after a change. <b>Response</b> chooses how quickly the curve follows (Fast is jumpier, Slow is steadier).</li>
   <li>It stops by itself after 10 minutes, when you leave the page, or if the mic hears it far louder than your test level. The receiver input, mode and volume are put back when it stops.</li>
 </ul>
-<h3>Auto EQ with the assistant</h3>
-<p><b>Auto EQ with the assistant</b> asks the assistant to do it for you. It starts the analyzer (you approve the sound once), finds the biggest peak above the goal, sets a cut, waits for the analyzer to settle, checks whether the curve got closer to the goal, adjusts, and moves to the next peak. It stops when nothing improves any more or the free bands are used up, then tells you the before and after. It only <b>cuts</b>: a narrow dip is usually a cancellation that boosting can't fill and that only wastes amplifier power. It won't save the bands into a tune unless you ask (and approve).</p>
+<h3>Auto-fit</h3>
+<p>With the analyzer running, <b>Auto-fit</b> works out the bands for you in about a second: it finds the peaks above your goal inside the tuned range and fits cut-only bands (frequency, depth and width) that bring the curve closest to the goal. It uses only as many free bands as actually help. They're sent straight away, and the curve from before is kept as the held curve so you can compare. Press it again after a few seconds to <b>refine</b>: it takes the bands that were playing out of the measurement first, so it improves them instead of stacking more. It gives the same answer for the same room every time and costs nothing to run.</p>
+<p>It only <b>cuts</b>. A narrow dip is usually a cancellation that boosting can't fill and that only wastes amplifier power: fix those with placement, the blend test or the seat.</p>
+<h3>Asking the assistant</h3>
+<p><b>Ask the assistant to do it</b> hands the same job to the chat. It starts the analyzer (you approve the sound once), runs the auto-fit, checks that the live curve did what the fit expected, refines if not, and explains the result in plain words, including anything EQ can't fix. You can also ask it for specific changes ("make the 42 Hz cut narrower"). It won't save the bands into a tune unless you ask (and approve).</p>
 <h3>Tips</h3>
 <ul>
   <li>Keep the mic at the seat you're EQ'ing (normally the MLP). Live EQ helps that seat most; the tune itself balances all seats.</li>
@@ -137,6 +141,7 @@
 
 <h2 id="m-trouble">When something goes wrong</h2>
 <ul>
+  <li><b>Start with Setup → Check the hardware (silent)</b>. It reads the miniDSP (slot, input, mute) and the receiver, listens to the mic for a second, and checks the Pi's HDMI, without playing anything or changing anything. On the Pi, <code>subtune smoke</code> does the same from a terminal.</li>
   <li><b>A test hears nothing</b>: is the receiver on, unmuted and on the right input? For Pi HDMI, the receiver should show a PCM signal while the test plays.</li>
   <li><b>"Another step is running"</b>: wait, or press Stop in the header.</li>
   <li><b>Live EQ won't send</b>: the miniDSP must be playing htTamer's slot (Tunes &amp; slots), and nothing else may be running.</li>
@@ -159,3 +164,6 @@
   <dt>All-pass filter</dt><dd>A filter that shifts phase around one frequency without changing level, used to line up subs and speakers.</dd>
   <dt>Headroom</dt><dd>How much louder something can go before it distorts or clips.</dd>
 </dl>
+
+<h2 id="m-license">License</h2>
+<p>htTamer is source-available under the <a href="https://polyformproject.org/licenses/noncommercial/1.0.0" target="_blank" rel="noopener">PolyForm Noncommercial License 1.0.0</a>: anyone may use, change and share it for non-commercial purposes. Commercial use needs separate permission from the copyright holder. Third-party parts (numpy, scipy, sounddevice, the anthropic SDK, minidsp-rs) keep their own licenses.</p>

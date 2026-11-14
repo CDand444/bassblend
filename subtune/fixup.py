@@ -44,24 +44,32 @@ def run(pos=1, mode="dlna", log=None, status=None, avr_input=None):
     err = before.get("bass_vs_target_db") or 0.0
     o = avr.Onkyo()
     cur = o.status().get("sub_level")
+    measured = (before.get("avr") or {}).get("sub_level")      # the level the report heard, not today's
     if abs(err) < 1:
         steps.append({"step": "Subwoofer level", "done": False, "text": f"Already within {abs(err):.1f} dB of your target: left as it is."})
     elif cur is None:
         steps.append({"step": "Subwoofer level", "done": False, "text": "Couldn't read the receiver's sub level (is it on?): skipped."})
+    elif measured is None:
+        steps.append({"step": "Subwoofer level", "done": False, "text": "This report doesn't record the sub level it was "
+                      "measured at, so htTamer can't work out an exact setting: run a new system report first. Skipped."})
     else:
         change = min(-round(err * 2) / 2, RAISE_MAX)
         lo, hi = avr.SUB_LEVEL_RANGE
-        to = max(lo, min(hi, cur + change))
+        to = max(lo, min(hi, float(measured) + change))         # absolute target from the measurement
         from . import fixlog
-        ok, why = fixlog.sub_level_check(cur, to)
-        if not ok:
+        ok, why = (True, "") if abs(to - cur) < 0.25 else fixlog.sub_level_check(cur, to)
+        if abs(to - cur) < 0.25:
+            steps.append({"step": "Subwoofer level", "done": False,
+                          "text": f"Already at {to:+.1f} dB, the level this report asks for (measured at {measured:+.1f} dB)."})
+        elif not ok:
             steps.append({"step": "Subwoofer level", "done": False, "text": why})
         else:
             o.set_sub_level(to)
             fixlog.note_sub_level(cur, to, "fix")
             log("avr", f"fix: subwoofer level {cur:+.1f} -> {to:+.1f} dB (bass was {err:+.1f} dB vs target)")
             steps.append({"step": "Subwoofer level", "done": True, "from": cur, "to": to,
-                          "text": f"Receiver sub level {cur:+.1f} → {to:+.1f} dB (the bass was {err:+.1f} dB against your target)."})
+                          "text": f"Receiver sub level {cur:+.1f} → {to:+.1f} dB (the report measured the bass {err:+.1f} dB "
+                                  f"against your target at {measured:+.1f} dB)."})
             time.sleep(1.0)
 
     # 2. blend subs with the front speakers

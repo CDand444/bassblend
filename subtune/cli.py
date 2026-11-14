@@ -268,6 +268,14 @@ def cmd_liveeq(a):
         raise
 
 
+def cmd_smoke(a):
+    from . import smoke
+    r = smoke.run()
+    for c in r["checks"]:
+        print(f"{c['status'].upper():5} {c['name']:9} {c['detail']}")
+    sys.exit(0 if r["status"] == "ok" else 1)
+
+
 def cmd_liveeq_bake(a):
     from . import liveeq
     with busy("save live EQ into a tune"):
@@ -656,6 +664,7 @@ def main(argv=None):
     s.add_argument("--speed", choices=["fast", "normal", "slow"], default="normal")
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_liveeq)
+    sp.add_parser("smoke", help="silent hardware check: miniDSP, receiver, mic, Pi HDMI, storage").set_defaults(fn=cmd_smoke)
     s = sp.add_parser("liveeq-bake", help="save the live EQ bands into a new tune and apply it")
     s.set_defaults(fn=cmd_liveeq_bake)
     a = p.parse_args(argv)

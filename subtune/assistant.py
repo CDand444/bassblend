@@ -129,15 +129,15 @@ when this is available, and don't speculate about whether fixes stacked: the log
 don't propose another blend fix or sub level nudge; offer exactly two ways out: keep_fixes (accept what's \
 playing) or undo_fixes and then measure the blend at 2-3 seats. If "Receiver sub level now" differs from what \
 htTamer set, say plainly the receiver changed it (an input change resets a temporary sub level on Onkyo).
-- Live EQ (get_live_eq, set_live_eq, start_live_analyzer, stop_live_analyzer, save_live_eq): the owner's own bands \
-in the miniDSP bands the playing tune leaves free, applied to every sub, sent in under a second. When asked to EQ \
-automatically ("auto EQ", "fix that peak", "tune it by ear with the mic"): (1) if the analyzer isn't running, start it \
-(approval; mic at the MLP unless told otherwise); (2) get_live_eq with wait_s 0; check snr_db >= 10 (else ask the \
-owner to raise the volume a little); (3) cut the biggest peak above the goal inside the tuned band: fc = the peak, \
-gain = minus most of the excess (cuts only, -1 to -10 dB), Q 3-8 for a narrow room mode, 1-2 for a broad hump; \
-(4) set_live_eq with ALL bands (it replaces the list), then get_live_eq with wait_s 4 and compare rms_vs_goal_db; \
-nudge fc/gain/Q of the band you just set, or keep it and move to the next peak. Stop when rms_vs_goal_db stops \
-improving by 0.2 dB, the bands are used up, or after about 8 changes. Rules: cut, don't boost (never boost a dip \
+- Live EQ (get_live_eq, fit_live_eq, set_live_eq, start_live_analyzer, stop_live_analyzer, save_live_eq): the \
+owner's own bands in the miniDSP bands the playing tune leaves free, applied to every sub, sent in under a second. \
+When asked to EQ automatically ("auto EQ", "fix that peak"): (1) if the analyzer isn't running, start it (approval; \
+mic at the MLP unless told otherwise); (2) get_live_eq with wait_s 0; check snr_db >= 10 (else ask the owner to raise \
+the volume a little); (3) run fit_live_eq (htTamer's own fitter: repeatable, cut-only), then get_live_eq with wait_s 4 \
+and check the measured rms_vs_goal_db got close to what the fit expected; (4) if it didn't (the room didn't behave \
+like the prediction), run fit_live_eq once more (it refines). Only hand-tune with set_live_eq when the owner asks for \
+something specific (it replaces the whole list: send ALL bands), checking with get_live_eq wait_s 4 after each \
+change. Stop after the fit settles or about 6 changes. Rules: cut, don't boost (never boost a dip \
 narrower than an octave: those are cancellations EQ can't fill; at most +3 dB for a broad shelf-like shortfall, \
 never below protect_hz); keep peak_db at or below 0; don't chase below 20 Hz or above the tuned band. Report in \
 two or three lines: what you set and the before/after rms. Then offer to save_live_eq (approval) or to leave the \
@@ -319,6 +319,10 @@ TOOLS = [
                                              "required": ["fc", "q", "gain_db", "on"]}},
         "bypass": {"type": "boolean", "description": "true = keep the bands but switch them off (A/B)"}},
        ["bands", "bypass"]),
+    _t("fit_live_eq", "htTamer's built-in auto-fit: from the running analyzer's latest curve it works out cut-only "
+       "bands (as many free bands as help) that bring the response closest to the goal, and sends them to the miniDSP. "
+       "Running it again refines (the bands that were playing are taken out first). Returns the bands and the expected "
+       "before/after RMS against the goal. Needs the analyzer running."),
     _t("start_live_analyzer", "Start the live analyzer: plays soft bass noise (15-200 Hz) through the receiver until "
        "stopped (max 10 minutes), after setting the volume with the guarded auto-level; the mic's response then shows "
        "in get_live_eq. Needs the mic at the seat being EQ'd (normally the MLP).",

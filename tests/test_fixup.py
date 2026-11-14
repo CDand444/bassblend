@@ -22,8 +22,9 @@ from subtune.state import load_state, update_state                 # noqa: E402
 LR_OK = {"level_db": 0.2, "timing_ms": 0.05, "timing_cm": 1.7, "polarity": "same", "tone_spread_db": 1.0, "polarity_corr": 0.8, "both_gain_bass_db": 5.5}
 
 
-def report(bass=4.2, lr=None, t=1000.0, fix=2, watch=3):
+def report(bass=4.2, lr=None, t=1000.0, fix=2, watch=3, measured=None):
     return {"t": t, "pos": 1, "bass_vs_target_db": bass, "lr": lr or LR_OK, "treble_tilt_db": -4.5,
+            "avr": {"sub_level": measured},
             "areas": {"bass": {"label": "Bass", "status": "fix"}}, "findings": [{"status": "fix"}] * fix + [{"status": "watch"}] * watch}
 
 
@@ -38,7 +39,7 @@ class Rx:
         self.calls.append(db); self.sub = db
 
 
-def run_fix(bass, sub, blend, apply_raises=None):
+def run_fix(bass, sub, blend, apply_raises=None, measured="same"):
     update_state(fix_ledger=None)                  # each run starts its own round of fixes
     rx = Rx(sub)
     applied = []
@@ -53,7 +54,7 @@ def run_fix(bass, sub, blend, apply_raises=None):
             raise SystemExit(apply_raises)
         applied.append(ns.multi); update_state(result={"tune_name": "Blend fix", "slot": 3})
     cli.cmd_avrapply = apply
-    update_state(deep_reports={"1": report(bass=bass)})
+    update_state(deep_reports={"1": report(bass=bass, measured=sub if measured == "same" else measured)})
     try:
         r = fixup.run(1, log=lambda *a, **k: None, status=lambda t: None)
     finally:
@@ -68,6 +69,16 @@ def test_lowers_sub_level_and_applies_a_helpful_blend():
     assert r["before"]["bass_vs_target_db"] == 4.2 and r["after"]["bass_vs_target_db"] == 0.4
     assert r["still_to_do"] == ["Increase the Left speaker's distance by 1.4 ft"]
     assert load_state()["fix_result"]["t"] == r["t"]
+
+
+def test_sub_level_target_comes_from_the_report_not_todays_setting():
+    blend = {"loss_now_db": 0.5, "loss_best_db": 0.4, "delay_ms": 0.0, "invert": False}
+    _, rx, _ = run_fix(2.0, -13.0, blend, measured=-9.0)        # measured at -9; someone moved it to -13 since
+    assert rx.calls == [-11.0], rx.calls                        # -9 - 2, not -13 - 2
+    _, rx, _ = run_fix(2.0, -11.0, blend, measured=-9.0)        # pressing Fix again: already there
+    assert rx.calls == [], rx.calls
+    r, rx, _ = run_fix(2.0, -11.0, blend, measured=None)        # an old report without the level: no guessing
+    assert rx.calls == [] and "new system report" in r["steps"][0]["text"]
 
 
 def test_raises_at_most_three_db():

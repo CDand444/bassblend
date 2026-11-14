@@ -58,11 +58,8 @@ def get(st=None) -> dict:
 
 
 def _save(**kw):
-    from .state import update_state
-    le = get()
-    le.update(kw)
-    update_state(live_eq=le)
-    return le
+    from .state import modify_state
+    return modify_state("live_eq", lambda old: {**get({"live_eq": old}), **kw})
 
 
 def used_bands(result: dict) -> int:
@@ -240,6 +237,94 @@ def tune_applied():
     le = get()
     if le["active"]:
         _save(active=False, bypass=False, note="Applying a tune switched the live EQ off; your bands are kept.")
+
+
+# ------------------------------------------------------------------ auto-fit
+FIT_MAX_CUT = 12.0
+FIT_Q = (0.7, 10.0)
+FIT_MIN_EXCESS = 1.5        # dB above the goal before a peak is worth a band
+FIT_MIN_GAIN = 0.2          # dB of RMS a new band must win
+
+
+def _fit_rms(err, w):
+    return float(np.sqrt(np.sum(w * err ** 2) / np.sum(w)))
+
+
+def autofit(f, db, goal, band, n_bands, live_now=None, protect=None):
+    """Cut-only peaking bands that bring the measured curve closest to the goal in the tuned band.
+
+    f, db, goal: the analyzer's curve (any common level). live_now: the bands that were on the
+    miniDSP while it was measured; their effect is taken out first, so pressing Auto-fit again
+    refines instead of stacking. Returns {"bands", "rms_before", "rms_after", "peaks_left"}."""
+    from scipy.optimize import least_squares
+    f, db, goal = np.asarray(f, float), np.asarray(db, float), np.asarray(goal, float)
+    native = db - (response_db(live_now, f) if live_now else 0.0)
+    m = (f >= band[0]) & (f <= band[1])
+    fm, w = f[m], np.ones(int(m.sum()))
+    base = native[m] - goal[m]
+
+    def err(bands_flat, k):
+        e = base.copy()
+        for i in range(k):
+            fc, q, g = bands_flat[3 * i:3 * i + 3]
+            e = e + response_db([{"fc": fc, "q": q, "gain_db": g}], fm)
+        return e - np.average(e, weights=w)               # overall level belongs to the sub level, not EQ
+
+    meas = db[m] - goal[m]
+    measured_rms = _fit_rms(meas - np.average(meas, weights=w), w)   # as heard, with the bands that were on
+    x = np.zeros(0)
+    cur = _fit_rms(err(x, 0), w)
+    rms0 = cur
+    for k in range(1, n_bands + 1):
+        e = err(x, k - 1)
+        taken = [x[3 * i] for i in range(k - 1)]
+        cand = [i for i in np.argsort(-e) if e[i] >= FIT_MIN_EXCESS
+                and all(abs(np.log2(fm[i] / t)) > 1 / 6 for t in taken)]
+        if not cand:
+            break
+        i = cand[0]
+        half = e[i] / 2                                    # width at half the excess -> starting Q
+        lo = i
+        while lo > 0 and e[lo] > half: lo -= 1
+        hi = i
+        while hi < len(e) - 1 and e[hi] > half: hi += 1
+        q0 = float(np.clip(fm[i] / max(fm[hi] - fm[lo], 1e-3), *FIT_Q))
+        x0 = np.concatenate([x, [fm[i], q0, -min(FIT_MAX_CUT, float(e[i]))]])
+        lob = np.tile([band[0], FIT_Q[0], -FIT_MAX_CUT], k)
+        hib = np.tile([band[1], FIT_Q[1], 0.0], k)
+        x0 = np.clip(x0, lob + 1e-6, hib - 1e-6)
+        r = least_squares(lambda v: err(v, k) * np.sqrt(w), x0, bounds=(lob, hib), max_nfev=400)
+        new = _fit_rms(err(r.x, k), w)
+        if cur - new < FIT_MIN_GAIN:
+            break
+        x, cur = r.x, new
+    bands = [{"fc": round(float(x[3 * i]), 1), "q": round(float(x[3 * i + 1]), 2),
+              "gain_db": round(float(x[3 * i + 2]), 1), "on": True} for i in range(len(x) // 3)]
+    bands = [b for b in bands if b["gain_db"] <= -0.3]
+    if protect:                                            # cuts only, but keep the rule in one place
+        bands = [b for b in bands if not (b["gain_db"] > 0 and b["fc"] < protect)]
+    final = err(np.array([v for b in bands for v in (b["fc"], b["q"], b["gain_db"])]), len(bands))
+    return {"bands": sorted(bands, key=lambda b: b["fc"]), "rms_before": round(rms0, 2),
+            "rms_after": round(_fit_rms(final, w), 2), "measured_rms": round(measured_rms, 2),
+            "peaks_left": [round(float(fm[i]), 1) for i in np.where(final >= FIT_MIN_EXCESS + 1)[0]][:5]}
+
+
+def fit_now() -> dict:
+    """Auto-fit from the running analyzer's latest curve and the bands that were playing."""
+    cur, _ = target_slot()
+    r = read_rta()
+    if not r or not r.get("db"):
+        raise RuntimeError("start the analyzer first: auto-fit works from the live curve")
+    if r.get("snr_db") is not None and r["snr_db"] < 10:
+        raise RuntimeError(f"the noise is only {r['snr_db']:.0f} dB above the room; raise the volume a little first")
+    le = get()
+    playing = [b for b in le["bands"] if b.get("on", True)] if le["active"] and not le["bypass"] else []
+    n = min(MAX_BANDS, len(slots_for(cur)))
+    if not n:
+        raise RuntimeError("the playing tune leaves no free EQ bands")
+    out = autofit(r["f"], r["db"], r["goal"], r["band"], n, playing, protect_hz(cur))
+    out["n_slots"] = n
+    return out
 
 
 # ------------------------------------------------------------------ analyzer
