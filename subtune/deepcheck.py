@@ -115,6 +115,69 @@ def response(ir, anchor, length=0.3, pre=0.005):
     return frac_smooth(f[1:], np.abs(H[1:]) ** 2, FG, 6)
 
 
+def complex_response(ir, anchor, length=0.3, pre=0.005):
+    """Complex response on FG with time zero at `anchor` (the direct sound), for phase views."""
+    a = anchor - int(pre * FS)
+    seg = np.take(ir, np.arange(a, a + int((pre + length) * FS)), mode="wrap").copy()
+    nt = int(0.3 * len(seg))
+    seg[-nt:] *= np.cos(np.linspace(0, np.pi / 2, nt)) ** 2
+    n = 1 << 16
+    buf = np.zeros(n)
+    k = int(pre * FS)
+    buf[:len(seg) - k] = seg[k:]
+    buf[-k:] = seg[:k]
+    H = np.fft.rfft(buf)
+    f = np.fft.rfftfreq(n, 1 / FS)
+    # 1/6-octave complex averaging keeps phase readable in a reflective room
+    out = np.empty(len(FG), complex)
+    lo = np.searchsorted(f, FG * 2 ** (-1 / 12))
+    hi = np.searchsorted(f, FG * 2 ** (1 / 12))
+    for i, (x0, x1) in enumerate(zip(lo, hi)):
+        out[i] = H[x0:x1].mean() if x1 > x0 else np.interp(FG[i], f, H.real) + 1j * np.interp(FG[i], f, H.imag)
+    return out
+
+
+def pro_views(ir, d):
+    """Phase, group delay, impulse/step response and a bass waterfall, compact enough to store."""
+    out = {"phase_deg": {}, "group_delay_ms": {}}
+    w = 2 * np.pi * FG
+    for k in ("left", "right", "both"):
+        H = complex_response(ir, d[k])
+        ph = np.unwrap(np.angle(H))
+        out["phase_deg"][k] = np.degrees(np.angle(np.exp(1j * ph))).round(0)[::2].tolist()
+        gd = -np.gradient(ph, w) * 1000
+        k3 = 5
+        gd = np.convolve(np.pad(gd, k3 // 2, mode="edge"), np.ones(k3) / k3, mode="valid")
+        out["group_delay_ms"][k] = np.clip(gd, -50, 200).round(2)[::2].tolist()
+    out["grid2"] = FG[::2].round(2).tolist()
+    # impulse and step: 2 ms before to 40 ms after the direct sound of 'both', every 2nd sample
+    a, b = d["both"] - int(0.002 * FS), d["both"] + int(0.040 * FS)
+    seg = ir[a:b]
+    pk = float(np.max(np.abs(seg))) or 1.0
+    out["impulse"] = {"t0_ms": -2.0, "dt_ms": round(2000.0 / FS, 5), "both": (seg / pk)[::2].round(3).tolist()}
+    st = np.cumsum(seg)
+    out["step"] = (st / (np.max(np.abs(st)) or 1.0))[::2].round(3).tolist()
+    # cumulative spectral decay of the bass (both speakers + subs): 0-300 ms in 20 ms slices
+    fq = FG[(FG >= 20) & (FG <= 300)][::2]
+    base = d["both"] - int(0.005 * FS)
+    win = int(0.5 * FS)
+    rows = []
+    for t_ms in range(0, 320, 20):
+        a0 = base + int(t_ms / 1000 * FS)
+        seg = np.take(ir, np.arange(a0, a0 + win), mode="wrap").copy()
+        r0 = int(0.002 * FS)
+        seg[:r0] *= np.sin(np.linspace(0, np.pi / 2, r0)) ** 2
+        seg[-int(0.3 * win):] *= np.cos(np.linspace(0, np.pi / 2, int(0.3 * win))) ** 2
+        n = 1 << 16
+        Hs = np.fft.rfft(seg, n)
+        f = np.fft.rfftfreq(n, 1 / FS)
+        rows.append(frac_smooth(f[1:], np.abs(Hs[1:]) ** 2, fq, 12))
+    rows = np.array(rows)
+    out["waterfall"] = {"f": fq.round(1).tolist(), "t_ms": list(range(0, 320, 20)),
+                        "db": np.clip(rows - rows.max(), -45, 0).round(1).tolist()}
+    return out
+
+
 def direct_arrival(ir, rough, span=0.06):
     """Sample index of the direct sound (high-passed, so the subs don't pull it later)."""
     a, b = max(0, rough - int(span * FS)), rough + int(span * FS)
@@ -300,9 +363,84 @@ def analyse(rec, t_start, cal=None, settings=None, system=None):
     # the speakers' natural in-room treble slope, as dB at 20 kHz (Dirac target "measured")
     hi = band_mean(FG, norm["avg"], 8000, 12000) - band_mean(FG, norm["avg"], 1000, 2000)
     r["treble_tilt_db"] = round(float(np.clip(hi * np.log(20) / np.log(10), -8.0, 0.0)), 1)
+    try:
+        r["pro"] = pro_views(ir, d)
+    except Exception as e:                         # noqa: BLE001 - the extra views must never cost the report
+        r["pro"] = {"error": str(e)}
+    r["curves_raw"] = {k: resp[k].round(1).tolist() for k in ("left", "right", "both")}     # dB SPL, for REW export
     r["findings"] = findings(r, dev, norm)
     r["areas"] = area_status(r["findings"])
     return r
+
+
+def combine(reports: list[dict]) -> dict | None:
+    """Average several spots' reports (power average of the normalised curves): the tonal balance
+    over the listening area, which treble readings at one spot can't give. Also says how much each
+    pitch varies from spot to spot, and which peaks/dips only showed at one spot."""
+    reps = [r for r in reports if r.get("curves") and r.get("target")]
+    if len(reps) < 2:
+        return None
+    grid = np.array(reps[0]["grid"])
+    tgt = np.array(reps[0]["target"])
+    pw = lambda key: np.array([10 ** (np.array(r["curves"][key]) / 10) for r in reps])
+    avg_lr = [10 * np.log10((10 ** (np.array(r["curves"]["left"]) / 10) + 10 ** (np.array(r["curves"]["right"]) / 10)) / 2) for r in reps]
+    norm = {k: 10 * np.log10(pw(k).mean(0)) for k in ("left", "right", "both")}
+    norm["avg"] = 10 * np.log10(np.mean([10 ** (a / 10) for a in avg_lr], 0))
+    for k in norm:                                   # re-centre the mids at 0 dB
+        norm[k] = norm[k] - band_mean(grid, norm[k], 500, 2000)
+    dev = {k: norm[k] - tgt for k in norm}
+    spread = np.std(np.array(avg_lr), 0)
+    bands = []
+    for key, label, lo, hi in BANDS:
+        m = (grid >= lo) & (grid < hi)
+        bands.append({"key": key, "label": label, "lo": lo, "hi": hi,
+                      **{k: {"vs_target_db": round(float(np.mean(dev[k][m])), 1), "rough_db": round(float(np.std(dev[k][m] - np.mean(dev[k][m]))), 1)}
+                         for k in ("left", "right", "both", "avg")},
+                      "spot_spread_db": round(float(np.mean(spread[m])), 1)})
+    b = {x["key"]: x["avg"] for x in bands}
+    fs = tonal_findings(b, bass_extension(grid, norm["avg"]))
+    pd = peaks_dips(dev, norm)
+    single = {}
+    for r in reps:                                   # peaks/dips seen at one spot only
+        for f in r["findings"]:
+            if f.get("kind"):
+                single.setdefault((f["kind"], round(np.log2(f["f"]) * 6)), []).append(r["pos"])
+    for f in pd:
+        seen = single.get((f["kind"], round(np.log2(f["f"]) * 6)), [])
+        f["spots"] = sorted(set(seen))
+    local = [dict(fl, status="info", title=fl["title"] + f" (spot {r['pos']} only)",
+                  todo="It doesn't show in the average over your spots: probably that mic position, not the room. Don't EQ it.")
+             for r in reps for fl in r["findings"]
+             if fl.get("kind") and fl["f"] >= 500 and not any(abs(np.log2(fl["f"] / q["f"])) < 1 / 6 for q in pd)]
+    fs += pd + local[:4]
+    seat = float(np.mean(spread[(grid >= 30) & (grid < 120)]))
+    fs.append(_f("bass", "good" if seat < 3 else "watch" if seat < 5 else "fix",
+                 f"Bass varies {seat:.1f} dB between your spots",
+                 f"From spot to spot the bass (30-120 Hz) differs by about ±{seat:.1f} dB on average.",
+                 "The more even, the more every seat sounds like the best one.",
+                 "" if seat < 3 else "Measure the blend at each seat and let BassBlend find one setting for all; sub placement "
+                                     "changes this the most."))
+    out = {"t": max(r["t"] for r in reps), "spots": sorted(r["pos"] for r in reps), "grid": grid.tolist(),
+           "curves": {k: v.round(1).tolist() for k, v in norm.items() if k != "avg"}, "target": tgt.tolist(),
+           "spread_db": spread.round(1).tolist(), "bands": bands, "findings": fs}
+    out["findings"].sort(key=lambda x: (-RANK[x["status"]], AREAS.index(next(a for a in AREAS if a[0] == x["area"]))))
+    out["areas"] = area_status(out["findings"])
+    return out
+
+
+def rew_text(r, ch="both"):
+    """A REW-importable text file: frequency, SPL (dB), phase (degrees)."""
+    grid = r["grid"]
+    spl = (r.get("curves_raw") or {}).get(ch) or [v + r["spl_ref"].get(ch, 0) for v in r["curves"][ch]]
+    pro = r.get("pro") or {}
+    g2 = pro.get("grid2") or grid
+    ph = (pro.get("phase_deg") or {}).get(ch)
+    phase = np.interp(np.log(grid), np.log(g2), ph) if ph else np.zeros(len(grid))
+    lines = [f"* BassBlend system report, {ch} speaker(s), spot {r.get('pos', 1)}",
+             f"* Measured {time.strftime('%Y-%m-%d %H:%M', time.localtime(r['t']))}; 1/6-octave smoothed; calibrated mic",
+             "* Freq(Hz) SPL(dB) Phase(degrees)"]
+    lines += [f"{f:.3f} {s:.2f} {p:.1f}" for f, s, p in zip(grid, spl, phase)]
+    return "\n".join(lines) + "\n"
 
 
 def receiver_advice(r, sub_level=None, dirac_on=False):
@@ -414,8 +552,13 @@ def peaks_dips(dev, norm):
 
 
 def findings(r, dev, norm):
-    out = []
     b = {x["key"]: x["avg"] for x in r["bands"]}
+    out = tonal_findings(b, r["bass_extension_hz"])
+    return _more_findings(out, r, dev, norm)
+
+
+def tonal_findings(b, ext):
+    out = []
     # tonal balance
     bass_v = (b["bass"]["vs_target_db"] + b["deep_bass"]["vs_target_db"]) / 2
     if bass_v > 4:
@@ -429,7 +572,6 @@ def findings(r, dev, norm):
     else:
         out.append(_f("bass", "good", "Bass level matches your target",
                       f"The bass sits within {abs(bass_v):.0f} dB of your target curve.", "Balanced bass supports everything without covering it.", ""))
-    ext = r["bass_extension_hz"]
     out.append(_f("bass", "good" if ext <= 25 else "watch" if ext <= 35 else "info",
                   f"Plays down to about {ext:.0f} Hz",
                   f"Your system stays within 6 dB of the midrange down to {ext:.0f} Hz.",
@@ -454,6 +596,10 @@ def findings(r, dev, norm):
                       "Less toe-in, a rug or curtains at the side walls, or a steeper treble target in Dirac."))
     else:
         out.append(_f("highs", "good", "Treble is balanced", "The upper mids and highs follow your target.", "", ""))
+    return out
+
+
+def _more_findings(out, r, dev, norm):
     pd = peaks_dips(dev, norm)
     strong_refl = [x for x in r["reflections"]["left"] + r["reflections"]["right"] if x["db"] > -6 and x["ms"] < 6]
     if strong_refl:

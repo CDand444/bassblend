@@ -221,6 +221,48 @@ def test_restore_puts_volume_back_before_standby():
         _t.sleep = real
 
 
+def test_pro_views():
+    r = report(L={"refl": (2.0, -3.0)}, r_late_ms=0.0)
+    pro = r["pro"]
+    assert "error" not in pro, pro
+    gd = np.array(pro["group_delay_ms"]["left"]); g2 = np.array(pro["grid2"])
+    m = (g2 > 1000) & (g2 < 8000)
+    assert abs(np.median(gd[m])) < 1.0, np.median(gd[m])          # direct sound at time zero: ~0 ms group delay up high
+    imp = np.array(pro["impulse"]["both"])
+    t0 = int(round(2.0 / pro["impulse"]["dt_ms"]))
+    assert np.argmax(np.abs(imp)) in range(t0 - 3, t0 + 4) and abs(imp.max()) == 1.0
+    wf = np.array(pro["waterfall"]["db"])
+    assert wf.shape == (len(pro["waterfall"]["t_ms"]), len(pro["waterfall"]["f"])) and wf.max() == 0
+    assert wf[-1].mean() < wf[0].mean() - 10, "a dry room decays"
+
+
+def test_resonance_rings_in_the_waterfall():
+    dry, ring = report(), report(L={"mode": (50, 12, 12)}, R={"mode": (50, 12, 12)})
+    def late_at(r, f):
+        w = r["pro"]["waterfall"]; i = int(np.argmin(np.abs(np.array(w["f"]) - f)))
+        return w["db"][5][i]                                          # 100 ms later
+    assert late_at(ring, 50) > late_at(dry, 50) + 10, (late_at(ring, 50), late_at(dry, 50))
+
+
+def test_combine_spots_and_spot_only_findings():
+    a = dict(report(L={"mode": (50, 8, 5)}, R={"mode": (50, 8, 5)}), pos=1)
+    b = dict(report(L={"mode": (50, 8, 5), "refl": (0.5, -2.0)}, R={"mode": (50, 8, 5)}), pos=2)
+    c = dc.combine([a, b])
+    assert c["spots"] == [1, 2] and len(c["spread_db"]) == len(c["grid"])
+    boom = [f for f in c["findings"] if f.get("kind") == "peak" and 45 < f["f"] < 56]
+    assert boom and boom[0]["spots"] == [1, 2], [(f["title"], f.get("spots")) for f in c["findings"]]
+    assert any("Bass varies" in f["title"] for f in c["findings"])
+    assert dc.combine([a]) is None
+
+
+def test_rew_export():
+    r = dict(R_CLEAN, pos=1)
+    txt = dc.rew_text(r, "left")
+    lines = [ln for ln in txt.splitlines() if not ln.startswith("*")]
+    f, spl, ph = map(float, lines[10].split())
+    assert len(lines) == len(r["grid"]) and 20 < f < 30 and 40 < spl < 130 and -180 <= ph <= 180
+
+
 def test_receiver_processing_read_flattened_and_restored():
     import time as _t
     from subtune import avr

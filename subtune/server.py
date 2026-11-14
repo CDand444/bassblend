@@ -1068,6 +1068,12 @@ class H(BaseHTTPRequestHandler):
                 print(f"[coach] {e}", flush=True)
             from . import journal
             st["journal"] = journal.recent(25)
+            if len(st.get("deep_reports") or {}) >= 2:
+                from . import deepcheck
+                try:
+                    st["deep_combined"] = deepcheck.combine(list(st["deep_reports"].values()))
+                except Exception as e:                   # noqa: BLE001
+                    print(f"[combine] {e}", flush=True)
             st["ai_api"] = st["ai_key"] is not None
             from . import version
             st["version"] = version()
@@ -1117,6 +1123,20 @@ class H(BaseHTTPRequestHandler):
             return
         if u.path == "/api/events":
             return self._send(200, _events(float(q.get("since", ["0"])[0])))
+        if u.path == "/api/report/rew":                  # REW-importable text: freq, SPL, phase
+            from . import deepcheck
+            pos, ch = q.get("pos", ["1"])[0], q.get("ch", ["both"])[0]
+            r = (load_state().get("deep_reports") or {}).get(pos)
+            if not r or ch not in ("left", "right", "both"):
+                return self._send(404, {"error": "no such report"})
+            data = deepcheck.rew_text(r, ch).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.send_header("Content-Disposition", f'attachment; filename="bassblend_spot{pos}_{ch}.txt"')
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if u.path == "/api/vendors":
             from . import vendors
             return self._send(200, vendors.catalog_view())

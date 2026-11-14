@@ -2255,7 +2255,9 @@ function renderDeep() {
   $('#dcRun').disabled = !!job.running || !!S.busy;
   $('#dcRun').textContent = running ? 'Running…' : Object.keys(reps).length ? 'Run again' : 'Run system report';
   const latest = deepLatest();
-  if (dcSel == null || !reps[dcSel]) dcSel = latest ? String(latest.pos) : null;
+  const comb = S.deep_combined;
+  if (dcSel == null || (!reps[dcSel] && !(dcSel === 'all' && comb))) dcSel = latest ? String(latest.pos) : null;
+  if (dcSel === 'all' && comb) { $('#dcPrint').hidden = true; renderFix(null, running); return renderCombined(comb, running, ds); }
   const r = dcSel ? reps[dcSel] : null;
   $('#dcPrint').hidden = !r || running;
   renderFix(r, running);
@@ -2267,12 +2269,16 @@ function renderDeep() {
   else if (ds.error) h += `<div class="notice bad">The last run stopped: ${esc(ds.error)}</div>`;
   if (!r) { $('#dcOut').innerHTML = h + (running ? '' : empty('No system report yet', 'Put the mic at your seat at ear height, pointing up, then press Run system report.')); return; }
   if (Object.keys(reps).length > 1) h += `<div class="seg" id="dcSpots" style="margin-bottom:12px"></div>`;
+  else h += `<p class="muted small" style="margin:0 0 10px">Tip: run the report at 2–3 more spots around your seats (move the mic about a foot each time) to see the average over your listening area.</p>`;
   h += `<div class="dc-areas">${Object.entries(r.areas).map(([k, a]) => `<div class="dc-area"><div class="top"><span class="light ${DC_LIGHT[a.status]}"></span>${esc(a.label)}</div>
     <div class="w">${a.fix ? a.fix + ' to fix' : a.watch ? a.watch + ' to look at' : a.status === 'info' ? 'not measured' : 'All good'}</div></div>`).join('')}</div>`;
   const lv = r.level;
   const hist = (S.deep_history || []).filter(x => x.pos === r.pos && Math.abs(x.t - r.t) > 1);
-  h += `<div class="row" style="margin:0 0 4px"><h3 class="dc-h" style="margin:0">Frequency response</h3><span class="grow"></span>${hist.length ? `<label class="f" style="flex-direction:row;align-items:center;gap:6px">Compare with<select id="dcCmp"><option value="">nothing</option>${hist.slice().reverse().map(x => `<option value="${x.t}" ${String(x.t) === String(dcCmp) ? 'selected' : ''}>${esc(new Date(x.t * 1000).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'}))}${x.label ? ' · ' + esc(x.label) : ''}</option>`).join('')}</select></label>` : ''}</div>`;
-  h += `<p class="hint muted small" style="margin:0 0 6px">How loud each pitch arrives at your seat, against your target (dashed). The midrange is set to 0 dB so the shapes compare. Dotted lines split the ranges in the table below (deep bass, bass, low mids, mids, upper mids, highs). Above about 5 kHz the exact mic position matters a lot.</p>
+  const pro = r.pro && !r.pro.error;
+  h += `<div class="row" style="margin:0 0 6px;gap:8px"><div class="seg" id="dcView">${DC_VIEWS.filter(v => v[0] === 'resp' || pro).map(([k, n]) => `<button type="button" data-k="${k}" class="${k === dcView ? 'on' : ''}">${n}</button>`).join('')}</div>
+    <span class="grow"></span><span class="muted small">Export for REW: ${['left', 'right', 'both'].map(c => `<a href="/api/report/rew?pos=${r.pos}&ch=${c}" download>${c}</a>`).join(' · ')}</span></div>`;
+  h += `<div class="row" style="margin:0 0 4px"><h3 class="dc-h" style="margin:0" id="dcViewTitle">Frequency response</h3><span class="grow"></span>${hist.length ? `<label class="f" style="flex-direction:row;align-items:center;gap:6px">Compare with<select id="dcCmp"><option value="">nothing</option>${hist.slice().reverse().map(x => `<option value="${x.t}" ${String(x.t) === String(dcCmp) ? 'selected' : ''}>${esc(new Date(x.t * 1000).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'}))}${x.label ? ' · ' + esc(x.label) : ''}</option>`).join('')}</select></label>` : ''}</div>`;
+  h += `<p class="hint muted small" style="margin:0 0 6px" id="dcViewHint">${esc(DC_HINT[dcView])}</p>
     <div class="legend" id="dcLegend"></div><div class="chart dc-chart" id="dcChart"></div>`;
   const ra = r.receiver_advice || [];
   if (ra.length) h += `<h3 class="dc-h" style="margin-top:18px">Receiver settings</h3><ul class="dc-ra">${ra.map(a => `<li class="${a.kind}"><span class="tag">${a.kind === 'auto' ? 'BassBlend can do this' : a.kind === 'menu' ? 'Receiver menu' : 'By hand'}</span>${esc(a.text)}</li>`).join('')}</ul>`;
@@ -2320,12 +2326,90 @@ function renderDeep() {
     <dt>Target curve</dt><dd>The tonal balance you're aiming for: BassBlend's bass lift plus your chosen treble. It's the dashed line.</dd>
     <dt>Signal-to-noise</dt><dd>How far the test was above the room's background noise. Below 15 dB, that part of the result isn't trustworthy.</dd></dl></details>`;
   $('#dcOut').innerHTML = h;
-  if ($('#dcSpots')) tabs($('#dcSpots'), Object.keys(reps).sort(), dcSel, k => spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
+  if ($('#dcSpots')) tabs($('#dcSpots'), Object.keys(reps).sort().concat(comb ? ['all'] : []), dcSel, k => k === 'all' ? 'All spots (average)' : spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
+  if ($('#dcView')) $('#dcView').querySelectorAll('button').forEach(b => b.onclick = () => { dcView = b.dataset.k; dcKey = null; renderDeep(); });
   if ($('#dcCmp')) $('#dcCmp').onchange = e => { dcCmp = e.target.value; dcKey = null; renderDeep(); };
   drawDeepChart(r);
 }
+const DC_VIEWS = [['resp', 'Response'], ['phase', 'Phase'], ['gd', 'Group delay'], ['impulse', 'Impulse'], ['step', 'Step'], ['waterfall', 'Waterfall']];
+const DC_HINT = {
+  resp: 'How loud each pitch arrives at your seat, against your target (dashed). The midrange is set to 0 dB so the shapes compare. Dotted lines split the ranges in the table below. Above about 5 kHz the exact mic position matters a lot.',
+  phase: 'The timing of each pitch, relative to the direct sound (degrees, wrapping at ±180°). Smooth lines are good; sudden jumps sit at cancellations. Left and right should look alike.',
+  gd: 'Group delay: how late each pitch arrives, in milliseconds. Bass naturally lags (the subs, the crossover); a sharp spike marks a resonance that rings. Flat near 0 ms in the treble means the speakers are well timed.',
+  impulse: 'What a single click sounds like at your seat (both speakers): the first spike is the direct sound, later spikes are reflections. A clean, single spike is ideal.',
+  step: 'The click response added up over time: it shows whether the speakers and subs push together (a smooth rise) or fight (wiggles).',
+  waterfall: 'How the bass dies away after the sound stops, from 0 ms (top) to 300 ms (bottom). Darker = louder. Long dark streaks are room resonances that ring.'};
+let dcView = 'resp';
+function renderCombined(c, running, ds) {
+  let h = running ? `<div class="notice"><span class="spin"></span>&nbsp; ${esc(ds.text || 'Working')}</div>` : '';
+  h += `<div class="seg" id="dcSpots" style="margin-bottom:12px"></div>`;
+  h += `<p class="muted small" style="margin:0 0 10px">The average of spots ${c.spots.join(', ')}: what your listening area hears overall. Peaks or dips that only show at one spot are that mic position, not the room.</p>`;
+  h += `<div class="dc-areas">${Object.entries(c.areas).map(([k, a]) => `<div class="dc-area"><div class="top"><span class="light ${DC_LIGHT[a.status]}"></span>${esc(a.label)}</div>
+    <div class="w">${a.fix ? a.fix + ' to fix' : a.watch ? a.watch + ' to look at' : a.status === 'info' ? 'not measured' : 'All good'}</div></div>`).join('')}</div>`;
+  h += `<h3 class="dc-h">Average response</h3><p class="hint muted small" style="margin:0 0 6px">Left/right average over your spots against the target; the dotted lines show how much it varies from spot to spot.</p>
+    <div class="legend" id="dcLegend"></div><div class="chart dc-chart" id="dcChart"></div>`;
+  const order = ['fix', 'watch', 'info', 'good'];
+  h += `<h3 class="dc-h" style="margin-top:18px">What we found over all spots</h3><ul class="dc-fd">${order.flatMap(st => c.findings.filter(x => x.status === st)).map(x => `<li><details>
+    <summary><span class="light ${DC_LIGHT[x.status]}"></span><span><b>${esc(x.title)}</b><small>${esc(x.found)}${x.spots && x.spots.length ? ` (seen at spot ${x.spots.join(', ')})` : ''}</small></span><span class="tag">${DC_WORD[x.status]}</span></summary>
+    ${x.why || x.todo ? `<div class="more">${x.why ? `<div><b>Why it matters:</b> ${esc(x.why)}</div>` : ''}${x.todo ? `<div><b>What you can do:</b> ${esc(x.todo)}</div>` : ''}</div>` : ''}</details></li>`).join('')}</ul>`;
+  h += `<div class="tw" style="margin-top:14px"><table class="dc-tbl"><thead><tr><th>Range (Hz)</th><th>vs target</th><th>Bumpiness</th><th>Spot to spot</th></tr></thead><tbody>${c.bands.map(b => `<tr><td>${esc(b.label)}</td><td>${b.avg.vs_target_db > 0 ? '+' : ''}${b.avg.vs_target_db.toFixed(1)}</td><td>±${b.avg.rough_db.toFixed(1)}</td><td>±${b.spot_spread_db.toFixed(1)}</td></tr>`).join('')}</tbody></table></div>`;
+  $('#dcOut').innerHTML = h;
+  const reps = S.deep_reports || {};
+  tabs($('#dcSpots'), Object.keys(reps).sort().concat(['all']), 'all', k => k === 'all' ? 'All spots (average)' : spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
+  const avg = c.curves.left.map((v, i) => 10 * Math.log10((10 ** (v / 10) + 10 ** (c.curves.right[i] / 10)) / 2));
+  const cl = y => y.map(v => Math.max(v, -30));
+  legend($('#dcLegend'), [{name: 'Average of left and right', color: css('--text'), thick: true}, {name: '± spot-to-spot', color: css('--s1'), dot: true}, {name: 'Your target', color: css('--text-3'), dash: true}]);
+  lineChart($('#dcChart'), [
+    {name: '+ spread', y: cl(avg.map((v, i) => v + c.spread_db[i])), color: css('--s1'), w: 1, dot: true, op: .7},
+    {name: '− spread', y: cl(avg.map((v, i) => v - c.spread_db[i])), color: css('--s1'), w: 1, dot: true, op: .7},
+    {name: 'Average', y: cl(avg), color: css('--text'), w: 2.2},
+    {name: 'Target', y: c.target, color: css('--text-3'), dash: true, w: 1.5}],
+    {x: c.grid, xmin: 20, xmax: 16000, ticks: [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000], aria: 'Average response over all spots'});
+}
+function timeChart(el, t, series, opt = {}) {
+  const W = el.clientWidth, H = el.clientHeight, m = {l: 40, r: 12, t: 12, b: 26};
+  if (W < 80) return;
+  const x0 = t[0], x1 = t[t.length - 1], ys = series.flatMap(s => s.y);
+  const ymax = opt.ymax ?? Math.max(...ys), ymin = opt.ymin ?? Math.min(...ys);
+  const X = v => m.l + (v - x0) / (x1 - x0) * (W - m.l - m.r), Y = v => m.t + (ymax - v) / (ymax - ymin || 1) * (H - m.t - m.b);
+  let g = '';
+  for (let v = Math.ceil(x0 / 5) * 5; v <= x1; v += 5) g += `<line x1="${X(v)}" x2="${X(v)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${X(v)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--text-3)">${v}${v + 5 > x1 ? ' ms' : ''}</text>`;
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--text-3)" opacity=".5"/>`;
+  series.forEach(s => { g += `<path d="${s.y.map((v, i) => (i ? 'L' : 'M') + X(t[i]).toFixed(1) + ',' + Y(v).toFixed(1)).join('')}" fill="none" stroke="${s.color}" stroke-width="${s.w || 1.5}" stroke-linejoin="round"/>`; });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.aria || 'time response')}">${g}</svg>`;
+}
+function waterfallChart(el, w) {
+  const W = el.clientWidth, H = el.clientHeight, m = {l: 48, r: 12, t: 10, b: 26};
+  if (W < 80) return;
+  const nf = w.f.length, nt = w.t_ms.length, x0 = w.f[0], x1 = w.f[nf - 1];
+  const X = f => m.l + Math.log(f / x0) / Math.log(x1 / x0) * (W - m.l - m.r), rowH = (H - m.t - m.b) / nt;
+  let g = '';
+  w.db.forEach((row, ti) => row.forEach((v, fi) => {
+    const xa = fi ? (X(w.f[fi - 1]) + X(w.f[fi])) / 2 : X(w.f[0]), xb = fi < nf - 1 ? (X(w.f[fi]) + X(w.f[fi + 1])) / 2 : X(w.f[nf - 1]);
+    g += `<rect x="${xa.toFixed(1)}" y="${(m.t + ti * rowH).toFixed(1)}" width="${(xb - xa + .6).toFixed(1)}" height="${(rowH + .6).toFixed(1)}" fill="var(--accent)" opacity="${Math.max(0.03, (45 + v) / 45).toFixed(2)}"><title>${w.f[fi]} Hz at ${w.t_ms[ti]} ms: ${v} dB</title></rect>`; }));
+  [20, 30, 50, 100, 200, 300].filter(f => f >= x0 && f <= x1).forEach(f => g += `<text x="${X(f)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--text-3)">${f}${f === 300 ? ' Hz' : ''}</text>`);
+  [0, 100, 200, 300].forEach(t => { const i = w.t_ms.indexOf(t); if (i >= 0) g += `<text x="${m.l - 6}" y="${m.t + (i + .7) * rowH}" text-anchor="end" font-size="11" fill="var(--text-3)">${t} ms</text>`; });
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bass waterfall">${g}</svg>`;
+}
 function drawDeepChart(r) {
   const el = $('#dcChart'); if (!el) return;
+  const pro = r.pro && !r.pro.error ? r.pro : null;
+  if (pro && dcView !== 'resp') {
+    const t = $('#dcViewTitle'); if (t) t.textContent = Object.fromEntries(DC_VIEWS)[dcView];
+    const lrb = key => [{name: 'Left', y: pro[key].left, color: css('--s1'), w: 1.5}, {name: 'Right', y: pro[key].right, color: css('--s2'), w: 1.5}, {name: 'Both', y: pro[key].both, color: css('--text'), w: 2}];
+    if (dcView === 'phase' || dcView === 'gd') {
+      legend($('#dcLegend'), [{name: 'Left', color: css('--s1')}, {name: 'Right', color: css('--s2')}, {name: 'Both', color: css('--text'), thick: true}]);
+      return lineChart(el, lrb(dcView === 'phase' ? 'phase_deg' : 'group_delay_ms'), {x: pro.grid2, xmin: 20, xmax: 16000, ticks: [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000],
+        aria: dcView === 'phase' ? 'Phase' : 'Group delay'});
+    }
+    if (dcView === 'impulse' || dcView === 'step') {
+      const im = pro.impulse, y = dcView === 'impulse' ? im.both : pro.step, t = y.map((_, i) => im.t0_ms + i * im.dt_ms);
+      legend($('#dcLegend'), [{name: 'Both speakers + subs', color: css('--text'), thick: true}]);
+      return timeChart(el, t, [{y, color: css('--text'), w: 1.5}], {ymin: -1.05, ymax: 1.05, aria: dcView});
+    }
+    if (dcView === 'waterfall') { legend($('#dcLegend'), [{name: 'Darker = louder (dB below the peak)', color: css('--accent'), thick: true}]); return waterfallChart(el, pro.waterfall); }
+  }
+  const t = $('#dcViewTitle'); if (t) t.textContent = 'Frequency response';
   const cl = y => y.map(v => Math.max(v, -30));             // a deep null shouldn't squash the whole chart
   const series = [
     {name: 'Left', y: cl(r.curves.left), color: css('--s1'), w: 1.5, op: .85},
