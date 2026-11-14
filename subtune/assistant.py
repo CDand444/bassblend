@@ -163,7 +163,10 @@ names a constraint (budget, looks, walls they can't treat, furniture, WAF), save
 and re-read the plan: blocked walls get freestanding alternatives, the budget marks what's over it. Suggest \
 practical swaps (bookshelf as diffuser, curtains, art-print panels, a rug) when looks matter. When the owner says \
 they put something up, record it with record_treatment (plan_id from the item when it matches), then suggest a new \
-system report and check-up so before_after can show the change; read before_after rather than guessing.
+system report and check-up so before_after can show the change; read before_after rather than guessing. For "what \
+will it cost / is it worth it", answer from cost_and_value: lead with its verdict (the sweet spot), then the items \
+marked great or good value, and name the poor-value ones plainly. Prices are rough US ranges; say so once. If the \
+owner would build panels, set build "diy" (much cheaper).
 - Receiver processing (avr_status): tone, Late Night (compression), Cinema Filter (softens treble), \
 Music Optimizer, dialogue enhance. htTamer's tests switch them off and restore them. If something \
 sounds dull, boomy or squashed, check these first.
@@ -347,7 +350,10 @@ TOOLS = [
     _t("get_treatment_plan", "Room treatment plan (offline, no sound): ranked problems treatment could help (with the "
        "measured evidence and what EQ can or can't do), treatment items by tier with wall, zone in feet, quantity, size, "
        "thickness and air gap, the lowest frequency each absorbs well, rough cost, expected effect, installed status, "
-       "the owner's constraints, and a before/after comparison of measurements around the last installed change."),
+       "the owner's constraints, a cost and value estimate (each item's price still to pay, DIY and ready-made, "
+       "benefit per $100 and a verdict; plan totals per tier, the spending order with the share of the benefit each "
+       "step gets, the sweet spot and what the budget buys), and a before/after comparison of measurements around the "
+       "last installed change."),
     _t("set_treatment_constraints", "Save the owner's room-treatment constraints; the plan adapts (blocked walls get "
        "freestanding alternatives, the budget marks what's over it, looks change the suggestions). Only the fields given "
        "change; every change is logged. No sound.",
@@ -355,6 +361,7 @@ TOOLS = [
                      "description": "surfaces that can't be treated (the whole list)"},
         "budget_usd": {"type": "number", "description": "total budget in US dollars (0 = none set)"},
         "looks": {"type": "string", "enum": ["any", "tidy", "hidden"], "description": "how visible treatment may be"},
+        "build": {"type": "string", "enum": ["buy", "diy"], "description": "price the plan as ready-made panels or DIY"},
         "furniture": {"type": "string", "description": "existing furniture that matters (sofa against the back wall, bookshelf...)"},
         "notes": {"type": "string", "description": "anything else (WAF, rented home, kids, pets)"}}, []),
     _t("record_treatment", "Record acoustic treatment the owner has installed (or remove a record by id), so later reports "

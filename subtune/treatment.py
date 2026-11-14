@@ -369,10 +369,138 @@ def _rect(wall, z, dims):
     return {"x0": a[0], "x1": a[1], "y0": b[0], "y1": b[1]}
 
 
-def _cost(kind, n):
-    each = {"absorber": (40, 120), "cloud": (60, 200), "bass trap": (60, 250), "diffuser": (80, 300),
-            "rug": (100, 400), "curtain": (40, 150)}.get(kind, (30, 100))
-    return [each[0] * n, each[1] * n]
+# ------------------------------------------------------------------ cost and value
+BUILDS = ("buy", "diy")
+GOBO_EXTRA = {"diy": (20, 40), "buy": (40, 100)}       # stands/feet to make a panel freestanding
+PRICE_NOTE = ("Rough 2026 US prices per piece: ready-made from acoustic-panel makers, DIY = rockwool or fibreglass "
+              "board, a wood frame and breathable fabric. Local prices vary; use them to compare, not to budget to the dollar.")
+
+
+def unit_price(kind: str, thickness_in: float | None = None, area_ft2: float | None = None, membrane=False) -> dict:
+    """Rough price per piece, {"diy": [lo, hi], "buy": [lo, hi]} in US dollars."""
+    t = thickness_in or 0
+    if kind == "bass trap":
+        if membrane:
+            return {"diy": [150, 300], "buy": [400, 900]}
+        return {"diy": [70, 130], "buy": [180, 350]} if t <= 12 else {"diy": [100, 200], "buy": [250, 500]}
+    if kind in ("absorber", "cloud"):
+        base = ({"diy": [25, 45], "buy": [50, 110]} if t <= 2 else {"diy": [35, 60], "buy": [80, 180]} if t <= 4
+                else {"diy": [50, 85], "buy": [120, 250]})
+        if kind == "cloud":                                   # hanging hardware
+            base = {"diy": [base["diy"][0] + 10, base["diy"][1] + 25], "buy": [base["buy"][0] + 20, base["buy"][1] + 60]}
+        return base
+    if kind == "diffuser":
+        return {"diy": [60, 150], "buy": [150, 400]}
+    if kind == "rug":
+        a = max(20.0, area_ft2 or 60.0)
+        r = [max(80, round(2 * a)), max(150, round(8 * a))]
+        return {"diy": r, "buy": list(r)}
+    if kind == "curtain":
+        return {"diy": [40, 150], "buy": [40, 150]}
+    return {"diy": [30, 100], "buy": [30, 100]}
+
+
+def _mid(r):
+    return (r[0] + r[1]) / 2
+
+
+VERDICTS = {"great": "Great value", "good": "Worth it", "fair": "Worth it if the budget allows",
+            "poor": "Expensive for what it does", "low": "Little to gain", "done": "Done", "skip": "Not possible here"}
+WHY = {"great": "a big improvement for little money",
+       "good": "a clear improvement for the money",
+       "fair": "it helps, but costs a lot for what you'd hear",
+       "poor": "a small improvement for a lot of money; spend on the better-value items first",
+       "low": "your room barely needs it; skip unless you want it for looks or completeness",
+       "done": "already installed", "skip": "the wall is marked untreatable"}
+
+
+def value_of(it: dict, build: str = "buy") -> dict:
+    """Cost of what's left to buy and how much it helps per dollar.
+    benefit = the item's score (0-100: how bad the problem is x how well treatment fixes it) scaled by the share
+    still to install; points_per_100usd = benefit per $100 at the middle of the price range."""
+    left = max(0, it["qty"] - (it.get("installed_qty") or 0))
+    area = None
+    if it["kind"] == "rug" and it.get("zone"):
+        z = it["zone"]
+        area = (z["a"][1] - z["a"][0]) * (z["b"][1] - z["b"][0]) / FT ** 2
+    each = unit_price(it["kind"], it.get("thickness_in"), area)
+    if it.get("blocked") and it["kind"] in ("absorber", "cloud"):
+        each = {m: [each[m][0] + GOBO_EXTRA[m][0], each[m][1] + GOBO_EXTRA[m][1]] for m in BUILDS}
+    total = {m: [each[m][0] * left, each[m][1] * left] for m in BUILDS}
+    benefit = round(it["score"] * left / it["qty"], 1) if it["qty"] else 0
+    cost = _mid(total[build])
+    per = round(benefit / cost * 100, 1) if cost else 0.0
+    if not left:
+        v = "done"
+    elif it.get("blocked") and it["kind"] not in ("absorber", "cloud"):
+        v = "skip"
+    elif it["score"] < 15:
+        v = "low"
+    else:
+        v = "great" if per >= 25 else "good" if per >= 10 else "fair" if per >= 4 else "poor"
+    why = WHY[v]
+    if v in ("great", "good", "fair") and not it.get("measured"):
+        why += " (predicted from the room size: a system report and check-up confirm it before you spend)"
+    out = {"left_qty": left, "each": each, "diy": total["diy"], "buy": total["buy"], "benefit": benefit,
+           "points_per_100usd": per, "verdict": v, "verdict_text": VERDICTS[v], "why": why}
+    if it.get("membrane_hz") and it["kind"] == "bass trap" and left:
+        m = unit_price("bass trap", membrane=True)
+        out["membrane_option"] = {"each": m, "diy": [m["diy"][0] * left, m["diy"][1] * left],
+                                  "buy": [m["buy"][0] * left, m["buy"][1] * left]}
+    return out
+
+
+def cost_summary(items: list, build: str = "buy", budget: float | None = None) -> dict:
+    """Totals per tier, the items in value order with the running cost and the share of the plan's benefit
+    each step of spending gets, the sweet spot (70 % of the benefit), and what a budget buys."""
+    live = [i for i in items if i["value"]["verdict"] not in ("done", "skip")]
+
+    def tot(its, m):
+        return [sum(i["value"][m][0] for i in its), sum(i["value"][m][1] for i in its)]
+    # the two side walls are one purchase: panels on one side only would pull the image sideways
+    groups = {}
+    for i in live:
+        groups.setdefault("side_panels" if i["id"].startswith("side_panels") else i["id"], []).append(i)
+    def gval(g):
+        c = sum(_mid(i["value"][build]) for i in g)
+        return sum(i["value"]["benefit"] for i in g) / c if c else 0
+    order = sorted(groups.values(), key=lambda g: -gval(g))
+    allb = sum(i["value"]["benefit"] for i in live) or 1
+    spent, got, steps = 0.0, 0.0, []
+    for g in order:
+        spent += sum(_mid(i["value"][build]) for i in g)
+        got += sum(i["value"]["benefit"] for i in g)
+        cost = [sum(i["value"][build][0] for i in g), sum(i["value"][build][1] for i in g)]
+        title = "Side walls: first-reflection panels (both sides)" if len(g) > 1 else g[0]["title"]
+        steps.append({"id": g[0]["id"], "ids": [i["id"] for i in g], "title": title, "cost": cost, "spent": round(spent),
+                      "share_pct": round(100 * got / allb), "verdict": g[0]["value"]["verdict"]})
+    sweet = next((x for x in steps if x["share_pct"] >= 70), steps[-1] if steps else None)
+    out = {"build": build, "note": PRICE_NOTE,
+           "total": {m: tot(live, m) for m in BUILDS},
+           "by_tier": {t: {m: tot([i for i in live if i["tier"] == t], m) for m in BUILDS} for t in TIER},
+           "steps": steps, "sweet_spot": None}
+    if sweet:
+        n = steps.index(sweet) + 1
+        out["sweet_spot"] = {"after": sweet["id"], "spent": sweet["spent"], "share_pct": sweet["share_pct"],
+                             "items": [x["title"] for x in steps[:n]]}
+        rest = round(_mid(out["total"][build])) - sweet["spent"]
+        out["verdict"] = (f"About ${sweet['spent']:,} ({'DIY' if build == 'diy' else 'ready-made'}) on the {n} best-value "
+                          f"purchase{'s' if n > 1 else ''} gets roughly {sweet['share_pct']}% of what this plan can do"
+                          + (f"; the other ~${rest:,} buys the last {100 - sweet['share_pct']}%." if rest > 0 and n < len(steps) else "."))
+    else:
+        out["verdict"] = "Nothing left worth buying."
+    if budget:
+        picks, s_ = [], 0.0
+        for g in order:                                  # best value first, skip what doesn't fit
+            c = sum(_mid(i["value"][build]) for i in g)
+            if s_ + c <= budget:
+                picks += [i["id"] for i in g]
+                s_ += c
+        share = round(100 * sum(i["value"]["benefit"] for i in live if i["id"] in picks) / allb)
+        out["budget"] = {"budget_usd": budget, "picks": picks, "spent": round(s_), "share_pct": share}
+        for i in items:
+            i["over_budget"] = i in live and i["id"] not in picks
+    return out
 
 
 def plan(room: dict, state: dict | None = None, placement: dict | None = None, modal: dict | None = None) -> dict | None:
@@ -408,7 +536,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
         it = {"id": iid, "title": title, "kind": kind, "wall": wall, "zone": zone_, "qty": qty, "size": size,
               "thickness_in": thick, "gap_in": gap, "absorbs_down_to_hz": low_limit_hz(thick, gap) if kind in ("absorber", "cloud", "bass trap") else None,
               "effect": effect, "why": why, "score": max(base, score.get(iid, 0)), "measured": iid in measured,
-              "cost_usd": _cost(kind, qty), "blocked": bool(blocked), **kw}
+              "blocked": bool(blocked), **kw}
         if blocked:
             it["alternative"] = ("Freestanding panels (gobos) on stands at the same spots, moved into place for listening."
                                  if kind in ("absorber", "cloud") else "Skip it, or use a freestanding version.")
@@ -504,15 +632,12 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     for it in items:
         s = it["score"] if not it["installed"] else 0
         it["tier"] = 1 if s >= 55 else 2 if s >= 30 else 3
-    # budget: drop lower tiers from the "buy" list when over budget (they stay listed)
-    budget = cons.get("budget_usd")
-    if budget:
-        spent = 0
-        for it in sorted(items, key=lambda i: (i["tier"], -i["score"])):
-            if it["installed"] or it["blocked"]:
-                continue
-            spent += it["cost_usd"][0]
-            it["over_budget"] = spent > budget
+    # cost and value; a budget buys the best value first (the rest is marked, still listed)
+    build = cons.get("build") if cons.get("build") in BUILDS else "buy"
+    for it in items:
+        it["value"] = value_of(it, build)
+        it["cost_usd"] = it["value"][build]
+    costs = cost_summary(items, build, cons.get("budget_usd"))
     looks = cons.get("looks") or "any"
     if looks == "hidden":
         notes.append("For a hidden look: fabric-wrapped panels with printed art, bass traps behind acoustically transparent "
@@ -530,7 +655,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             "subs": [{"out": int(k) + 1, "x_m": s["x_m"], "y_m": s["y_m"]} for k, s in (room.get("subs") or {}).items()
                      if s.get("x_m") is not None and s.get("y_m") is not None],
             "problems": probs, "items": items, "notes": notes, "tiers": TIER, "installed": inst, "constraints": cons,
-            "metrics": room_metrics(state), "compare": compare(tr, state), "honesty": HONESTY,
+            "metrics": room_metrics(state), "compare": compare(tr, state), "honesty": HONESTY, "costs": costs,
             "summary": _summary(probs, items)}
 
 
@@ -615,6 +740,11 @@ def update(add: list | None = None, remove: list | None = None, constraints: dic
             c["no_walls"] = sorted(set(constraints["no_walls"] or []))
         if "budget_usd" in constraints:
             c["budget_usd"] = _num(constraints["budget_usd"], 0, 1_000_000)
+        if "build" in constraints:
+            b = str(constraints["build"] or "buy").lower()
+            if b not in BUILDS:
+                raise ValueError("build must be buy or diy")
+            c["build"] = b
         if "looks" in constraints:
             lk = str(constraints["looks"] or "any").lower()
             if lk not in LOOKS:
@@ -687,4 +817,4 @@ def brief(p: dict | None) -> dict | None:
     return {"top_problems": [{k: x[k] for k in ("title", "score", "measured")} for x in p["problems"][:4]],
             "first_items": [{"title": i["title"], "tier": TIER[i["tier"]], "qty": i["qty"], "installed": i["installed"]}
                             for i in p["items"][:4]],
-            "installed": len(p["installed"])}
+            "installed": len(p["installed"]), "cost_and_value": p["costs"].get("verdict")}

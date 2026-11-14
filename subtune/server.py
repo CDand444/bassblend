@@ -1027,7 +1027,7 @@ def build_executors():
         trim = lambda x: {k: v for k, v in x.items() if k not in ("points", "rect", "zone")}
         return {"problems": p["problems"], "items": [trim(i) for i in p["items"]], "notes": p["notes"],
                 "installed": p["installed"], "constraints": p["constraints"], "before_after": p["compare"],
-                "measured": p["metrics"], "first_reflection_zones_ft": {
+                "measured": p["metrics"], "cost_and_value": p["costs"], "first_reflection_zones_ft": {
                     i["id"]: {"wall": i["wall"], "along_ft": [round(v / 0.3048, 1) for v in i["zone"]["a"]],
                               "up_ft": [round(v / 0.3048, 1) for v in i["zone"]["b"]]} for i in p["items"] if i.get("zone")},
                 "zone_note": "along_ft is from the front wall on side walls, from the left wall on the front/back wall and "

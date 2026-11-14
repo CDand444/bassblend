@@ -192,11 +192,16 @@ function renderTreatment() {
     if (!p) $('#trtOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and at least the main seat in Room & subs.');
     else {
       const usd = c => `$${c[0].toLocaleString()}–${c[1].toLocaleString()}`;
+      const cs = p.costs || {}, bm = cs.build === 'diy' ? 'diy' : 'buy';
+      const valBadge = v => v && !['done', 'skip'].includes(v.verdict) ? `<span class="val ${v.verdict}" title="${esc(v.why)}">${esc(v.verdict_text)}</span>` : '';
+      const costLine = i => { const v = i.value; if (!v || !v.left_qty) return '';
+        return `<div class="spec"><b>${usd(v[bm])}</b> ${bm === 'diy' ? 'DIY' : 'ready-made'} for ${v.left_qty}${v.left_qty < i.qty ? ' more' : ''} (${bm === 'diy' ? `${usd(v.buy)} ready-made` : `${usd(v.diy)} DIY`}) · ${esc(v.verdict_text.toLowerCase())}: ${esc(v.why)}</div>`
+          + (v.membrane_option ? `<div class="spec">Tuned membrane traps instead: ${usd(v.membrane_option[bm])} ${bm === 'diy' ? 'DIY' : 'ready-made'}.</div>` : ''); };
       const itemHtml = i => `<li class="${i.installed ? 'done' : ''}"><div class="hd"><span class="sw4" style="background:${trtColor(i)}"></span><b>${esc(i.title)}</b>
           ${i.installed ? '<span class="conf">✓ installed</span>' : i.installed_qty ? `<span class="conf">${i.installed_qty} of ${i.qty} installed</span>` : ''}
-          ${i.measured ? '<span class="conf">from your measurements</span>' : ''}${i.blocked ? '<span class="conf">wall marked untreatable</span>' : ''}${i.over_budget ? '<span class="conf">over budget</span>' : ''}</div>
+          ${valBadge(i.value)}${i.measured ? '<span class="conf">from your measurements</span>' : ''}${i.blocked ? '<span class="conf">wall marked untreatable</span>' : ''}${i.over_budget ? '<span class="conf">over budget</span>' : ''}</div>
         <p>${esc(i.effect)}</p>
-        <div class="spec">${i.qty} × ${esc(i.size)}${i.kind !== 'rug' && i.kind !== 'bass trap' ? ` · ${i.thickness_in}″ thick${i.gap_in ? ` + ${i.gap_in}″ air gap` : ''}` : ''}${i.absorbs_down_to_hz ? ` · absorbs well above ~${i.absorbs_down_to_hz} Hz` : ''} · rough cost ${usd(i.cost_usd)}</div>
+        <div class="spec">${i.qty} × ${esc(i.size)}${i.kind !== 'rug' && i.kind !== 'bass trap' ? ` · ${i.thickness_in}″ thick${i.gap_in ? ` + ${i.gap_in}″ air gap` : ''}` : ''}${i.absorbs_down_to_hz ? ` · absorbs well above ~${i.absorbs_down_to_hz} Hz` : ''}</div>${costLine(i)}
         <div class="spec">${esc(trtWhere(i))}</div>
         <p class="small">${esc(i.why)}${i.membrane_hz ? ` For ${i.membrane_hz} Hz, a membrane (pressure) trap tuned there does more than porous depth.` : ''}</p>
         ${i.blocked && i.alternative ? `<p class="small"><b>Instead:</b> ${esc(i.alternative)}</p>` : ''}
@@ -215,8 +220,10 @@ function renderTreatment() {
       }
       $('#trtOut').innerHTML = `<div class="notice" style="margin-bottom:12px">${esc(p.honesty)}</div>
         <div class="dc-grid" style="margin-top:0"><div>${trtDrawing(p)}</div><div><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
-        ${list}${cmpH}
+        ${trtCostHtml(p, usd)}${list}${cmpH}
         ${p.notes.length ? `<ul class="wins" style="margin-top:14px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}`;
+      $('#trtOut').querySelectorAll('[data-trt-build]').forEach(b => b.onclick = async () => {
+        const r = await post('/api/treatment', {constraints: {build: b.dataset.trtBuild}}); if (r.error) alert(r.error); poll(); });
       $('#trtOut').querySelectorAll('[data-trt-mark]').forEach(b => b.onclick = async () => {
         const i = p.items.find(x => x.id === b.dataset.trtMark); if (!i) return;
         const n = prompt(`How many did you install? (the plan suggests ${i.qty})`, String(Math.max(1, i.qty - (i.installed_qty || 0)))); if (n === null) return;
@@ -226,6 +233,24 @@ function renderTreatment() {
     }
   }
   renderTreatmentForms(p);
+}
+function trtCostHtml(p, usd) {
+  const c = p.costs; if (!c) return '';
+  const bm = c.build === 'diy' ? 'diy' : 'buy', name = bm === 'diy' ? 'DIY' : 'ready-made';
+  const seg = `<div class="seg" role="group" aria-label="Price as"><button type="button" data-trt-build="buy" class="${bm === 'buy' ? 'on' : ''}">Ready-made</button><button type="button" data-trt-build="diy" class="${bm === 'diy' ? 'on' : ''}">DIY</button></div>`;
+  if (!c.steps.length) return `<div class="trt-cost"><div class="row"><h3 style="margin:0">Cost and value</h3><span class="grow"></span>${seg}</div><p class="big">${esc(c.verdict)}</p></div>`;
+  const sweet = c.sweet_spot ? c.steps.findIndex(s => s.id === c.sweet_spot.after) : -1;
+  const b = c.budget;
+  const short = {great: 'Great value', good: 'Worth it', fair: 'If budget allows', poor: 'Poor value', low: 'Little to gain'};
+  return `<div class="trt-cost"><div class="row"><h3 style="margin:0">Cost and value</h3><span class="grow"></span>${seg}</div>
+    <p class="big"><b>Is it worth it?</b> ${esc(c.verdict)}</p>
+    ${b ? `<p class="small" style="margin:0 0 8px">Your $${b.budget_usd.toLocaleString()} budget ${b.picks.length ? `buys the best-value items that fit, about $${b.spent.toLocaleString()} ${name}: roughly <b>${b.share_pct}%</b> of what the plan can do.` : `doesn't cover any item yet (${name}).`}</p>` : ''}
+    <div class="tw"><table class="dc-tbl"><thead><tr><th>Buy in this order (best value first)</th><th>Cost (${name})</th><th>Running total</th><th>Of the plan's benefit</th><th></th></tr></thead><tbody>
+      ${c.steps.map((s, k) => `<tr${k === sweet ? ' style="border-bottom:2px solid var(--good)"' : ''}><td>${k + 1}. ${esc(s.title)}${b && !b.picks.includes(s.id) ? ' <span class="conf">over budget</span>' : ''}</td><td>${usd(s.cost)}</td><td>~$${s.spent.toLocaleString()}</td><td><span class="trt-share"><i style="width:${s.share_pct}%"></i></span>${s.share_pct}%</td><td><span class="val ${s.verdict}">${esc(short[s.verdict] || '')}</span></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="tots"><span>Whole plan: <b>${usd(c.total.buy)}</b> ready-made · <b>${usd(c.total.diy)}</b> DIY</span>
+      ${[1, 2, 3].filter(t => c.by_tier[t] && c.by_tier[t][bm][1]).map(t => `<span>${esc(p.tiers[t])}: ${usd(c.by_tier[t][bm])}</span>`).join('')}</div>
+    <p class="muted small" style="margin:8px 0 0">The green line marks the sweet spot (about 70% of the benefit). “Benefit” is htTamer’s estimate of how much each item would improve what your measurements show: a guide for ordering, not a promise. ${esc(c.note)}</p></div>`;
 }
 function renderTreatmentForms(p) {
   const c = (p && p.constraints) || {}, ck = JSON.stringify(c);

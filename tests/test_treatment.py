@@ -255,6 +255,96 @@ def test_bad_items_are_refused():
             pass
 
 
+# ------------------------------------------------------------------ cost and value
+def _costed(build="buy", budget=None, installed=None):
+    r = room_with_speakers()
+    r["treatment"] = {"constraints": {"build": build, **({"budget_usd": budget} if budget else {})},
+                      "installed": installed or []}
+    st = {"deep_reports": {"1": rep(rt=0.55, refl=(2.6, -4.0))}, "checkups": [ck({50: 0.9, 63: 0.7, 100: 0.5})]}
+    return T.plan(r, st, None, room.modal_report(r, 200))
+
+
+def test_prices_scale_with_thickness_and_diy_is_cheaper():
+    thin, thick = T.unit_price("absorber", 2), T.unit_price("absorber", 6)
+    assert thin["buy"][1] < thick["buy"][1] and thin["diy"][1] < thick["diy"][1]
+    for k, t in (("absorber", 4), ("cloud", 4), ("bass trap", 18), ("diffuser", 6)):
+        u = T.unit_price(k, t)
+        assert u["diy"][0] < u["buy"][0] and u["diy"][1] < u["buy"][1], k
+    assert T.unit_price("cloud", 4)["buy"][0] > T.unit_price("absorber", 4)["buy"][0], "clouds need hanging hardware"
+    assert T.unit_price("bass trap", membrane=True)["buy"][0] > T.unit_price("bass trap", 24)["buy"][0]
+
+
+def test_every_item_has_a_cost_and_verdict_and_the_order_is_by_value():
+    p = _costed()
+    for i in p["items"]:
+        v = i["value"]
+        assert v["left_qty"] == i["qty"] and v["buy"][0] == v["each"]["buy"][0] * i["qty"]
+        assert v["verdict"] in T.VERDICTS and v["why"]
+        assert i["cost_usd"] == v["buy"]
+    c = p["costs"]
+    assert c["total"]["diy"][1] < c["total"]["buy"][0] + c["total"]["buy"][1]
+    shares = [s["share_pct"] for s in c["steps"]]
+    assert shares == sorted(shares) and shares[-1] == 100
+    spent = [s["spent"] for s in c["steps"]]
+    assert spent == sorted(spent)
+    assert c["sweet_spot"]["share_pct"] >= 70 and "%" in c["verdict"]
+
+
+def test_side_walls_are_bought_together():
+    p = _costed("buy", budget=600)
+    c = p["costs"]
+    side = next(s for s in c["steps"] if "side_panels" in s["ids"])
+    assert set(side["ids"]) == {"side_panels", "side_panels_r"}
+    picks = set(c["budget"]["picks"])
+    assert ("side_panels" in picks) == ("side_panels_r" in picks), "never one side only"
+
+
+def test_budget_buys_best_value_first_and_marks_the_rest():
+    p = _costed("diy", budget=600)
+    b = p["costs"]["budget"]
+    assert b["spent"] <= 600 and b["picks"] and 0 < b["share_pct"] <= 100
+    for i in p["items"]:
+        assert i.get("over_budget") == (i["id"] not in b["picks"]), i["id"]
+    big = _costed("diy", budget=100000)["costs"]["budget"]
+    assert big["share_pct"] == 100
+
+
+def test_installed_items_cost_nothing_more_and_partial_installs_cost_the_rest():
+    full = _costed()
+    n = next(i for i in full["items"] if i["id"] == "ceiling_cloud")["qty"]
+    done = _costed(installed=[{"plan_id": "ceiling_cloud", "kind": "cloud", "wall": "ceiling", "qty": n, "t": 1}])
+    cl = next(i for i in done["items"] if i["id"] == "ceiling_cloud")
+    assert cl["value"]["verdict"] == "done" and cl["value"]["buy"] == [0, 0]
+    assert all(s["id"] != "ceiling_cloud" for s in done["costs"]["steps"])
+    side_n = next(i for i in full["items"] if i["id"] == "side_panels")["qty"]
+    if side_n > 1:
+        part = _costed(installed=[{"plan_id": "side_panels", "kind": "absorber", "wall": "left", "qty": 1, "t": 1}])
+        sp = next(i for i in part["items"] if i["id"] == "side_panels")
+        assert sp["value"]["left_qty"] == side_n - 1 and sp["value"]["benefit"] < sp["score"]
+
+
+def test_little_to_gain_and_unconfirmed_items_say_so():
+    p = _costed()
+    fw = next((i for i in p["items"] if i["id"] == "front_wall"), None)
+    if fw:
+        assert fw["value"]["verdict"] in ("low", "poor", "fair")
+    geo = T.plan(room_with_speakers(), {}, None, None)            # nothing measured
+    worth = [i for i in geo["items"] if i["value"]["verdict"] in ("great", "good", "fair")]
+    assert worth and all("confirm it before you spend" in i["value"]["why"] for i in worth)
+
+
+def test_build_preference_is_validated_and_switches_prices():
+    _fresh()
+    T.update(constraints={"build": "diy"})
+    p = T.plan(room.load_room(), {}, None, None)
+    assert p["costs"]["build"] == "diy" and p["items"][0]["cost_usd"] == p["items"][0]["value"]["diy"]
+    try:
+        T.update(constraints={"build": "steal"})
+        raise AssertionError("bad build accepted")
+    except ValueError:
+        pass
+
+
 def test_assistant_tools_are_wired():
     from subtune import assistant, server
     names = {t["name"] for t in assistant.TOOLS}
@@ -275,6 +365,10 @@ def test_assistant_tools_are_wired():
     got = ex["get_treatment_plan"]()
     assert got["items"] and "points" not in got["items"][0] and got["constraints"]["looks"] == "tidy"
     assert any(i["blocked"] for i in got["items"] if i["wall"] == "ceiling")
+    assert got["cost_and_value"]["verdict"] and got["items"][0]["value"]["verdict_text"]
+    assert ex["set_treatment_constraints"](build="diy")["constraints"]["build"] == "diy"
+    sch = next(t for t in assistant.TOOLS if t["name"] == "set_treatment_constraints")["input_schema"]
+    assert sch["properties"]["build"]["enum"] == ["buy", "diy"]
     rec = ex["record_treatment"](add=[{"kind": "rug", "wall": "floor"}])
     assert rec["installed"] and rec["changed"]
 
