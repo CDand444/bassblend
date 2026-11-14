@@ -497,6 +497,14 @@ def build_executors():
         except Exception as e:                           # noqa: BLE001
             out["next_steps"] = [{"title": f"(coach unavailable: {e})"}]
         out["journal"] = [{k: v for k, v in j.items() if k in ("t", "kind", "text")} for j in journal.recent(15)]
+        from . import dirac as _dirac, layout
+        _sy = _dirac.system()
+        pl = layout.plan(load_room(), _sy.get("beds"), _sy.get("heights"))
+        if pl:
+            out["speaker_placement"] = {"guideline": pl["source"], "notes": pl["notes"],
+                                        "speakers": [{k: x[k] for k in ("name", "x_ft", "y_ft", "z_ft") if k in x}
+                                                     | {"angle_deg": x.get("azimuth", x.get("elevation")), "dolby_range": x["range"]}
+                                                     for x in pl["speakers"]]}
         rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
         if rep:
             out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
@@ -1066,8 +1074,13 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:                       # noqa: BLE001 - never break the dashboard over advice
                 st["coach"] = []
                 print(f"[coach] {e}", flush=True)
-            from . import journal
+            from . import journal, layout
             st["journal"] = journal.recent(25)
+            try:
+                st["placement"] = layout.plan(room, st["system"].get("beds"), st["system"].get("heights"))
+            except Exception as e:                       # noqa: BLE001
+                st["placement"] = None
+                print(f"[placement] {e}", flush=True)
             if len(st.get("deep_reports") or {}) >= 2:
                 from . import deepcheck
                 try:

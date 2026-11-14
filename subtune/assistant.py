@@ -104,6 +104,10 @@ output, ask the owner to record the change in Room & subs, then re-measure. Port
 below their safe limit (no_boost_below_hz). Prefer the receiver doing the crossover (sub crossover Out / \
 LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies (Hsu: one port open, \
 EQ1, Q 0.7).
+- Speaker placement (get_overview -> speaker_placement): Dolby-guideline positions for the layout, worked out from \
+the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
+heights) and notes when the room forces a compromise. BassBlend doesn't know where the owner's speakers actually \
+are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
 - Receiver processing (avr_status): tone, Late Night (compression), Cinema Filter (softens treble), \
 Music Optimizer, dialogue enhance. BassBlend's tests switch them off and restore them. If something \
 sounds dull, boomy or squashed, check these first.

@@ -842,6 +842,12 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="dcOut" style="margin-top:16px"></div>
     </section>
 
+    <section class="card" id="placeCard">
+      <div class="card-h"><h2>Speaker placement</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Compare my speaker placement with the recommended positions. Ask me where my speakers are now, then tell me what's worth moving.">Ask about this</button></div>
+      <p class="lead">Where each speaker of your layout should go, worked out from your room and main seat with Dolby’s home-theater guidelines. Compare with where yours are now; small differences are fine.</p>
+      <div id="placeOut"></div>
+    </section>
+
     <!-- TOOLS: SPL METER -->
     <section class="card" id="splCard">
       <div class="card-h"><h2>Sound level meter</h2></div>
@@ -2183,6 +2189,31 @@ $('#ckRun').onclick = async () => {
   const r = await post('/api/run', {cmd: 'checkup', pos}); if (r.error) alert(r.error); ckKey = null; poll();
 };
 
+// ---------- speaker placement (Dolby guidelines from the room and the main seat)
+let placeKey = null;
+function renderPlacement() {
+  const p = S.placement, key = JSON.stringify(p);
+  if (key === placeKey) return; placeKey = key;
+  if (!p) { $('#placeOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and the main seat position in Room & subs, and the speaker layout in Tune my system.'); return; }
+  const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
+  let g = `<rect x="${X(0)}" y="${Y(0)}" width="${W * sc}" height="${L * sc}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" rx="3"/>
+    <line x1="${X(W * .25)}" x2="${X(W * .75)}" y1="${Y(0) + 3}" y2="${Y(0) + 3}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>
+    <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
+  p.speakers.forEach(s => {
+    g += `<line x1="${X(p.seat.x_m)}" y1="${Y(p.seat.y_m)}" x2="${X(s.x_m)}" y2="${Y(s.y_m)}" stroke="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke-dasharray="2 4" opacity=".6"/>
+      <circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 6 : 7}" fill="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke="var(--surface)" stroke-width="2"><title>${esc(s.name)}</title></circle>
+      <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < p.seat.y_m ? 18 : -10)}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-2)">${s.id}</text>`; });
+  g += `<circle cx="${X(p.seat.x_m)}" cy="${Y(p.seat.y_m)}" r="8" fill="var(--text)"/><text x="${X(p.seat.x_m)}" y="${Y(p.seat.y_m) + 22}" text-anchor="middle" font-size="10.5" fill="var(--text)">MLP</text>`;
+  const ang = s => s.kind === 'height' ? `${s.elevation}° up${s.elevation > 90 ? ' (behind)' : ''}` : `${Math.abs(s.azimuth)}° ${s.azimuth < 0 ? 'left' : s.azimuth > 0 ? 'right' : ''}`;
+  const rng = s => s.kind === 'height' ? `${s.range[0]}–${s.range[1]}°` : s.azimuth === 0 ? 'straight ahead' : `${Math.min(...s.range.map(Math.abs))}–${Math.max(...s.range.map(Math.abs))}°`;
+  $('#placeOut').innerHTML = `<div class="dc-grid" style="margin-top:0"><div><svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:440px" role="img" aria-label="Recommended speaker positions">${g}</svg>
+      <div class="legend"><span><i style="border-color:var(--s1)"></i>Ear-level speakers</span><span><i style="border-color:var(--s4)"></i>Height speakers (ceiling)</span></div></div>
+    <div><div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>From left</th><th>From front</th><th>Height</th><th>Angle</th><th>Dolby range</th></tr></thead><tbody>
+      ${p.speakers.map(s => `<tr><td>${esc(s.name)}</td><td>${s.x_ft} ft</td><td>${s.y_ft} ft</td><td>${s.kind === 'height' ? 'ceiling' : s.z_ft + ' ft'}</td><td>${ang(s)}</td><td>${rng(s)}</td></tr>`).join('')}</tbody></table></div>
+      ${p.notes.length ? `<ul class="wins" style="margin-top:12px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}
+      <p class="muted small" style="margin:10px 0 0">Angles are seen from the main seat. Distances are to the front of each speaker. Source: ${esc(p.source)}.</p></div></div>`;
+}
+
 // ---------- coach: next best steps (computed by BassBlend, no AI needed)
 let coachKey = null;
 const WHO = {bassblend: 'BassBlend does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};
@@ -2967,6 +2998,7 @@ const MENU = [
    tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
   {grp: 'Setup', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
    tag: () => { const n = Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
+  {grp: 'Setup', key: 'place', icon: 'room', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
   {grp: 'Setup', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
    tag: () => (S.analysis_status || {}).running || (S.suggest_status || {}).running ? ['…', ''] : null},
   {grp: 'More', key: 'filters', icon: 'filters', title: 'Filters', full: 'Filters on the DSP', el: card('#filters'),
@@ -3027,7 +3059,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCoach(); renderPlacement(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     if (sheetKey && !$('#sheetNav').contains(document.activeElement)) renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);
