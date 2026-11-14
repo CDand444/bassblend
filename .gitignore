@@ -24,3 +24,6 @@ anthropic_api_key
 build/
 dist/
 build-image.log
+
+# Local dev-server launcher for Claude Code (machine-specific paths)
+.claude/launch.json

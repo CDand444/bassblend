@@ -1,6 +1,6 @@
 # Receiver (Onkyo TX-RZ50) setup
 
-htTamer controls the receiver over your network at **192.168.1.50** (Menu → Receiver).
+htTamer controls the receiver over your network at its IP address (for example **192.168.1.50**; set it in Setup → Receiver).
 Control already works: power, input, listening mode, volume down, mute and subwoofer level.
 
 ## One step needed for the automatic blend test
