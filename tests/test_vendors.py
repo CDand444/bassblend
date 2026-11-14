@@ -25,7 +25,7 @@ def test_finds_models_from_typed_names():
     assert V.find("Hsu Research VT-3 MK5") == HSU
     assert V.find("HSU VTF-3 MK5 HP") == HSU
     assert V.find("SVS SB-1000") == "svs-sb1000"
-    assert V.find("Rythmik F12") is None
+    assert V.find("Klipsch R-120SW") is None
 
 
 def test_hsu_modes_match_the_manual():
@@ -72,6 +72,27 @@ def test_describe_for_the_assistant():
     assert d["settings"]["Q"] == "0.3" and "Crossover frequency" not in d["settings"]   # hidden unless crossover In
     assert d["auto_eq_setup"] == {"ports": "4in", "eq": "EQ1", "q": "0.7"} and "manual" in d["source"]
     json.dumps(d)
+
+
+def test_svs_pb2000_pro_modes_and_mismatches():
+    cid = V.find("SVS PB-2000 Pro")
+    assert cid == "svs-pb2000-pro"
+    assert V.mode_of(cid, {"ports": "open", "app_mode": "standard"})["name"] == "Standard (ported)"
+    assert V.protect_hz(cid, {"ports": "open", "app_mode": "standard"}) == 18
+    assert V.protect_hz(cid, {"ports": "plugged", "app_mode": "sealed"}) is None
+    assert any("won't match" in n["text"] for n in V.check(cid, {"ports": "plugged", "app_mode": "standard"}))
+    assert not any("stack" in n["text"] for n in V.check(cid, {"lpf": "off"})), "app low-pass off is right"
+    assert any("stack" in n["text"] for n in V.check(cid, {"lpf": "80"}))
+
+
+def test_rythmik_f12():
+    cid = V.find("Rythmik F12")
+    assert cid == "rythmik-f12" and V.find("Hsu VTF-3 MK5") != cid
+    assert V.protect_hz(cid, {}) is None
+    assert any("stack" in n["text"] for n in V.check(cid, {"lpf_mode": "80"}))
+    assert not any("stack" in n["text"] for n in V.check(cid, {"lpf_mode": "avr"}))
+    d = V.describe(cid, {"extension": "14", "damping": "low"})
+    assert d["settings"]["Extension filter"] == "14 Hz" and d["auto_eq_setup"]["damping"] == "low"
 
 
 def test_room_saves_catalog_and_controls():

@@ -19,6 +19,8 @@ from __future__ import annotations
 
 HSU_SRC = "Hsu Research VTF-3 MK5 HP owner's manual (2014)"
 SVS_SRC = "SVS SB-1000 product page and spec sheet (owner's manual not checked)"
+SVS_PB2000_SRC = "SVS PB-2000 Pro product page (svsound.com)"
+RYTHMIK_SRC = "Rythmik XLR3 sealed quick guide and F12/PEQ3 installation guide (rythmikaudio.com)"
 
 CLOCK = ["7:00", "7:30", "8:00", "8:30", "9:00", "9:30", "10:00", "10:30", "11:00", "11:30", "12:00",
          "12:30", "1:00", "1:30", "2:00", "2:30", "3:00", "3:30", "4:00", "4:30", "5:00"]
@@ -85,6 +87,82 @@ CATALOG = {
             "volume knob to match, or set the power switch to ON.",
         ],
         "auto_eq": {"ports": "4in", "eq": "EQ1", "q": "0.7"},
+    },
+    "svs-pb2000-pro": {
+        "brand": "SVS", "model": "PB-2000 Pro", "match": ["pb-2000", "pb2000", "pb 2000"],
+        "summary": "12-inch ported, two ports with foam plugs; port tuning mode (Standard / Sealed) set in the SVS app to "
+                   "match the plugs; app DSP with volume, low-pass, phase, polarity, room gain and 3-band PEQ.",
+        "enclosure": "ported (pluggable)", "driver": "12\"", "amp_w": None, "source": SVS_PB2000_SRC,
+        "controls": [
+            {"key": "ports", "label": "Ports", "kind": "choice", "options": [["open", "Both open"], ["plugged", "Both plugged (sealed)"],
+                                                                              ["one", "One plugged"]], "default": "open"},
+            {"key": "app_mode", "label": "Port tuning (app)", "kind": "choice", "options": [["standard", "Standard"], ["sealed", "Sealed"]],
+             "default": "standard"},
+            {"key": "lpf", "label": "Low-pass (app)", "kind": "choice",
+             "options": [["off", "Off / LFE (receiver does the crossover)"]] + [[str(h), f"{h} Hz"] for h in range(40, 161, 10)], "default": "off"},
+            {"key": "phase", "label": "Phase (app)", "kind": "number", "min": 0, "max": 180, "step": 15, "unit": "°", "default": 0},
+            {"key": "polarity", "label": "Polarity (app)", "kind": "choice", "options": [["pos", "Positive"], ["neg", "Negative"]], "default": "pos"},
+            {"key": "room_gain", "label": "Room gain compensation (app)", "kind": "choice", "options": [["off", "Off"], ["on", "On"]], "default": "off"},
+            {"key": "peq", "label": "App PEQ bands in use", "kind": "choice", "options": [["0", "None"], ["1", "1"], ["2", "2"], ["3", "3"]],
+             "default": "0"},
+        ],
+        "modes": [
+            {"when": {"ports": "open", "app_mode": "standard"}, "name": "Standard (ported)", "ext_hz": 16, "protect_hz": 18,
+             "for": "maximum output; 16-290 Hz ±3 dB (SVS spec)."},
+            {"when": {"ports": "plugged", "app_mode": "sealed"}, "name": "Sealed", "ext_hz": 17, "protect_hz": None,
+             "for": "the best transient response; SVS's preferred choice for mostly music. 17-290 Hz ±3 dB (SVS spec)."},
+        ],
+        "forbidden": [
+            {"when": {"ports": "plugged", "app_mode": "standard"}, "level": "warn",
+             "text": "Ports plugged but the app's port tuning is Standard: the DSP's tuning won't match the box. Set the app to "
+                     "Sealed (or open the ports)."},
+            {"when": {"ports": "open", "app_mode": "sealed"}, "level": "warn",
+             "text": "Ports open but the app's port tuning is Sealed: the DSP's tuning won't match the box. Plug both ports "
+                     "(or set the app to Standard)."},
+            {"when": {"ports": "one"}, "level": "warn",
+             "text": "One port plugged isn't one of the PB-2000 Pro's two modes (Standard = both open, Sealed = both plugged)."},
+        ],
+        "q_guide": "",
+        "tips": [
+            "SVS: Standard (ports open) for maximum output; Sealed (both ports plugged, app set to Sealed) for the best "
+            "transient response, preferred for mostly music.",
+            "With a receiver doing bass management, leave the app's low-pass off (LFE) and let the receiver and BassBlend "
+            "handle crossover and timing; keep the app's PEQ and room gain off so they don't fight BassBlend's EQ.",
+            "The app's three presets are a handy way to switch between a Standard and a Sealed setup: re-measure after switching.",
+        ],
+        "auto_eq": {"lpf": "off", "room_gain": "off", "peq": "0"},
+    },
+    "rythmik-f12": {
+        "brand": "Rythmik", "model": "F12 (sealed, XLR3 amp)", "match": ["rythmik f12", "rythmik"],
+        "summary": "12-inch sealed servo sub; extension filter (14/20/28 Hz), damping (high/medium/low), rumble filter, "
+                   "low-pass with 12 dB 'AVR' or 24 dB slopes, phase 0-180°, gain.",
+        "enclosure": "sealed", "driver": "12\"", "amp_w": 370, "source": RYTHMIK_SRC,
+        "controls": [
+            {"key": "extension", "label": "Extension filter", "kind": "choice", "options": [["14", "14 Hz"], ["20", "20 Hz"], ["28", "28 Hz"]],
+             "default": "20"},
+            {"key": "damping", "label": "Damping", "kind": "choice", "options": [["high", "High"], ["medium", "Medium"], ["low", "Low"]],
+             "default": "medium"},
+            {"key": "rumble", "label": "Rumble filter", "kind": "choice", "options": [["off", "Off"], ["on", "On"]], "default": "off"},
+            {"key": "lpf_mode", "label": "Low-pass", "kind": "choice",
+             "options": [["avr", "12 dB / AVR (receiver does the crossover)"], ["80", "80 Hz / 24 dB"], ["50", "50 Hz / 24 dB"]], "default": "avr"},
+            {"key": "phase", "label": "Phase", "kind": "number", "min": 0, "max": 180, "step": 15, "unit": "°", "default": 0},
+            {"key": "volume", "label": "Gain knob", "kind": "choice", "options": [[c, c] for c in CLOCK], "default": "12:00"},
+        ],
+        "modes": [{"when": {}, "name": "Sealed servo", "ext_hz": None, "protect_hz": None,
+                   "for": "a sealed box with servo control: no port tuning to protect."}],
+        "forbidden": [],
+        "q_guide": "Rythmik: damping sets the low-end slope and ringing. High = least ringing, most gradual roll-off; low = "
+                   "steepest roll-off at the bottom, more ringing.",
+        "tips": [
+            "Rythmik: try 20 Hz with all three damping settings; if you can't hear a difference, use 20 Hz / medium.",
+            "Rythmik: 14 Hz / high damping for medium playback levels; 28 Hz / low damping with the rumble filter on for high SPL.",
+            "Rythmik (F12/PEQ3 guide): 14 Hz / high damping for articulate sound, 14 Hz / low damping for full-bodied home "
+            "theatre. With room EQ (like BassBlend or Dirac), start from rumble off, 14 Hz, low damping.",
+            "Rythmik: with a receiver, use the 12 dB / AVR low-pass setting and turn the crossover knob to maximum so the "
+            "receiver does the crossover.",
+            "Rythmik: the phase control is an all-pass filter (up to 180°), not a true delay; BassBlend's miniDSP delay does that.",
+        ],
+        "auto_eq": {"rumble": "off", "extension": "14", "damping": "low", "lpf_mode": "avr"},
     },
     "svs-sb1000": {
         "brand": "SVS", "model": "SB-1000", "match": ["sb-1000", "sb1000", "sb 1000"],
@@ -170,7 +248,10 @@ def check(cid: str, st: dict, avr_crossover_hz=None) -> list[dict]:
         out.append({"level": "warn", "text": "The sub's own low-pass is switched In while the receiver also crosses over: the two "
                     "filters stack, so the sub fades out early and arrives later. Hsu recommends Out with bass management.",
                     "source": c["source"]})
-    if st.get("lpf") not in (None, "lfe"):
+    if st.get("lpf_mode") in ("80", "50"):
+        out.append({"level": "warn", "text": f"The sub's low-pass is at {st['lpf_mode']} Hz / 24 dB while the receiver also crosses "
+                    "over: the filters stack. Rythmik recommends the 12 dB / AVR setting with the knob at maximum.", "source": c["source"]})
+    if st.get("lpf") not in (None, "lfe", "off"):
         out.append({"level": "warn", "text": f"The sub's low-pass is at {st['lpf']} Hz while the receiver also crosses over: the filters "
                     "stack. SVS recommends LFE/off with a receiver.", "source": c["source"]})
     if st.get("power") == "off":

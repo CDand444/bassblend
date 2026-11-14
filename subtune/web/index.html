@@ -1514,7 +1514,8 @@ function hwCheck(card) {
   const m = (c.modes || []).find(x => Object.keys(x.when).length && match(x.when));
   if (m) notes.push(['info', `${m.name} mode${m.ext_hz ? ` (±2 dB to ${m.ext_hz} Hz)` : ''}: for ${m.for}` + (m.protect_hz ? ` BassBlend won't boost this sub below ${m.protect_hz} Hz.` : '')]);
   if (st.xover === 'in') notes.push(['warn', 'Crossover switch is In while the receiver also crosses over: the filters stack. Out is recommended with a receiver.']);
-  if (st.lpf && st.lpf !== 'lfe') notes.push(['warn', `Low-pass at ${st.lpf} Hz while the receiver also crosses over: the filters stack. LFE/off is recommended.`]);
+  if (st.lpf && st.lpf !== 'lfe' && st.lpf !== 'off') notes.push(['warn', `Low-pass at ${st.lpf} Hz while the receiver also crosses over: the filters stack. LFE/off is recommended.`]);
+  if (st.lpf_mode === '80' || st.lpf_mode === '50') notes.push(['warn', `Low-pass at ${st.lpf_mode} Hz / 24 dB while the receiver also crosses over: the filters stack. The 12 dB / AVR setting is recommended.`]);
   if (st.power === 'off') notes.push(['danger', 'Power switch OFF: this sub won’t play.']);
   box.innerHTML = notes.map(([l, t]) => `<div class="hwnote ${l}">${l === 'danger' ? '⚠ ' : ''}${esc(t)}</div>`).join('');
 }
