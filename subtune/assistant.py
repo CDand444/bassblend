@@ -150,6 +150,20 @@ network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
+- Room treatment (get_treatment_plan, set_treatment_constraints, record_treatment; get_overview -> room_treatment): \
+htTamer's own offline planner ranks what acoustic treatment would help, from the room geometry (first-reflection \
+points of the front speakers at every seat on the side walls, ceiling and floor; corners; back wall), the room modes \
+and the measurements (system report RT60 and early reflections, left/right spread, check-up bass ringing per band). \
+Each problem has a score (how much treatment would really help) and each item a tier (do this first / next / nice to \
+have), size, thickness and air gap, quantity, rough cost and expected effect. Explain it from the plan; don't invent \
+positions: zones are in first_reflection_zones_ft. Be honest: EQ fixes peaks, treatment fixes ringing, reflections \
+and decay; a porous panel only absorbs well down to about 1000 / depth-in-inches Hz (thin 1-2 in. panels do nothing \
+for bass, little below 200 Hz without real depth), and under about 40 Hz the subs and EQ do the work. When the owner \
+names a constraint (budget, looks, walls they can't treat, furniture, WAF), save it with set_treatment_constraints \
+and re-read the plan: blocked walls get freestanding alternatives, the budget marks what's over it. Suggest \
+practical swaps (bookshelf as diffuser, curtains, art-print panels, a rug) when looks matter. When the owner says \
+they put something up, record it with record_treatment (plan_id from the item when it matches), then suggest a new \
+system report and check-up so before_after can show the change; read before_after rather than guessing.
 - Receiver processing (avr_status): tone, Late Night (compression), Cinema Filter (softens treble), \
 Music Optimizer, dialogue enhance. htTamer's tests switch them off and restore them. If something \
 sounds dull, boomy or squashed, check these first.
@@ -330,6 +344,27 @@ TOOLS = [
                                                                              "get_overview -> playback says it's ready)"},
         "auto_volume": {"type": "boolean"}}, ["mode", "auto_volume"], approval=True),
     _t("stop_live_analyzer", "Stop the live analyzer's noise and put the receiver back. The live bands stay on."),
+    _t("get_treatment_plan", "Room treatment plan (offline, no sound): ranked problems treatment could help (with the "
+       "measured evidence and what EQ can or can't do), treatment items by tier with wall, zone in feet, quantity, size, "
+       "thickness and air gap, the lowest frequency each absorbs well, rough cost, expected effect, installed status, "
+       "the owner's constraints, and a before/after comparison of measurements around the last installed change."),
+    _t("set_treatment_constraints", "Save the owner's room-treatment constraints; the plan adapts (blocked walls get "
+       "freestanding alternatives, the budget marks what's over it, looks change the suggestions). Only the fields given "
+       "change; every change is logged. No sound.",
+       {"no_walls": {"type": "array", "items": {"type": "string", "enum": ["left", "right", "front", "back", "ceiling", "floor"]},
+                     "description": "surfaces that can't be treated (the whole list)"},
+        "budget_usd": {"type": "number", "description": "total budget in US dollars (0 = none set)"},
+        "looks": {"type": "string", "enum": ["any", "tidy", "hidden"], "description": "how visible treatment may be"},
+        "furniture": {"type": "string", "description": "existing furniture that matters (sofa against the back wall, bookshelf...)"},
+        "notes": {"type": "string", "description": "anything else (WAF, rented home, kids, pets)"}}, []),
+    _t("record_treatment", "Record acoustic treatment the owner has installed (or remove a record by id), so later reports "
+       "can be compared before and after. Each change keeps a snapshot of the measurements at that moment. No sound.",
+       {"add": {"type": "array", "items": {"type": "object"},
+                "description": "items: {plan_id (the plan item it fulfils, e.g. side_panels, side_panels_r, ceiling_cloud, "
+                               "corner_traps, rear_wall, rug, front_wall), kind (absorber, bass trap, cloud, diffuser, rug, "
+                               "curtain, other), wall (left, right, front, back, ceiling, floor, corners), qty, size, "
+                               "thickness_in, gap_in, notes}"},
+        "remove": {"type": "array", "items": {"type": "string"}, "description": "ids of installed records to remove"}}, []),
     _t("save_live_eq", "Bake the live EQ bands into a copy of the playing tune and apply it to the same slot (the "
        "old tune stays in the library). Do this only when the owner is happy with the result.", approval=True),
 ]
@@ -565,7 +600,9 @@ def _brief(name, inp, out):
              "get_live_eq": "Read the live analyzer", "set_live_eq": "Set the live EQ",
              "start_live_analyzer": "Started the live analyzer", "stop_live_analyzer": "Stopped the live analyzer",
              "save_live_eq": "Saved the live EQ into a tune",
-             "apply_avr_blend": "Applied the blend fix"}.get(name, name)
+             "apply_avr_blend": "Applied the blend fix", "get_treatment_plan": "Read the room treatment plan",
+             "set_treatment_constraints": "Saved your treatment constraints",
+             "record_treatment": "Recorded installed treatment"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):
         extra = ": " + str(out["summary"])[:160]

@@ -609,6 +609,20 @@ details.lastone > summary { cursor: pointer; font-weight: 600; font-size: 13.5px
 .sugg { margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); font-size: 12.5px; }
 .sugg .t { font-weight: 650; margin-bottom: 6px; display: flex; gap: 8px; align-items: baseline; }
 .sugg .why { color: var(--text-2); margin: 6px 0 0; }
+/* room treatment */
+.trt-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.trt-list li { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px; background: var(--surface); }
+.trt-list li.done { opacity: .72; }
+.trt-list .hd { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
+.trt-list .hd b { font-size: 14px; }
+.trt-list p { margin: 4px 0 0; font-size: 13px; color: var(--text-2); }
+.trt-list .spec { font-size: 12.5px; color: var(--text-3); margin-top: 4px; }
+.trt-list .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.trt-tier { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-3); margin: 16px 0 8px; }
+.trt-score { display: inline-block; width: 60px; height: 6px; border-radius: 3px; background: var(--surface-3); overflow: hidden; vertical-align: middle; }
+.trt-score i { display: block; height: 100%; background: var(--s2); }
+.trt-walls { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; }
+.trt-walls label { display: inline-flex; gap: 5px; align-items: center; }
 .conf { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; background: var(--surface-3); color: var(--text-2); }
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip { display: inline-flex; gap: 6px; align-items: baseline; padding: 4px 10px; border-radius: 8px; background: var(--surface-2); font-size: 12.5px; color: var(--text-2); }
@@ -950,6 +964,16 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="card-h"><h2>Speaker placement</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Compare my speaker placement with the recommended positions. Ask me where my speakers are now, then tell me what's worth moving.">Ask about this</button></div>
       <p class="lead">Where each speaker of your layout should go, worked out from your room and main seat with Dolby’s home-theater guidelines. Compare with where yours are now; small differences are fine.</p>
       <div id="placeOut"></div>
+    </section>
+
+    <section class="card" id="trtCard">
+      <div class="card-h"><h2>Room treatment</h2><span class="grow"></span><button class="btn ghost ask" data-ask="Look at my room treatment plan and explain what I should do first and why, in plain words. Ask me about my budget, looks and any walls I can't treat, save those, and adjust the plan.">Ask the assistant</button></div>
+      <p class="lead">What acoustic treatment would help your room most, and where it goes: worked out from your room, seats and speakers, the room modes and your measurements. No sound plays here.</p>
+      <div id="trtOut"></div>
+      <h3 style="margin:18px 0 6px">Your constraints</h3>
+      <div id="trtCons"></div>
+      <h3 style="margin:18px 0 6px">What you have installed</h3>
+      <div id="trtInst"></div>
     </section>
 
     <!-- TOOLS: SPL METER -->

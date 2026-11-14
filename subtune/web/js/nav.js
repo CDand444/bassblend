@@ -27,6 +27,7 @@ const IC = {
   speakers: '<rect x="2" y="2.5" width="5" height="11" rx="1"/><rect x="9" y="2.5" width="5" height="11" rx="1"/><circle cx="4.5" cy="9.5" r="1.4"/><circle cx="11.5" cy="9.5" r="1.4"/>',
   place: '<circle cx="8" cy="8" r="1.6"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/><circle cx="8" cy="8" r="5"/>',
   book: '<path d="M8 4c-1.5-1.2-3.5-1.5-6-1.3v10c2.5-.2 4.5.1 6 1.3 1.5-1.2 3.5-1.5 6-1.3v-10c-2.5-.2-4.5.1-6 1.3z"/><path d="M8 4v10"/>',
+  panel: '<rect x="2" y="2.5" width="4" height="11" rx=".6"/><rect x="10" y="2.5" width="4" height="11" rx=".6"/><path d="M6 5.5h4M6 10.5h4"/>',
   eq: '<path d="M1.5 10c2 0 2.5-6 4.5-6s2 9 4.5 9 2.5-5 4-5"/><circle cx="6" cy="4" r="1.3"/><circle cx="10.5" cy="13" r="1.3"/>',
 };
 const icon = k => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
@@ -78,6 +79,8 @@ const MENU = [
    tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
      const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
   {grp: 'Setup', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
+  {grp: 'Setup', key: 'treatment', icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
+   tag: () => { const t = S.treatment; if (!t) return null; const n = t.items.filter(i => i.tier === 1 && !i.installed && !i.blocked).length; return n ? [String(n), ''] : ['✓', '']; }},
   {grp: 'Setup', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
    tag: () => (S.analysis_status || {}).running || (S.suggest_status || {}).running ? ['…', ''] : null},
   {grp: 'System', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
@@ -174,7 +177,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderFixLog(); renderSpeakers(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCoach(); renderPlacement(); renderTreatment(); renderHeadroom(); renderAllSpk(); renderFixLog(); renderSpeakers(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);

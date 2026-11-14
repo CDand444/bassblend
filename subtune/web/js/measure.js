@@ -150,6 +150,118 @@ function renderPlacement() {
       <p class="muted small" style="margin:10px 0 0">Angles are seen from the main seat. Distances are to the front of each speaker. Source: ${esc(p.source)}.</p></div></div>`;
 }
 
+// ---------- room treatment planner (offline: geometry + measurements, ranked)
+let trtKey = null, trtConsKey = null, trtInstKey = null;
+const TRT_WALLS = ['left', 'right', 'front', 'back', 'ceiling', 'floor'];
+const trtColor = i => i.installed ? 'var(--good)' : i.blocked ? 'var(--text-3)' : i.tier === 1 ? 'var(--s2)' : i.tier === 2 ? 'var(--s1)' : 'var(--s4)';
+const ftRange = r => `${fmtFt(r[0])}–${fmtFt(r[1])}`;
+function trtWhere(i) {
+  const z = i.zone; if (!z) return i.id === 'corner_traps' ? 'All four floor-to-ceiling corners (wall-to-ceiling corners also work)' : '';
+  if (i.wall === 'left' || i.wall === 'right') return `${i.wall} wall, ${ftRange(z.a)} from the front wall, ${ftRange(z.b)} up from the floor`;
+  if (i.wall === 'front' || i.wall === 'back') return `${i.wall} wall, ${ftRange(z.a)} from the left wall, ${ftRange(z.b)} up`;
+  return `${i.wall === 'ceiling' ? 'ceiling' : 'floor'}, ${ftRange(z.a)} from the left wall, ${ftRange(z.b)} from the front wall`;
+}
+function trtDrawing(p) {
+  const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
+  let g = `<rect x="${X(0)}" y="${Y(0)}" width="${W * sc}" height="${L * sc}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" rx="3"/>
+    <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
+  const items = p.items;
+  // floor and ceiling zones first (underneath)
+  items.filter(i => i.rect && (i.wall === 'floor' || i.wall === 'ceiling')).forEach(i => { const r = i.rect;
+    g += `<rect x="${X(r.x0)}" y="${Y(r.y0)}" width="${(r.x1 - r.x0) * sc}" height="${(r.y1 - r.y0) * sc}" fill="${trtColor(i)}" fill-opacity="${i.wall === 'floor' ? .08 : .14}" stroke="${trtColor(i)}" stroke-dasharray="${i.wall === 'floor' ? '1 3' : '5 4'}" rx="4"><title>${esc(i.title)}</title></rect>`; });
+  items.filter(i => i.rect && !['floor', 'ceiling'].includes(i.wall)).forEach(i => { const r = i.rect, inset = 4;
+    const x0 = r.x0 === 0 && r.x1 === 0 ? X(0) + inset : r.x0 === W && r.x1 === W ? X(W) - inset : X(r.x0);
+    const x1 = r.x0 === r.x1 ? x0 : X(r.x1), y0 = r.y0 === 0 && r.y1 === 0 ? Y(0) + inset : r.y0 === L && r.y1 === L ? Y(L) - inset : Y(r.y0), y1 = r.y0 === r.y1 ? y0 : Y(r.y1);
+    g += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${trtColor(i)}" stroke-width="7" stroke-linecap="round"${i.kind === 'diffuser' ? ' stroke-dasharray="6 3"' : ''}><title>${esc(i.title)}</title></line>`; });
+  const ct = items.find(i => i.id === 'corner_traps');
+  if (ct) (ct.corners || []).forEach(c => { const s = 0.45 * sc, cx = X(c.x_m), cy = Y(c.y_m), dx = c.x_m > 0 ? -s : s, dy = c.y_m > 0 ? -s : s;
+    g += `<path d="M${cx} ${cy}L${cx + dx} ${cy}L${cx} ${cy + dy}Z" fill="${trtColor(ct)}" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"><title>Corner bass trap (${esc(c.name)})</title></path>`; });
+  // reflection points on the side walls (main seat, front speakers)
+  items.filter(i => i.wall === 'left' || i.wall === 'right').forEach(i => (i.points || []).forEach(pt => {
+    g += `<circle cx="${X(pt.x_m) + (pt.x_m < 0.01 ? 4 : -4)}" cy="${Y(pt.y_m)}" r="2.6" fill="var(--text)"><title>${esc(pt.speaker)} → ${esc(pt.seat)}: ${pt.ms} ms later</title></circle>`; }));
+  (p.speakers || []).filter(s => s.kind === 'bed').forEach(s => g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="5" fill="var(--surface)" stroke="var(--text-2)" stroke-width="1.5"><title>${esc(s.id)} (${s.source})</title></circle>
+    <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < L / 2 ? 16 : -9)}" text-anchor="middle" font-size="9" fill="var(--text-3)">${esc(s.id)}</text>`);
+  (p.subs || []).forEach(s => g += `<rect x="${X(s.x_m) - 6}" y="${Y(s.y_m) - 6}" width="12" height="12" rx="2" fill="var(--text-2)"><title>Sub out ${s.out}</title></rect>`);
+  (p.seats || []).forEach((s, k) => g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${k ? 5.5 : 7}" fill="var(--text)"><title>${esc(s.name)}</title></circle>`);
+  return `<svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:440px" role="img" aria-label="Suggested room treatment positions">${g}</svg>
+    <div class="legend"><span><i style="border-color:var(--s2)"></i>Do first</span><span><i style="border-color:var(--s1)"></i>Next</span><span><i style="border-color:var(--s4)"></i>Nice to have</span><span><i style="border-color:var(--good)"></i>Installed</span><span><i class="dash" style="border-color:var(--text-2)"></i>Ceiling cloud</span><span><i class="dot" style="color:var(--text)"></i>Reflection points</span></div>`;
+}
+function renderTreatment() {
+  const p = S.treatment, key = JSON.stringify(p);
+  if (key !== trtKey) { trtKey = key;
+    if (!p) $('#trtOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and at least the main seat in Room & subs.');
+    else {
+      const usd = c => `$${c[0].toLocaleString()}–${c[1].toLocaleString()}`;
+      const itemHtml = i => `<li class="${i.installed ? 'done' : ''}"><div class="hd"><span class="sw4" style="background:${trtColor(i)}"></span><b>${esc(i.title)}</b>
+          ${i.installed ? '<span class="conf">✓ installed</span>' : i.installed_qty ? `<span class="conf">${i.installed_qty} of ${i.qty} installed</span>` : ''}
+          ${i.measured ? '<span class="conf">from your measurements</span>' : ''}${i.blocked ? '<span class="conf">wall marked untreatable</span>' : ''}${i.over_budget ? '<span class="conf">over budget</span>' : ''}</div>
+        <p>${esc(i.effect)}</p>
+        <div class="spec">${i.qty} × ${esc(i.size)}${i.kind !== 'rug' && i.kind !== 'bass trap' ? ` · ${i.thickness_in}″ thick${i.gap_in ? ` + ${i.gap_in}″ air gap` : ''}` : ''}${i.absorbs_down_to_hz ? ` · absorbs well above ~${i.absorbs_down_to_hz} Hz` : ''} · rough cost ${usd(i.cost_usd)}</div>
+        <div class="spec">${esc(trtWhere(i))}</div>
+        <p class="small">${esc(i.why)}${i.membrane_hz ? ` For ${i.membrane_hz} Hz, a membrane (pressure) trap tuned there does more than porous depth.` : ''}</p>
+        ${i.blocked && i.alternative ? `<p class="small"><b>Instead:</b> ${esc(i.alternative)}</p>` : ''}
+        <div class="acts">${i.installed ? '' : `<button class="btn" data-trt-mark="${esc(i.id)}">Mark installed</button>`}
+          <button class="btn ghost ask" data-ask="${esc(`Tell me more about this room treatment item: ${i.title}. What exactly should I buy or build, and how do I place it?`)}">Ask</button></div></li>`;
+      let list = '';
+      [1, 2, 3].forEach(t => { const its = p.items.filter(i => i.tier === t && !i.installed); if (its.length) list += `<div class="trt-tier">${esc(p.tiers[t])}</div><ul class="trt-list">${its.map(itemHtml).join('')}</ul>`; });
+      const done = p.items.filter(i => i.installed); if (done.length) list += `<div class="trt-tier">Already done</div><ul class="trt-list">${done.map(itemHtml).join('')}</ul>`;
+      const probs = p.problems.length ? `<div class="tw"><table class="dc-tbl"><thead><tr><th>What the room does</th><th>Treatment helps</th></tr></thead><tbody>${p.problems.map(x => `<tr><td style="text-align:left"><b>${esc(x.title)}</b>${x.measured ? '' : ' <span class="conf">predicted</span>'}<div class="small muted">${esc(x.found)}</div><div class="small">${esc(x.eq_note)}</div></td><td><span class="trt-score" title="${x.score}/100"><i style="width:${x.score}%"></i></span></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No problems found that treatment would help with.</p>';
+      const cmp = p.compare;
+      let cmpH = '';
+      if (cmp) {
+        cmpH = `<h3 style="margin:18px 0 6px">Before and after</h3><p class="small muted" style="margin:0 0 6px">Since ${esc(new Date(cmp.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}))}: ${esc(cmp.change)}</p>`;
+        if (cmp.rows.length) cmpH += `<div class="tw"><table class="dc-tbl"><thead><tr><th>Measurement</th><th>Before</th><th>After</th><th></th></tr></thead><tbody>${cmp.rows.map(r => `<tr><td>${esc(r.what)}</td><td>${r.before} ${r.unit}</td><td>${r.after} ${r.unit}</td><td>${r.verdict === 'better' ? '✓ better' : r.verdict === 'worse' ? 'worse' : 'about the same'}</td></tr>`).join('')}</tbody></table></div>`;
+        if (cmp.waiting.length) cmpH += `<p class="small muted">Run a new ${cmp.waiting.join(' and a new ')} to see the change.</p>`;
+      }
+      $('#trtOut').innerHTML = `<div class="notice" style="margin-bottom:12px">${esc(p.honesty)}</div>
+        <div class="dc-grid" style="margin-top:0"><div>${trtDrawing(p)}</div><div><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
+        ${list}${cmpH}
+        ${p.notes.length ? `<ul class="wins" style="margin-top:14px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}`;
+      $('#trtOut').querySelectorAll('[data-trt-mark]').forEach(b => b.onclick = async () => {
+        const i = p.items.find(x => x.id === b.dataset.trtMark); if (!i) return;
+        const n = prompt(`How many did you install? (the plan suggests ${i.qty})`, String(Math.max(1, i.qty - (i.installed_qty || 0)))); if (n === null) return;
+        const r = await post('/api/treatment', {add: [{plan_id: i.id, kind: i.kind, wall: i.wall, qty: +n || 1, size: i.size, thickness_in: i.thickness_in, gap_in: i.gap_in}]});
+        if (r.error) alert(r.error); poll();
+      });
+    }
+  }
+  renderTreatmentForms(p);
+}
+function renderTreatmentForms(p) {
+  const c = (p && p.constraints) || {}, ck = JSON.stringify(c);
+  if (ck !== trtConsKey && !$('#trtCons').contains(document.activeElement)) { trtConsKey = ck;
+    $('#trtCons').innerHTML = `<div class="f" style="margin-bottom:8px">Surfaces you can’t treat<div class="trt-walls">${TRT_WALLS.map(w => `<label><input type="checkbox" value="${w}" ${(c.no_walls || []).includes(w) ? 'checked' : ''}> ${w}</label>`).join('')}</div></div>
+      <div class="row"><label class="f" style="width:140px">Budget (US$)<input id="trtBudget" type="number" min="0" step="50" value="${c.budget_usd ?? ''}" placeholder="none"></label>
+        <label class="f" style="width:170px">Looks<select id="trtLooks">${[['any', 'Anything goes'], ['tidy', 'Tidy, matching'], ['hidden', 'As hidden as possible']].map(([v, t]) => `<option value="${v}" ${(c.looks || 'any') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
+      <label class="f" style="margin-top:8px">Furniture that matters<input id="trtFurn" value="${esc(c.furniture || '')}" placeholder="e.g. sofa against the back wall, bookshelf on the right"></label>
+      <label class="f" style="margin-top:8px">Other notes<input id="trtNotes" value="${esc(c.notes || '')}" placeholder="e.g. rented home, no holes in the ceiling"></label>
+      <div class="row" style="margin-top:8px"><button class="btn primary" id="trtSaveCons">Save constraints</button></div>`;
+    $('#trtSaveCons').onclick = async () => {
+      const r = await post('/api/treatment', {constraints: {no_walls: [...$('#trtCons').querySelectorAll('input[type=checkbox]:checked')].map(x => x.value),
+        budget_usd: $('#trtBudget').value === '' ? null : +$('#trtBudget').value, looks: $('#trtLooks').value, furniture: $('#trtFurn').value, notes: $('#trtNotes').value}});
+      if (r.error) alert(r.error); trtConsKey = null; poll();
+    };
+  }
+  const inst = (p && p.installed) || [], ik = JSON.stringify(inst);
+  if (ik !== trtInstKey && !$('#trtInst').contains(document.activeElement)) { trtInstKey = ik;
+    $('#trtInst').innerHTML = (inst.length ? `<div class="tw"><table class="dc-tbl"><thead><tr><th>What</th><th>Where</th><th>Qty</th><th>Thickness</th><th>Since</th><th></th></tr></thead><tbody>${inst.map(x => `<tr><td>${esc(x.kind)}${x.size ? ' · ' + esc(x.size) : ''}${x.notes ? `<div class="small muted">${esc(x.notes)}</div>` : ''}</td><td>${esc(x.wall || '')}</td><td>${x.qty}</td><td>${x.thickness_in != null ? x.thickness_in + '″' + (x.gap_in ? ` + ${x.gap_in}″ gap` : '') : ''}</td><td>${esc(new Date(x.t * 1000).toLocaleDateString())}</td><td><button class="btn ghost" data-trt-rm="${esc(x.id)}">Remove</button></td></tr>`).join('')}</tbody></table></div>` : '<p class="muted small" style="margin:0 0 8px">Nothing recorded yet. Use “Mark installed” on a plan item, or add what you already have:</p>')
+      + `<div class="row" style="margin-top:8px;flex-wrap:wrap"><label class="f" style="width:130px">What<select id="trtKind">${['absorber', 'bass trap', 'cloud', 'diffuser', 'rug', 'curtain', 'other'].map(k => `<option>${k}</option>`).join('')}</select></label>
+        <label class="f" style="width:120px">Where<select id="trtWall">${[...TRT_WALLS, 'corners'].map(w => `<option>${w}</option>`).join('')}</select></label>
+        <label class="f" style="width:70px">Qty<input id="trtQty" type="number" min="1" value="1"></label>
+        <label class="f" style="width:100px">Thickness (in)<input id="trtTh" type="number" min="0" step="0.5"></label>
+        <label class="f" style="flex:1;min-width:140px">Notes<input id="trtNote" placeholder="e.g. 2x4 ft rockwool panels"></label>
+        <button class="btn" id="trtAdd" style="align-self:flex-end">Add</button></div>
+      <p class="muted small" style="margin:8px 0 0">Each change is logged in the journal and keeps a snapshot of your latest measurements, so a new system report and check-up show what it changed.</p>`;
+    $('#trtInst').querySelectorAll('[data-trt-rm]').forEach(b => b.onclick = async () => {
+      if (!confirm('Remove this from what you have installed?')) return;
+      const r = await post('/api/treatment', {remove: [b.dataset.trtRm]}); if (r.error) alert(r.error); trtInstKey = null; poll(); });
+    $('#trtAdd').onclick = async () => {
+      const r = await post('/api/treatment', {add: [{kind: $('#trtKind').value, wall: $('#trtWall').value, qty: +$('#trtQty').value || 1,
+        thickness_in: $('#trtTh').value === '' ? null : +$('#trtTh').value, notes: $('#trtNote').value}]});
+      if (r.error) alert(r.error); trtInstKey = null; poll(); };
+  }
+}
+
 // ---------- coach: next best steps (computed by htTamer, no AI needed)
 let coachKey = null;
 const WHO = {bassblend: 'htTamer does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};

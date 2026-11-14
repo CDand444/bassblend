@@ -637,6 +637,15 @@ def _summ_result(r):
             "shared_eq": r["peq_global"]}
 
 
+def treatment_plan(st=None):
+    """The room treatment plan from the room, the latest measurements and the speaker placement."""
+    from . import dirac, layout, treatment
+    from .room import load_room, modal_report
+    room, st = load_room(), st if st is not None else load_state()
+    sy = dirac.system()
+    return treatment.plan(room, st, layout.plan(room, sy.get("beds"), sy.get("heights")), modal_report(room, 200))
+
+
 def build_executors():
     from . import library
     from .room import load_room, modal_report
@@ -690,6 +699,11 @@ def build_executors():
             out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
                                            "areas": {k: v["status"] for k, v in rep["areas"].items()},
                                            "top_findings": [f["title"] for f in rep["findings"] if f["status"] in ("fix", "watch")][:6]}
+        try:
+            from . import treatment
+            out["room_treatment"] = treatment.brief(treatment_plan(st))
+        except Exception as e:                           # noqa: BLE001
+            out["room_treatment"] = {"error": str(e)}
         from . import fixlog
         fs = fixlog.summary(sub_level_now=(avr_status()["status"] or {}).get("sub_level"))
         if fs:
@@ -1006,6 +1020,32 @@ def build_executors():
         r = load_state().get("result") or {}
         return {"summary": f"saved: slot {r.get('slot')} now plays '{r.get('tune_name')}'"}
 
+    def treatment_get():
+        p = treatment_plan()
+        if not p:
+            return {"plan": None, "summary": "no room size yet: record it first (update_room)"}
+        trim = lambda x: {k: v for k, v in x.items() if k not in ("points", "rect", "zone")}
+        return {"problems": p["problems"], "items": [trim(i) for i in p["items"]], "notes": p["notes"],
+                "installed": p["installed"], "constraints": p["constraints"], "before_after": p["compare"],
+                "measured": p["metrics"], "first_reflection_zones_ft": {
+                    i["id"]: {"wall": i["wall"], "along_ft": [round(v / 0.3048, 1) for v in i["zone"]["a"]],
+                              "up_ft": [round(v / 0.3048, 1) for v in i["zone"]["b"]]} for i in p["items"] if i.get("zone")},
+                "zone_note": "along_ft is from the front wall on side walls, from the left wall on the front/back wall and "
+                             "ceiling; up_ft is height from the floor on walls, distance from the front wall on the ceiling/floor.",
+                "honesty": p["honesty"], "summary": p["summary"]}
+
+    def treatment_constraints(**c):
+        from . import treatment
+        r = treatment.update(constraints=c, who="assistant")
+        return {"constraints": r["treatment"]["constraints"], "changed": r["changed"],
+                "summary": "; ".join(r["changed"]) or "nothing changed"}
+
+    def treatment_record(add=None, remove=None):
+        from . import treatment
+        r = treatment.update(add or [], remove or [], who="assistant")
+        return {"installed": r["treatment"]["installed"], "changed": r["changed"],
+                "summary": "; ".join(r["changed"]) or "nothing changed"}
+
     def tune_name(tid):
         try:
             return library.get(tid)["name"]
@@ -1022,6 +1062,8 @@ def build_executors():
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "get_live_eq": leq_get, "set_live_eq": leq_set, "fit_live_eq": leq_fit, "start_live_analyzer": leq_start,
             "stop_live_analyzer": leq_stop, "save_live_eq": leq_save,
+            "get_treatment_plan": treatment_get, "set_treatment_constraints": treatment_constraints,
+            "record_treatment": treatment_record,
             "_tune_name": tune_name}
 
 
@@ -1447,6 +1489,12 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:                       # noqa: BLE001
                 st["placement"] = None
                 print(f"[placement] {e}", flush=True)
+            try:
+                from . import treatment
+                st["treatment"] = treatment.plan(room, st, st["placement"], st["modes"])
+            except Exception as e:                       # noqa: BLE001
+                st["treatment"] = None
+                print(f"[treatment] {e}", flush=True)
             if len(st.get("deep_reports") or {}) >= 2:
                 from . import deepcheck
                 try:
@@ -1457,6 +1505,8 @@ class H(BaseHTTPRequestHandler):
             from . import version
             st["version"] = version()
             return self._send(200, st)
+        if u.path == "/api/treatment":
+            return self._send(200, {"plan": treatment_plan()})
         if u.path == "/api/live":
             return self._send(200, _live_levels())
         if u.path == "/api/spl":
@@ -1641,6 +1691,10 @@ class H(BaseHTTPRequestHandler):
             if path == "/api/speakers":
                 from . import equip
                 return self._send(200, equip.update_speakers(body.get("speakers") or {}, body.get("remove") or [], who="page"))
+            if path == "/api/treatment":                # installed treatment and the owner's constraints (no sound)
+                from . import treatment
+                r = treatment.update(body.get("add") or [], body.get("remove") or [], body.get("constraints"), who="page")
+                return self._send(200, {**r, "plan": treatment_plan()})
             if path == "/api/fixes":
                 from . import fixlog
                 if body.get("action") == "accept":

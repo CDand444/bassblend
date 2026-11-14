@@ -1,0 +1,690 @@
+"""Room treatment planner: what acoustic treatment the room needs, where, and how much it would help.
+
+Deterministic and offline. It works from what htTamer already knows:
+  * the room, seats and speaker/sub positions (room.json; the Dolby placement plan fills in
+    speakers the owner hasn't placed),
+  * room modes (room.modal_report),
+  * the latest system report (RT60 per octave, early reflections, classified peaks/dips,
+    left/right differences) and check-up (bass decay per 1/3 octave), and the tune's seat spread.
+
+Honesty rules baked in: EQ fixes peaks, treatment fixes ringing, reflections and decay; porous
+panels only absorb well above roughly 1000 / depth-in-inches Hz (a 2" panel does little below
+about 500 Hz, nothing much below 200 Hz); deep bass (under ~40 Hz) is the subs' and EQ's job.
+
+Advice from a measurement uses that measurement (its own decay and reflection numbers and its
+time), never today's state. What the owner has installed and their constraints are stored in
+room.json under "treatment" and every change is journaled; each change keeps a snapshot of the
+measured numbers at that moment, so later reports can be compared before and after.
+
+Coordinates as everywhere in htTamer: metres, x from the left wall, y from the front (screen)
+wall, z from the floor. Walls: left (x=0), right (x=W), front (y=0), back (y=L), ceiling, floor.
+"""
+from __future__ import annotations
+
+import math
+import time
+
+FT = 0.3048
+IN = 0.0254
+C = 343.0
+EAR = 1.05
+WALLS = ("left", "right", "front", "back", "ceiling", "floor")
+KINDS = ("absorber", "bass trap", "cloud", "diffuser", "rug", "curtain", "other")
+LOOKS = ("any", "tidy", "hidden")
+TIER = {1: "Do this first", 2: "Next", 3: "Nice to have"}
+PANEL = (2 * FT, 4 * FT)               # a standard 2 x 4 ft panel (width, height)
+
+
+def _ft(m):
+    return None if m is None else round(m / FT, 1)
+
+
+def low_limit_hz(thickness_in: float, gap_in: float = 0.0) -> float:
+    """Roughly the lowest frequency a porous panel still absorbs well (about 0.8 or more).
+    Rule of thumb: 1000 / depth in inches, an air gap counting about half its depth."""
+    d = max(0.25, float(thickness_in) + 0.5 * float(gap_in or 0))
+    return round(1000.0 / d)
+
+
+def depth_for_hz(f: float) -> float:
+    """Total porous depth (inches) for good absorption down to f (inverse of low_limit_hz)."""
+    return round(1000.0 / max(f, 1.0), 1)
+
+
+# ------------------------------------------------------------------ geometry
+_AXIS = {"left": (0, lambda d: 0.0), "right": (0, lambda d: d["W"]), "front": (1, lambda d: 0.0),
+         "back": (1, lambda d: d["L"]), "floor": (2, lambda d: 0.0), "ceiling": (2, lambda d: d["H"])}
+
+
+def reflection_point(src, lis, wall, dims):
+    """First-order (mirror-image) reflection of src heard at lis off a wall.
+    src, lis: (x, y, z) in metres; dims: {"L", "W", "H"}. Returns {x, y, z, extra_m, ms, db} with
+    the point on the wall, the extra path vs the direct sound, its delay (ms) and the level of the
+    reflection relative to the direct sound from distance alone (dB, a perfectly hard wall), or None
+    when the point falls outside the wall."""
+    ax, val = _AXIS[wall]
+    p = val(dims)
+    img = list(src)
+    img[ax] = 2 * p - src[ax]
+    den = img[ax] - lis[ax]
+    if abs(den) < 1e-9:
+        return None
+    t = (p - lis[ax]) / den
+    if not 0 < t < 1:
+        return None
+    pt = [lis[i] + t * (img[i] - lis[i]) for i in range(3)]
+    lim = (dims["W"], dims["L"], dims["H"])
+    if any(not (-1e-6 <= pt[i] <= lim[i] + 1e-6) for i in range(3)):
+        return None
+    direct, refl = math.dist(src, lis), math.dist(img, lis)
+    return {"x_m": round(pt[0], 3), "y_m": round(pt[1], 3), "z_m": round(pt[2], 3),
+            "extra_m": round(refl - direct, 3), "ms": round((refl - direct) / C * 1000, 2),
+            "db": round(20 * math.log10(direct / refl), 1) if refl > 0 else None}
+
+
+def _dims(room):
+    rm = room.get("room") or {}
+    L, W, H = rm.get("length_m"), rm.get("width_m"), rm.get("height_m")
+    return {"L": L, "W": W, "H": H} if (L and W and H) else None
+
+
+def seats_of(room):
+    out = []
+    for s in room.get("seats") or []:
+        if s.get("x_m") is not None and s.get("y_m") is not None:
+            out.append({"name": s.get("name") or f"Seat {len(out) + 1}", "x_m": s["x_m"], "y_m": s["y_m"],
+                        "z_m": s.get("z_m") or EAR})
+    return out
+
+
+def speakers_of(room, placement=None):
+    """Speaker positions: the owner's recorded ones, else the Dolby placement plan's (marked 'suggested')."""
+    rec = room.get("speakers") or {}
+    out = {}
+    for s in (placement or {}).get("speakers") or []:
+        out[s["id"]] = {"id": s["id"], "x_m": s["x_m"], "y_m": s["y_m"], "z_m": s["z_m"], "kind": s.get("kind", "bed"),
+                        "source": "suggested"}
+    for ch, d in rec.items():
+        if d.get("x_m") is not None and d.get("y_m") is not None:
+            kind = "height" if ch.startswith("T") else "bed"
+            out[ch] = {"id": ch, "x_m": d["x_m"], "y_m": d["y_m"], "z_m": d.get("z_m") or (EAR if kind == "bed" else None),
+                       "kind": kind, "source": "recorded"}
+    return {k: v for k, v in out.items() if v.get("z_m") is not None}
+
+
+def first_reflections(room, placement=None, channels=("FL", "FR", "C"), walls=("left", "right", "ceiling", "floor")):
+    """Every first reflection of the given speakers at every seat, per wall."""
+    dims = _dims(room)
+    if not dims:
+        return {}
+    spk = speakers_of(room, placement)
+    out = {w: [] for w in walls}
+    for st in seats_of(room):
+        lis = (st["x_m"], st["y_m"], st["z_m"])
+        for ch in channels:
+            s = spk.get(ch)
+            if not s:
+                continue
+            for w in walls:
+                r = reflection_point((s["x_m"], s["y_m"], s["z_m"]), lis, w, dims)
+                if r:
+                    out[w].append({**r, "speaker": ch, "seat": st["name"], "source": s["source"]})
+    return out
+
+
+def _zone(points, wall, dims, margin=0.3):
+    """Panel area that covers a set of reflection points on one wall (with a margin for head movement)."""
+    if not points:
+        return None
+    if wall in ("left", "right"):
+        a, b = "y_m", "z_m"
+        alim, blim = dims["L"], dims["H"]
+    elif wall in ("front", "back"):
+        a, b = "x_m", "z_m"
+        alim, blim = dims["W"], dims["H"]
+    else:
+        a, b = "x_m", "y_m"
+        alim, blim = dims["W"], dims["L"]
+    lo_a = max(0.0, min(p[a] for p in points) - margin)
+    hi_a = min(alim, max(p[a] for p in points) + margin)
+    lo_b = max(0.0, min(p[b] for p in points) - margin)
+    hi_b = min(blim, max(p[b] for p in points) + margin)
+    if hi_a - lo_a < PANEL[0]:                         # at least one panel wide
+        mid = (lo_a + hi_a) / 2
+        lo_a, hi_a = max(0.0, mid - PANEL[0] / 2), min(alim, mid + PANEL[0] / 2)
+    if hi_b - lo_b < PANEL[1] * (0.5 if wall in ("ceiling", "floor") else 1):
+        mid = (lo_b + hi_b) / 2
+        need = PANEL[1] * (0.5 if wall in ("ceiling", "floor") else 1)
+        lo_b, hi_b = max(0.0, mid - need / 2), min(blim, mid + need / 2)
+    return {"axis": [a, b], "a": [round(lo_a, 2), round(hi_a, 2)], "b": [round(lo_b, 2), round(hi_b, 2)],
+            "area_m2": round((hi_a - lo_a) * (hi_b - lo_b), 2)}
+
+
+def _panels(area_m2):
+    return max(1, math.ceil(area_m2 / (PANEL[0] * PANEL[1]) - 0.15))
+
+
+def match_reflection(ms, refl):
+    """Which wall most likely made a measured reflection (ms after the direct sound), from the geometry
+    of the front left speaker at the main seat. Returns (wall, predicted_ms) or None."""
+    best = None
+    for w, pts in refl.items():
+        for p in pts:
+            if p["speaker"] != "FL" or p.get("seat_idx", 0) != 0:
+                continue
+            d = abs(p["ms"] - ms)
+            if d <= max(0.5, 0.2 * ms) and (best is None or d < best[2]):
+                best = (w, p["ms"], d)
+    return best and best[:2]
+
+
+# ------------------------------------------------------------------ measured numbers
+def room_metrics(state: dict) -> dict:
+    """The treatment-relevant numbers from the latest measurements, each with its own time."""
+    out = {}
+    reps = (state.get("deep_reports") or {}).values()
+    rep = max(reps, key=lambda r: r.get("t", 0), default=None)
+    if rep:
+        bands = {str(d["f"]): d["t60"] for d in rep.get("decay") or [] if d.get("t60") is not None}
+        mid = [d["t60"] for d in rep.get("decay") or [] if d.get("t60") is not None and d["f"] >= 250]
+        refl = (rep.get("reflections") or {})
+        allr = (refl.get("left") or []) + (refl.get("right") or [])
+        strong = max((x for x in allr if x["ms"] < 15), key=lambda x: x["db"], default=None)
+        out["report"] = {"t": rep.get("t"), "pos": rep.get("pos"), "rt60_bands": bands,
+                         "rt60_mid_s": round(sorted(mid)[len(mid) // 2], 2) if mid else None,
+                         "strongest_reflection": strong and {k: strong[k] for k in ("ms", "db")},
+                         "lr_tone_spread_db": (rep.get("lr") or {}).get("tone_spread_db"),
+                         "lr_level_db": (rep.get("lr") or {}).get("level_db")}
+    ck = (state.get("checkups") or [None])[-1]
+    if ck and ck.get("decay"):
+        ts = [d for d in ck["decay"] if d.get("t60") is not None and d["f"] >= 30]
+        worst = max(ts, key=lambda d: d["t60"] / _decay_good(d["f"]), default=None)
+        out["checkup"] = {"t": ck.get("t"), "pos": ck.get("pos"),
+                          "bass_t60": {str(d["f"]): d["t60"] for d in ck["decay"] if d.get("t60") is not None},
+                          "bass_t60_median_s": round(sorted(d["t60"] for d in ts)[len(ts) // 2], 2) if ts else None,
+                          "worst": worst and {"f": worst["f"], "t60": worst["t60"]}}
+    res = state.get("result") or {}
+    sp = ((res.get("metrics") or {}).get("after") or {}).get("seat_spread_db")
+    if sp is not None:
+        out["seats"] = {"t": res.get("applied") or res.get("t"), "seat_spread_db": sp}
+    return out
+
+
+def _decay_good(f):
+    from .checkup import decay_limits
+    return decay_limits(f)[0]
+
+
+# ------------------------------------------------------------------ problems
+def _p(pid, title, score, found, why, eq, measured, treat, **kw):
+    return {"id": pid, "title": title, "score": int(round(max(0, min(100, score)))), "found": found, "why": why,
+            "eq_note": eq, "measured": measured, "treatments": treat, **kw}
+
+
+def _treatability_bass(f):
+    """How much practical porous/corner trapping helps at f (0..1)."""
+    return 0.75 if f >= 80 else 0.5 if f >= 50 else 0.3 if f >= 35 else 0.15
+
+
+def problems(room: dict, state: dict, modal: dict | None = None, refl: dict | None = None) -> list[dict]:
+    """Ranked problems that treatment could help with, score = severity x how well treatment helps."""
+    out = []
+    dims = _dims(room)
+    m = room_metrics(state)
+    rep = max((state.get("deep_reports") or {}).values(), key=lambda r: r.get("t", 0), default=None)
+    ck = m.get("checkup")
+    # 1. bass ringing (check-up decay per 1/3 octave, and the report's 63/125 Hz octaves)
+    ring = []
+    if ck:
+        for f, t in ck["bass_t60"].items():
+            f = float(f)
+            if f < 30:
+                continue
+            g = _decay_good(f)
+            if t > g:
+                ring.append((f, t, g, "check-up"))
+    if rep:
+        for d in rep.get("decay") or []:
+            if d.get("t60") is not None and d["f"] <= 125 and d["t60"] > _decay_good(d["f"]):
+                ring.append((float(d["f"]), d["t60"], _decay_good(d["f"]), "system report"))
+    if ring:
+        f, t, g, src = max(ring, key=lambda r: (r[1] / r[2]) * _treatability_bass(r[0]))
+        sev = min(1.0, (t / g - 1) / 1.0)
+        mode = None
+        if modal:
+            ax = [x for x in modal.get("axial") or [] if abs(math.log2(x["f"] / f)) < 1 / 6]
+            if ax:
+                mode = min(ax, key=lambda x: abs(x["f"] - f))
+        dim = mode and {0: "width", 1: "length", 2: "height"}[[i for i, n in enumerate(mode["n"]) if n][0]]
+        out.append(_p("bass_ringing", f"Bass rings around {f:g} Hz ({t:.2f} s)", 25 + 75 * sev * _treatability_bass(f),
+                      f"Notes around {f:g} Hz keep sounding for {t:.2f} s ({src}); under {g:.1f} s is tight."
+                      + (f" That lines up with the room's {dim} mode at {mode['f']:g} Hz." if mode else ""),
+                      "Ringing bass blurs kick drums and bass lines and makes the room sound boomy.",
+                      "EQ (the sub tune, live EQ, Dirac) pulls the peak down, which shortens the ringing at that pitch a "
+                      "little, but only absorption removes the stored energy. "
+                      + ("At this pitch practical traps help a lot." if f >= 80 else
+                         "Below about 80 Hz only big traps (12 in. or deeper) or tuned membrane traps do much; "
+                         "multiple subs and EQ stay your main tools there."),
+                      True, ["corner_traps"], f=f, t60=t, limit=g, mode_hz=mode and mode["f"]))
+    elif modal and dims:                                  # nothing measured: predict from the modes
+        ax = (modal.get("axial") or [])[:6]
+        close = [(a, b) for i, a in enumerate(ax) for b in ax[i + 1:] if abs(a["f"] - b["f"]) < 5]
+        out.append(_p("bass_ringing", "Bass ringing (predicted from the room size)", 30 + (10 if close else 0),
+                      "No check-up yet. Every room rings at its modes; yours start at "
+                      + ", ".join(f"{x['f']:g}" for x in ax[:4]) + " Hz"
+                      + (" and two of them sit close together, which stacks them." if close else "."),
+                      "Run a check-up for the real ringing per band.",
+                      "EQ fixes the peaks of the modes; corner traps reduce how long they ring.", False, ["corner_traps"]))
+    # 2. a lively room (RT60 above 250 Hz)
+    rm = (m.get("report") or {}).get("rt60_mid_s")
+    if rm is not None:
+        if rm > 0.4:
+            out.append(_p("live_room", f"The room is lively (ring time {rm:.2f} s)", 30 + 140 * min(0.5, rm - 0.4),
+                          f"Above 250 Hz sound takes {rm:.2f} s to die away; home theatres sound best at 0.2-0.4 s.",
+                          "Dialogue gets less clear and the surround effects smear together.",
+                          "EQ can't change how long a room rings; only absorption (panels, rug, curtains, soft furniture) does.",
+                          True, ["side_panels", "ceiling_cloud", "rear_wall", "rug"], rt60=rm))
+        elif rm < 0.2:
+            out.append(_p("dead_room", f"The room is already quite dead ({rm:.2f} s)", 0,
+                          f"Above 250 Hz the room rings for only {rm:.2f} s.",
+                          "More absorption would make it feel closed-in.",
+                          "Prefer diffusion (bookshelves, diffusers) and bass traps over more thin panels.", True, ["rear_wall"], rt60=rm))
+    # 3. strong early reflections
+    if rep:
+        allr = [dict(x, side="left") for x in (rep.get("reflections") or {}).get("left") or []] + \
+               [dict(x, side="right") for x in (rep.get("reflections") or {}).get("right") or []]
+        strong = [x for x in allr if x["ms"] < 15 and x["db"] > -10]
+        if strong:
+            x = max(strong, key=lambda r: r["db"] - r["ms"] / 5)
+            hit = match_reflection(x["ms"], refl or {}) if refl else None
+            sev = min(1.0, (x["db"] + 10) / 8) * (1.0 if x["ms"] < 6 else 0.7)
+            where = {"left": "the left side wall", "right": "the right side wall", "ceiling": "the ceiling",
+                     "floor": "the floor"}.get(hit[0], "") if hit else ""
+            out.append(_p("early_reflection", f"Strong early reflection {x['ms']:.1f} ms after the direct sound",
+                          35 + 60 * sev,
+                          f"The {x['side']} speaker's sound comes back off a surface only {abs(x['db']):.0f} dB quieter, "
+                          f"{x['ms']:.1f} ms late (about {x['ms'] * C / 10:.0f} cm extra path)."
+                          + (f" The geometry says that's most likely {where} (predicted {hit[1]:.1f} ms)." if hit else ""),
+                          "Strong early reflections blur the stereo image and cause comb-filter ripples in the treble.",
+                          "EQ can't fix a reflection (the ripples move as you move your head); treat the reflection point.",
+                          True, ["side_panels", "ceiling_cloud", "rug"] if not hit else
+                          [{"left": "side_panels", "right": "side_panels", "ceiling": "ceiling_cloud", "floor": "rug"}[hit[0]]],
+                          ms=x["ms"], db=x["db"], wall=hit and hit[0]))
+    # 4. left/right differences
+    if rep:
+        lr = rep.get("lr") or {}
+        spread = lr.get("tone_spread_db") or 0
+        if spread > 1.5:
+            out.append(_p("lr_mismatch", f"Left and right sound different ({spread:.1f} dB tonal spread)", 20 + 25 * min(1.0, (spread - 1.5) / 2),
+                          f"Above 500 Hz the left and right speakers differ by ±{spread:.1f} dB in tone at your seat.",
+                          "An unsymmetrical room (a window, an opening, furniture on one side) shifts the image to one side.",
+                          "Dirac evens the levels, but symmetrical treatment of both side walls fixes the cause.",
+                          True, ["side_panels"], spread_db=spread))
+    # 5. findings in the report: cancellation dips (wall behind the speakers) and booms (peaks)
+    for f in (rep or {}).get("findings") or []:
+        if f.get("kind") == "dip" and "wall behind" in f.get("title", ""):
+            out.append(_p("boundary_dip", f.get("title"), 20 + 2 * min(10, abs(f.get("db") or 0)),
+                          f.get("found", ""), "Instruments and voices lose body in that range.",
+                          "EQ can't fill a cancellation. Moving the speakers (closer to the wall or further out) works best; "
+                          "thick absorption behind the speakers helps a little.", True, ["front_wall"], f=f.get("f")))
+            break
+    booms = [f for f in (rep or {}).get("findings") or [] if f.get("kind") == "peak" and (f.get("f") or 999) < 300]
+    if booms:
+        b = max(booms, key=lambda x: x.get("db") or 0)
+        out.append(_p("boom_peak", b.get("title"), 10, b.get("found", ""),
+                      "A peak makes some bass notes louder than others.",
+                      "This one is EQ's job: the sub tune and Dirac pull peaks down well. Treatment only helps the ringing that comes with it.",
+                      True, ["corner_traps"], f=b.get("f")))
+    # 6. seat-to-seat bass differences
+    sp = (m.get("seats") or {}).get("seat_spread_db")
+    if sp is not None and sp >= 3:
+        out.append(_p("seat_spread", f"Bass differs {sp:.1f} dB between seats", 8,
+                      f"After the tune, the bass still varies about {sp:.1f} dB from seat to seat.",
+                      "Some seats get more bass than others.",
+                      "Treatment barely changes this. Sub placement, more subs and the multi-seat tune are what even it out.",
+                      True, [], spread_db=sp))
+    # 7. geometry-only: seat close to the back wall
+    st = seats_of(room)
+    if dims and st and dims["L"] - max(s["y_m"] for s in st) < 0.9:
+        out.append(_p("seat_near_back", "Seats close to the back wall", 35,
+                      f"The back row is {_ft(dims['L'] - max(s['y_m'] for s in st))} ft from the back wall.",
+                      "Sound bouncing straight back off the wall arrives almost with the direct sound, and bass piles up there.",
+                      "EQ can't fix it; thick absorption right behind the heads does.", False, ["rear_wall"]))
+    out.sort(key=lambda p: -p["score"])
+    return out
+
+
+# ------------------------------------------------------------------ the plan
+def _rect(wall, z, dims):
+    """Drawing rectangle (top-down, metres) for a zone on a wall."""
+    if not z:
+        return None
+    a, b = z["a"], z["b"]
+    if wall in ("left", "right"):
+        x = 0.0 if wall == "left" else dims["W"]
+        return {"x0": x, "x1": x, "y0": a[0], "y1": a[1]}
+    if wall in ("front", "back"):
+        y = 0.0 if wall == "front" else dims["L"]
+        return {"x0": a[0], "x1": a[1], "y0": y, "y1": y}
+    return {"x0": a[0], "x1": a[1], "y0": b[0], "y1": b[1]}
+
+
+def _cost(kind, n):
+    each = {"absorber": (40, 120), "cloud": (60, 200), "bass trap": (60, 250), "diffuser": (80, 300),
+            "rug": (100, 400), "curtain": (40, 150)}.get(kind, (30, 100))
+    return [each[0] * n, each[1] * n]
+
+
+def plan(room: dict, state: dict | None = None, placement: dict | None = None, modal: dict | None = None) -> dict | None:
+    """The full plan: ranked problems, treatment items by tier, geometry for the drawing."""
+    dims = _dims(room)
+    if not dims:
+        return None
+    state = state or {}
+    tr = treatment_data(room)
+    cons = tr["constraints"]
+    banned = set(cons.get("no_walls") or [])
+    refl = first_reflections(room, placement)
+    # tag main-seat points so a measured reflection is matched against the MLP
+    mlp = (seats_of(room) or [{}])[0].get("name")
+    for pts in refl.values():
+        for p in pts:
+            p["seat_idx"] = 0 if p["seat"] == mlp else 1
+    probs = problems(room, state, modal, refl)
+    score, measured = {}, set()
+    for p in probs:
+        for n, t in enumerate(p["treatments"]):          # the first listed treatment is the main cure
+            score[t] = max(score.get(t, 0), round(p["score"] * (1 if n == 0 else 0.7)))
+            if p["measured"]:
+                measured.add(t)
+    seats, spk = seats_of(room), speakers_of(room, placement)
+    carpet = "carpet" in ((room.get("room") or {}).get("construction") or "").lower() + \
+             ((room.get("room") or {}).get("notes") or "").lower()
+    rt = (room_metrics(state).get("report") or {}).get("rt60_mid_s")
+    items, notes = [], []
+
+    def add(iid, title, kind, wall, zone_, qty, size, thick, gap, effect, base, why, **kw):
+        blocked = wall in banned
+        it = {"id": iid, "title": title, "kind": kind, "wall": wall, "zone": zone_, "qty": qty, "size": size,
+              "thickness_in": thick, "gap_in": gap, "absorbs_down_to_hz": low_limit_hz(thick, gap) if kind in ("absorber", "cloud", "bass trap") else None,
+              "effect": effect, "why": why, "score": max(base, score.get(iid, 0)), "measured": iid in measured,
+              "cost_usd": _cost(kind, qty), "blocked": bool(blocked), **kw}
+        if blocked:
+            it["alternative"] = ("Freestanding panels (gobos) on stands at the same spots, moved into place for listening."
+                                 if kind in ("absorber", "cloud") else "Skip it, or use a freestanding version.")
+        items.append(it)
+
+    # side walls: first reflections of the front three
+    for w in ("left", "right"):
+        z = _zone(refl.get(w) or [], w, dims)
+        if z:
+            n = _panels(z["area_m2"])
+            add("side_panels" if w == "left" else "side_panels_r", f"{w.title()} side wall: first-reflection panels", "absorber", w, z,
+                n, "2 x 4 ft", 4, 2,
+                "Clearer dialogue and a sharper, steadier centre image; takes out the comb ripples in the treble.",
+                45, "The first reflections of the front speakers off the side walls arrive within a few milliseconds and blur the image.",
+                rect=_rect(w, z, dims), points=refl.get(w))
+    # ceiling cloud
+    z = _zone(refl.get("ceiling") or [], "ceiling", dims)
+    if z:
+        add("ceiling_cloud", "Ceiling cloud over the seats", "cloud", "ceiling", z, _panels(z["area_m2"]), "2 x 4 ft",
+            4, 6, "Less 'boxy' sound and clearer dialogue; with height speakers, keep it between the front and rear heights.",
+            30, "The ceiling reflection is as strong as the side walls' and often the earliest one in rooms with low ceilings.",
+            rect=_rect("ceiling", z, dims), points=refl.get("ceiling"))
+        if any(s["kind"] == "height" for s in spk.values()):
+            notes.append("Don't cover the ceiling right under or in front of the height speakers; a cloud between them is fine.")
+    # corner bass traps
+    ring = next((p for p in probs if p["id"] == "bass_ringing"), None)
+    f = (ring or {}).get("f") or 60
+    depth = float(round(min(24.0, max(6.0, depth_for_hz(max(f, 40))))))
+    corners = [(0.0, 0.0, "front left"), (dims["W"], 0.0, "front right"), (0.0, dims["L"], "back left"), (dims["W"], dims["L"], "back right")]
+    sub_corner = []
+    for k, s in (room.get("subs") or {}).items():
+        if s.get("x_m") is not None and s.get("y_m") is not None:
+            sub_corner.append(min(corners, key=lambda c: math.dist((c[0], c[1]), (s["x_m"], s["y_m"])))[2])
+    eff = ("Bass notes stop sooner and sound tighter, mainly above about 60-80 Hz; peaks drop a little and dips fill a little."
+           if f >= 60 else
+           f"Helps the ringing a bit; around {f:g} Hz porous traps this size do less, so tuned membrane (pressure) traps or "
+           "the subs and EQ do the heavy lifting.")
+    add("corner_traps", "Corner bass traps, floor to ceiling", "bass trap", "corners", None, 4, f"{depth:.0f} in. across the corner, floor to ceiling",
+        depth, 0, eff, 40,
+        "Every room mode has its maximum pressure in the corners, so that's where a trap works hardest. "
+        "Wall-to-ceiling corners (soffits) work too.",
+        corners=[{"x_m": c[0], "y_m": c[1], "name": c[2], "sub_here": c[2] in sub_corner} for c in corners],
+        membrane_hz=f if f < 60 else None)
+    # rear wall
+    back = dims["L"] - max((s["y_m"] for s in seats), default=dims["L"] / 2)
+    if back < 0.9:
+        rk, rthick, rgap, reff = "absorber", 4, 2, "Removes the slap right behind your head; the image and dialogue get clearer."
+    elif back >= 1.8 and (rt is None or rt <= 0.45):
+        rk, rthick, rgap, reff = "diffuser", 6, 0, "Spreads the rear-wall reflection out so the room keeps life without echo."
+    else:
+        rk, rthick, rgap, reff = "absorber", 4, 2, "Less echo from behind; surround effects get more precise."
+    zr = {"axis": ["x_m", "z_m"], "a": [round(max(0.0, dims["W"] / 2 - 1.2), 2), round(min(dims["W"], dims["W"] / 2 + 1.2), 2)],
+          "b": [0.6, min(dims["H"], 1.8)], "area_m2": None}
+    zr["area_m2"] = round((zr["a"][1] - zr["a"][0]) * (zr["b"][1] - zr["b"][0]), 2)
+    add("rear_wall", f"Back wall behind the seats: {'diffusion' if rk == 'diffuser' else 'absorption'}", rk, "back", zr,
+        _panels(zr["area_m2"]), "2 x 4 ft", rthick, rgap, reff, 35 if back < 0.9 else 20,
+        f"Your back row is {_ft(back)} ft from the back wall." + (" Close walls need thick absorption." if back < 0.9 else ""),
+        rect=_rect("back", zr, dims))
+    # floor
+    zf = _zone(refl.get("floor") or [], "floor", dims, margin=0.4)
+    if zf and not carpet:
+        add("rug", "Thick rug between the screen and the seats", "rug", "floor", zf, 1,
+            f"about {_ft(zf['a'][1] - zf['a'][0]):.0f} x {_ft(zf['b'][1] - zf['b'][0]):.0f} ft", 1, 0,
+            "Softens the floor bounce and some slap echo; easy and cheap.", 22,
+            "A hard floor reflects the speakers' sound to your ears like a mirror.", rect=_rect("floor", zf, dims), points=refl.get("floor"))
+    # front wall behind the speakers
+    if any(p["id"] == "boundary_dip" for p in probs) or any(s["y_m"] < 0.9 for k, s in spk.items() if k in ("FL", "FR")):
+        zfw = {"axis": ["x_m", "z_m"], "a": [0.0, dims["W"]], "b": [0.3, min(dims["H"], 1.5)], "area_m2": None}
+        zfw["area_m2"] = round(dims["W"] * (zfw["b"][1] - zfw["b"][0]), 2)
+        add("front_wall", "Front wall behind the speakers", "absorber", "front", zfw, 2 if dims["W"] < 4.5 else 3, "2 x 4 ft",
+            6, 4, "A little more body where the wall-bounce dip is, and a cleaner image depth. Moving the speakers helps more.",
+            15, "The wall behind the speakers bounces bass back that cancels the direct sound at one pitch.",
+            rect=_rect("front", zfw, dims))
+    # merge the right-side panels into the left item for ranking (one row each, same score)
+    for it in items:
+        if it["id"] == "side_panels_r":
+            it["score"] = max(it["score"], score.get("side_panels", 0))
+            it["measured"] = it["measured"] or "side_panels" in measured
+    # installed?
+    inst = tr["installed"]
+    for it in items:
+        mine = [x for x in inst if x.get("plan_id") == it["id"] or
+                (not x.get("plan_id") and x.get("kind") == it["kind"] and x.get("wall") == it["wall"])]
+        it["installed_qty"] = sum(int(x.get("qty") or 1) for x in mine)
+        it["installed"] = it["installed_qty"] >= it["qty"]
+    # don't add more absorption to a dead room
+    if rt is not None and rt < 0.2:
+        for it in items:
+            if it["kind"] in ("absorber", "cloud") and it["id"] != "rear_wall":
+                it["score"] = min(it["score"], 10)
+        notes.append("Your room is already dead above 250 Hz: skip more thin panels; bass traps and diffusion still help.")
+    # tiers
+    for it in items:
+        s = it["score"] if not it["installed"] else 0
+        it["tier"] = 1 if s >= 55 else 2 if s >= 30 else 3
+    # budget: drop lower tiers from the "buy" list when over budget (they stay listed)
+    budget = cons.get("budget_usd")
+    if budget:
+        spent = 0
+        for it in sorted(items, key=lambda i: (i["tier"], -i["score"])):
+            if it["installed"] or it["blocked"]:
+                continue
+            spent += it["cost_usd"][0]
+            it["over_budget"] = spent > budget
+    looks = cons.get("looks") or "any"
+    if looks == "hidden":
+        notes.append("For a hidden look: fabric-wrapped panels with printed art, bass traps behind acoustically transparent "
+                     "fabric or furniture, a bookshelf (filled unevenly) as the rear-wall diffuser, heavy curtains over the side walls.")
+    elif looks == "tidy":
+        notes.append("Panels in the wall colour or with a fabric that matches the room look intentional; keep them symmetrical.")
+    if not any(s["source"] == "recorded" for s in spk.values()):
+        notes.append("Speaker positions are the suggested Dolby spots; record where yours really are (Speakers page) "
+                     "for exact reflection points.")
+    if not state.get("deep_reports") and not state.get("checkups"):
+        notes.append("No measurements yet: this plan is from the room geometry only. A system report and a check-up "
+                     "rank it by what your room really does.")
+    items.sort(key=lambda i: (i["installed"], i["tier"], -i["score"]))
+    return {"room": dims, "seats": seats, "speakers": list(spk.values()),
+            "subs": [{"out": int(k) + 1, "x_m": s["x_m"], "y_m": s["y_m"]} for k, s in (room.get("subs") or {}).items()
+                     if s.get("x_m") is not None and s.get("y_m") is not None],
+            "problems": probs, "items": items, "notes": notes, "tiers": TIER, "installed": inst, "constraints": cons,
+            "metrics": room_metrics(state), "compare": compare(tr, state), "honesty": HONESTY,
+            "summary": _summary(probs, items)}
+
+
+HONESTY = ("EQ fixes peaks; treatment fixes ringing, reflections and decay. Thin panels (1-2 in.) only work in the "
+           "upper mids and treble; a porous panel absorbs well down to about 1000 / its depth in inches Hz (4 in. with "
+           "a 2 in. gap ≈ 200 Hz), so below about 200 Hz you need thick traps, and below about 40 Hz the subs and EQ do "
+           "almost all the work.")
+
+
+def _summary(probs, items):
+    top = [i for i in items if not i["installed"] and not i["blocked"]][:3]
+    p = probs[0]["title"] if probs else "nothing measured"
+    return f"top problem: {p}; first: " + ", ".join(i["title"] for i in top)
+
+
+# ------------------------------------------------------------------ owner's data
+def treatment_data(room: dict) -> dict:
+    t = room.get("treatment") or {}
+    return {"installed": list(t.get("installed") or []), "constraints": dict(t.get("constraints") or {}),
+            "history": list(t.get("history") or [])}
+
+
+def _clean_item(d: dict) -> dict:
+    from .equip import _feet
+    d = _feet(d or {})
+    kind = str(d.get("kind") or "absorber").lower()
+    if kind not in KINDS:
+        raise ValueError(f"kind must be one of {', '.join(KINDS)}")
+    wall = str(d.get("wall") or "").lower()
+    if wall and wall not in WALLS + ("corners",):
+        raise ValueError(f"wall must be one of {', '.join(WALLS)}, corners")
+    out = {"kind": kind, "wall": wall or None, "qty": max(1, min(50, int(d.get("qty") or 1))),
+           "plan_id": str(d.get("plan_id") or "")[:40] or None,
+           "size": str(d.get("size") or "")[:40], "thickness_in": _num(d.get("thickness_in"), 0, 36),
+           "gap_in": _num(d.get("gap_in"), 0, 24), "notes": str(d.get("notes") or "")[:200]}
+    for k in ("x_m", "y_m"):
+        out[k] = _num(d.get(k), 0, 50)
+    return out
+
+
+def _num(v, lo, hi):
+    if v in (None, ""):
+        return None
+    v = float(v)
+    if not lo <= v <= hi:
+        raise ValueError(f"value {v:g} outside {lo:g}-{hi:g}")
+    return v
+
+
+def _describe(it):
+    w = it.get("wall") or ""
+    th = f", {it['thickness_in']:g} in." if it.get("thickness_in") else ""
+    return f"{it['qty']} x {it['kind']}{' on the ' + w + (' wall' if w in WALLS[:4] else '') if w else ''}{th}"
+
+
+def update(add: list | None = None, remove: list | None = None, constraints: dict | None = None,
+           who="page", state: dict | None = None) -> dict:
+    """Record installed treatment (add items, remove by id) and/or the owner's constraints.
+    Each change snapshots the measured numbers so far, for a before/after comparison later."""
+    from .room import load_room, write_room
+    r = load_room()
+    tr = treatment_data(r)
+    changed = []
+    now = time.time()
+    for d in add or []:
+        it = _clean_item(d)
+        it["id"] = f"t{int(now * 1000) % 10 ** 9}{len(tr['installed'])}"
+        it["t"] = now
+        tr["installed"].append(it)
+        changed.append("installed " + _describe(it))
+    for rid in remove or []:
+        hit = next((x for x in tr["installed"] if x.get("id") == rid), None)
+        if hit:
+            tr["installed"].remove(hit)
+            changed.append("removed " + _describe(hit))
+    if constraints is not None:
+        c = dict(tr["constraints"])
+        if "no_walls" in constraints:
+            bad = [w for w in constraints["no_walls"] or [] if w not in WALLS]
+            if bad:
+                raise ValueError(f"unknown wall {bad[0]}; use {', '.join(WALLS)}")
+            c["no_walls"] = sorted(set(constraints["no_walls"] or []))
+        if "budget_usd" in constraints:
+            c["budget_usd"] = _num(constraints["budget_usd"], 0, 1_000_000)
+        if "looks" in constraints:
+            lk = str(constraints["looks"] or "any").lower()
+            if lk not in LOOKS:
+                raise ValueError(f"looks must be one of {', '.join(LOOKS)}")
+            c["looks"] = lk
+        for k, n in (("furniture", 300), ("notes", 500)):
+            if k in constraints:
+                c[k] = str(constraints[k] or "")[:n]
+        diff = [f"{k} {tr['constraints'].get(k)!r} → {v!r}" for k, v in c.items() if tr["constraints"].get(k) != v]
+        if diff:
+            changed.append("constraints: " + ", ".join(diff))
+        tr["constraints"] = c
+    if changed and (add or remove):
+        if state is None:
+            from .state import load_state
+            state = load_state()
+        tr["history"] = (tr["history"] + [{"t": now, "change": "; ".join(changed), "before": room_metrics(state)}])[-20:]
+    r["treatment"] = tr
+    write_room(r)
+    if changed:
+        from . import journal
+        from .state import event
+        txt = f"{'The assistant' if who == 'assistant' else 'You'} updated room treatment: " + "; ".join(changed)
+        event("config", txt[:400])
+        journal.add("treatment", txt[:400])
+    return {"treatment": tr, "changed": changed}
+
+
+def compare(tr: dict, state: dict) -> dict | None:
+    """Before/after: the numbers stored with the last installed-treatment change vs measurements made since."""
+    hist = [h for h in tr.get("history") or [] if h.get("before")]
+    if not hist:
+        return None
+    h = hist[-1]
+    now = room_metrics(state)
+    out = {"t": h["t"], "change": h["change"], "rows": [], "waiting": []}
+
+    def row(label, b, a, unit, better_lower=True):
+        if b is None or a is None:
+            return
+        d = a - b
+        out["rows"].append({"what": label, "before": b, "after": a, "unit": unit,
+                            "verdict": "better" if (d < -0.02 if better_lower else d > 0.02) else
+                                       "worse" if (d > 0.02 if better_lower else d < -0.02) else "same"})
+
+    for key, label in (("report", "system report"), ("checkup", "check-up")):
+        b, a = h["before"].get(key), now.get(key)
+        if not a or (a.get("t") or 0) <= h["t"]:
+            out["waiting"].append(label)
+            continue
+        if not b:
+            continue
+        if key == "report":
+            row("Room ring time above 250 Hz", b.get("rt60_mid_s"), a.get("rt60_mid_s"), "s")
+            bs, as_ = b.get("strongest_reflection"), a.get("strongest_reflection")
+            row("Strongest early reflection", bs and bs["db"], as_ and as_["db"], "dB")
+            row("Left/right tonal spread", b.get("lr_tone_spread_db"), a.get("lr_tone_spread_db"), "dB")
+        else:
+            row("Bass ringing (median, 30-125 Hz)", b.get("bass_t60_median_s"), a.get("bass_t60_median_s"), "s")
+            wb = (b.get("worst") or {})
+            if wb.get("f") is not None:
+                row(f"Bass ringing at {wb['f']:g} Hz", wb.get("t60"), (a.get("bass_t60") or {}).get(str(wb["f"])), "s")
+    return out
+
+
+def brief(p: dict | None) -> dict | None:
+    """Compact version for the assistant's overview."""
+    if not p:
+        return None
+    return {"top_problems": [{k: x[k] for k in ("title", "score", "measured")} for x in p["problems"][:4]],
+            "first_items": [{"title": i["title"], "tier": TIER[i["tier"]], "qty": i["qty"], "installed": i["installed"]}
+                            for i in p["items"][:4]],
+            "installed": len(p["installed"])}

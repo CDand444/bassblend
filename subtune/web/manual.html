@@ -9,6 +9,7 @@
   <a href="#m-report">System report and fixes</a>
   <a href="#m-fixes">What htTamer changed</a>
   <a href="#m-measure">Other tests</a>
+  <a href="#m-treatment">Room treatment</a>
   <a href="#m-play">How tests play through the receiver</a>
   <a href="#m-assistant">The assistant</a>
   <a href="#m-dirac">Dirac Live</a>
@@ -116,6 +117,16 @@
   <li><b>Level meter</b>: a calibrated sound level meter (C-weighted and bass-only), accurate to about ±1-2 dB.</li>
 </ul>
 
+<h2 id="m-treatment">Room treatment</h2>
+<p><b>Setup → Room treatment</b> plans acoustic treatment (bass traps, absorption panels, a ceiling cloud, the back wall, a rug) for your room. It works offline from what htTamer already knows: the room size, seats and speaker and sub positions, the room modes, and your latest system report (ring time, early reflections, left/right differences) and check-up (bass ringing per band). Nothing plays.</p>
+<ul>
+  <li><b>What the measurements say</b>: the problems treatment could help with, ranked by how much it would really help. "Predicted" means it comes from the room's size alone; run a system report and a check-up for the real thing.</li>
+  <li><b>The plan</b>: each item says what to use (size, thickness, air gap), how many, roughly what it costs, where it goes (in feet from the walls) and what you'll hear. Items are grouped as <b>Do this first</b>, <b>Next</b> and <b>Nice to have</b>. The drawing shows the spots from above; the dots on the side walls are the <b>first-reflection points</b>, where the front speakers' sound bounces off the wall to each seat (worked out from your speaker and seat positions; record where your speakers really are on the Speakers page for exact spots).</li>
+  <li><b>Be realistic</b>: EQ fixes peaks; treatment fixes ringing, reflections and decay. A porous panel only absorbs well down to about 1000 ÷ its depth in inches Hz (a 4″ panel with a 2″ gap ≈ 200 Hz), so thin panels do nothing for bass. Below about 40 Hz the subs and EQ do almost all the work.</li>
+  <li><b>Your constraints</b>: walls you can't treat (the plan offers freestanding panels instead), a budget (items beyond it are marked), how visible it may be, and furniture. The assistant can save these for you and adjust the plan ("Ask the assistant").</li>
+  <li><b>What you have installed</b>: press <b>Mark installed</b> on an item, or add what you already have. Each change is logged in the journal and keeps a snapshot of your latest measurements; after a new system report and check-up, <b>Before and after</b> shows what changed (ring time, the strongest reflection, left/right spread, bass ringing).</li>
+</ul>
+
 <h2 id="m-play">How tests play through the receiver</h2>
 <ul>
   <li><b>Pi HDMI</b> (best): the Pi plays the test file out of its HDMI port. htTamer switches the receiver to the input you picked, and back afterwards. Up to 7.1 channels.</li>
@@ -125,7 +136,7 @@
 <p><b>Set the receiver volume for me</b> plays soft pink noise first and raises the volume in small steps until the mic reads your test level (75 dB by default). It never goes above your maximum test volume (Settings), or above your current volume + 12 when none is set, and never above 70. If raising doesn't make it louder, it stops. The original volume, input, listening mode, sub level and processing (Late Night, Cinema Filter, tone) are put back afterwards, including when you press Stop.</p>
 
 <h2 id="m-assistant">The assistant</h2>
-<p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
+<p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It can read the room treatment plan, explain it and adjust it to your budget, looks and the walls you can't treat, and record what you've put up. It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
 
 <h2 id="m-dirac">Dirac Live</h2>
 <p>Order of work: <b>sub tune first</b>, then Dirac Live with htTamer's target curve (the Dirac step gives you the file), then the blend test with Dirac on, then verify and a system report. While Dirac is measuring, close htTamer's level meter and don't start an htTamer test: both use the same mic. A new sub tune means Dirac should be run again.</p>
@@ -162,6 +173,9 @@
   <dt>Blend / dB lost</dt><dd>How well subs and speakers add up around the crossover. Lost dB is bass cancelled there.</dd>
   <dt>Polarity</dt><dd>Whether a driver pushes or pulls on the same signal. Flipping a sub's polarity can fix a cancellation.</dd>
   <dt>All-pass filter</dt><dd>A filter that shifts phase around one frequency without changing level, used to line up subs and speakers.</dd>
+  <dt>First-reflection point</dt><dd>The spot on a wall, the ceiling or the floor where a speaker's sound bounces straight to your ears. Treating it sharpens the image and dialogue.</dd>
+  <dt>Bass trap</dt><dd>Thick absorption (or a tuned membrane) in corners, where bass pressure is highest. It shortens how long bass rings.</dd>
+  <dt>RT60 / ring time</dt><dd>How long sound takes to die away by 60 dB. 0.2-0.4 s suits a home theatre.</dd>
   <dt>Headroom</dt><dd>How much louder something can go before it distorts or clips.</dd>
 </dl>
 

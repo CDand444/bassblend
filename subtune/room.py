@@ -20,6 +20,7 @@ EMPTY = {
     "subs": {},          # "0".."3" -> sub description (output index, 0-based)
     "avr": "",
     "goals": "",
+    "treatment": {},     # installed acoustic treatment + the owner's constraints (treatment.py)
     "speakers": {},      # channel ("FL", "TFL", ...) -> {model, kind, size, crossover_hz, x_m, y_m, z_m, aim, amp, notes}
 }
 
