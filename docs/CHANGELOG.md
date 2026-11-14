@@ -1,5 +1,31 @@
 # BassBlend changelog
 
+## Nov 14, 2026 (overnight) - pro views, placement, headroom, all speakers, offline helper
+
+Built and tested offline (simulations and the browser); nothing played on the real system.
+
+- **Offline helper**: with no AI provider, the chat answers from BassBlend's own data (next steps,
+  latest report, sub settings with warnings, receiver processing, playing tune) and a glossary.
+- **Settings files** carry system reports, report history, the last fixes and the tuning journal.
+- **System report pro views**: phase, group delay, impulse and step response, bass waterfall
+  (0-300 ms), and REW export (frequency, SPL, phase per channel).
+- **Multi-spot average**: with reports at 2+ spots, an "All spots (average)" view shows the
+  response over the listening area, spot-to-spot spread, and marks treble findings seen at one
+  spot only as mic-position effects.
+- **Speaker placement** (Setup): Dolby-guideline positions for the layout from the room and main
+  seat, each within its allowed angle on its own wall, with notes (e.g. your MLP sits near the
+  room's first bass null, and front speakers fit at 23-25 degrees rather than 30).
+- **Sub headroom** (Measure, not yet run): rising tone bursts at 25/40/63 Hz per sub with automatic
+  stops (5-10% distortion, 3 dB compression, mic overload, 105 dB, -12 dBFS).
+- **All speakers** (Measure, experimental, not yet run): the receiver's network player is
+  stereo-only (it lists 1-2 channel PCM), so a 7.1 WAV is played by the owner from an HDMI source
+  or USB stick; every bed speaker and the LFE are checked against the front left for level,
+  arrival, polarity and whether it played. Heights need Atmos content and aren't covered.
+- **Sub catalog**: SVS PB-2000 Pro (port plugs vs the app's Standard/Sealed mode) and Rythmik F12
+  (extension, damping, rumble, low-pass mode), from the makers' pages and guides.
+- Tests: `test_helper.py`, `test_layout.py`, `test_headroom.py`, `test_allspk.py`, additions to
+  `test_deepcheck.py`, `test_bundle.py` and `test_vendors.py`.
+
 ## Nov 14, 2026 - tuning coach, journal and a holistic assistant
 
 - **Tuning coach** (`subtune/coach.py`): ranked next steps from all the data, in the order the
