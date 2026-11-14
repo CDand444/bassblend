@@ -134,6 +134,15 @@ def test_assistant_instructions_only_name_real_tools():
     assert "get_tuning_plan" in names and "get_journal" in names
 
 
+def test_strict_tools_stay_within_the_api_limit():
+    from subtune import assistant
+    strict = [t["name"] for t in assistant.API_TOOLS if t.get("strict")]
+    assert len(strict) <= assistant.MAX_STRICT == 20, len(strict)
+    assert "get_overview" not in strict, "a tool with no inputs gains nothing from strict"
+    many = [assistant._t(f"tool_{i}", "x", {"a": {"type": "string"}}, ["a"]) for i in range(30)]
+    assert sum(1 for t in assistant._api_tools(many) if t.get("strict")) == 20, "capped even with many candidates"
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

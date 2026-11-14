@@ -294,16 +294,29 @@ APPROVAL = {t["name"] for t in TOOLS if t["approval"]}
 REQUIRED = {t["name"]: t["input_schema"]["required"] for t in TOOLS}
 
 
-def _api_tool(t):
-    d = {k: v for k, v in t.items() if k != "approval"}
-    d["eager_input_streaming"] = True                # we stream; inputs are validated before running
+MAX_STRICT = 20          # the Claude API refuses a request with more strict tools than this
+
+
+def _strict_ok(t) -> bool:
+    """Strict schemas only help where there are inputs to check and every one is required."""
     sch = t["input_schema"]
-    if set(sch["required"]) == set(sch["properties"]):
-        d["strict"] = True                           # strict only where every field is required
-    return d
+    return bool(sch["properties"]) and set(sch["required"]) == set(sch["properties"])
 
 
-API_TOOLS = [_api_tool(t) for t in TOOLS]
+def _api_tools(tools):
+    # tools that change something (approval) get the strict slots first, then the read-only ones
+    want = [t["name"] for t in sorted(tools, key=lambda t: not t["approval"]) if _strict_ok(t)][:MAX_STRICT]
+    out = []
+    for t in tools:
+        d = {k: v for k, v in t.items() if k != "approval"}
+        d["eager_input_streaming"] = True            # we stream; inputs are validated before running
+        if t["name"] in want:
+            d["strict"] = True
+        out.append(d)
+    return out
+
+
+API_TOOLS = _api_tools(TOOLS)
 
 DESCRIBE = {
     "set_target_settings": lambda i: "Change the tuning target: " + ", ".join(f"{k} → {v}" for k, v in i.items()),
