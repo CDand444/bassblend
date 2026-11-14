@@ -226,6 +226,17 @@ def cmd_deepcheck(a):
         raise
 
 
+def cmd_fixup(a):
+    """Act on the latest system report: sub level, blend fix, then check again."""
+    from . import fixup
+    try:
+        with busy(f"fixes at spot {a.pos}"):
+            fixup.run(a.pos, a.mode)
+    except Exception as e:
+        update_state(fix_status={"running": False, "error": str(e)})
+        raise
+
+
 def blend_tune(cur, b, seats_txt="the MLP"):
     """The playing tune with a blend fix baked in: (new result, name, notes).
     b: {"delay_ms", "invert", "allpass": None | {"fc", "q"}}. Negative delays are
@@ -488,6 +499,10 @@ def main(argv=None):
     s.add_argument("--pos", type=int, default=1)
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_deepcheck)
+    s = sp.add_parser("fixup", help="fix what BassBlend can from the latest system report, then check again")
+    s.add_argument("--mode", choices=["dlna", "manual"], default="dlna")
+    s.add_argument("--pos", type=int, default=1)
+    s.set_defaults(fn=cmd_fixup)
     s = sp.add_parser("avrapply"); s.add_argument("--multi", action="store_true", help="use the multi-seat blend")
     s.set_defaults(fn=cmd_avrapply)
     sp.add_parser("blendseats").set_defaults(fn=cmd_blendseats)

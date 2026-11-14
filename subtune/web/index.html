@@ -345,7 +345,23 @@ a.btn { text-decoration: none; }
   #printRoot .tip, #printRoot .xh { display: none !important; }
   * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+.dc-ra { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 6px; }
+.dc-ra li { border: 1px solid var(--border); border-radius: 10px; padding: 8px 12px; font-size: 13px; background: var(--surface); }
+.dc-ra .tag { display: inline-block; font-size: 11px; font-weight: 650; margin-right: 8px; padding: 1px 7px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+.dc-ra li.auto .tag { background: color-mix(in srgb, var(--good) 16%, var(--surface)); color: var(--text); }
+.dc-fixbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; border: 1px dashed var(--border-strong); border-radius: 12px; padding: 10px 14px; }
+.dc-fixbar > div { flex: 1 1 280px; } .dc-fixbar b { display: block; font-size: 13.5px; } .dc-fixbar span { display: block; }
+.dc-fixres { margin-top: 10px; border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; background: var(--surface); font-size: 13px; }
+.dc-fixres ul { margin: 6px 0; padding-left: 18px; } .dc-fixres li { margin: 3px 0; color: var(--text-2); } .dc-fixres li.ok { color: var(--text); }
 .dc-gloss dt { font-weight: 650; font-size: 13px; margin-top: 8px; } .dc-gloss dd { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
+.hw { margin-top: 12px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.hw-h { font-weight: 650; font-size: 13px; margin-bottom: 6px; }
+.hwnote { font-size: 12.5px; padding: 6px 9px; border-radius: 8px; margin-top: 6px; background: var(--surface-2); color: var(--text-2); }
+.hwnote.warn { background: color-mix(in srgb, var(--warn) 14%, var(--surface)); color: var(--text); }
+.hwnote.danger { background: color-mix(in srgb, var(--bad) 16%, var(--surface)); color: var(--text); font-weight: 600; }
+.hwtips { margin-top: 8px; } .hwtips ul { margin: 6px 0; padding-left: 18px; color: var(--text-2); } .hwtips li { margin: 3px 0; }
+.ai-grid { max-width: 640px; }
+.avr-h { font-size: 13px; font-weight: 650; margin: 16px 0 8px; }
 .cfg-h { font-size: 13px; font-weight: 650; margin: 16px 0 8px; color: var(--text-1); }
 #cfgCard .cb { margin-bottom: 8px; }
 .chk { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
@@ -801,6 +817,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <span class="grow"></span>
         <button class="btn primary lg" id="dcRun">Run system report</button>
       </div>
+      <div id="dcFix" style="margin-top:12px"></div>
       <p class="muted small" id="dcFile" style="margin:8px 0 0"></p>
       <div id="dcOut" style="margin-top:16px"></div>
     </section>
@@ -848,11 +865,16 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <section class="card">
       <div class="card-h"><h2>Room analysis</h2><span class="sub" id="aiSub"></span><span class="grow"></span><span class="muted" id="keyState"></span></div>
       <form class="keybox" id="keyForm" hidden autocomplete="off">
-        <label class="f">Anthropic API key
-          <span class="row" style="flex-wrap:nowrap"><input id="keyIn" type="password" placeholder="sk-ant-…" autocomplete="off" spellcheck="false" style="flex:1"><button class="btn primary" type="submit">Save key</button></span>
-          <span class="hint">Stored only on this PC, in your user profile. Never shown again or sent anywhere except Anthropic.</span>
-        </label>
-        <p class="muted" id="keyMsg" style="margin:6px 0 0"></p>
+        <div class="grid g2 ai-grid">
+          <label class="f">AI provider<select id="aiProv"></select></label>
+          <label class="f">Model<span class="row" style="flex-wrap:nowrap;width:100%"><select id="aiModel" style="flex:1;min-width:0"></select><button type="button" class="btn ghost" id="aiModels" title="Fetch the models this provider offers">Load list</button></span></label>
+          <label class="f span2" id="aiBaseRow" hidden>Local server address<input id="aiBase" placeholder="http://192.168.1.20:11434/v1" spellcheck="false">
+            <span class="hint">Any OpenAI-compatible server on your network: Ollama (port 11434, add /v1), LM Studio (port 1234, add /v1).</span></label>
+          <label class="f span2" id="aiKeyRow"><span id="aiKeyLabel">API key</span>
+            <input id="keyIn" type="password" autocomplete="off" spellcheck="false">
+            <span class="hint" id="aiKeyHint"></span></label>
+        </div>
+        <div class="row" style="margin-top:8px"><button class="btn primary" type="submit">Save</button><button type="button" class="btn" id="aiTest">Test</button><span class="muted small" id="keyMsg"></span></div>
       </form>
       <div class="row" id="askRow">
         <input id="aiQ" placeholder="Ask something specific (optional), e.g. where should the right VT-3 go?" style="flex:1;min-width:220px">
@@ -1379,8 +1401,85 @@ function subCard(o, s = {}, used) {
       <label class="f">Rated low end (F3)<span class="unit" data-u="Hz"><input data-f="f3_hz" type="number" value="${v('f3_hz')}"></span></label>
       <label class="f">Amp power<span class="unit" data-u="W"><input data-f="amp_w" type="number" value="${v('amp_w')}"></span></label>
       <label class="f span2">Notes<input data-f="notes" value="${v('notes')}" placeholder="Ports open/plugged, gain knob, phase switch"></label>
-    </div></details><div class="sugslot" data-o="${o}"></div></div>`;
+    </div></details>${used ? hwBlock(o, s) : ''}<div class="sugslot" data-o="${o}"></div></div>`;
 }
+// ---- receiver sound processing (tone, Late Night, Cinema Filter, Music Optimizer, dialogue, dimmer)
+const LATE_NIGHT = {'00': 'Off', '01': 'Low', '02': 'High', '03': 'Auto'};
+const DIMMER = {'00': 'Bright', '01': 'Dim', '02': 'Dark', '03': 'Display off', '08': 'Bright, LED off'};
+function avrProcessing(st) {
+  if (st.tone_bass == null && st.late_night == null && st.cinema_filter == null) return '';
+  const db = v => v == null ? '–' : (v > 0 ? '+' : '') + v + ' dB';
+  const tog = (key, on, label) => `<button class="btn ${on ? 'primary' : ''}" data-p="${key}" data-v="${on ? 0 : 1}">${on ? label + ': on' : label + ': off'}</button>`;
+  const opt = (map, cur) => Object.entries(map).map(([k, v]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('');
+  const colouring = [];
+  if (st.tone_bass || st.tone_treble) colouring.push(`tone (bass ${db(st.tone_bass)}, treble ${db(st.tone_treble)})`);
+  if (st.cinema_filter) colouring.push('Cinema Filter (softens the treble)');
+  if (st.late_night && st.late_night !== '00') colouring.push(`Late Night ${LATE_NIGHT[st.late_night] || ''} (squeezes loud and soft together)`);
+  if (st.music_optimizer) colouring.push('Music Optimizer');
+  if (st.dialog) colouring.push(`dialogue enhance ${st.dialog}`);
+  return `<h4 class="avr-h">Sound processing</h4>
+    <div class="avrgrid">
+      <div class="avrbox"><span class="k">Bass (tone)</span><span class="v">${db(st.tone_bass)}</span>
+        <div class="row"><button class="btn" data-p="bass" data-d="-1">−1</button><button class="btn" data-p="bass" data-d="1">+1</button></div></div>
+      <div class="avrbox"><span class="k">Treble (tone)</span><span class="v">${db(st.tone_treble)}</span>
+        <div class="row"><button class="btn" data-p="treble" data-d="-1">−1</button><button class="btn" data-p="treble" data-d="1">+1</button></div></div>
+      <div class="avrbox"><span class="k">Late Night</span><select data-p="late_night">${opt(LATE_NIGHT, st.late_night)}</select>
+        <span class="muted small">Compresses dynamics for quiet listening</span></div>
+      <div class="avrbox"><span class="k">Dialogue enhance</span><select data-p="dialog">${[0, 1, 2, 3, 4, 5].map(n => `<option value="${n}" ${n === st.dialog ? 'selected' : ''}>${n ? n : 'Off'}</option>`).join('')}</select></div>
+      <div class="avrbox"><span class="k">Filters</span><div class="row">${tog('cinema_filter', st.cinema_filter, 'Cinema Filter')}${tog('music_optimizer', st.music_optimizer, 'Music Optimizer')}</div></div>
+      <div class="avrbox"><span class="k">Display</span><select data-p="dimmer">${opt(DIMMER, st.dimmer)}</select>
+        ${st.temp_c != null ? `<span class="muted small">Receiver at ${st.temp_c} °C${st.temp_c >= 60 ? ': running hot, check its ventilation' : ''}</span>` : ''}</div>
+    </div>
+    ${colouring.length ? `<div class="notice warn" style="margin-top:8px">On now: ${esc(colouring.join(', '))}. These change the sound on top of your tuning. BassBlend switches them off during its tests and puts them back afterwards.</div>` : '<p class="muted small" style="margin:8px 0 0">Tone flat and processing off: the receiver plays your tuning as measured.</p>'}
+    ${st.audio_in ? `<p class="muted small" style="margin:6px 0 0">Input signal: ${esc(st.audio_in)}</p>` : ''}`;
+}
+// ---- vendor-aware sub controls (knobs, switches, port plugs the owner sets by hand)
+let VENDORS = null;
+fetch('/api/vendors').then(r => r.json()).then(v => { VENDORS = v; if (roomInit) { roomInit = false; initRoom(); } }).catch(() => {});
+const guessCatalog = m => { const t = (m || '').toLowerCase(); return Object.keys(VENDORS || {}).find(k => (VENDORS[k].match || []).some(x => t.includes(x))) || ''; };
+function hwBlock(o, s) {
+  if (!VENDORS) return '<div class="hw" data-o="' + o + '"></div>';
+  const cid = s.catalog || guessCatalog(s.model);
+  const opts = '<option value="">Not listed</option>' + Object.entries(VENDORS).map(([k, c]) => `<option value="${k}" ${k === cid ? 'selected' : ''}>${esc(c.brand + ' ' + c.model)}</option>`).join('');
+  return `<div class="hw" data-o="${o}"><div class="hw-h">Controls on the sub</div>
+    <label class="f">Catalog model<select data-f="catalog">${opts}</select></label>
+    <div class="hwctl">${hwControls(cid, s.controls || {})}</div></div>`;
+}
+function hwControls(cid, ctl) {
+  const c = (VENDORS || {})[cid];
+  if (!c) return '<p class="muted small" style="margin:6px 0 0">Pick your model to record its knobs and switches, so BassBlend and the assistant can use them. Not listed? Put them in Notes.</p>';
+  const v = k => ctl[k] ?? c.controls.find(x => x.key === k).default;
+  const w = c.controls.map(x => `<label class="f" ${x.only_if ? `data-only='${JSON.stringify(x.only_if)}'` : ''}>${esc(x.label)}${x.kind === 'choice'
+      ? `<select data-c="${x.key}">${x.options.map(([val, lab]) => `<option value="${esc(val)}" ${String(v(x.key)) === String(val) ? 'selected' : ''}>${esc(lab)}</option>`).join('')}</select>`
+      : `<span class="unit" data-u="${esc(x.unit || '')}"><input data-c="${x.key}" type="number" min="${x.min}" max="${x.max}" step="${x.step}" value="${v(x.key)}"></span>`}</label>`).join('');
+  return `<p class="muted small" style="margin:6px 0 8px">${esc(c.summary)}</p><div class="grid g2">${w}</div><div class="hwnotes"></div>
+    <details class="hwtips"><summary class="muted small">What ${esc(c.brand)} says</summary>${c.q_guide ? `<p class="small">${esc(c.q_guide)}</p>` : ''}
+      <ul class="small">${(c.modes || []).filter(m => Object.keys(m.when).length).map(m => `<li><b>${esc(m.name)}</b> (${esc(Object.values(m.when).join(' + ').replace('4in', '4″ port').replace('both', 'both ports').replace('none', 'ports plugged'))}): ${esc(m.for)}</li>`).join('')}
+      ${(c.tips || []).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="muted small">Source: ${esc(c.source)}</p></details>`;
+}
+function hwRead(card) {
+  const o = {}; card.querySelectorAll('[data-c]').forEach(i => o[i.dataset.c] = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value); return o;
+}
+function hwCheck(card) {
+  const sel = card.querySelector('[data-f="catalog"]'); if (!sel) return;
+  const c = (VENDORS || {})[sel.value], box = card.querySelector('.hwnotes'); if (!c || !box) return;
+  const st = Object.fromEntries(c.controls.map(x => [x.key, String(x.default)])); Object.assign(st, Object.fromEntries(Object.entries(hwRead(card)).map(([k, v]) => [k, String(v)])));
+  const match = w => Object.entries(w).every(([k, v]) => String(st[k]) === String(v));
+  card.querySelectorAll('[data-only]').forEach(el => el.hidden = !match(JSON.parse(el.dataset.only)));
+  const notes = [];
+  (c.forbidden || []).filter(f => match(f.when)).forEach(f => notes.push([f.level, f.text]));
+  const m = (c.modes || []).find(x => Object.keys(x.when).length && match(x.when));
+  if (m) notes.push(['info', `${m.name} mode${m.ext_hz ? ` (±2 dB to ${m.ext_hz} Hz)` : ''}: for ${m.for}` + (m.protect_hz ? ` BassBlend won't boost this sub below ${m.protect_hz} Hz.` : '')]);
+  if (st.xover === 'in') notes.push(['warn', 'Crossover switch is In while the receiver also crosses over: the filters stack. Out is recommended with a receiver.']);
+  if (st.lpf && st.lpf !== 'lfe') notes.push(['warn', `Low-pass at ${st.lpf} Hz while the receiver also crosses over: the filters stack. LFE/off is recommended.`]);
+  if (st.power === 'off') notes.push(['danger', 'Power switch OFF: this sub won’t play.']);
+  box.innerHTML = notes.map(([l, t]) => `<div class="hwnote ${l}">${l === 'danger' ? '⚠ ' : ''}${esc(t)}</div>`).join('');
+}
+$('#roomCard').addEventListener('change', e => {
+  const card = e.target.closest('.subcard'); if (!card) return;
+  if (e.target.matches('[data-f="catalog"]')) card.querySelector('.hwctl').innerHTML = hwControls(e.target.value, {});
+  if (e.target.matches('[data-f="catalog"], [data-c]')) hwCheck(card);
+});
 function initRoom() {
   if (roomInit || !S.room) return; roomInit = true; roomBuild++;
   const r = S.room, rm = r.room, subs = (S.settings || {}).subs || [];
@@ -1388,6 +1487,7 @@ function initRoom() {
   $('#rC').value = rm.construction || ''; $('#rO').value = rm.openings || ''; $('#rAvr').value = r.avr || ''; $('#rGoals').value = r.goals || '';
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
+  document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
 }
 $('#roomCard').addEventListener('input', () => renderPlan(readRoom()));
 $('#roomCard').addEventListener('click', async e => {
@@ -1419,6 +1519,7 @@ function readRoom() {
   const seats = [...document.querySelectorAll('#seatRows .seat')].map(d => { const o = {}; d.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = val(i)); return o; });
   const subs = {};
   document.querySelectorAll('#subRows .subcard').forEach(d => { const o = {}; d.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = val(i));
+    if (d.querySelector('[data-c]')) o.controls = hwRead(d);
     if (Object.values(o).some(v => v !== '' && v != null)) subs[d.dataset.o] = o; });
   return {room: {length_m: toM($('#rL').value), width_m: toM($('#rW').value), height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: ''},
           seats, subs, avr: $('#rAvr').value, goals: $('#rGoals').value};
@@ -1534,7 +1635,7 @@ function md(src) {
 function renderAI() {
   const st = S.analysis_status || {}, a = S.analysis;
   $('#aiBtn').disabled = !!st.running || !S.ai_api;
-  $('#aiSub').textContent = a ? `${new Date(a.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} · ${a.source}` : 'Claude reviews the room, sub placement and measurements';
+  $('#aiSub').textContent = a ? `${new Date(a.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} · ${a.source}` : 'The AI reviews the room, sub placement and measurements';
   let note = '';
   if (st.running) note = '<p class="muted" style="margin:0"><span class="spin"></span>&nbsp; Reading the measurements and room layout. Takes a minute or two.</p>';
   else if (st.error) note = `<div class="notice bad">${esc(st.error)}</div>`;
@@ -1542,23 +1643,65 @@ function renderAI() {
   else if (!a) note = '<p class="muted" style="margin:0">Works best after measuring and with sub positions filled in below.</p>';
   if (a && a.question) note += `<p class="muted" style="margin:8px 0 0">Question: ${esc(a.question)}</p>`;
   $('#aiNote').innerHTML = note;
-  const showForm = !S.ai_key || keyEditing;
+  const ap = S.ai_provider || {}, showForm = !S.ai_key || keyEditing;
   $('#keyForm').hidden = !showForm;
   $('#askRow').style.display = S.ai_key ? '' : 'none';
-  $('#keyState').innerHTML = S.ai_key === 'environment' ? 'Key from ANTHROPIC_API_KEY'
-    : S.ai_key === 'saved' ? 'Key saved on this device · <button class="btn ghost" id="keyRemove" style="height:24px;padding:0 6px">Remove</button>' : '';
-  const rm = $('#keyRemove'); if (rm) rm.onclick = async () => { if (!confirm('Remove the saved API key from this device?')) return; await post('/api/apikey', {remove: true}); poll(); };
+  if (!keyEditing) aiFormFill();
+  $('#keyState').innerHTML = (ap.label ? `${esc(ap.label)}${ap.model ? ' · ' + esc(ap.model) : ''} · ` : '') +
+    (S.ai_key === 'environment' ? 'key from the environment' : S.ai_key === 'saved' ? 'key saved' : S.ai_key === 'local' ? 'on your network' : 'not set up') +
+    ` · <button class="btn ghost" id="keyEdit" style="height:24px;padding:0 6px">${showForm ? 'Close' : 'Change'}</button>` +
+    (S.ai_key === 'saved' ? ' <button class="btn ghost" id="keyRemove" style="height:24px;padding:0 6px">Remove key</button>' : '');
+  const ke = $('#keyEdit'); if (ke) ke.onclick = () => { keyEditing = !showForm; aiFilled = null; renderAI(); };
+  const rm = $('#keyRemove'); if (rm) rm.onclick = async () => { if (!confirm(`Remove the saved ${ap.label} key from this device?`)) return; await post('/api/ai', {action: 'remove_key', provider: ap.active}); poll(); };
   const key = a ? String(a.t) : '';
   if ($('#aiOut').dataset.key !== key) { $('#aiOut').dataset.key = key; $('#aiOut').innerHTML = a ? md(a.markdown) : ''; }
 }
-let keyEditing = false;
-$('#keyIn').addEventListener('focus', () => keyEditing = true);
+let keyEditing = false, aiFilled = null;
+const aiProv = () => ((S.ai_provider || {}).providers || []).find(p => p.id === $('#aiProv').value) || {};
+function aiFormFill(force) {
+  const ap = S.ai_provider; if (!ap) return;
+  const k = JSON.stringify([ap.active, ap.model, ap.local_base]); if (!force && aiFilled === k) return; aiFilled = k;
+  $('#aiProv').innerHTML = ap.providers.map(p => `<option value="${p.id}" ${p.id === ap.active ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
+  $('#aiBase').value = ap.local_base || '';
+  aiProvChanged();
+}
+function aiProvChanged() {
+  const p = aiProv(), local = p.id === 'local';
+  $('#aiBaseRow').hidden = !local;
+  $('#aiKeyLabel').textContent = local ? 'API key (only if your server asks for one)' : `${p.label || ''} API key`;
+  $('#keyIn').placeholder = p.key ? '•••••• saved (leave empty to keep it)' : p.key_hint || '';
+  $('#aiKeyHint').textContent = (local ? '' : `Get one at ${p.key_where}. `) + 'Stored only on this device and sent only to this provider.';
+  const cur = p.model || '';
+  $('#aiModel').innerHTML = cur ? `<option value="${esc(cur)}">${esc(cur)}</option>` : '<option value="">Press “Load list” to choose</option>';
+}
+$('#aiProv').onchange = () => { keyEditing = true; aiProvChanged(); };
+['#keyIn', '#aiBase', '#aiModel'].forEach(s => $(s).addEventListener('focus', () => keyEditing = true));
+$('#aiModels').onclick = async () => {
+  keyEditing = true; const p = aiProv(); $('#keyMsg').textContent = 'Loading models…';
+  if ($('#keyIn').value.trim() && p.id !== 'local') {                       // save a new key first so the list can load
+    const r0 = await post('/api/ai', {action: 'save', provider: p.id, key: $('#keyIn').value.trim()});
+    if (r0.error) { $('#keyMsg').textContent = r0.error; return; }
+    $('#keyIn').value = '';
+  }
+  const r = await post('/api/ai', {action: 'models', provider: p.id, local_base: p.id === 'local' ? $('#aiBase').value.trim() : undefined});
+  if (r.error) { $('#keyMsg').textContent = r.error; return; }
+  const cur = $('#aiModel').value;
+  $('#aiModel').innerHTML = r.models.map(m => `<option value="${esc(m)}" ${m === cur ? 'selected' : ''}>${esc(m)}</option>`).join('') || '<option value="">No models found</option>';
+  $('#keyMsg').textContent = `${r.models.length} models. Pick one and press Save.`;
+};
+$('#aiTest').onclick = async () => {
+  $('#keyMsg').textContent = 'Testing…';
+  const r = await post('/api/ai', {action: 'test'});
+  $('#keyMsg').textContent = r.error ? r.error : `✓ ${r.text}`;
+};
 $('#keyForm').onsubmit = async e => {
   e.preventDefault();
-  const r = await post('/api/apikey', {key: $('#keyIn').value});
+  const p = aiProv();
+  const r = await post('/api/ai', {action: 'save', provider: p.id, model: $('#aiModel').value, key: $('#keyIn').value.trim() || undefined,
+                                   local_base: p.id === 'local' ? $('#aiBase').value.trim() : undefined});
   $('#keyIn').value = '';
-  $('#keyMsg').textContent = r.error || '';
-  if (!r.error) { keyEditing = false; $('#keyIn').blur(); }
+  $('#keyMsg').textContent = r.error || 'Saved.';
+  if (!r.error) { keyEditing = false; aiFilled = null; $('#keyIn').blur(); }
   poll();
 };
 $('#aiBtn').onclick = async () => { const r = await post('/api/analyze', {question: $('#aiQ').value}); if (r.error) alert(r.error); poll(); };
@@ -1679,18 +1822,31 @@ function renderAvr() {
         <div class="avrbox"><span class="k">Listening mode</span>${sel(MODE_OPTS, st.mode_code, 'mode')}</div>
         <div class="avrbox"><span class="k">Subwoofer level</span><span class="v">${st.sub_level != null ? (st.sub_level > 0 ? '+' : '') + st.sub_level.toFixed(1) + ' dB' : '–'}</span>
           <div class="row"><button class="btn" data-a="sub_level" data-d="-1">−1</button><button class="btn" data-a="sub_level" data-d="-0.5">−½</button><button class="btn" data-a="sub_level" data-d="0.5">+½</button><button class="btn" data-a="sub_level" data-d="1">+1</button></div></div>
-        <div class="avrbox"><span class="k">Center level</span><span class="v">${st.center_level != null ? (st.center_level > 0 ? '+' : '') + st.center_level.toFixed(1) + ' dB' : '–'}</span><span class="muted small">read only</span></div>
+        <div class="avrbox"><span class="k">Centre (dialogue) level</span><span class="v">${st.center_level != null ? (st.center_level > 0 ? '+' : '') + st.center_level.toFixed(1) + ' dB' : '–'}</span>
+          <div class="row"><button class="btn" data-a="center_level" data-d="-1">−1</button><button class="btn" data-a="center_level" data-d="-0.5">−½</button><button class="btn" data-a="center_level" data-d="0.5">+½</button><button class="btn" data-a="center_level" data-d="1">+1</button></div></div>
       </div>
-      <p class="muted small" style="margin:8px 0 0">BassBlend never raises the volume on its own; “+” asks first and is limited to small steps. Speaker setup and Dirac are left alone.</p>`;
+      ${avrProcessing(st)}
+      <p class="muted small" style="margin:8px 0 0">BassBlend raises the volume only for its tests (up to your max, then puts it back); “+” here asks first and is limited to small steps. Speaker setup and Dirac are left alone.</p>`;
     }
     $('#avrCtl').innerHTML = h;
+    $('#avrCtl').querySelectorAll('[data-p]').forEach(el => el.onchange = el.onclick = async e => {
+      if (el.tagName === 'SELECT' && e.type === 'click') return;
+      const a = el.dataset.p;
+      if (a === 'bass' || a === 'treble') {
+        const target = (st['tone_' + a] || 0) + +el.dataset.d;
+        if (+el.dataset.d > 0 && !confirm(`Raise the ${a} to ${target > 0 ? '+' : ''}${target} dB?`)) return;
+        return avrDo({action: a, value: target, confirm: +el.dataset.d > 0});
+      }
+      if (a === 'cinema_filter' || a === 'music_optimizer') return avrDo({action: a, value: el.dataset.v === '1'});
+      return avrDo({action: a, value: el.value});
+    });
     const f = $('#avrFind'); if (f) f.onclick = () => avrDo({action: 'discover'});
     $('#avrCtl').querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
       const a = b.dataset.a;
-      if (a === 'sub_level') {
-        const target = (st.sub_level || 0) + +b.dataset.d;
-        if (+b.dataset.d > 0 && !confirm(`Raise the subwoofer level to ${target > 0 ? '+' : ''}${target.toFixed(1)} dB?`)) return;
-        return avrDo({action: 'sub_level', value: target, confirm: +b.dataset.d > 0});
+      if (a === 'sub_level' || a === 'center_level') {
+        const target = (st[a] || 0) + +b.dataset.d, what = a === 'sub_level' ? 'subwoofer' : 'centre';
+        if (+b.dataset.d > 0 && !confirm(`Raise the ${what} level to ${target > 0 ? '+' : ''}${target.toFixed(1)} dB?`)) return;
+        return avrDo({action: a, value: target, confirm: +b.dataset.d > 0});
       }
       if (a === 'volume_up' && !confirm('Raise the receiver volume by 1?')) return;
       avrDo({action: a, value: b.dataset.v != null ? +b.dataset.v : undefined, confirm: a === 'volume_up'});
@@ -2007,7 +2163,39 @@ $('#ckRun').onclick = async () => {
 };
 
 // ---------- system report (full range, through the receiver)
-let dcKey = null, dcSel = null, dcInit = false;
+let dcKey = null, dcSel = null, dcInit = false, dcCmp = '', fixKey = null;
+const subTxt = a => `Receiver subwoofer level ${a.change_db > 0 ? '+' : ''}${a.change_db.toFixed(1)} dB${a.to != null ? ` (to ${a.to > 0 ? '+' : ''}${a.to.toFixed(1)} dB)` : ''}`;
+function renderFix(r, running) {
+  const fs = S.fix_status || {}, fr = S.fix_result, job = S.job || {}, el = $('#dcFix');
+  const fixing = !!fs.running && !!job.running;
+  const key = JSON.stringify([r && r.t, fixing, fs.text, fs.error, fr && fr.t, !!job.running]);
+  if (key === fixKey) return; fixKey = key;
+  if (!r) { el.innerHTML = ''; return; }
+  let h = '';
+  const auto = (r.receiver_advice || []).filter(a => a.kind === 'auto');
+  if (fixing) h = `<div class="notice"><span class="spin"></span>&nbsp; ${esc(fs.text || 'Working…')}</div>`;
+  else {
+    h = `<div class="dc-fixbar"><div><b>Fix what BassBlend can</b><span class="muted small">${auto.length ? esc(auto.map(subTxt).join('; ')) + ', then checks' : 'Checks'} the blend of subs and speakers and applies a fix if it helps, then runs a new report to compare.</span></div>
+      <button class="btn primary" id="fixRun" ${job.running || S.busy ? 'disabled' : ''}>Fix it for me</button></div>`;
+    if (fs.error) h += `<div class="notice bad" style="margin-top:8px">The fixes stopped: ${esc(fs.error)}</div>`;
+    if (fr && fr.pos === r.pos) {
+      const b = fr.before, a = fr.after, f = v => (v > 0 ? '+' : '') + v.toFixed(1);
+      h += `<div class="dc-fixres"><b>Last fixes</b> <span class="muted small">${esc(new Date(fr.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}))}</span>
+        <ul>${fr.steps.map(s => `<li class="${s.done ? 'ok' : ''}">${s.done ? '✓' : '–'} <b>${esc(s.step)}:</b> ${esc(s.text)}</li>`).join('')}</ul>
+        <p class="small">Bass vs your target: <b>${f(b.bass_vs_target_db)} → ${f(a.bass_vs_target_db)} dB</b> · things to fix: ${b.fix} → ${a.fix} · to look at: ${b.watch} → ${a.watch}</p>
+        ${fr.still_to_do.length ? `<p class="small" style="margin:6px 0 2px"><b>Still yours to do:</b></p><ul>${fr.still_to_do.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>`;
+    }
+  }
+  el.innerHTML = h;
+  const b = $('#fixRun'); if (b) b.onclick = async () => {
+    const set = S.settings || {};
+    if (!confirm(`Fix what BassBlend can, at ${spotName(r.pos)}?\n\n` +
+        (auto.length ? `1. ${auto.map(subTxt).join(', ')}.\n` : '1. Sub level: already on target, left alone.\n') +
+        `2. Blend test (sweeps on the left and right speakers, volume set automatically up to ${set.avr_test_max_volume ?? 'your volume + 12'}), and if a sub delay or polarity change helps, save it as a new tune on the playing slot (never slot 1).\n` +
+        `3. A new system report to compare.\n\nAbout 3 minutes of sweeps. Your volume, input and mode are put back afterwards; the new sub level stays.`)) return;
+    const res = await post('/api/fixup', {pos: r.pos}); if (res.error) alert(res.error); fixKey = null; poll();
+  };
+}
 const DC_WORD = {good: 'Good', watch: 'Worth a look', fix: 'Fix this', info: 'For info'};
 const DC_LIGHT = {good: 'good', watch: 'warn', fix: 'bad', info: 'none'};
 function deepLatest() {
@@ -2033,7 +2221,8 @@ function renderDeep() {
   if (dcSel == null || !reps[dcSel]) dcSel = latest ? String(latest.pos) : null;
   const r = dcSel ? reps[dcSel] : null;
   $('#dcPrint').hidden = !r || running;
-  const key = [r ? r.t : '', running, ds.text, ds.error, dcSel, Object.keys(reps).join()].join('|');
+  renderFix(r, running);
+  const key = [r ? r.t : '', running, ds.text, ds.error, dcSel, Object.keys(reps).join(), dcCmp, (S.deep_history || []).length].join('|');
   if (key === dcKey) { if (r && !$('#dcChart svg')) drawDeepChart(r); return; }
   dcKey = key;
   let h = '';
@@ -2044,8 +2233,12 @@ function renderDeep() {
   h += `<div class="dc-areas">${Object.entries(r.areas).map(([k, a]) => `<div class="dc-area"><div class="top"><span class="light ${DC_LIGHT[a.status]}"></span>${esc(a.label)}</div>
     <div class="w">${a.fix ? a.fix + ' to fix' : a.watch ? a.watch + ' to look at' : a.status === 'info' ? 'not measured' : 'All good'}</div></div>`).join('')}</div>`;
   const lv = r.level;
-  h += `<h3 class="dc-h">Frequency response</h3><p class="hint muted small" style="margin:0 0 6px">How loud each pitch arrives at your seat, against your target (dashed). The midrange is set to 0 dB so the shapes compare. Dotted lines split the ranges in the table below (deep bass, bass, low mids, mids, upper mids, highs). Above about 5 kHz the exact mic position matters a lot.</p>
+  const hist = (S.deep_history || []).filter(x => x.pos === r.pos && Math.abs(x.t - r.t) > 1);
+  h += `<div class="row" style="margin:0 0 4px"><h3 class="dc-h" style="margin:0">Frequency response</h3><span class="grow"></span>${hist.length ? `<label class="f" style="flex-direction:row;align-items:center;gap:6px">Compare with<select id="dcCmp"><option value="">nothing</option>${hist.slice().reverse().map(x => `<option value="${x.t}" ${String(x.t) === String(dcCmp) ? 'selected' : ''}>${esc(new Date(x.t * 1000).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'}))}${x.label ? ' · ' + esc(x.label) : ''}</option>`).join('')}</select></label>` : ''}</div>`;
+  h += `<p class="hint muted small" style="margin:0 0 6px">How loud each pitch arrives at your seat, against your target (dashed). The midrange is set to 0 dB so the shapes compare. Dotted lines split the ranges in the table below (deep bass, bass, low mids, mids, upper mids, highs). Above about 5 kHz the exact mic position matters a lot.</p>
     <div class="legend" id="dcLegend"></div><div class="chart dc-chart" id="dcChart"></div>`;
+  const ra = r.receiver_advice || [];
+  if (ra.length) h += `<h3 class="dc-h" style="margin-top:18px">Receiver settings</h3><ul class="dc-ra">${ra.map(a => `<li class="${a.kind}"><span class="tag">${a.kind === 'auto' ? 'BassBlend can do this' : a.kind === 'menu' ? 'Receiver menu' : 'By hand'}</span>${esc(a.text)}</li>`).join('')}</ul>`;
   const fs = r.findings, order = ['fix', 'watch', 'info', 'good'];
   h += `<h3 class="dc-h" style="margin-top:18px">What we found</h3><ul class="dc-fd">${order.flatMap(st => fs.filter(x => x.status === st)).map(x => `<li><details>
     <summary><span class="light ${DC_LIGHT[x.status]}"></span><span><b>${esc(x.title)}</b><small>${esc(x.found)}</small></span><span class="tag">${esc((r.areas[x.area] || {}).label || '')} · ${DC_WORD[x.status]}</span></summary>
@@ -2091,6 +2284,7 @@ function renderDeep() {
     <dt>Signal-to-noise</dt><dd>How far the test was above the room's background noise. Below 15 dB, that part of the result isn't trustworthy.</dd></dl></details>`;
   $('#dcOut').innerHTML = h;
   if ($('#dcSpots')) tabs($('#dcSpots'), Object.keys(reps).sort(), dcSel, k => spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
+  if ($('#dcCmp')) $('#dcCmp').onchange = e => { dcCmp = e.target.value; dcKey = null; renderDeep(); };
   drawDeepChart(r);
 }
 function drawDeepChart(r) {
@@ -2101,7 +2295,10 @@ function drawDeepChart(r) {
     {name: 'Right', y: cl(r.curves.right), color: css('--s2'), w: 1.5, op: .85},
     {name: 'Both', y: cl(r.curves.both), color: css('--text'), w: 2.2},
     {name: 'Target', y: r.target, color: css('--text-3'), dash: true, w: 1.5}];
-  legend($('#dcLegend'), [{name: 'Left', color: css('--s1')}, {name: 'Right', color: css('--s2')}, {name: 'Both', color: css('--text'), thick: true}, {name: 'Your target', color: css('--text-3'), dash: true}]);
+  const cmp = dcCmp && (S.deep_history || []).find(x => String(x.t) === String(dcCmp));
+  if (cmp) series.push({name: 'Earlier (L/R avg)', y: cl(cmp.avg), color: css('--s4'), w: 2, dot: true});
+  legend($('#dcLegend'), [{name: 'Left', color: css('--s1')}, {name: 'Right', color: css('--s2')}, {name: 'Both', color: css('--text'), thick: true}, {name: 'Your target', color: css('--text-3'), dash: true}]
+    .concat(cmp ? [{name: `Earlier: ${new Date(cmp.t * 1000).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}${cmp.label ? ' · ' + cmp.label : ''}`, color: css('--s4'), dot: true}] : []));
   lineChart(el, series, {x: r.grid, xmin: 20, xmax: 16000, ticks: el.clientWidth < 520 ? [20, 100, 1000, 10000] : [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000], aria: 'Full-range frequency response',
     markers: [40, 120, 500, 2000, 6000].map(f => ({f, label: ''}))});
 }
@@ -2453,10 +2650,14 @@ function targetSvg(hd, fc, tilt) {
 }
 function renderDirac() {
   const sy = SYS(), el = $('#wizDirac'); if (!el || !sy.dirac) return;
-  const res = S.result, set = S.settings || {}, treble = diracTreble || sy.treble || 'gentle';
+  const res = S.result, set = S.settings || {};
+  const dl = deepLatest(), tilt = dl && dl.treble_tilt_db != null ? dl.treble_tilt_db : null;
+  const TRE = Object.assign({}, TREBLE, tilt != null ? {measured: ['Matched to your speakers', tilt, 'Follows your speakers’ own in-room treble slope, measured by the system report']} : {});
+  const treble = TRE[diracTreble] ? diracTreble : TRE[sy.treble] ? sy.treble : 'gentle';
+  const autoEq = Object.entries((S.room || {}).subs || {}).filter(([, d]) => d.catalog === 'hsu-vtf3-mk5-hp');
   const tuned = !!(res && res.applied), onAvr = !!liveMaster && String(liveMaster.source).toLowerCase() !== 'usb';
   const done = sy.dirac_done, cur = !!sy.dirac_current, cal = set.cal_file ? set.cal_file.split(/[\\/]/).pop() : null;
-  const key = JSON.stringify([sy, treble, tuned, onAvr, !!liveMaster, res && res.tune_id, set.house_db, set.house_fc, cal, (AVR.status || {}).power]);
+  const key = JSON.stringify([sy, treble, tilt, autoEq.length, tuned, onAvr, !!liveMaster, res && res.tune_id, set.house_db, set.house_fc, cal, (AVR.status || {}).power]);
   if (key === diracKey) return; diracKey = key;
   const nSpk = (sy.beds || 0) + (sy.heights || 0), groups = (sy.groups || []).map(g => g.name);
   const li = (ok, txt, btn = '') => `<li class="${ok ? 'ok' : 'no'}"><span class="mk">${ok ? '✓' : '!'}</span><span>${txt}</span>${btn}</li>`;
@@ -2471,14 +2672,19 @@ function renderDirac() {
         ${li(tuned, tuned ? `Sub tune applied: “${esc(res.tune_name || 'Tune')}”` : 'No sub tune applied yet. Finish “Tune the subs” first.', tuned ? '' : `<button class="btn" data-goto="tune">Go to step 2</button>`)}
         ${li(onAvr, !liveMaster ? 'miniDSP not connected' : onAvr ? 'The subs are listening to the receiver' : 'The subs are listening to this PC (USB), so Dirac would not hear them', onAvr || !liveMaster ? '' : `<button class="btn" id="diracAvr">Switch to receiver</button>`)}
         ${li(true, 'Close BassBlend’s level meter and don’t start a BassBlend measurement while Dirac is working: both use the same mic.')}
+        ${autoEq.length ? li(true, `Hsu’s advice for auto-EQ: while Dirac measures, set your Hsu sub${autoEq.length > 1 ? 's' : ''} (out ${autoEq.map(([k]) => +k + 1).join(' and ')}) to <b>one port open (4″), EQ1, Q 0.7</b>. Afterwards you can switch back to the mode you prefer (record it in Room & subs).`) : ''}
       </ul>`)}
     ${step(2, 'todo', 'Download BassBlend’s target curve', `
       <p>A target curve tells Dirac what “right” should sound like. This one has the same bass rise your subs were tuned to (+${set.house_db ?? 0} dB below about ${set.house_fc ?? 45} Hz), so Dirac leaves the sub tune alone instead of fighting it.</p>
       <div class="row" style="align-items:end;gap:12px"><label class="f" style="width:auto">Treble
-        <div class="seg" id="dTreble" role="radiogroup">${Object.entries(TREBLE).map(([k, [name]]) => `<button type="button" data-k="${k}" class="${k === treble ? 'on' : ''}" title="${TREBLE[k][2]}">${name}</button>`).join('')}</div></label>
+        <div class="seg" id="dTreble" role="radiogroup">${Object.entries(TRE).map(([k, [name]]) => `<button type="button" data-k="${k}" class="${k === treble ? 'on' : ''}" title="${TRE[k][2]}">${name}</button>`).join('')}</div></label>
         <a class="btn primary" href="/api/dirac/targetcurve?treble=${treble}" download>Download target curve</a></div>
-      <p class="muted small" style="margin:6px 0 2px">${TREBLE[treble][2]}${TREBLE[treble][1] ? `: ${Math.abs(TREBLE[treble][1])} dB less at the very top` : ': treble left as it is'}.</p>
-      ${targetSvg(+(set.house_db ?? 0), +(set.house_fc ?? 45), TREBLE[treble][1])}`)}
+      <p class="muted small" style="margin:6px 0 2px">${TRE[treble][2]}${TRE[treble][1] ? `: ${Math.abs(TRE[treble][1])} dB less at the very top` : ': treble left as it is'}.${tilt == null ? ' Run a system report to get a treble matched to your speakers.' : ''}</p>
+      ${targetSvg(+(set.house_db ?? 0), +(set.house_fc ?? 45), TRE[treble][1])}
+      <details class="small" style="margin-top:8px"><summary class="muted">Recommended Dirac settings</summary><ul class="howto" style="margin-top:6px">
+        <li><b>Correction range:</b> full range is fine with this target. If the system report shows the treble already balanced, many installers limit correction to about 500 Hz and below: Dirac then fixes the room’s bass and low mids and leaves the speakers’ own voicing alone.</li>
+        <li><b>Mic positions:</b> start at the MLP, keep the mic at ear height pointing at the ceiling, and keep the other positions within about a head-width or two of the seats you care about.</li>
+        <li><b>Afterwards:</b> run the System report again and compare it with the one from before (the report page overlays them).</li></ul></details>`)}
     ${step(3, 'todo', 'Run Dirac Live', `<ol class="howto">
         <li><b>Open Dirac Live</b> on your computer with the receiver switched on, and pick the ${esc(AVR.model || 'receiver')}.</li>
         <li><b>Choose the mic.</b> Select the UMIK-1 and load its calibration file${cal ? ` (<code>${esc(cal)}</code>, the same one BassBlend uses)` : ''}.</li>

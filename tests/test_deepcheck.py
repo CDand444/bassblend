@@ -221,6 +221,39 @@ def test_restore_puts_volume_back_before_standby():
         _t.sleep = real
 
 
+def test_receiver_processing_read_flattened_and_restored():
+    import time as _t
+    from subtune import avr
+    real = _t.sleep
+    _t.sleep = lambda s: None
+    try:
+        o = object.__new__(avr.Onkyo)
+        o.host = "x"
+        replies = {"PWR": "01", "MVL": "81", "AMT": "00", "SLI": "2B", "LMD": "00", "SWL": "-16", "CTL": "-01",
+                   "TFR": "B+2T-1", "LTN": "01", "RAS": "01", "MOT": "00", "DLC": "02", "DIM": "00", "TPD": "F 69C 21", "IFA": "N/A"}
+        o._xfer = lambda cmds, wait=3.0: ["!1" + c[:3] + replies[c[:3]] for c in cmds]
+        st = o.status()
+        assert (st["tone_bass"], st["tone_treble"], st["late_night"], st["cinema_filter"], st["music_optimizer"],
+                st["dialog"], st["temp_c"], st["audio_in"]) == (2, -1, "01", True, False, 2, 21, None), st
+        snap = o.snapshot()
+        sent = []
+        o.send = lambda code, val: sent.append(code + val)
+        changed = o.neutral_for_test(snap)
+        assert sent == ["TFRB00", "TFRT00", "LTN00", "RAS00", "DLC00"], sent
+        assert len(changed) == 4 and "Cinema Filter" in changed
+        sent.clear()
+        o.restore(snap)
+        assert {"TFRB+2", "TFRT-1", "LTN01", "RAS01", "DLC02"} <= set(sent) and "MOT01" not in sent, sent
+        for bad in (lambda: o.set_tone(bass=11), lambda: o.set_late_night("09"), lambda: o.set_dialog(6)):
+            try:
+                bad()
+                raise AssertionError("out-of-range value accepted")
+            except ValueError:
+                pass
+    finally:
+        _t.sleep = real
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

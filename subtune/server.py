@@ -176,6 +176,18 @@ class Runner:
         self.cmd = f"system report ({mode})"
         return self.cmd
 
+    def start_fixup(self, body):
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        pos = int(body.get("pos", 1))
+        if str(pos) not in (load_state().get("deep_reports") or {}):
+            raise ValueError(f"run a system report at spot {pos} first")
+        update_state(fix_status={"running": True, "text": "Starting…", "pos": pos})
+        args = [sys.executable, "-m", "subtune", "fixup", "--pos", str(pos), "--mode", "dlna"]
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = "fix what BassBlend can"
+        return self.cmd
+
     def start_avrapply(self, multi=None):
         st = load_state()
         if self.running() or st.get("busy"):
@@ -396,7 +408,7 @@ def mic_free() -> bool:
     return True
 
 
-for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck"):
+for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -475,7 +487,7 @@ def build_executors():
                "avr_blend_seats_status": st.get("avr_blend_seats"),
                "room": load_room(), "room_modes_hz": [m["f"] for m in (modal_report(load_room()) or {}).get("axial", [])[:10]],
                "receiver": avr_status()["status"], "measured_spots": len(st.get("measurements") or {}),
-               "speaker_system": _system_brief()}
+               "speaker_system": _system_brief(), "sub_hardware": sub_hardware()}
         out["summary"] = f"slot {r and r.get('slot')} playing {r and r.get('tune_name')}"
         return out
 
@@ -573,10 +585,17 @@ def build_executors():
         body = {"action": action, "value": value}
         if action in ("power", "mute"):
             body["value"] = value in ("1", "on", "true", "True")
-        elif action == "sub_level":
-            cur = (avr_status(force=True)["status"] or {}).get("sub_level")
+        elif action in ("bass", "treble"):
+            cur = (avr_status(force=True)["status"] or {}).get("tone_" + action)
             if cur is not None and float(value) > cur + 3:
-                raise RuntimeError("raise the sub level in steps of 3 dB at most")
+                raise RuntimeError("raise the tone in steps of 3 dB at most")
+            body["confirm"] = True
+        elif action in ("cinema_filter", "music_optimizer"):
+            body["value"] = value in ("1", "on", "true", "True")
+        elif action in ("sub_level", "center_level"):
+            cur = (avr_status(force=True)["status"] or {}).get(action)
+            if cur is not None and float(value) > cur + 3:
+                raise RuntimeError("raise the level in steps of 3 dB at most")
             body["confirm"] = True                       # the owner already approved this exact change
         r = avr_action(body)
         return {**(r["status"] or {}), "summary": f"{action} {value}"}
@@ -608,7 +627,13 @@ def build_executors():
                 "distortion_pct": {str(d["f"]): (None if d["below_noise"] else d["pct"]) for d in r["thd"]},
                 "noise": {k: (r["noise"] or {}).get(k) for k in ("overall", "bass", "hum_hz")},
                 "bass_extension_hz": r["bass_extension_hz"], "volume": r.get("level"),
+                "bass_vs_target_db": r.get("bass_vs_target_db"), "treble_tilt_db": r.get("treble_tilt_db"),
+                "receiver_advice": [a["text"] for a in r.get("receiver_advice") or []], "label": r.get("label"),
                 "summary": ", ".join(f"{v['label']} {v['status']}" for v in r["areas"].values())}
+
+    def fix_run(pos):
+        r = _measure(lambda: RUN.start_fixup({"pos": pos}), "fix_result", timeout=900)
+        return {**(r or {}), "summary": "; ".join(s["text"] for s in (r or {}).get("steps", []))[:300]}
 
     def report_get(pos=0):
         reps = load_state().get("deep_reports") or {}
@@ -641,6 +666,7 @@ def build_executors():
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "get_system_report": report_get, "run_system_report": report_run,
+            "fix_from_report": fix_run,
             "_tune_name": tune_name}
 
 
@@ -731,6 +757,33 @@ def avr_action(body):
                 raise ValueError("raising the subwoofer level needs confirmation")
             target = min(target, cur + 6)
         o.set_sub_level(target)
+    elif act in ("bass", "treble"):
+        st0 = avr_status(force=True)["status"] or {}
+        cur = st0.get("tone_" + act)
+        target = int(round(float(val)))
+        if cur is not None and target > cur:
+            if body.get("confirm") is not True:
+                raise ValueError(f"raising the {act} needs confirmation")
+            target = min(target, cur + 3)
+        o.set_tone(**{act: target})
+    elif act == "late_night":
+        o.set_late_night(str(val))
+    elif act == "cinema_filter":
+        o.set_cinema_filter(val in (True, 1, "1", "on", "true"))
+    elif act == "music_optimizer":
+        o.set_music_optimizer(val in (True, 1, "1", "on", "true"))
+    elif act == "dialog":
+        o.set_dialog(int(val))
+    elif act == "dimmer":
+        o.set_dimmer(str(val))
+    elif act == "center_level":
+        cur = (avr_status(force=True)["status"] or {}).get("center_level")
+        target = round(float(val) * 2) / 2
+        if cur is not None and target > cur:
+            if body.get("confirm") is not True:
+                raise ValueError("raising the centre level needs confirmation")
+            target = min(target, cur + 3)
+        o.set_center_level(target)
     else:
         raise ValueError("unknown receiver action")
     event("config", f"receiver: {act}{'' if val is None else ' ' + str(val)}")
@@ -771,6 +824,21 @@ def _events(since: float, limit=300):
     lines = EVENTS_FILE.read_text(encoding="utf-8").splitlines()[-2000:]
     out = [json.loads(l) for l in lines if l.strip()]
     return [e for e in out if e["t"] > since][-limit:]
+
+
+def sub_hardware(room=None):
+    """Vendor-aware view of each sub: model, recorded knob settings, mode, warnings."""
+    from . import vendors
+    room = room or load_room()
+    out = {}
+    for k, d in (room.get("subs") or {}).items():
+        cid = d.get("catalog") or vendors.find(d.get("model", ""))
+        if cid:
+            out[str(int(k) + 1)] = vendors.describe(cid, d.get("controls") or {})
+        elif d.get("model"):
+            out[str(int(k) + 1)] = {"make_model": d["model"], "catalog": None,
+                                    "note": "not in BassBlend's catalog yet: use the owner's notes and general knowledge"}
+    return out
 
 
 def _system_brief():
@@ -947,11 +1015,18 @@ class H(BaseHTTPRequestHandler):
             room = load_room()
             st["room"] = room
             st["modes"] = modal_report(room, 200)
+            from . import vendors
+            st["sub_checks"] = {k: {"mode": (vendors.mode_of(d["catalog"], {**vendors.defaults(d["catalog"]), **(d.get("controls") or {})}) or {}).get("name"),
+                                    "notes": vendors.check(d["catalog"], d.get("controls") or {}),
+                                    "protect_hz": vendors.protect_hz(d["catalog"], d.get("controls") or {})}
+                                for k, d in (room.get("subs") or {}).items() if d.get("catalog") in vendors.CATALOG}
             from . import dirac
             st["system"] = dirac.system()
             st["system"]["dirac_current"] = dirac.dirac_current(st["system"], st.get("result") or {})
             st["net"] = {"lan": NET["lan"], "signed_in": NET["lan"] and not self._local()}
-            st["ai_key"] = key_source()          # "environment" | "saved" | None (never the key)
+            st["ai_key"] = key_source()          # "environment" | "saved" | "local" | None (never the key)
+            from . import ai
+            st["ai_provider"] = ai.status()
             st["ai_api"] = st["ai_key"] is not None
             from . import version
             st["version"] = version()
@@ -1001,6 +1076,9 @@ class H(BaseHTTPRequestHandler):
             return
         if u.path == "/api/events":
             return self._send(200, _events(float(q.get("since", ["0"])[0])))
+        if u.path == "/api/vendors":
+            from . import vendors
+            return self._send(200, vendors.catalog_view())
         if u.path == "/api/config/export":             # settings file to download
             from . import bundle
             flag = lambda k, d: q.get(k, [d])[0] in ("1", "true", "yes")
@@ -1108,6 +1186,8 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"started": RUN.start_avrblend(body)})
             if path == "/api/deepcheck":
                 return self._send(200, {"started": RUN.start_deepcheck(body)})
+            if path == "/api/fixup":
+                return self._send(200, {"started": RUN.start_fixup(body)})
             if path == "/api/avr/apply":
                 m = body.get("multi")
                 return self._send(200, {"started": RUN.start_avrapply(None if m is None else bool(m))})
@@ -1203,6 +1283,36 @@ class H(BaseHTTPRequestHandler):
                 r = save_room(body)
                 event("config", "room & subwoofer details saved")
                 return self._send(200, {"ok": True, "room": r})
+            if path == "/api/ai":                         # choose provider / model, save a key, list models, test
+                from . import ai
+                act = body.get("action")
+                p = body.get("provider") or ai.active()
+                if p not in ai.PROVIDERS:
+                    raise ValueError("unknown AI provider")
+                if act == "save":
+                    if body.get("key"):
+                        ai.save_key(p, str(body["key"]))
+                    ai.save_config(provider=p, model=body.get("model"), local_base=body.get("local_base"))
+                    if ai.key_source(p):
+                        ai.ensure_model(p)                    # beginners don't have to pick a model
+                    event("config", f"AI provider: {ai.PROVIDERS[p]['label']}" + (f", model {ai.model_for(p)}" if ai.model_for(p) else ""))
+                    return self._send(200, ai.status())
+                if act == "models":
+                    if p == "local" and body.get("local_base") is not None:
+                        ai.save_config(local_base=body.get("local_base"))
+                    try:
+                        return self._send(200, {"models": ai.list_models(p)})
+                    except ai.AIError as e:
+                        return self._send(409, {"error": str(e)})
+                if act == "test":
+                    try:
+                        return self._send(200, {"ok": True, "text": ai.test()})
+                    except ai.AIError as e:
+                        return self._send(409, {"error": str(e)})
+                if act == "remove_key":
+                    ai.delete_key(p)
+                    return self._send(200, ai.status())
+                raise ValueError("action must be save, models, test or remove_key")
             if path == "/api/apikey":
                 from .analysis import delete_key, save_key
                 if body.get("remove"):

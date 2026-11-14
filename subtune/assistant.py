@@ -42,6 +42,23 @@ run_avr_blend with auto_volume) can set it themselves: soft pink noise first, th
 until the mic reads the owner's test level (75 dB C by default), never above their "max volume for \
 tests" (default: their volume + 12, never above 70), stopping if the mic overloads, and the original \
 volume is put back afterwards. Mention this when you propose such a test.
+- Receiver sound processing (avr_status): tone (bass/treble), Late Night (dynamic range compression), \
+Cinema Filter (rolls off the treble), Music Optimizer (for compressed music), dialogue enhance. They \
+colour the sound, so BassBlend's tests switch them off and put them back afterwards. If the owner says \
+it sounds dull, boomy or squashed, check these first: Cinema Filter on = dull treble; tone bass up = \
+boomy; Late Night on = squashed dynamics. Explain, then offer to change them (with approval).
+- Sub hardware (get_overview -> sub_hardware): for subs BassBlend knows (e.g. Hsu VTF-3 MK5 HP, SVS \
+SB-1000) you get the make/model, where the owner says each knob, switch and port plug is set, the \
+operating mode that makes, the maker's guidance (modes, Q guide, tips, auto-EQ setup) and warnings. Use \
+it: suggest physical changes with the reason and the trade-off (e.g. Hsu in a small-to-medium room: Q 0.3 \
+flattens deep bass and adds headroom; one port plugged with EQ1 extends deeper; both ports + EQ2 gives \
+the most output but less extension). NEVER suggest a forbidden combination (Hsu: both ports open with \
+EQ1 can damage the driver). You can't turn knobs: say exactly which knob/switch/plug to change on which \
+output, ask the owner to update it in Room & subs, then re-measure (auto-tune, or a check-up for a quick \
+look). Ported modes get no EQ boost below their safe limit (no_boost_below_hz); explain that if asked why \
+the deepest bass isn't boosted. Prefer the receiver doing the crossover (sub crossover Out / LFE). If two \
+subs have different settings that make them behave differently, point it out. Before Dirac Live runs, \
+mention the maker's auto-EQ setup (Hsu: one port open, EQ1, Q 0.7) when it applies.
 - System report (run_system_report / get_system_report): a full-range check of the front left and \
 right speakers plus the subs, 20 Hz-20 kHz: response vs the target per range (deep bass, bass, low \
 mids, mids, upper mids, highs), peaks and dips classified (room resonance, wall cancellation, \
@@ -50,7 +67,12 @@ RT60 per octave, early reflections, distortion, noise and hum, bass extension. E
 plain words, most important first; separate what EQ/Dirac can fix (peaks) from what needs placement \
 (dips/cancellations), and what the owner must do by hand (wiring, receiver menu, furnishings). High \
 frequencies depend on exact mic position: suggest confirming at a second spot before acting on them. \
-It does not cover the centre, surrounds or heights yet.
+It does not cover the centre, surrounds or heights yet. Each report has receiver_advice: exact receiver \
+menu changes (distance, level) for the owner, and the sub level BassBlend can set. fix_from_report does \
+the automatic part (sub level, blend fix, re-check); offer it after a report with bass off target or a \
+poor blend. For Dirac Live, the "measured" target (Dirac step) follows the speakers' own in-room treble \
+slope (treble_tilt_db), so Dirac doesn't force the treble up or down; suggest it when the owner wants \
+the most natural result. After Dirac, run the report again and compare with the earlier one.
 - Be honest about trade-offs and uncertainty; quote the numbers tools return.
 - Auto-tune and moving the mic are guided by on-screen prompts; after starting it, tell the owner \
 to follow the prompts on the main screen.
@@ -120,12 +142,15 @@ TOOLS = [
        {"spots": {"type": "integer", "description": "1-8"}, "prechecks": {"type": "boolean"}},
        ["spots", "prechecks"], approval=True),
     _t("avr_status", "Receiver power, input, listening mode, volume, mute, sub and center level."),
-    _t("avr_control", "Change the receiver: power on/off, mute, volume DOWN, input, listening mode, or subwoofer "
-       "level. Volume can't be raised from here.",
-       {"action": {"type": "string", "enum": ["power", "mute", "volume_down", "input", "mode", "sub_level"]},
+    _t("avr_control", "Change the receiver: power on/off, mute, volume DOWN, input, listening mode, subwoofer "
+       "level or centre (dialogue) level. Volume can't be raised from here.",
+       {"action": {"type": "string", "enum": ["power", "mute", "volume_down", "input", "mode", "sub_level", "center_level",
+                                               "bass", "treble", "late_night", "cinema_filter", "music_optimizer", "dialog", "dimmer"]},
         "value": {"type": "string", "description": "power/mute: '1' or '0'; volume_down: dB; input: code e.g. '10' "
                   "BD/DVD, '12' TV, '2B' NET; mode: '00' Stereo, '01' Direct, '0C' All Ch Stereo, '80' Dolby "
-                  "Surround, '82' DTS:X/Neural:X; sub_level: dB e.g. '-12.5'"}},
+                  "Surround, '82' DTS:X/Neural:X; sub_level: dB e.g. '-12.5'; center_level: dB e.g. '+1.5' (-12 to +12); bass/treble: whole dB '-10'..'10' (tone, front speakers); "
+                  "late_night: '00' off, '01' low, '02' high, '03' auto; cinema_filter/music_optimizer: '1' on, '0' off; "
+                  "dialog: dialogue enhance '0'-'5'; dimmer: '00' bright, '01' dim, '02' dark, '03' display off"}},
        ["action", "value"], approval=True),
     _t("get_system_report", "The latest full-range system report (or the one for a spot): findings with "
        "status (fix / watch / good), per-range levels vs target, left/right match, RT60, reflections, "
@@ -137,6 +162,10 @@ TOOLS = [
                               "description": "dlna = automatic over the network; manual = owner plays a file from USB"},
         "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (dlna only)"}},
        ["pos", "mode", "auto_volume"], approval=True),
+    _t("fix_from_report", "Fix what BassBlend can from the latest system report at a spot: sets the receiver's "
+       "subwoofer level to bring the bass to the target, runs a left+right blend test and applies the blend fix "
+       "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
+       "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
     _t("run_avr_blend", "Measure through the receiver: left speaker alone, then with subs; finds the sub "
        "timing/polarity and level that blend best with the speakers. Plays sweeps through the receiver; "
        "with auto_volume it first sets the volume to the test level (and puts it back after).",
@@ -181,6 +210,8 @@ DESCRIBE = {
                                 + ("left + right speakers" if i.get("speakers") == "both" else "left speaker")
                                 + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
                                 + (", volume set automatically" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
+    "fix_from_report": lambda i: (f"Fix what BassBlend can at spot {i['pos']}: set the receiver's sub level, blend test + "
+                                  "blend fix on the playing slot, then a new system report (several minutes of sweeps)"),
     "run_system_report": lambda i: (f"Full-range system report at spot {i['pos']}: sweeps on the left, right and both "
                                     "front speakers" + (" (network)" if i["mode"] == "dlna" else " (USB stick)")
                                     + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "dlna" else "")),
@@ -240,8 +271,8 @@ class Assistant:
 
     # ---- internals
     def _call(self):
-        from .analysis import _call_claude_raw
-        return _call_claude_raw(SYSTEM, self.messages, API_TOOLS)
+        from . import ai
+        return ai.chat(SYSTEM, self.messages, API_TOOLS)
 
     def _exec(self, name, inp):
         try:
@@ -340,6 +371,7 @@ def _brief(name, inp, out):
              "start_autotune": "Started auto-tune", "avr_status": "Checked the receiver",
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",
              "get_system_report": "Read the system report", "run_system_report": "Ran the system report",
+             "fix_from_report": "Fixed what BassBlend can",
              "apply_avr_blend": "Applied the blend fix"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):

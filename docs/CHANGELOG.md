@@ -1,5 +1,30 @@
 # BassBlend changelog
 
+## Nov 13, 2026 (evening) - vendor-aware subs, AI providers, receiver control and fixes
+
+- **Vendor-aware subs**: Room & subs shows each catalog model's own controls. Hsu VTF-3 MK5 HP
+  (from Hsu's manual): ports, EQ1/EQ2, Q 0.3-0.7, crossover In/Out and frequency, phase 0/180,
+  volume, power; the five operating modes; a danger warning for both ports open with EQ1. SVS
+  SB-1000: volume, low-pass/LFE, phase. Stacked-crossover warnings. Ported modes get no EQ boost
+  below a conservative limit. The assistant sees settings, modes and the maker's guidance.
+- **AI providers**: Anthropic (default), OpenAI, Google Gemini or a local OpenAI-compatible
+  server (Ollama, LM Studio). Key per provider, models from the provider's live list (a sensible
+  one is picked automatically), Test button; assistant tools and analysis work with all of them.
+  Provider choice and (optionally) keys travel in the settings file.
+- **Receiver control**: centre level; sound processing (bass/treble, Late Night, Cinema Filter,
+  Music Optimizer, dialogue enhance, dimmer) plus temperature and input signal, all confirmed
+  supported by the TX-RZ50's own capability list. Tests switch the colouring processing off and
+  restore it afterwards.
+- **Fix what BassBlend can** (System report): receiver sub level to the target (max +3 dB up),
+  left+right blend test with the blend fix applied when it helps (never slot 1), then a new report
+  with before/after. Receiver advice with exact menu numbers (distance, level) and Dirac notes.
+- **Report history** with a before/after overlay; Dirac target "Matched to your speakers" (the
+  measured in-room treble slope), recommended Dirac settings, Hsu auto-EQ reminder.
+- **8 s lead-in** on the test files (the receiver skipped the start of network playback, losing
+  the left sweep's deepest bass); the report flags a clipped start.
+- Tests: `test_vendors.py`, `test_ai.py` (fake provider server, full tool loop), `test_fixup.py`,
+  receiver processing in `test_deepcheck.py`.
+
 ## Nov 13, 2026 — system report, automatic receiver volume, header SPL meter, target slot
 
 - **System report** (menu → Measure): a 20 Hz-20 kHz sweep on the left speaker, the right, then

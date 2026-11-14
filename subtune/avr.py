@@ -7,8 +7,11 @@ DLNA:  the receiver is a UPnP MediaRenderer; BassBlend serves a WAV from this
 Safety rules (enforced here, not just in the UI):
   * volume is never raised above the level it had before BassBlend touched it,
     and never above VOLUME_CAP; an explicit raise is limited to +RAISE_STEP;
-  * only power, input, listening mode, volume, mute and subwoofer level are
-    touched: no setup menus, no room correction settings.
+  * only power, input, listening mode, volume, mute, subwoofer/centre level and
+    the sound-processing switches (tone, Late Night, Cinema Filter, Music
+    Optimizer, dialogue enhance, dimmer) are touched: no setup menus, no room
+    correction settings. During BassBlend's tests the processing that colours the
+    sound is set flat/off, then put back exactly as it was.
 """
 from __future__ import annotations
 
@@ -27,6 +30,11 @@ PORT = 60128
 VOLUME_CAP = 70.0        # display units (0-100 scale on the RZ50, 0.5 steps)
 RAISE_STEP = 6.0         # most a single explicit "louder" may add
 SUB_LEVEL_RANGE = (-15.0, 12.0)
+TONE_RANGE = (-10, 10)                    # bass/treble, dB (TX-RZ50 reports min -10, max 10, step 1)
+LATE_NIGHT = {"00": "Off", "01": "Low", "02": "High", "03": "Auto"}
+DIMMER = {"00": "Bright", "01": "Dim", "02": "Dark", "03": "Display off", "08": "Bright, LED off"}
+DIALOG_RANGE = (0, 5)
+CENTER_LEVEL_RANGE = (-12.0, 12.0)
 
 MODES = {"00": "Stereo", "01": "Direct", "02": "Surround", "03": "Film", "04": "THX", "05": "Action",
          "06": "Musical", "08": "Orchestra", "09": "Unplugged", "0A": "Studio-Mix", "0B": "TV Logic",
@@ -100,6 +108,20 @@ def half_db_to_signed(db: float) -> str:
     return ("-" if db < 0 else "+" if db > 0 else "") + f"{n:02X}"
 
 
+def tone_decode(raw: str | None):
+    """'B00T00' -> (0, 0); 'B+2T-A' -> (2, -10). Hex digit after the sign."""
+    m = re.fullmatch(r"B([+-]?[0-9A-Fa-f]{1,2})T([+-]?[0-9A-Fa-f]{1,2})", raw or "")
+    if not m:
+        return None, None
+    dec = lambda t: (-1 if t.startswith("-") else 1) * int(t.lstrip("+-"), 16)
+    return dec(m[1]), dec(m[2])
+
+
+def tone_encode(db: int) -> str:
+    db = int(db)
+    return "00" if db == 0 else ("+" if db > 0 else "-") + f"{abs(db):X}"
+
+
 # ------------------------------------------------------------- control
 class Onkyo:
     def __init__(self, host: str | None = None):
@@ -159,6 +181,11 @@ class Onkyo:
         if got.get("PWR") == "01":            # the rest only answer when the receiver is on
             for r in self._xfer([f"{c}QSTN" for c in ("MVL", "AMT", "SLI", "LMD", "SWL", "CTL")], wait=4.0):
                 got.setdefault(r[2:5], r[5:])
+            try:                                   # extras: a slow or older receiver may not answer these
+                for r in self._xfer([f"{c}QSTN" for c in ("TFR", "LTN", "RAS", "MOT", "DLC", "DIM", "TPD", "IFA")], wait=3.0):
+                    got.setdefault(r[2:5], r[5:])
+            except OSError:
+                pass
         pwr = got.get("PWR")
         st = {"host": self.host, "model": load_settings().get("avr_model", "Onkyo"),
               "power": None if pwr is None else pwr == "01"}
@@ -172,6 +199,16 @@ class Onkyo:
             st["mode"], st["mode_code"] = MODES.get(lmd, lmd), lmd
             st["sub_level"] = signed_half_db(got.get("SWL"))
             st["center_level"] = signed_half_db(got.get("CTL"))
+            st["tone_bass"], st["tone_treble"] = tone_decode(got.get("TFR"))
+            ok = lambda c: got.get(c) not in (None, "N/A")
+            st["late_night"] = got["LTN"] if ok("LTN") else None
+            st["cinema_filter"] = (got["RAS"] == "01") if ok("RAS") else None
+            st["music_optimizer"] = (got["MOT"] == "01") if ok("MOT") else None
+            st["dialog"] = int(got["DLC"], 16) if ok("DLC") and re.fullmatch(r"[0-9A-Fa-f]{2}", got["DLC"]) else None
+            st["dimmer"] = got["DIM"] if ok("DIM") else None
+            m = re.search(r"C\s*(-?\d+)", got.get("TPD") or "")
+            st["temp_c"] = int(m[1]) if m else None
+            st["audio_in"] = got["IFA"].strip(", ") if ok("IFA") else None
         return st
 
     # ---- guarded setters
@@ -222,11 +259,66 @@ class Onkyo:
             raise ValueError(f"subwoofer level must be {lo:g} to {hi:+g} dB")
         self.send("SWL", half_db_to_signed(db) if db else "00")
 
+    def set_tone(self, bass: int | None = None, treble: int | None = None):
+        lo, hi = TONE_RANGE
+        for v in (bass, treble):
+            if v is not None and not lo <= int(v) <= hi:
+                raise ValueError(f"bass and treble go from {lo} to {hi:+d} dB")
+        if bass is not None:
+            self.send("TFR", "B" + tone_encode(bass))
+        if treble is not None:
+            self.send("TFR", "T" + tone_encode(treble))
+
+    def set_late_night(self, code: str):
+        if code not in LATE_NIGHT:
+            raise ValueError("Late Night must be 00 (off), 01 (low), 02 (high) or 03 (auto)")
+        self.send("LTN", code)
+
+    def set_cinema_filter(self, on: bool):
+        self.send("RAS", "01" if on else "00")
+
+    def set_music_optimizer(self, on: bool):
+        self.send("MOT", "01" if on else "00")
+
+    def set_dialog(self, n: int):
+        lo, hi = DIALOG_RANGE
+        if not lo <= int(n) <= hi:
+            raise ValueError(f"dialogue enhance goes from {lo} to {hi}")
+        self.send("DLC", f"{int(n):02X}")
+
+    def set_dimmer(self, code: str):
+        if code not in DIMMER:
+            raise ValueError("unknown dimmer setting")
+        self.send("DIM", code)
+
+    def neutral_for_test(self, snap: dict) -> list[str]:
+        """Switch off what colours a measurement (tone, Late Night, Cinema Filter, Music
+        Optimizer, dialogue enhance). restore(snap) puts every one back. Returns what changed."""
+        changed = []
+        if snap.get("tone_bass") or snap.get("tone_treble"):
+            self.set_tone(0, 0); changed.append(f"tone (bass {snap.get('tone_bass'):+d}, treble {snap.get('tone_treble'):+d})")
+        if snap.get("late_night") not in (None, "00"):
+            self.set_late_night("00"); changed.append(f"Late Night ({LATE_NIGHT.get(snap['late_night'], snap['late_night'])})")
+        if snap.get("cinema_filter"):
+            self.set_cinema_filter(False); changed.append("Cinema Filter")
+        if snap.get("music_optimizer"):
+            self.set_music_optimizer(False); changed.append("Music Optimizer")
+        if snap.get("dialog"):
+            self.set_dialog(0); changed.append(f"dialogue enhance ({snap['dialog']})")
+        return changed
+
+    def set_center_level(self, db: float):
+        lo, hi = CENTER_LEVEL_RANGE
+        if not lo <= db <= hi:
+            raise ValueError(f"centre level must be {lo:g} to {hi:+g} dB")
+        self.send("CTL", half_db_to_signed(db) if db else "00")
+
     # ---- snapshot / restore around a measurement
     def snapshot(self, tries=4):
         """The settings a test must put back. Retries: a busy receiver sometimes doesn't
         answer in time, and a test must never start without knowing what to restore."""
-        keys = ("power", "volume", "mute", "input_code", "mode_code", "sub_level")
+        keys = ("power", "volume", "mute", "input_code", "mode_code", "sub_level", "tone_bass", "tone_treble",
+                "late_night", "cinema_filter", "music_optimizer", "dialog")
         for i in range(tries):
             st = self.status()
             snap = {k: st.get(k) for k in keys}
@@ -254,6 +346,19 @@ class Onkyo:
         if snap.get("volume") is not None:
             self.send("MVL", display_to_vol(snap["volume"]))      # back to exactly where it was
         self.send("AMT", "01" if snap.get("mute") else "00")
+        try:                                       # sound-processing switches set flat for the test
+            if snap.get("tone_bass") or snap.get("tone_treble"):
+                self.set_tone(snap.get("tone_bass") or 0, snap.get("tone_treble") or 0)
+            if snap.get("late_night") not in (None, "00"):
+                self.set_late_night(snap["late_night"])
+            if snap.get("cinema_filter"):
+                self.set_cinema_filter(True)
+            if snap.get("music_optimizer"):
+                self.set_music_optimizer(True)
+            if snap.get("dialog"):
+                self.set_dialog(snap["dialog"])
+        except (OSError, ValueError):
+            pass
         if snap.get("power") is False:
             time.sleep(0.5)
             self.power(False)

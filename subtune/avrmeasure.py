@@ -28,7 +28,7 @@ from . import audio
 from .audio import GRID
 from .config import AUDIO_FS as FS, DATA, load_settings
 
-LEAD, SWEEP, GAP, TAIL = 4.0, 6.0, 7.0, 3.0
+LEAD, SWEEP, GAP, TAIL = 8.0, 6.0, 7.0, 3.0   # 8 s lead-in: receivers can skip the first seconds of network playback
 F1, F2 = 10.0, 500.0
 FILE_DBFS = -20.0
 MEDIA_NAME = "bassblend_blend_test.wav"
@@ -229,6 +229,9 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
             o.power(True)
             time.sleep(3)
             snap.update({k: v for k, v in o.snapshot().items() if k != "power"})
+        flat = o.neutral_for_test(snap)                       # tone, Late Night, Cinema Filter... off for the test
+        if flat:
+            log("avr", "AVR test: switched off for the test (put back afterwards): " + ", ".join(flat))
         if auto_volume and mode == "dlna":
             # dial in the volume first with pink noise (subs on, as you listen); this needs the mic
             # before the sweep recording opens it

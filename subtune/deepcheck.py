@@ -34,7 +34,7 @@ from .config import AUDIO_FS as FS, load_settings
 
 F1, F2 = 20.0, 20000.0
 SWEEP = 8.0
-LEAD, GAP, TAIL = 4.0, 3.0, 3.0
+LEAD, GAP, TAIL = 8.0, 3.0, 3.0        # 8 s lead-in: receivers can skip the first seconds of network playback
 FILE_DBFS = -20.0
 MEDIA_NAME = "bassblend_full_range_test.wav"
 OFFS = {"left": 0.0, "right": SWEEP + GAP, "both": 2 * (SWEEP + GAP)}
@@ -295,9 +295,46 @@ def analyse(rec, t_start, cal=None, settings=None, system=None):
          "bands": bands, "lr": lr, "reflections": {"left": refl, "right": refl_r}, "etc": etc,
          "decay": decay, "thd": thd, "noise": noise, "snr": None if snr is None else snr.tolist(),
          "bass_extension_hz": round(ext, 1), "peak_dbfs": round(20 * np.log10(max(peak, 1e-9)), 1)}
+    bb = {x["key"]: x["avg"]["vs_target_db"] for x in bands}
+    r["bass_vs_target_db"] = round((bb["deep_bass"] + bb["bass"]) / 2, 1)
+    # the speakers' natural in-room treble slope, as dB at 20 kHz (Dirac target "measured")
+    hi = band_mean(FG, norm["avg"], 8000, 12000) - band_mean(FG, norm["avg"], 1000, 2000)
+    r["treble_tilt_db"] = round(float(np.clip(hi * np.log(20) / np.log(10), -8.0, 0.0)), 1)
     r["findings"] = findings(r, dev, norm)
     r["areas"] = area_status(r["findings"])
     return r
+
+
+def receiver_advice(r, sub_level=None, dirac_on=False):
+    """Concrete receiver changes: what BassBlend can do itself, and exact numbers for the menu."""
+    out = []
+    lr = r["lr"]
+    if dirac_on:
+        note = " Dirac Live sets distances and levels itself: re-run Dirac with the mic centred instead of changing these by hand."
+    else:
+        note = ""
+    if abs(lr["timing_ms"]) >= 0.15:
+        side = "Left" if lr["timing_ms"] < 0 else "Right"
+        cm = abs(lr["timing_cm"])
+        out.append({"kind": "menu", "what": "distance",
+                    "text": f"Increase the {side} speaker's distance by {cm / 30.48:.1f} ft ({cm:.0f} cm) in the receiver's Speaker Setup → "
+                            f"Distance, or check the mic was centred.{note}"})
+    if abs(lr["level_db"]) >= 0.5:
+        side = "Left" if lr["level_db"] > 0 else "Right"
+        db = round(abs(lr["level_db"]) * 2) / 2
+        out.append({"kind": "menu", "what": "level",
+                    "text": f"Lower the {side} speaker's level by {db:.1f} dB in Speaker Setup → Level Calibration.{note}"})
+    err = r.get("bass_vs_target_db") or 0.0
+    if abs(err) >= 1:
+        change = -round(err * 2) / 2
+        to = None if sub_level is None else max(-15.0, min(12.0, sub_level + change))
+        out.append({"kind": "auto", "what": "sub_level", "change_db": change, "to": to,
+                    "text": f"Subwoofer level {change:+.1f} dB" + (f" (from {sub_level:+.1f} to {to:+.1f} dB)" if to is not None else "")
+                            + " to bring the bass to your target. BassBlend can do this."})
+    if lr["polarity"] == "reversed":
+        out.append({"kind": "hands", "what": "wiring",
+                    "text": "Swap the red and black wires on one front speaker (it's wired backwards), then run the report again."})
+    return out
 
 
 # ---------------------------------------------------------------- findings
@@ -427,6 +464,16 @@ def findings(r, dev, norm):
                 f["todo"] = (f"This is likely ripple from the strong reflection {x['ms']:.1f} ms after the direct sound "
                              "(it cancels a series of evenly spaced pitches). Fix the reflection rather than EQ-ing the dips.")
     out += pd
+    # the receiver skipped the start of the file: the left sweep (first) lost its lowest notes
+    lo = (FG >= 20) & (FG < 35)
+    mid = (FG >= 200) & (FG < 2000)
+    gap_lo = float(np.mean(norm["right"][lo] - norm["left"][lo]))
+    if gap_lo > 10 and abs(float(np.mean(norm["right"][mid] - norm["left"][mid]))) < 2:
+        out.append(_f("clean", "watch", "The start of the test was cut off",
+                      f"The left speaker's deepest bass reads {gap_lo:.0f} dB below the right's, but the subs play the same bass "
+                      "for both: the receiver most likely skipped the first moments of the file.",
+                      "Ignore the left speaker's reading below 35 Hz in this report; everything else is unaffected.",
+                      "Run the report again. If it keeps happening, tell BassBlend: the lead-in can be made longer."))
     # left / right
     lr = r["lr"]
     if lr["polarity"] == "reversed":
@@ -546,7 +593,7 @@ def area_status(fs):
 
 
 # ---------------------------------------------------------------------- run
-def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None):
+def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label=""):
     """Measure through the receiver and store the report. mode: 'dlna' | 'manual'."""
     from . import autolevel, avr
     from .avrmeasure import SweepWatcher
@@ -573,6 +620,9 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None):
             time.sleep(3)
             # remember its volume and input now that it answers; restore() sets them back before standby
             snap.update({k: v for k, v in o.snapshot().items() if k != "power"})
+        flat = o.neutral_for_test(snap)                       # tone, Late Night, Cinema Filter... off for the test
+        if flat:
+            log("avr", "system report: switched off for the test (put back afterwards): " + ", ".join(flat))
         if dsp_before == "usb":                                # subs listen to the receiver for this test
             dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")], "system report: subs on the receiver's sub out")
         if mode == "dlna":
@@ -622,12 +672,20 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None):
             o.restore(snap)
             log("avr", f"system report: receiver restored (volume {snap.get('volume')})")
     r = analyse(rec, t0, cal, s)
-    r.update({"pos": pos, "mode": mode, "level": level,
+    r.update({"pos": pos, "mode": mode, "level": level, "neutralised": flat,
               "avr": {k: snap.get(k) for k in ("volume", "sub_level", "input_code", "mode_code")},
               "tune_id": (load_state().get("result") or {}).get("tune_id")})
-    reports = load_state().get("deep_reports") or {}
+    from .dirac import system as _system
+    r["receiver_advice"] = receiver_advice(r, snap.get("sub_level"), bool(_system().get("dirac")))
+    r["label"] = label
+    st = load_state()
+    reports = st.get("deep_reports") or {}
     reports[str(pos)] = r
-    update_state(deep_reports=reports, deep_status={"running": False})
+    hist = (st.get("deep_history") or [])[-11:]
+    hist.append({"t": r["t"], "pos": pos, "label": label, "avg": [round((a + b) / 2, 1) for a, b in zip(r["curves"]["left"], r["curves"]["right"])],
+                 "both": r["curves"]["both"], "bass_vs_target_db": r["bass_vs_target_db"],
+                 "areas": {k: v["status"] for k, v in r["areas"].items()}, "sub_level": snap.get("sub_level")})
+    update_state(deep_reports=reports, deep_history=hist, deep_status={"running": False})
     n = r["areas"]
     log("measure", f"system report at spot {pos}: " + ", ".join(f"{v['label']} {v['status']}" for v in n.values()))
     return r

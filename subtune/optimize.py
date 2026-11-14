@@ -60,10 +60,31 @@ def _sdb(power, axis=-1):
 
 
 def sub_allow(f, s, nearfield):
-    """Per-sub max boost (S, F): nearfield subs get their own, lower cap."""
+    """Per-sub max boost (S, F): nearfield subs get their own, lower cap, and a
+    ported sub gets no boost below its mode's safe limit (vendors.protect_hz)."""
     base = allowed_boost(f, s)
     nf = float(s.get("nearfield_max_boost_db", 0.0))
-    return np.stack([np.minimum(base, nf) if n else base for n in nearfield])
+    prot = list(s.get("_protect_hz") or []) + [None] * len(nearfield)
+    rows = []
+    for i, n in enumerate(nearfield):
+        a = np.minimum(base, nf) if n else base
+        if prot[i]:
+            a = np.where(f < prot[i], np.minimum(a, 0.0), a)
+        rows.append(a)
+    return np.stack(rows)
+
+
+def sub_protect(subs):
+    """No-boost-below frequency per sub output, from the recorded vendor settings."""
+    from . import vendors
+    from .room import load_room
+    room = load_room()["subs"]
+    out = []
+    for o in subs:
+        d = room.get(str(o)) or {}
+        cid = d.get("catalog") or vendors.find(d.get("model", ""))
+        out.append(vendors.protect_hz(cid, d.get("controls") or {}) if cid else None)
+    return out
 
 
 def position_weights(P, s):
@@ -205,6 +226,15 @@ def optimise(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
         raise ValueError(f"sub_peq_bands + global_peq_bands must be <= {PEQ_BANDS}")
     roles = roles or sub_roles(subs)
     nearfield = np.array([r == "nearfield" for r in roles])
+    if "_protect_hz" not in s:                     # ported subs: no EQ boost below their mode's safe limit
+        try:
+            prot = sub_protect(subs)
+        except Exception:                          # noqa: BLE001 - never block a tune over this
+            prot = [None] * S
+        if any(prot):
+            s = dict(s, _protect_hz=prot)
+            log("opt", "no EQ boost below " + ", ".join(f"{p:g} Hz on out {o + 1}" for o, p in zip(subs, prot) if p)
+                       + " (ported mode)")
     nf_cut = float(s.get("nearfield_max_cut_db", 3.0))
     gain_lo = [-nf_cut if n else s["min_gain_db"] for n in nearfield]     # per-sub gain floor
     boost_hi = [float(s.get("nearfield_max_boost_db", 0.0)) if n else s["max_boost_db"] for n in nearfield]

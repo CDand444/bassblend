@@ -93,11 +93,14 @@ def export(include_history: bool = True, include_pin: bool = False, include_key:
         a = auth._load()
         if a.get("pin_hash"):
             secrets["pin"] = {"pin_hash": a["pin_hash"], "salt": a["salt"]}
+    from . import ai
+    b["ai"] = {k: v for k, v in ai.config().items()}       # provider + models: not secret
     if include_key:
-        from .analysis import saved_key
-        k = saved_key()
-        if k:
-            secrets["ai_key"] = k
+        keys = {p: ai.saved_key(p) for p in ai.PROVIDERS if ai.saved_key(p)}
+        if keys:
+            secrets["ai_keys"] = keys
+            if keys.get("anthropic"):
+                secrets["ai_key"] = keys["anthropic"]           # older BassBlend reads this one
     if secrets:
         b["secrets"] = secrets
     return b
@@ -239,10 +242,30 @@ def import_bundle(b, keep_sessions: bool = True) -> dict:
             auth._save({"pin_hash": pin["pin_hash"], "salt": pin["salt"],
                         "sessions": cur.get("sessions", {}) if keep_sessions else {}})
         done.append("PIN")
-    if isinstance(sec, dict) and sec.get("ai_key"):
-        from .analysis import save_key
-        save_key(str(sec["ai_key"]))
-        done.append("AI key")
+    from . import ai
+    aic = b.get("ai")
+    if isinstance(aic, dict) and aic.get("provider") in ai.PROVIDERS:
+        try:
+            for pv, m in (aic.get("models") or {}).items():
+                if pv in ai.PROVIDERS:
+                    ai.save_config(provider=pv, model=m)
+            ai.save_config(provider=aic["provider"], local_base=aic.get("local_base") or "")
+            done.append(f"AI provider {ai.PROVIDERS[aic['provider']]['label']}")
+        except ValueError:
+            pass
+    keys = dict(sec.get("ai_keys") or {}) if isinstance(sec, dict) else {}
+    if isinstance(sec, dict) and sec.get("ai_key") and "anthropic" not in keys:
+        keys["anthropic"] = sec["ai_key"]
+    saved = []
+    for pv, k in keys.items():
+        if pv in ai.PROVIDERS and isinstance(k, str):
+            try:
+                ai.save_key(pv, k)
+                saved.append(ai.PROVIDERS[pv]["label"])
+            except ValueError:
+                pass
+    if saved:
+        done.append("AI key" + ("s" if len(saved) > 1 else "") + " (" + ", ".join(saved) + ")")
     from . import auth
     s = load_settings()
     if auth.pin_set() and s.get("cal_file") and s.get("avr_host") and not s.get("onboarded"):

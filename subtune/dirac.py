@@ -116,10 +116,10 @@ def dirac_current(sy=None, res=None) -> bool:
 
 
 # ---------------------------------------------------------------- target curve
-def target_points(house_db: float, house_fc: float, treble: str = "gentle") -> list[tuple[float, float]]:
+def target_points(house_db: float, house_fc: float, treble: str = "gentle", tilt: float | None = None) -> list[tuple[float, float]]:
     """(frequency, dB) breakpoints: BassBlend's bass rise, flat mids, optional
     gentle fall in the treble. 0 dB is the midrange."""
-    tilt = TREBLE.get(treble, TREBLE["gentle"])
+    tilt = TREBLE.get(treble, TREBLE["gentle"]) if tilt is None else float(tilt)
     pts = []
     for f in FREQS:
         bass = house_db / (1 + (f / house_fc) ** 4)
@@ -139,12 +139,29 @@ def serialize(name: str, pts, device: str = "BassBlend", lo: float = 20, hi: flo
     return "\n".join(lines) + "\n"
 
 
+def measured_tilt():
+    """The speakers' natural treble slope from the latest system report (dB at 20 kHz), if any."""
+    from .state import load_state
+    reps = list((load_state().get("deep_reports") or {}).values())
+    if not reps:
+        return None
+    r = max(reps, key=lambda x: x["t"])
+    return r.get("treble_tilt_db")
+
+
 def target_file(treble: str | None = None) -> tuple[str, str, list]:
     """(file name, file text, points) for the current BassBlend target."""
     s = load_settings()
     sy = system()
-    treble = treble if treble in TREBLE else sy.get("treble", "gentle")
     hd, fc = float(s.get("house_db", 0)), float(s.get("house_fc", 45))
+    if treble == "measured":                       # follow the speakers' own in-room treble slope
+        tilt = measured_tilt()
+        if tilt is None:
+            raise ValueError("run a system report first: the measured treble comes from it")
+        pts = target_points(hd, fc, tilt=tilt)
+        name = f"BassBlend +{hd:g} dB bass, your treble ({tilt:+.1f} dB at 20k)"
+        return "BassBlend_target_measured.targetcurve", serialize(name, pts), pts
+    treble = treble if treble in TREBLE else sy.get("treble", "gentle")
     pts = target_points(hd, fc, treble)
     name = f"BassBlend +{hd:g} dB bass, {treble} treble"
     return f"BassBlend_target_{treble}.targetcurve", serialize(name, pts), pts

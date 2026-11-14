@@ -178,10 +178,14 @@ function avrBody() {
     <p class="msg" id="avrMsg" role="alert"></p>`;
 }
 function aiBody() {
-  return `<p>The assistant explains results in plain words and can run tests for you (it always asks first). It needs an Anthropic API key, which is billed by Anthropic per use.</p>
-    <div class="note">Get a key at console.anthropic.com → API keys. It starts with <b>sk-ant-</b>. BassBlend keeps it on this device only and never shows it again.</div>
-    <label class="f">API key<input type="password" id="aiKey" autocomplete="off" spellcheck="false"></label>
-    <div class="row"><button class="btn primary" id="aiSave">Save key</button><button class="btn link" data-skip="ai">Skip, I’ll do this later</button></div>
+  return `<p>The assistant explains results in plain words and can run tests for you (it always asks first). It needs an AI provider: an API key (billed by that provider per use), or a model you run yourself on another computer.</p>
+    <div class="note">Claude works best with BassBlend. Keys: console.anthropic.com (Claude), platform.openai.com (OpenAI) or aistudio.google.com (Gemini). BassBlend keeps the key on this device only, sends it only to that provider, and picks a suitable model for you (you can change it later).</div>
+    <label class="f">AI provider<select id="aiProv">
+      <option value="anthropic">Anthropic (Claude), recommended</option><option value="openai">OpenAI</option>
+      <option value="gemini">Google Gemini</option><option value="local">A local model on my network (Ollama, LM Studio)</option></select></label>
+    <label class="f" id="aiBaseRow" hidden>Local server address<input type="text" id="aiBase" spellcheck="false" placeholder="http://192.168.1.20:11434/v1"></label>
+    <label class="f" id="aiKeyRow">API key<input type="password" id="aiKey" autocomplete="off" spellcheck="false"></label>
+    <div class="row"><button class="btn primary" id="aiSave">Save</button><button class="btn link" data-skip="ai">Skip, I’ll do this later</button></div>
     <p class="msg" id="aiMsg" role="alert"></p>`;
 }
 
@@ -237,11 +241,17 @@ function wire() {
   const ak = $('#aiSave');
   if (ak) {
     const go = async () => {
-      const m = $('#aiMsg'), r = await post('/api/apikey', {key: $('#aiKey').value});
+      const prov = $('#aiProv').value, m = $('#aiMsg');
+      m.className = 'msg'; m.textContent = 'Checking…';
+      const r = await post('/api/ai', {action: 'save', provider: prov, key: $('#aiKey').value.trim() || undefined,
+                                       local_base: prov === 'local' ? $('#aiBase').value.trim() : undefined});
+      if (!r.error && !r.ready) { m.className = 'msg bad'; m.textContent = prov === 'local' ? 'Enter the server address.' : 'Enter the API key.'; return; }
       if (r.error) { m.className = 'msg bad'; m.textContent = r.error; return; }
       open = null; await load();
     };
     ak.onclick = go; $('#aiKey').onkeydown = e => { if (e.key === 'Enter') go(); };
+    $('#aiProv').onchange = () => { const local = $('#aiProv').value === 'local';
+      $('#aiBaseRow').hidden = !local; $('#aiKeyRow').firstChild.textContent = local ? 'API key (only if your server needs one)' : 'API key'; };
   }
   const imf = $('#impFile');
   if (imf) imf.onchange = async () => {

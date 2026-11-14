@@ -79,6 +79,11 @@ def save_room(body: dict) -> dict:
                 d[f] = v if v in ROLES else "main"
             else:
                 d[f] = _txt(v, 300)
+        # vendor-aware: which catalog model it is, and where its knobs and switches are set
+        from . import vendors
+        cid = s.get("catalog") if s.get("catalog") in vendors.CATALOG else vendors.find(d.get("model", ""))
+        d["catalog"] = cid or ""
+        d["controls"] = vendors.clean(cid, s.get("controls") or {}) if cid else {}
         subs[str(k)] = d
     r["subs"] = subs
     r["avr"] = _txt(body.get("avr"))

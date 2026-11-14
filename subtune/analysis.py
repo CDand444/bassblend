@@ -28,8 +28,8 @@ def _key_file():
 
 
 def saved_key() -> str | None:
-    f = _key_file()
-    return f.read_text(encoding="utf-8").strip() or None if f.exists() else None
+    from . import ai
+    return ai.saved_key("anthropic")
 
 
 def save_key(key: str) -> None:
@@ -54,12 +54,9 @@ def delete_key() -> None:
 
 
 def key_source() -> str | None:
-    import os
-    if os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN"):
-        return "environment"
-    if saved_key():
-        return "saved"
-    return None
+    """Whether the chosen AI provider is ready: 'environment' | 'saved' | 'local' | None (never the key)."""
+    from . import ai
+    return ai.key_source()
 MODEL = "claude-opus-5-5"
 POINTS = [15, 18, 20, 22, 25, 28, 31.5, 35, 40, 45, 50, 56, 63, 71, 80, 90, 100, 112, 125, 140, 160, 180, 200]
 
@@ -165,8 +162,7 @@ def store_external(markdown: str, source="Claude Code") -> dict:
     return rec
 
 
-class AIError(Exception):
-    pass
+from .ai import AIError  # noqa: E402  (one error type for every provider)
 
 
 def _call_claude(system: str, user: str, output_format: dict | None = None):
@@ -182,7 +178,7 @@ def _call_claude(system: str, user: str, output_format: dict | None = None):
         env = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
         client = anthropic.Anthropic() if env else anthropic.Anthropic(api_key=saved_key())
         with client.beta.messages.stream(
-            model=MODEL,
+            model=_claude_model(),
             max_tokens=32000,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
@@ -220,7 +216,7 @@ def _call_claude_raw(system: str, messages: list, tools: list):
         env = os.environ.get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_AUTH_TOKEN")
         client = anthropic.Anthropic() if env else anthropic.Anthropic(api_key=saved_key())
         with client.beta.messages.stream(
-            model=MODEL,
+            model=_claude_model(),
             max_tokens=16000,
             betas=["server-side-fallback-2026-07-01"],
             fallbacks="default",
@@ -251,6 +247,16 @@ def _call_claude_raw(system: str, messages: list, tools: list):
     return {"content": d["content"], "stop_reason": d.get("stop_reason")}
 
 
+def _claude_model():
+    from . import ai
+    return ai.model_for("anthropic") or MODEL
+
+
+def _who():
+    from . import ai
+    return f"{ai.PROVIDERS[ai.active()]['label']} ({ai.model_for() or 'no model chosen'})"
+
+
 def _context_message(ctx, extra=""):
     return ("Here is everything the tuning tool knows about this system (JSON):\n\n```json\n"
             + json.dumps(ctx, indent=1) + "\n```" + (f"\n\n{extra}" if extra else ""))
@@ -259,18 +265,20 @@ def _context_message(ctx, extra=""):
 def run_claude(question: str | None = None) -> dict:
     ctx = build_context()
     update_state(analysis_status={"running": True, "started": time.time()})
-    event("ai", f"asking {MODEL} to analyse the room and placement")
+    event("ai", f"asking {_who()} to analyse the room and placement")
+    from . import ai
     try:
-        msg = _call_claude(SYSTEM, _context_message(ctx, f"The owner also asks: {question}" if question else ""))
+        msg = ai.complete(SYSTEM, _context_message(ctx, f"The owner also asks: {question}" if question else ""))
     except AIError as e:
         return _fail(str(e))
-    text = "".join(b.text for b in msg.content if b.type == "text").strip()
+    if msg.stop_reason == "refusal":
+        return _fail("The model declined this request.")
+    text = msg.text
     if msg.stop_reason == "max_tokens":
         text += "\n\n_(cut off at the length limit)_"
-    rec = _store(text, msg.model, ctx, {"request_id": getattr(msg, '_request_id', None),
-                                        "usage": {"in": msg.usage.input_tokens, "out": msg.usage.output_tokens},
-                                        "question": question})
-    event("ai", f"analysis ready ({msg.usage.output_tokens} output tokens)")
+    rec = _store(text, msg.model, ctx, {"request_id": msg.request_id,
+                                        "usage": {"in": msg.tokens_in, "out": msg.tokens_out}, "question": question})
+    event("ai", f"analysis ready ({msg.tokens_out or '?'} output tokens)")
     return rec
 
 
@@ -351,15 +359,19 @@ TARGET_LIMITS = {"fmin": (10, 40), "fmax": (60, 200), "house_db": (0, 10), "hous
 def run_suggest() -> dict:
     ctx = build_context()
     update_state(suggest_status={"running": True, "started": time.time()})
-    event("ai", f"asking {MODEL} for a suggested sub setup")
+    event("ai", f"asking {_who()} for a suggested sub setup")
+    from . import ai
     try:
-        msg = _call_claude(SUGGEST_SYSTEM, _context_message(ctx, "Recommend the setup. Output 1-based "
-                                                                 "output numbers in subs[].output."),
-                           {"type": "json_schema", "schema": SUGGEST_SCHEMA})
+        msg = ai.complete(SUGGEST_SYSTEM, _context_message(ctx, "Recommend the setup. Output 1-based "
+                                                                "output numbers in subs[].output."), SUGGEST_SCHEMA)
         if msg.stop_reason == "max_tokens":
             raise AIError("The suggestion was cut off. Try again.")
-        text = next(b.text for b in msg.content if b.type == "text")
-        data = json.loads(text)
+        if not msg.text:
+            raise StopIteration
+        data = json.loads(msg.text)
+        for k in ("dsp_target",):                    # models without strict JSON schemas can leave parts out
+            if not isinstance(data.get(k), dict):
+                raise json.JSONDecodeError("missing " + k, msg.text, 0)
     except AIError as e:
         return _fail(str(e), "suggest_status", "Setup suggestion")
     except (StopIteration, json.JSONDecodeError):
@@ -371,11 +383,10 @@ def run_suggest() -> dict:
         data["dsp_target"]["fmin"], data["dsp_target"]["fmax"] = 18.0, 120.0
     rec = {"t": time.time(), "source": msg.model, "goals": ctx.get("user_goals"),
            "had_measurements": bool(ctx.get("measurements")), "suggestion": data,
-           "request_id": getattr(msg, '_request_id', None),
-           "usage": {"in": msg.usage.input_tokens, "out": msg.usage.output_tokens}}
+           "request_id": msg.request_id, "usage": {"in": msg.tokens_in, "out": msg.tokens_out}}
     SUGGEST_FILE.write_text(json.dumps(rec, indent=2))
     update_state(suggestion=rec, suggest_status={"running": False})
-    event("ai", f"setup suggestion ready ({msg.usage.output_tokens} output tokens)")
+    event("ai", f"setup suggestion ready ({msg.tokens_out or '?'} output tokens)")
     return rec
 
 
