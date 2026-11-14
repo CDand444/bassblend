@@ -346,6 +346,13 @@ class Onkyo:
         if snap.get("volume") is not None:
             self.send("MVL", display_to_vol(snap["volume"]))      # back to exactly where it was
         self.send("AMT", "01" if snap.get("mute") else "00")
+        if snap.get("sub_level") is not None:
+            # a sub level set over the network or the remote is temporary on Onkyo receivers: an input
+            # change (an HDMI test switches inputs) drops it back to the calibrated level, so set it again
+            try:
+                self.set_sub_level(snap["sub_level"])
+            except (OSError, ValueError):
+                pass
         try:                                       # sound-processing switches set flat for the test
             if snap.get("tone_bass") or snap.get("tone_treble"):
                 self.set_tone(snap.get("tone_bass") or 0, snap.get("tone_treble") or 0)

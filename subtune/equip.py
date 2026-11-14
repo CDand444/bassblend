@@ -1,0 +1,198 @@
+"""Everything htTamer knows about the owner's equipment, and safe ways to change it.
+
+One place for the speakers (one record per channel of the layout), and edit
+helpers that the page and the assistant share for the room, seats, subs,
+speakers and speaker layout. Each helper validates its input, merges it into
+what's stored (so a partial update never wipes other fields) and writes one
+journal line saying what changed, so edits by the assistant are always visible.
+
+Positions are stored in metres, like the rest of room.json; any field ending in
+_ft is accepted too and converted.
+"""
+from __future__ import annotations
+
+import json
+
+FT = 0.3048
+KINDS = ("tower", "bookshelf", "centre", "on-wall", "in-wall", "in-ceiling", "atmos module", "satellite", "other")
+SIZES = ("large", "small")
+SPK_FIELDS = {"model": str, "kind": str, "size": str, "crossover_hz": float, "x_m": float, "y_m": float, "z_m": float,
+              "aim": str, "amp": str, "notes": str}
+TEXT_LEN = {"model": 80, "aim": 120, "amp": 120, "notes": 500}
+
+
+def channels(sy=None) -> list[str]:
+    """The speaker channels of the owner's layout (bed then heights), e.g. 7.x.4."""
+    from . import dirac, layout
+    sy = sy or dirac.system()
+    return list(layout.BED.get(sy.get("beds") or 0, [])) + list(layout.HEIGHTS.get(sy.get("heights") or 0, []))
+
+
+def names() -> dict:
+    from .layout import NAMES
+    return NAMES
+
+
+def _feet(d: dict) -> dict:
+    """Accept *_ft as well as *_m; feet win when both are given."""
+    out = dict(d)
+    for k, v in d.items():
+        if k.endswith("_ft"):
+            out.pop(k)
+            out[k[:-3] + "_m"] = None if v in (None, "") else round(float(v) * FT, 3)
+    return out
+
+
+def _num(v, lo, hi, what):
+    if v in (None, ""):
+        return None
+    v = float(v)
+    if not lo <= v <= hi:
+        raise ValueError(f"{what} must be {lo:g}-{hi:g}")
+    return v
+
+
+def clean_speaker(ch: str, d: dict, old: dict | None = None) -> dict:
+    d = _feet(d)
+    out = dict(old or {})
+    for f, typ in SPK_FIELDS.items():
+        if f not in d:
+            continue
+        v = d[f]
+        if f == "kind":
+            v = str(v or "").lower()
+            if v and v not in KINDS:
+                raise ValueError(f"{ch}: kind must be one of {', '.join(KINDS)}")
+        elif f == "size":
+            v = str(v or "").lower()
+            if v and v not in SIZES:
+                raise ValueError(f"{ch}: size (the receiver's speaker size setting) must be large or small")
+        elif f == "crossover_hz":
+            v = _num(v, 40, 250, f"{ch} crossover")
+        elif f in ("x_m", "y_m"):
+            v = _num(v, 0, 50, f"{ch} {f[0]} position")
+        elif f == "z_m":
+            v = _num(v, 0, 15, f"{ch} height")
+        else:
+            v = str(v or "")[:TEXT_LEN.get(f, 200)]
+        out[f] = v
+    return out
+
+
+def speakers() -> dict:
+    from .room import load_room
+    return load_room().get("speakers") or {}
+
+
+def update_speakers(updates: dict | None = None, remove: list | None = None, who="page") -> dict:
+    """Merge per-channel changes ({"FL": {"model": ...}, ...}); remove clears a channel's record."""
+    from .room import load_room, write_room
+    r = load_room()
+    spk = dict(r.get("speakers") or {})
+    known = set(channels()) | set(names())
+    changed = []
+    for ch, d in (updates or {}).items():
+        ch = str(ch).upper()
+        if ch not in known:
+            raise ValueError(f"unknown channel {ch}; use one of {', '.join(channels() or names())}")
+        if not isinstance(d, dict):
+            raise ValueError(f"{ch}: expected an object of fields")
+        new = clean_speaker(ch, d, spk.get(ch))
+        diff = [f"{k} {spk.get(ch, {}).get(k)!r} → {v!r}" for k, v in new.items() if (spk.get(ch) or {}).get(k) != v]
+        if diff:
+            changed.append(f"{ch}: " + ", ".join(diff))
+        spk[ch] = new
+    for ch in remove or []:
+        if spk.pop(str(ch).upper(), None) is not None:
+            changed.append(f"{str(ch).upper()} removed")
+    r["speakers"] = spk
+    write_room(r)
+    _log(who, "speakers", changed)
+    return {"speakers": spk, "changed": changed}
+
+
+def update_room(patch: dict, who="page") -> dict:
+    """Partial update of room details, seats, goals, receiver text and subs (by 1-based output).
+    patch keys: room {length/width/height_m|_ft, construction, openings, notes}, seats [full list] or
+    seat {name, x/y/z_m|_ft} (update or add by name), goals, avr, subs {"1": {model, location, x_m.., controls{}}}."""
+    from .room import load_room, save_room
+    before = load_room()
+    body = json.loads(json.dumps(before))
+    if "room" in patch:
+        body["room"].update(_feet(patch["room"] or {}))
+    if "seats" in patch:
+        body["seats"] = [_feet(s) for s in patch["seats"] or []]
+    if "seat" in patch:
+        s = _feet(patch["seat"] or {})
+        name = (s.get("name") or "").strip()
+        hit = next((x for x in body["seats"] if x.get("name", "").lower() == name.lower()), None)
+        if hit:
+            hit.update({k: v for k, v in s.items() if k != "name"})     # matched by name: keep its spelling
+        else:
+            body["seats"].append(s)
+    for k in ("goals", "avr"):
+        if k in patch:
+            body[k] = patch[k]
+    for out, d in (patch.get("subs") or {}).items():
+        k = str(int(out) - 1)
+        cur = dict(body["subs"].get(k) or {})
+        d = _feet(d or {})
+        ctl = d.pop("controls", None)
+        cur.update(d)
+        if ctl is not None:
+            cur["controls"] = dict(cur.get("controls") or {}, **ctl)
+        body["subs"][k] = cur
+    after = save_room(body)
+    changed = _diff(before, after)
+    _log(who, "room", changed)
+    return {"changed": changed}
+
+
+def update_system(patch: dict, who="page") -> dict:
+    """Speaker layout and receiver facts: beds, heights, crossover_hz, dirac, dlbc_license, dlbc, treble."""
+    from . import dirac
+    before = dirac.system()
+    sy = dirac.save_system({k: v for k, v in patch.items() if k in ("beds", "heights", "crossover_hz", "dirac",
+                                                                    "dlbc_license", "dlbc", "treble")})
+    changed = [f"{k} {before.get(k)!r} → {sy.get(k)!r}" for k in ("beds", "heights", "crossover_hz", "dirac",
+                                                                 "dlbc_license", "dlbc", "treble") if before.get(k) != sy.get(k)]
+    _log(who, "speaker layout", changed)
+    return {"system": sy, "changed": changed}
+
+
+def summary() -> dict:
+    """All equipment, for the assistant: layout, every channel's speaker (or what's missing), subs, room."""
+    from . import dirac
+    from .room import load_room
+    r, sy = load_room(), dirac.system()
+    spk = r.get("speakers") or {}
+    chans = channels(sy)
+    nm = names()
+    return {"layout": sy.get("label"), "crossover_hz": sy.get("crossover_hz"), "dirac": sy.get("dirac"),
+            "speakers": [{"channel": c, "name": nm.get(c, c), **(spk.get(c) or {})} for c in chans],
+            "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
+            "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},
+            "room": r.get("room"), "seats": r.get("seats"), "receiver": r.get("avr"), "goals": r.get("goals")}
+
+
+def _diff(a, b, path="") -> list[str]:
+    out = []
+    if isinstance(a, dict) and isinstance(b, dict):
+        for k in sorted(set(a) | set(b)):
+            out += _diff(a.get(k), b.get(k), f"{path}.{k}" if path else str(k))
+    elif isinstance(a, list) and isinstance(b, list) and len(a) == len(b):
+        for i, (x, y) in enumerate(zip(a, b)):
+            out += _diff(x, y, f"{path}[{i}]")
+    elif a != b and not (a in (None, "") and b in (None, "")):
+        out.append(f"{path} {a!r} → {b!r}")
+    return out
+
+
+def _log(who, what, changed):
+    if not changed:
+        return
+    from . import journal
+    from .state import event
+    txt = f"{'The assistant' if who == 'assistant' else 'You'} updated {what}: " + "; ".join(changed)
+    event("config", txt[:400])
+    journal.add("data", txt[:400])

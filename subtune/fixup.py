@@ -52,11 +52,17 @@ def run(pos=1, mode="dlna", log=None, status=None, avr_input=None):
         change = min(-round(err * 2) / 2, RAISE_MAX)
         lo, hi = avr.SUB_LEVEL_RANGE
         to = max(lo, min(hi, cur + change))
-        o.set_sub_level(to)
-        log("avr", f"fix: subwoofer level {cur:+.1f} -> {to:+.1f} dB (bass was {err:+.1f} dB vs target)")
-        steps.append({"step": "Subwoofer level", "done": True, "from": cur, "to": to,
-                      "text": f"Receiver sub level {cur:+.1f} → {to:+.1f} dB (the bass was {err:+.1f} dB against your target)."})
-        time.sleep(1.0)
+        from . import fixlog
+        ok, why = fixlog.sub_level_check(cur, to)
+        if not ok:
+            steps.append({"step": "Subwoofer level", "done": False, "text": why})
+        else:
+            o.set_sub_level(to)
+            fixlog.note_sub_level(cur, to, "fix")
+            log("avr", f"fix: subwoofer level {cur:+.1f} -> {to:+.1f} dB (bass was {err:+.1f} dB vs target)")
+            steps.append({"step": "Subwoofer level", "done": True, "from": cur, "to": to,
+                          "text": f"Receiver sub level {cur:+.1f} → {to:+.1f} dB (the bass was {err:+.1f} dB against your target)."})
+            time.sleep(1.0)
 
     # 2. blend subs with the front speakers
     status("Step 2 of 3: blend test (left, right, then left with the subs)…")
@@ -86,8 +92,9 @@ def run(pos=1, mode="dlna", log=None, status=None, avr_input=None):
     status("Step 3 of 3: system report to check the result…")
     after = deepcheck.run(mode, pos, auto_volume=(mode in ("dlna", "hdmi")), label="after fixes", avr_input=avr_input)
     left = [a for a in after.get("receiver_advice") or [] if a["kind"] in ("menu", "hands")]
+    from . import fixlog
     result = {"t": time.time(), "pos": pos, "steps": steps, "before": _summary(before), "after": _summary(after),
-              "still_to_do": [a["text"] for a in left]}
+              "still_to_do": [a["text"] for a in left], "net": fixlog.summary(sub_level_now=o.status().get("sub_level"))}
     update_state(fix_result=result, fix_status={"running": False})
     from . import journal
     journal.add("fix", "Fix what htTamer can: " + " ".join(s["text"] for s in steps)

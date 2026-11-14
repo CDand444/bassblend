@@ -39,6 +39,7 @@ class Rx:
 
 
 def run_fix(bass, sub, blend, apply_raises=None):
+    update_state(fix_ledger=None)                  # each run starts its own round of fixes
     rx = Rx(sub)
     applied = []
     real = (avr.Onkyo, avrmeasure.run, deepcheck.run, cli.cmd_avrapply)

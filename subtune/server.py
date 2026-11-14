@@ -232,6 +232,14 @@ class Runner:
         self.cmd = "fix what htTamer can"
         return self.cmd
 
+    def start_fixes_revert(self):
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        args = [sys.executable, "-m", "subtune", "fixes", "--revert"]
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = "undo fixes"
+        return self.cmd
+
     def start_avrapply(self, multi=None):
         st = load_state()
         if self.running() or st.get("busy"):
@@ -554,13 +562,17 @@ def build_executors():
         a_all = max((st.get("allspk") or {}).values(), key=lambda r: r["t"], default=None)
         if a_all:
             out["all_speakers_check"] = {"t": a_all["t"], "spot": a_all.get("pos"), "advice": [x["text"] for x in a_all["advice"]],
-                                         "speakers": {k: {x: v[x] for x in ("level_vs_fl_db", "arrival_vs_fl_ms", "polarity", "heard")}
+                                         "speakers": {k: {x: v.get(x) for x in ("level_vs_fl_db", "arrival_vs_fl_ms", "heard")}
                                                       for k, v in a_all["speakers"].items()}}
         rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
         if rep:
             out["latest_system_report"] = {"spot": rep["pos"], "t": rep["t"], "bass_vs_target_db": rep.get("bass_vs_target_db"),
                                            "areas": {k: v["status"] for k, v in rep["areas"].items()},
                                            "top_findings": [f["title"] for f in rep["findings"] if f["status"] in ("fix", "watch")][:6]}
+        from . import fixlog
+        fs = fixlog.summary(sub_level_now=(avr_status()["status"] or {}).get("sub_level"))
+        if fs:
+            out["changes_since_baseline"] = fs
         out["summary"] = f"slot {r and r.get('slot')} playing {r and r.get('tune_name')}"
         return out
 
@@ -726,7 +738,7 @@ def build_executors():
         r = _measure(lambda: RUN.start_allspk({"pos": pos, "mode": mode, "auto_volume": auto_volume}), "allspk", timeout=420)
         x = (r or {}).get(str(pos)) or {}
         return {"advice": [a["text"] for a in x.get("advice", [])], "stereo_only": x.get("stereo_only", False),
-                "speakers": {k: {f: v[f] for f in ("level_vs_fl_db", "arrival_vs_fl_ms", "polarity", "heard")}
+                "speakers": {k: {f: v.get(f) for f in ("level_vs_fl_db", "arrival_vs_fl_ms", "heard")}
                              for k, v in (x.get("speakers") or {}).items()},
                 "summary": "; ".join(a["text"] for a in x.get("advice", []))[:300]}
 
@@ -744,6 +756,49 @@ def build_executors():
         r = _measure(lambda: RUN.start_deepcheck({"pos": pos, "mode": mode, "auto_volume": auto_volume}),
                      "deep_reports", timeout=420)
         return report_view((r or {}).get(str(pos)))
+
+    def equipment():
+        from . import equip
+        e = equip.summary()
+        e["summary"] = (f"{e['layout'] or 'layout not set'}; {len(e['speakers']) - len(e['speakers_missing'])} of "
+                        f"{len(e['speakers'])} speakers recorded, {len(e['subs'])} subs")
+        return e
+
+    def speakers_set(speakers=None, remove=None):
+        from . import equip
+        r = equip.update_speakers(speakers or {}, remove or [], who="assistant")
+        return {"changed": r["changed"], "summary": ("; ".join(r["changed"]) or "nothing changed")[:300]}
+
+    def room_set(**patch):
+        from . import equip
+        r = equip.update_room(patch, who="assistant")
+        return {"changed": r["changed"], "summary": ("; ".join(r["changed"]) or "nothing changed")[:300]}
+
+    def system_set(**patch):
+        from . import equip
+        r = equip.update_system(patch, who="assistant")
+        return {"changed": r["changed"], "layout": r["system"].get("label"),
+                "summary": ("; ".join(r["changed"]) or "nothing changed")[:300]}
+
+    def measure_spot(pos):
+        m = _measure(lambda: RUN.start_single("measure", {"pos": pos}), "measurements")
+        return {"measured_spots": sorted(m.keys()) if isinstance(m, dict) else None,
+                "summary": f"measured every sub at spot {pos}; run simulate_tune or start_autotune to use it"}
+
+    def fixes_keep():
+        from . import fixlog
+        fixlog.accept()
+        return {"summary": "kept: the current tune and sub level are the new starting point"}
+
+    def fixes_undo():
+        t0 = time.time()
+        RUN.start_fixes_revert()
+        _wait_job(120)
+        err = _last_error_since(t0)
+        if err:
+            raise RuntimeError(err)
+        r = load_state().get("result") or {}
+        return {"summary": f"undone: slot {r.get('slot')} plays {r.get('tune_name')} again"}
 
     def blend_apply():
         t0 = time.time()
@@ -764,7 +819,9 @@ def build_executors():
             "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot,
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
-            "apply_avr_blend": blend_apply, "get_system_report": report_get, "run_system_report": report_run,
+            "apply_avr_blend": blend_apply, "keep_fixes": fixes_keep, "undo_fixes": fixes_undo,
+            "get_equipment": equipment, "update_speakers": speakers_set, "update_room": room_set,
+            "update_system": system_set, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "_tune_name": tune_name}
 
@@ -856,6 +913,9 @@ def avr_action(body):
                 raise ValueError("raising the subwoofer level needs confirmation")
             target = min(target, cur + 6)
         o.set_sub_level(target)
+        from . import fixlog
+        if fixlog.get():                                  # only while a round of fixes is open
+            fixlog.note_sub_level(cur, target, "manual")
     elif act in ("bass", "treble"):
         st0 = avr_status(force=True)["status"] or {}
         cur = st0.get("tone_" + act)
@@ -931,6 +991,7 @@ def _events(since: float, limit=300):
 def sub_hardware(room=None):
     """Vendor-aware view of each sub: model, recorded knob settings, mode, warnings."""
     from . import vendors
+    from .room import load_room
     room = room or load_room()
     out = {}
     for k, d in (room.get("subs") or {}).items():
@@ -1122,6 +1183,16 @@ class H(BaseHTTPRequestHandler):
             from pathlib import Path
             st["settings"]["cal_ok"] = bool(s.get("cal_file")) and Path(s["cal_file"]).is_file()
             st["job"] = RUN.view()
+            try:
+                from . import equip
+                st["speaker_channels"] = [{"ch": c, "name": equip.names().get(c, c)} for c in equip.channels()]
+            except Exception:                                # noqa: BLE001
+                st["speaker_channels"] = []
+            try:
+                from . import fixlog
+                st["fix_summary"] = fixlog.summary(st.get("fix_ledger"), (_avr.get("data") or {}).get("sub_level"))
+            except Exception as e:                       # noqa: BLE001
+                st["fix_summary"] = {"error": str(e)}
             from .analysis import key_source
             from .room import load_room, modal_report
             room = load_room()
@@ -1340,6 +1411,17 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"started": RUN.start_avrblend(body)})
             if path == "/api/deepcheck":
                 return self._send(200, {"started": RUN.start_deepcheck(body)})
+            if path == "/api/speakers":
+                from . import equip
+                return self._send(200, equip.update_speakers(body.get("speakers") or {}, body.get("remove") or [], who="page"))
+            if path == "/api/fixes":
+                from . import fixlog
+                if body.get("action") == "accept":
+                    fixlog.accept()
+                    return self._send(200, {"ok": True})
+                if body.get("action") == "revert":
+                    return self._send(200, {"started": RUN.start_fixes_revert()})
+                raise ValueError("action must be accept or revert")
             if path == "/api/allspk":
                 return self._send(200, {"started": RUN.start_allspk(body)})
             if path == "/api/fixup":

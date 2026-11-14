@@ -49,11 +49,11 @@ R = A.analyse(*record(SYSTEM))
 S = R["speakers"]
 
 
-def test_levels_timing_and_polarity():
+def test_levels_and_timing():
     assert abs(S["C"]["level_vs_fl_db"] + 2.0) < 0.3, S["C"]
     assert abs(S["FR"]["level_vs_fl_db"]) < 0.3 and abs(S["FR"]["arrival_vs_fl_ms"]) < 0.05
     assert abs(S["SL"]["arrival_vs_fl_ms"] - 0.6) < 0.05 and abs(S["SL"]["distance_vs_fl_cm"] - 21) <= 2, S["SL"]
-    assert S["SBL"]["polarity"] == "reversed" and S["SBR"]["polarity"] == "same"
+    assert "polarity" not in S["SBL"] and "polarity_corr" not in S["SBL"], "polarity is no longer judged"
 
 
 def test_dead_channel_and_lfe():
@@ -64,7 +64,7 @@ def test_dead_channel_and_lfe():
 def test_advice():
     txt = " ".join(t["text"] for t in R["advice"])
     assert "Surround right: not heard" in txt
-    assert "Surround back left: looks wired backwards" in txt
+    assert "wired backwards" not in txt and "Surround back left" not in txt, "a reversed speaker is not reported"
     assert "Centre: 2.0 dB quieter" in txt and "+2.0 dB" in txt
     assert "Surround left: arrives 0.60 ms later" in txt
 

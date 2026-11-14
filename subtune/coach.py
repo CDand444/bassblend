@@ -115,6 +115,14 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
                          "One sweep confirms the miniDSP does what the tune predicted (catches a knob that moved or a sub that's off).",
                          sound=True, open="wiz:verify", tool="run_verify", inp={"pos": 1}))
 
+    # ---- a round of fixes that isn't settling comes first: stop stacking, keep or undo
+    from . import fixlog
+    fs = fixlog.summary(st.get("fix_ledger"), (avr or {}).get("sub_level"))
+    if fs and not fs["settled"]:
+        out.append(_step(3, "fixes_unsettled", "tune", "Fixes aren't settling: keep them or undo them",
+                         fs["verdict"] + " " + " ".join(f"{x['what']}: {x['net']}." for x in fs["lines"]),
+                         open="home", tool="undo_fixes"))
+
     # ---- blend with the speakers
     b = st.get("avr_blend") or {}
     base = res.get("base_tune_id") or tid
@@ -130,7 +138,8 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
             out.append(_step(9, "blend_confirm", "blend", "Re-measure the blend to confirm the fix",
                              "The playing tune already includes a blend fix; one more blend test shows how well it worked.",
                              sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": _mode(), "speakers": "both", "auto_volume": True}))
-        elif blend_current and b.get("loss_now_db", 0) - b.get("loss_best_db", 0) >= 0.5 and (b.get("delay_ms", 0) > 0 or b.get("invert")):
+        elif blend_current and b.get("loss_now_db", 0) - b.get("loss_best_db", 0) >= 0.5 and (b.get("delay_ms", 0) > 0 or b.get("invert")) \
+                and fixlog.blend_check(b, st.get("fix_ledger"))[0]:
             out.append(_step(8, "blend_apply", "blend", f"Apply the blend fix ({b['loss_now_db'] - b['loss_best_db']:.1f} dB less cancellation)",
                              "The last blend test found a sub delay/polarity that makes subs and speakers add up better.",
                              open="blend", tool="apply_avr_blend"))

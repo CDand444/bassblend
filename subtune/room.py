@@ -20,6 +20,7 @@ EMPTY = {
     "subs": {},          # "0".."3" -> sub description (output index, 0-based)
     "avr": "",
     "goals": "",
+    "speakers": {},      # channel ("FL", "TFL", ...) -> {model, kind, size, crossover_hz, x_m, y_m, z_m, aim, amp, notes}
 }
 
 SUB_FIELDS = {"model": str, "driver": str, "enclosure": str, "tuning_hz": float, "amp_w": float,
@@ -88,9 +89,13 @@ def save_room(body: dict) -> dict:
     r["subs"] = subs
     r["avr"] = _txt(body.get("avr"))
     r["goals"] = _txt(body.get("goals"), 600)
+    write_room(r)
+    return r
+
+
+def write_room(r: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
     ROOM_FILE.write_text(json.dumps(r, indent=2))
-    return r
 
 
 # ------------------------------------------------------------------ modes

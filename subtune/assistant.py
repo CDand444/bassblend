@@ -105,11 +105,29 @@ below their safe limit (no_boost_below_hz). Prefer the receiver doing the crosso
 LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies (Hsu: one port open, \
 EQ1, Q 0.7).
 - All-speakers check (run_all_speakers / get_overview -> all_speakers_check, experimental): level, arrival and \
-polarity of every bed speaker and the LFE against the front left, from a 7.1 test file. It needs HDMI: the Pi \
+of every bed speaker and the LFE against the front left (level and distance only; it doesn't judge polarity), from a 7.1 test file. It needs HDMI: the Pi \
 plays the file out of its own HDMI port and htTamer switches the receiver to the input the Pi is plugged into \
 (chosen once on the All speakers page), in Direct mode, volume set automatically, all restored after. The \
 receiver's network player can't play 8 channels, so there is no network option. Mode "manual" = the owner plays \
 the file from another HDMI source or USB stick. Heights can't be tested this way.
+- Equipment and data: get_equipment shows everything recorded (speakers per channel, subs, room, seats, \
+receiver, goals) and which speakers are still missing. Keep it current: whenever the owner mentions a speaker, \
+sub, knob setting, seat, measurement of the room or a receiver setting, record it straight away with \
+update_speakers / update_room / update_system (they only change the fields you give, and every change is logged \
+for the owner to see), then say in one line what you saved. Ask only for what you can't infer; don't invent models \
+or positions. When speakers_missing isn't empty and the owner is setting up, offer to fill them in together.
+- Running tests: you can run every test yourself when the owner asks (run_measurement, run_checkup, run_verify, \
+level_match, run_avr_blend, run_system_report, run_all_speakers, run_headroom, fix_from_report, start_autotune). \
+Each one asks the owner to approve it first because it plays sound; pick sensible inputs (spot, playback mode from \
+get_overview -> playback) instead of asking, and after it finishes explain the result and the next step.
+- Fixes and re-applying (get_overview -> changes_since_baseline): htTamer keeps one log of every fix since a \
+baseline (the sub tune and receiver sub level before the first fix) and its NET effect. Whenever fixes come up, \
+lead with that net result in one or two lines ("Compared with 'Single MLP': subs +7.25 ms later, polarity flipped; \
+receiver sub level -15 -> -5.5 dB"), then the verdict. Never reconstruct history from tune names or the journal \
+when this is available, and don't speculate about whether fixes stacked: the log says. When it isn't settled, \
+don't propose another blend fix or sub level nudge; offer exactly two ways out: keep_fixes (accept what's \
+playing) or undo_fixes and then measure the blend at 2-3 seats. If "Receiver sub level now" differs from what \
+htTamer set, say plainly the receiver changed it (an input change resets a temporary sub level on Onkyo).
 - Playback for every receiver test (blend, system report, fix, all speakers): get_overview -> playback says whether \
 the Pi's HDMI is plugged in and which receiver input it's on. When it's ready use mode "hdmi" (the Pi plays the file \
 out of its HDMI port and htTamer switches the receiver to that input, then back); otherwise "dlna" (the receiver's \
@@ -217,7 +235,7 @@ TOOLS = [
        "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
        "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
     _t("run_all_speakers", "Experimental: a sweep on each bed speaker in turn plus the LFE from a 7.1 test file, then "
-       "level, arrival (distance) and polarity of each against the front left. hdmi = the Pi plays it out of its HDMI "
+       "level and arrival (distance) of each against the front left. hdmi = the Pi plays it out of its HDMI "
        "port, the receiver is switched to that input in Direct mode (volume set automatically if auto_volume, all "
        "restored after; the input must have been picked on the All speakers page); manual = the owner plays the "
        "file from another HDMI source or USB stick. About a minute of sweeps.",
@@ -242,7 +260,35 @@ TOOLS = [
        ["pos", "mode", "speakers", "auto_volume"], approval=True),
     _t("apply_avr_blend", "Bake the blend fix (sub delay, polarity, optional all-pass) into a new saved tune "
        "on the playing slot. Uses the all-seats answer when seats were measured with the playing tune, "
-       "otherwise the latest single blend test.", approval=True),
+       "otherwise the latest single blend test. Refused when changes_since_baseline says the fixes aren't settled.", approval=True),
+    _t("get_equipment", "Everything recorded about the owner's equipment: speaker layout, each speaker by channel "
+       "(model, kind, receiver size setting, crossover, position, notes) and which channels have nothing recorded yet, "
+       "the subs (model, placement, knob settings), the room, seats, receiver and goals. No sound."),
+    _t("update_speakers", "Record or correct speakers. Merges the given fields into each channel's record; nothing "
+       "else changes. Use it whenever the owner tells you about a speaker. No sound.",
+       {"speakers": {"type": "object", "description": "channel code -> fields to set, e.g. {\"FL\": {\"model\": \"Klipsch RP-8000F\", \"kind\": \"tower\", \"size\": \"small\", \"crossover_hz\": 80}}. Channels: FL FR C WL WR SL SR BL BR (rear surrounds) TFL TFR TML TMR TRL TRR. Fields: model, kind (tower, bookshelf, centre, on-wall, in-wall, in-ceiling, atmos module, satellite, other), size (the receiver's large/small setting), crossover_hz, x_ft/y_ft/z_ft (from the left wall, the front wall, the floor), aim, amp, notes. Only the fields given change."},
+        "remove": {"type": "array", "items": {"type": "string"}, "description": "channel codes whose record to clear"}},
+       []),
+    _t("update_room", "Record or correct the room, seats, subs, receiver description or goals. Partial: only what's given "
+       "changes. Lengths may be given in feet (*_ft) or metres (*_m). No sound.",
+       {"room": {"type": "object", "description": "length_ft, width_ft, height_ft, construction, openings, notes"},
+        "seat": {"type": "object", "description": "one seat to add or update, matched by name: name, x_ft, y_ft, z_ft (ear height)"},
+        "seats": {"type": "array", "items": {"type": "object"}, "description": "replace the whole seat list (first = MLP)"},
+        "subs": {"type": "object", "description": "1-based sub output -> fields: model, driver, enclosure, location, x_ft, y_ft, "
+                                                  "facing, role (main or nearfield), notes, controls {knob: value}"},
+        "goals": {"type": "string"}, "avr": {"type": "string", "description": "receiver model and notes"}},
+       []),
+    _t("update_system", "Change the speaker layout and receiver facts: beds (2, 3, 5, 7, 9), heights (0, 2, 4, 6), "
+       "crossover_hz, dirac (bool), dlbc_license, dlbc, treble. Only what's given changes. No sound.",
+       {"beds": {"type": "integer"}, "heights": {"type": "integer"}, "crossover_hz": {"type": "number"},
+        "dirac": {"type": "boolean"}, "dlbc_license": {"type": "boolean"}, "dlbc": {"type": "boolean"},
+        "treble": {"type": "string"}}, []),
+    _t("run_measurement", "Measure every sub on its own at one mic spot (sweeps through the miniDSP; about a minute). "
+       "The raw measurements a new tune is built from.", {"pos": SPOT}, ["pos"], approval=True),
+    _t("keep_fixes", "End the current round of fixes: what's playing now (tune and receiver sub level) becomes the new "
+       "baseline that later fixes are compared with. No sound.", approval=True),
+    _t("undo_fixes", "Undo every fix since the baseline: the baseline sub tune goes back on the playing slot and the "
+       "receiver sub level goes back to where it was. No sound.", approval=True),
 ]
 APPROVAL = {t["name"] for t in TOOLS if t["approval"]}
 REQUIRED = {t["name"]: t["input_schema"]["required"] for t in TOOLS}
@@ -285,6 +331,9 @@ DESCRIBE = {
                                     "front speakers" + (" (Pi HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
                                     + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] != "manual" else "")),
     "apply_avr_blend": lambda i: "Apply the blend fix (all measured seats, if any) as a new tune on the playing slot",
+    "keep_fixes": lambda i: "Keep the current fixes: make what's playing the new starting point",
+    "run_measurement": lambda i: f"Measure every sub at spot {i['pos']} (a sweep on each sub, about a minute)",
+    "undo_fixes": lambda i: "Undo all fixes: put the starting tune and receiver sub level back",
 }
 
 

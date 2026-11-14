@@ -291,11 +291,40 @@ def blend_tune(cur, b, seats_txt="the MLP"):
                 raise ValueError(f"output {x['output'] + 1} has no free EQ band for the phase filter")
             x["biquads"] = list(x["biquads"]) + [allpass_minidsp(ap["fc"], ap["q"])]
             x["allpass"] = list(x.get("allpass") or []) + [{"fc": ap["fc"], "q": ap["q"]}]
-    parts = ([f"+{d:g} ms"] if d else []) + (["inverted"] if b["invert"] else []) +             ([f"all-pass {ap['fc']:.0f} Hz"] if ap else [])
-    name = f"{cur.get('tune_name') or 'Tune'} + blend ({', '.join(parts)})"
+    parts = ([f"+{d:g} ms"] if d else []) + (["inverted"] if b["invert"] else []) + ([f"all-pass {ap['fc']:.0f} Hz"] if ap else [])
+    # short, numbered names that can't be cut off: "<sub tune> · blend fix 2 (+1.75 ms)"
+    chain = list(cur.get("blend_fixes") or []) + [{"delay_ms": d, "invert": bool(b["invert"]), "allpass": ap}]
+    new["blend_fixes"] = chain
+    root = _root_name(cur.get("tune_name") or "Tune")
+    name = f"{root} · blend fix {len(chain)} ({', '.join(parts)})"
     ap_txt = f", all-pass {ap['fc']:.0f} Hz Q {ap['q']}" if ap else ""
     flip_txt = ", polarity flipped" if b["invert"] else ""
-    return new, name, f"Blend with the speakers ({seats_txt}): subs delayed {d:g} ms{flip_txt}{ap_txt}."
+    total = round(sum(x["delay_ms"] for x in chain), 3)
+    net = [f"{total:+g} ms"] + (["polarity flipped"] if sum(x["invert"] for x in chain) % 2 else []) + \
+          [f"all-pass {x['allpass']['fc']:.0f} Hz" for x in chain if x.get("allpass")]
+    return new, name, (f"Blend with the speakers ({seats_txt}): subs delayed {d:g} ms{flip_txt}{ap_txt}. "
+                       f"Net against '{root}': subs {', '.join(net)}.")
+
+
+def _root_name(name: str) -> str:
+    """The sub tune's own name, without blend-fix suffixes (old style '+ blend (...)' too)."""
+    for sep in (" · blend fix", " + blend ("):
+        if sep in name:
+            name = name.split(sep)[0]
+    return name.strip()
+
+
+def cmd_fixes(a):
+    """Keep the fixes made since the baseline (it moves to here), or undo them all."""
+    from . import fixlog
+    if a.revert:
+        with busy("undo fixes"):
+            out = fixlog.revert()
+        print(json.dumps(out))
+    elif a.accept:
+        fixlog.accept()
+    else:
+        print(json.dumps(fixlog.summary(), indent=1))
 
 
 def cmd_avrapply(a):
@@ -318,11 +347,17 @@ def cmd_avrapply(a):
         if b.get("tune_id") is not None and b.get("tune_id") != cur.get("tune_id"):
             sys.exit("that blend test was measured with a different tune; run it again first")
         seats_txt = "the MLP" if b.get("pos", 1) == 1 else f"spot {b.get('pos')}"
+    from . import fixlog
+    ok, why = fixlog.blend_check(b)
+    if not ok and not getattr(a, "force", False):
+        sys.exit(why)
     try:
         new, name, notes = blend_tune(cur, b, seats_txt)
     except ValueError as e:
         sys.exit(str(e))
+    fixlog.ensure()                             # the baseline is the tune before this fix
     t = library.save(new, name, notes)
+    fixlog.note_blend(t, b, seats_txt)
     a.tune, a.slot, a.lpf, a.allow_original = t["id"], cur.get("slot") or (load_settings()["preset"] + 1), None, False
     cmd_apply(a)
     if not getattr(a, "multi", False):         # a single-seat fix is used up once applied
@@ -551,7 +586,13 @@ def main(argv=None):
     s.add_argument("--pos", type=int, default=1)
     s.set_defaults(fn=cmd_fixup)
     s = sp.add_parser("avrapply"); s.add_argument("--multi", action="store_true", help="use the multi-seat blend")
+    s.add_argument("--force", action="store_true", help="stack it even when the fix log says the blend isn't settling")
     s.set_defaults(fn=cmd_avrapply)
+    s = sp.add_parser("fixes", help="what the fixes changed since the baseline; keep or undo them")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--accept", action="store_true", help="keep them: the current state becomes the new baseline")
+    g.add_argument("--revert", action="store_true", help="undo them: the baseline tune and receiver sub level go back")
+    s.set_defaults(fn=cmd_fixes)
     sp.add_parser("blendseats").set_defaults(fn=cmd_blendseats)
     s = sp.add_parser("baseline"); s.add_argument("--pos", type=int, required=True); s.set_defaults(fn=cmd_baseline)
     s = sp.add_parser("verify"); s.add_argument("--pos", type=int, required=True)

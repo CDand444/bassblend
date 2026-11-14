@@ -109,6 +109,7 @@ main { min-width: 0; padding: 22px 32px 64px; }
 .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 aside.col { display: none; }
 .view-body > .card { box-shadow: none; }
+.spk-tbl td { vertical-align: middle; } .spk-tbl input, .spk-tbl select { height: 32px; }
 .view-body > .card > .card-h:first-child h2, .view-body > details.card > summary { display: none; }
 .view-body > .card > .card-h:first-child:has(> h2:only-child) { display: none; }
 .subnav { display: none; }
@@ -682,6 +683,13 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="health" id="health"></div>
     </section>
 
+    <!-- FIX LOG: the net effect of every fix since the baseline -->
+    <section class="card" id="fixCard" hidden>
+      <div class="card-h"><h2>What htTamer changed</h2><span class="sub" id="fixSub"></span><span class="grow"></span>
+        <button class="btn ghost ask" data-ask="Explain what htTamer's fixes changed compared with where I started, and whether I should keep them or undo them.">Ask about this</button></div>
+      <div id="fixOut"></div>
+    </section>
+
     <!-- COACH: next best steps -->
     <section class="card" id="coachCard">
       <div class="card-h"><h2>Next steps</h2><span class="sub">What would improve your system most, in order</span><span class="grow"></span>
@@ -867,7 +875,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 
     <section class="card" id="allCard">
       <div class="card-h"><h2>All speakers <span class="muted small" style="font-weight:500">experimental</span></h2><span class="grow"></span><button class="btn ghost ask" data-ask="Explain my all-speakers check. What should I change in the receiver, and what can Dirac fix?">Ask about this</button></div>
-      <p class="lead">Checks every bed speaker (front, centre, surrounds, surround backs and the LFE) for level, distance and polarity against the front left, with a 7.1 test file that plays a sweep on each speaker in turn. Height speakers need Dolby Atmos content, so they aren’t covered.</p>
+      <p class="lead">Checks every bed speaker (front, centre, surrounds, surround backs and the LFE) for level and distance against the front left, with a 7.1 test file that plays a sweep on each speaker in turn. Height speakers need Dolby Atmos content, so they aren’t covered.</p>
       <div class="tune-controls dc-controls">
         <label class="f" style="width:150px">Mic at<select id="allPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label>
         <label class="f">Playback<select id="allMode"><option value="hdmi">The Pi plays it over HDMI</option><option value="manual">I’ll play it (another HDMI source or USB stick)</option></select></label>
@@ -951,6 +959,15 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       </div>
       <div id="aiNote" style="margin-top:10px"></div>
       <div class="md" id="aiOut" style="margin-top:6px"></div>
+    </section>
+
+    <!-- SPEAKERS -->
+    <section class="card" id="spkCard">
+      <div class="card-h"><h2>Speakers</h2><span class="sub" id="spkSub"></span><span class="grow"></span>
+        <button class="btn ghost ask" data-ask="Help me record my speakers. Ask me what you need, one channel at a time, and save each one.">Fill in with the assistant</button></div>
+      <p class="lead" style="margin-bottom:10px">One row per speaker in your layout. The assistant uses this to give advice about your actual equipment, and it can fill it in for you: tell it the models in the chat. Positions are in feet from the left wall, the front (screen) wall and the floor.</p>
+      <div id="spkOut"></div>
+      <div class="save-bar"><button class="btn primary" id="spkSave">Save speakers</button><span class="muted" id="spkMsg"></span></div>
     </section>
 
     <!-- ROOM -->
@@ -2272,8 +2289,8 @@ function renderAllSpk() {
     const sp = latest.speakers;
     const f = v => (v > 0 ? '+' : '') + v.toFixed(1);
     if (latest.stereo_only) h += '<div class="notice warn" style="margin-bottom:10px">Only the front left and right came through: the receiver got or played the file as stereo. Check it’s in Direct or a multichannel mode and run it again.</div>';
-    h += `<div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>Played</th><th>Level vs front left</th><th>Arrival vs front left</th><th>Polarity</th></tr></thead><tbody>
-      ${Object.entries(sp).map(([k, r]) => `<tr><td>${esc(r.name)}</td><td>${r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.level_vs_fl_db) + ' dB' : '–'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.arrival_vs_fl_ms) + ' ms (' + Math.abs(r.distance_vs_fl_cm) + ' cm)' : '–'}</td><td>${r.polarity == null ? '–' : r.polarity === 'reversed' ? '<b style="color:var(--bad)">reversed</b>' : r.polarity}</td></tr>`).join('')}</tbody></table></div>
+    h += `<div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>Played</th><th>Level vs front left</th><th>Arrival vs front left</th></tr></thead><tbody>
+      ${Object.entries(sp).map(([k, r]) => `<tr><td>${esc(r.name)}</td><td>${r.heard ? '✓' : '<b style="color:var(--bad)">not heard</b>'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.level_vs_fl_db) + ' dB' : '–'}</td><td>${k === 'FL' ? 'reference' : r.heard ? f(r.arrival_vs_fl_ms) + ' ms (' + Math.abs(r.distance_vs_fl_cm) + ' cm)' : '–'}</td></tr>`).join('')}</tbody></table></div>
       <ul class="dc-ra" style="margin-top:10px">${latest.advice.map(a => `<li class="${a.status === 'good' ? 'auto' : ''}">${esc(a.text)}</li>`).join('')}</ul>
       <p class="muted small" style="margin:8px 0 0">${spotName(latest.pos || 1)} · ${new Date(latest.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}. The LFE row is the subs’ arrival through the LFE channel.</p>`;
   } else if (!running) h += empty('Not checked yet', 'Follow the three steps above.');
@@ -2819,6 +2836,68 @@ document.addEventListener('click', e => {
   const a = e.target.closest('.ask'); if (a) { chatOpen(true); $('#chatText').value = a.dataset.ask; setTimeout(() => $('#chatText').focus(), 60); }
 });
 
+// ---------- speakers: one record per channel of the layout
+let spkKey = null, spkDirty = false;
+const SPK_KINDS = ['', 'tower', 'bookshelf', 'centre', 'on-wall', 'in-wall', 'in-ceiling', 'atmos module', 'satellite', 'other'];
+const ftOf = m => m == null ? '' : (m / 0.3048).toFixed(1);
+function renderSpeakers() {
+  const chans = S.speaker_channels || [], rec = (S.room || {}).speakers || {};
+  const key = JSON.stringify([chans, rec]);
+  if (key === spkKey || spkDirty || $('#spkOut').contains(document.activeElement)) return; spkKey = key;
+  const done = chans.filter(c => (rec[c.ch] || {}).model).length;
+  $('#spkSub').textContent = chans.length ? `${done} of ${chans.length} recorded` : '';
+  if (!chans.length) { $('#spkOut').innerHTML = empty('Speaker layout not set', 'Set your layout (for example 7.1.4) in Setup → Checklist → Speakers and Dirac Live first.'); return; }
+  const opt = (list, v) => list.map(x => `<option value="${x}" ${x === (v || '') ? 'selected' : ''}>${x || '–'}</option>`).join('');
+  $('#spkOut').innerHTML = `<div class="tw"><table class="dc-tbl spk-tbl"><thead><tr><th>Speaker</th><th>Model</th><th>Kind</th><th>Receiver size</th><th>Crossover</th><th>From left</th><th>From front</th><th>Height</th><th>Notes</th></tr></thead><tbody>
+    ${chans.map(c => { const r = rec[c.ch] || {};
+      return `<tr data-ch="${c.ch}"><td><b>${esc(c.name)}</b><div class="muted small">${c.ch}</div></td>
+        <td><input data-f="model" value="${esc(r.model || '')}" placeholder="Make and model" style="min-width:150px"></td>
+        <td><select data-f="kind" style="min-width:128px">${opt(SPK_KINDS, r.kind)}</select></td>
+        <td><select data-f="size" style="min-width:84px">${opt(['', 'small', 'large'], r.size)}</select></td>
+        <td><span class="unit" data-u="Hz"><input data-f="crossover_hz" type="number" min="40" max="250" step="10" value="${r.crossover_hz ?? ''}" style="width:88px"></span></td>
+        <td><span class="unit" data-u="ft"><input data-f="x_ft" type="number" step="0.1" min="0" value="${ftOf(r.x_m)}" style="width:84px"></span></td>
+        <td><span class="unit" data-u="ft"><input data-f="y_ft" type="number" step="0.1" min="0" value="${ftOf(r.y_m)}" style="width:84px"></span></td>
+        <td><span class="unit" data-u="ft"><input data-f="z_ft" type="number" step="0.1" min="0" value="${ftOf(r.z_m)}" style="width:84px"></span></td>
+        <td><input data-f="notes" value="${esc(r.notes || '')}" placeholder="Aim, mounting, amp…" style="min-width:140px"></td></tr>`; }).join('')}</tbody></table></div>`;
+  $('#spkOut').querySelectorAll('input, select').forEach(x => x.oninput = () => { spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; });
+}
+$('#spkSave').onclick = async () => {
+  const speakers = {};
+  $('#spkOut').querySelectorAll('tr[data-ch]').forEach(tr => {
+    const d = {}; tr.querySelectorAll('[data-f]').forEach(x => { d[x.dataset.f] = x.value.trim(); }); speakers[tr.dataset.ch] = d; });
+  const r = await post('/api/speakers', {speakers});
+  if (r.error) { $('#spkMsg').textContent = r.error; return; }
+  spkDirty = false; spkKey = null; $('#spkMsg').textContent = r.changed && r.changed.length ? `Saved ${r.changed.length} change${r.changed.length === 1 ? '' : 's'}` : 'Nothing changed';
+  poll();
+};
+
+// ---------- fix log: net change since the baseline, keep or undo
+let fixKeyH = null;
+function renderFixLog() {
+  const f = S.fix_summary, job = S.job || {};
+  const key = JSON.stringify([f, !!job.running, job.cmd]);
+  if (key === fixKeyH) return; fixKeyH = key;
+  if (!f || f.error || !(f.lines || []).length) { $('#fixCard').hidden = true; return; }
+  $('#fixCard').hidden = false;
+  $('#fixSub').textContent = `since ${new Date(f.since * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} · ${f.changes} change${f.changes === 1 ? '' : 's'}`;
+  const undoing = job.running && job.cmd === 'undo fixes';
+  $('#fixOut').innerHTML = `<div class="notice ${f.settled ? '' : 'warn'}" style="margin-bottom:12px">${f.settled ? '✓ ' : ''}${esc(f.verdict)}</div>
+    <div class="tw"><table class="dc-tbl"><thead><tr><th>What</th><th>Net change</th><th>How it got there</th></tr></thead><tbody>
+    ${f.lines.map(l => `<tr><td><b>${esc(l.what)}</b></td><td>${esc(l.net)}</td><td class="muted">${esc(l.steps)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="row" style="margin-top:12px;gap:8px">
+      <button class="btn primary" id="fixKeep" ${job.running ? 'disabled' : ''}>Keep these changes</button>
+      <button class="btn" id="fixUndo" ${job.running ? 'disabled' : ''}>${undoing ? '<span class="spin"></span> Undoing…' : `Undo all fixes`}</button>
+      <span class="muted small">Undo puts “${esc(f.base_tune_name || 'the starting tune')}” back on the playing slot${f.sub_level_before != null ? ` and the receiver sub level back to ${f.sub_level_before > 0 ? '+' : ''}${f.sub_level_before} dB` : ''}. No sound.</span></div>`;
+  $('#fixKeep').onclick = async () => {
+    if (!confirm('Keep these changes?\n\nWhat’s playing now becomes the new starting point: later fixes are compared with it, and htTamer can stack fixes again.')) return;
+    const r = await post('/api/fixes', {action: 'accept'}); if (r.error) alert(r.error); fixKeyH = null; poll();
+  };
+  $('#fixUndo').onclick = async () => {
+    if (!confirm(`Undo all fixes?\n\n“${f.base_tune_name || 'The starting tune'}” goes back on the playing slot` + (f.sub_level_before != null ? ` and the receiver sub level back to ${f.sub_level_before} dB` : '') + '. Nothing plays.')) return;
+    const r = await post('/api/fixes', {action: 'revert'}); if (r.error) alert(r.error); fixKeyH = null; poll();
+  };
+}
+
 // ---------- home: system map + health score
 let mapKey = null;
 function healthParts() {
@@ -3148,6 +3227,9 @@ const MENU = [
    tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
   {grp: 'Setup', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
    tag: () => { const n = Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
+  {grp: 'Setup', key: 'speakers', icon: 'speakers', title: 'Speakers', full: 'Your speakers', el: $('#spkCard'),
+   tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
+     const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
   {grp: 'Setup', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
   {grp: 'Setup', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
    tag: () => (S.analysis_status || {}).running || (S.suggest_status || {}).running ? ['…', ''] : null},
@@ -3236,7 +3318,7 @@ async function poll() {
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
     initSettings(); initRoom();
     render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
+    renderCoach(); renderPlacement(); renderHeadroom(); renderAllSpk(); renderFixLog(); renderSpeakers(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
     renderMenu();
     if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
     renderPlan(roomInit ? readRoom() : null);

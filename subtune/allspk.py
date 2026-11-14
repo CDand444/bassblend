@@ -1,4 +1,4 @@
-"""All-speakers check (experimental): level, distance and polarity of every bed speaker.
+"""All-speakers check (experimental): level and distance of every bed speaker.
 
 A 7.1 WAV file with a sweep on one channel at a time. The Pi plays it out of its
 own HDMI port into the receiver, which htTamer switches to that input and to
@@ -10,7 +10,8 @@ USB stick while htTamer listens. Sweep order:
     FL, FR, C, SL, SR, SBL, SBR (20 Hz-20 kHz), then LFE (15-150 Hz)
 
 and reports for each speaker, against the front left: level, arrival time
-(distance), polarity and response, plus whether it played at all. Height
+(distance) and response, plus whether it played at all. (Polarity was dropped: with real speakers of
+different designs and Dirac in the chain it read wrong too often to trust.) Height
 speakers can't be reached with a plain multichannel file (they need Dolby Atmos
 content), so they aren't part of this test.
 """
@@ -20,11 +21,10 @@ import struct
 import time
 
 import numpy as np
-from scipy.signal import sosfiltfilt
 
 from . import audio
 from .config import AUDIO_FS as FS, load_settings
-from .deepcheck import FG, _bp, band_mean, direct_arrival, frac_smooth, spl_offset
+from .deepcheck import FG, band_mean, direct_arrival, frac_smooth, spl_offset
 
 MEDIA_NAME = "bassblend_all_speakers_7_1.wav"
 F1, F2 = 20.0, 20000.0
@@ -77,14 +77,13 @@ def build_file(path=None, order=None):
 
 
 def analyse(rec, t_start, cal=None):
-    """Per-speaker level, arrival, polarity and response from one recording."""
+    """Per-speaker level, arrival and response from one recording."""
     off = spl_offset(cal)
     ir_full = audio.deconvolve(rec, sweep("FL"), F1, F2)
     guess = int(t_start * FS)
     a0 = audio.find_arrival(ir_full, max(0, guess - int(3.5 * FS)), guess + int(0.5 * FS))
     fl_direct = direct_arrival(ir_full, a0)
     out = {}
-    ref_seg = None
     for ch in ORDER:
         if ch == "LFE":
             ir = audio.deconvolve(rec, sweep("LFE"), LF1, LF2)
@@ -108,23 +107,15 @@ def analyse(rec, t_start, cal=None):
         # how far above the room noise the speaker is: tells "didn't play" apart from "quiet"
         quiet = np.take(ir, np.arange(rough - int(1.2 * FS), rough - int(0.4 * FS)), mode="wrap")
         heard = float(np.max(np.abs(seg[: int(0.05 * FS)]))) / max(float(np.std(quiet)) * 6, 1e-12)
-        pol = None
-        if ch != "LFE":
-            s = sosfiltfilt(_bp(300, 3000), ir[arr - int(0.002 * FS): arr + int(0.004 * FS)])
-            if ref_seg is None:
-                ref_seg = s
-            best = max(range(-24, 25), key=lambda k: abs(np.dot(ref_seg, np.roll(s, k))))
-            pol = float(np.dot(ref_seg, np.roll(s, best)) / max(np.linalg.norm(ref_seg) * np.linalg.norm(s), 1e-12))
         expected = (fl_direct if ch != "LFE" else a0) + int(OFFS[ch] * FS)
         out[ch] = {"name": NAMES[ch], "level_db": round(float(level), 1), "arrival_ms": round((arr - expected) / FS * 1000, 2),
-                   "polarity_corr": None if pol is None else round(pol, 2), "heard": bool(heard > 1.0), "snr_x": round(heard, 1),
+                   "heard": bool(heard > 1.0), "snr_x": round(heard, 1),
                    "curve": (db - band_mean(FG, db, 500, 2000) if ch != "LFE" else db - level).round(1)[::2].tolist()}
     ref = out["FL"]
     for ch, r in out.items():
         r["level_vs_fl_db"] = round(r["level_db"] - ref["level_db"], 1)
         r["arrival_vs_fl_ms"] = round(r["arrival_ms"] - ref["arrival_ms"], 2)
         r["distance_vs_fl_cm"] = round(r["arrival_vs_fl_ms"] / 1000 * 343 * 100)
-        r["polarity"] = None if r["polarity_corr"] is None else "reversed" if r["polarity_corr"] < -0.4 else "same" if r["polarity_corr"] > 0.4 else "unclear"
     return {"t": time.time(), "grid2": FG[::2].round(2).tolist(), "speakers": out, "advice": advice(out)}
 
 
@@ -145,9 +136,6 @@ def advice(out):
             tips.append({"ch": ch, "status": "fix", "text": f"{r['name']}: not heard. Check it's connected, set up in the receiver, "
                          "and that the receiver is in a direct/multichannel mode (not stereo)."})
             continue
-        if r.get("polarity") == "reversed":
-            tips.append({"ch": ch, "status": "fix", "text": f"{r['name']}: looks wired backwards compared with the front left. "
-                         "Swap its red and black wires (polarity can read oddly for very different speakers; check the wiring)."})
         if ch != "LFE" and abs(r["level_vs_fl_db"]) >= 1.0:
             d = -r["level_vs_fl_db"]
             tips.append({"ch": ch, "status": "watch", "text": f"{r['name']}: {abs(r['level_vs_fl_db']):.1f} dB "
@@ -161,7 +149,7 @@ def advice(out):
                          "(or let Dirac set distances)."})
     if not tips:
         tips.append({"ch": "", "status": "good", "text": "Every bed speaker plays, matches the front left within 1 dB, arrives "
-                     "in step and has the same polarity."})
+                     "in step."})
     return tips
 
 

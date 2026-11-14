@@ -54,7 +54,10 @@ def event(kind: str, msg: str, **data) -> None:
     rec = {"t": time.time(), "kind": kind, "msg": msg, **data}
     with open(EVENTS_FILE, "a", encoding="utf-8") as f:
         f.write(json_dumps(rec) + "\n")
-    print(f"[{kind}] {msg}", flush=True)
+    try:
+        print(f"[{kind}] {msg}", flush=True)
+    except UnicodeEncodeError:                     # a Windows console that can't show "→" or "°": never fail a step over it
+        print(f"[{kind}] {msg}".encode("ascii", "replace").decode(), flush=True)
 
 
 @contextmanager
