@@ -22,7 +22,7 @@ import time
 SOUND = {"run_checkup", "run_verify", "level_match", "test_tone", "start_autotune", "run_avr_blend",
          "run_system_report", "fix_from_report", "run_headroom", "run_all_speakers", "run_measurement",
          "start_live_analyzer"}
-CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "avr_control", "apply_avr_blend",
+CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_night_mode", "avr_control", "apply_avr_blend",
                    "keep_fixes", "undo_fixes", "update_speakers", "update_room", "update_system", "hw_save",
                    "set_live_eq", "fit_live_eq", "save_live_eq", "save_simulation", "set_treatment_constraints",
                    "record_treatment"}

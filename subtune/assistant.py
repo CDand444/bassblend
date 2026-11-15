@@ -85,6 +85,14 @@ seats for the blend, A/B listening.
 If the owner says no sound now (late at night, others asleep), do only silent things until they say \
 otherwise: read data, explain, plan, simulate offline, review settings, prepare the next session's \
 plan. Don't propose tools that play sound; mention what you'd measure next time instead.
+Night mode (set_night_mode) is different: it cuts all bass from the subs. Offer it when the owner wants no \
+bass at all (late films, sleeping neighbours); while it's on, sound tests are refused.
+
+## Automation (get_overview -> automation)
+htTamer can switch the miniDSP slot by itself when the receiver's input or listening mode changes, keep the \
+receiver's sub level where htTamer set it (the watchdog), and run a blind A/B test between two slots. These are \
+set up by the owner on the Automation and Blind A/B pages; explain them and suggest rules, but you can't change \
+their settings. To prove a new tune is better, suggest the blind A/B test (Verify -> Blind A/B).
 
 ## Safety (the app enforces these too)
 - You can't raise the receiver volume directly. Tests through the receiver (run_system_report, \
@@ -274,6 +282,9 @@ TOOLS = [
        ["tune_id", "slot"], approval=True),
     _t("switch_slot", "Make a miniDSP slot the one that plays (for A/B listening).",
        {"slot": {"type": "integer"}}, ["slot"], approval=True),
+    _t("set_night_mode", "Night mode: on = cut ALL bass from the subs (the miniDSP's master mute; no slot is written), "
+       "off = the subs play again. Sound tests are refused while it's on. get_overview -> automation shows it.",
+       {"on": {"type": "boolean"}}, ["on"], approval=True),
     _t("run_checkup", "20-second health check at a mic spot: room noise, distortion, bass ringing per band, "
        "measurement quality. Plays one sweep through the subs.", {"pos": SPOT}, ["pos"], approval=True),
     _t("run_verify", "One sweep with all subs at a mic spot, compared with what the playing tune predicted.",
@@ -478,6 +489,8 @@ DESCRIBE = {
     "apply_tune": lambda i: f"Write tune {i.get('tune_name', i['tune_id'])} to miniDSP slot {i['slot']}"
                             + (" (your ORIGINAL setup!)" if i["slot"] == 1 else ""),
     "switch_slot": lambda i: f"Switch the miniDSP to slot {i['slot']}",
+    "set_night_mode": lambda i: ("Night mode ON: mute the subs completely (no bass from them)" if i["on"]
+                                 else "Night mode OFF: the subs play again"),
     "run_checkup": lambda i: f"Run a check-up at spot {i['pos']} (one sweep through the subs)",
     "run_verify": lambda i: f"Verify at spot {i['pos']} (one sweep, all subs on)",
     "level_match": lambda i: "Compare sub levels (a rumble on each sub in turn)",
@@ -739,7 +752,7 @@ def _brief(name, inp, out):
     label = {"get_overview": "Looked at the current state", "list_tunes": "Read the saved tunes",
              "simulate_tune": "Tried a tune offline", "save_simulation": "Saved the trial tune",
              "set_target_settings": "Changed the tuning target", "apply_tune": "Applied a tune",
-             "switch_slot": "Switched slot", "run_checkup": "Ran a check-up", "run_verify": "Verified",
+             "switch_slot": "Switched slot", "set_night_mode": "Changed night mode", "run_checkup": "Ran a check-up", "run_verify": "Verified",
              "level_match": "Compared sub levels", "test_tone": "Played a test tone",
              "start_autotune": "Started auto-tune", "avr_status": "Checked the receiver",
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",

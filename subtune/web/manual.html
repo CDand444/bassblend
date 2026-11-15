@@ -16,6 +16,10 @@
   <a href="#m-assistant">The assistant</a>
   <a href="#m-mcp">Using htTamer from another AI app (MCP)</a>
   <a href="#m-dirac">Dirac Live</a>
+  <a href="#m-night">Night mode</a>
+  <a href="#m-auto">Automatic slot and watchdog</a>
+  <a href="#m-ab">Blind A/B test</a>
+  <a href="#m-ha">Home Assistant</a>
   <a href="#m-updates">Updates</a>
   <a href="#m-feedback">Bugs and feedback</a>
   <a href="#m-guards">Built-in safeguards</a>
@@ -214,6 +218,19 @@
 <h2 id="m-dirac">Dirac Live</h2>
 <p><b>What makes Dirac out of date:</b> anything that changes the subs' <i>levels or EQ</i> after Dirac measured: a different sub tune, Live EQ bands playing, or Live EQ saved into a tune. Timing-only changes (a blend fix's delay, polarity or phase filter) keep Dirac's correction valid. htTamer asks before a change that would make Dirac out of date, and Home says when it is.</p>
 <p>Order of work: <b>sub tune first</b>, then Dirac Live with htTamer's target curve (the Dirac step gives you the file), then the blend test with Dirac on, then verify and a system report. While Dirac is measuring, close htTamer's level meter and don't start an htTamer test: both use the same mic. A new sub tune means Dirac should be run again.</p>
+
+<h2 id="m-night">Night mode</h2>
+<p>Press <b>☾ Night</b> at the top of any page (or Tools → Automation) to cut all bass from the subs. htTamer mutes the miniDSP's master output, so whatever the receiver plays, the subs stay silent; nothing is written to any slot. It stays on until you turn it off, or until the time you set under <b>Switch off by itself at</b> (say 07:30). Switching slots, by hand or automatically, keeps the subs muted, and if something unmutes them (the miniDSP remote, say) htTamer mutes them again within a minute. Sound tests wait while it's on. Note that with the subs muted, the bass your receiver sends to them is gone too: speakers set to "small" won't play it instead.</p>
+
+<h2 id="m-auto">Automatic slot and watchdog</h2>
+<p><b>Automatic slot</b> (Tools → Automation): choose a slot for any receiver input or listening mode, for example slot 3 for the streaming box and slot 2 for the CD player, or a slot just for Pure Audio. When the receiver's input or mode changes, htTamer switches the miniDSP to that slot within a few seconds. A listening-mode rule wins over an input rule. It acts only when something changes, so a slot you pick by hand stays until the next change, and it pauses while tests run (tests switch the receiver's input themselves).</p>
+<p><b>Watchdog</b>: every minute, and right after the receiver's input changes, htTamer checks that the receiver's sub level is still the one to keep. An Onkyo resets a sub level set over the network whenever you change inputs, which quietly undoes a blend fix. With <b>Put the sub level back by itself</b> it sets it again; otherwise it just tells you. It also tells you if the miniDSP isn't on htTamer's slot or isn't listening to the receiver. The level to keep is the last one htTamer set, unless you type your own. Everything it puts back appears as a notice and in the activity log. Nothing plays.</p>
+
+<h2 id="m-ab">Blind A/B test</h2>
+<p><b>Verify → Blind A/B</b> tells you which of two slots you really prefer, without knowing which is which. Pick the two slots and the number of rounds, then play your own music or a film scene at your usual volume. In each round the slots hide behind buttons 1 and 2 in a new random order: switch between them as often as you like and pick the one you prefer. At the end htTamer reveals which slot won how often and how likely that split is by pure chance (under 5% is a real preference), and puts the slot you were on back. Louder usually sounds better, so compare tunes at the same level; 8 or more rounds give a clearer answer. Comparing with slot 1 (your original setup) is a good way to check htTamer's tune is an improvement.</p>
+
+<h2 id="m-ha">Home Assistant</h2>
+<p>Tools → Automation → <b>Home Assistant</b> connects htTamer to Home Assistant with its built-in RESTful integration, with no add-on to install. Press <b>Make a token</b>, add it to Home Assistant's <code>secrets.yaml</code> as shown, and paste the configuration under it into <code>configuration.yaml</code>. You get sensors for the playing slot, its tune, the receiver's sub level, night mode and the automatic slot, and actions to switch the slot, night mode and the automatic slot, ready for a "movie night" script or an automation. Every request needs the token, which only works for these few silent actions (it can't play tests or change tunes). Revoke it there at any time.</p>
 
 <h2 id="m-updates">Updates</h2>
 <p><b>Tools → Updates</b> keeps the Windows app and the Pi up to date from htTamer's public GitHub releases, with nothing to set up. htTamer checks once a day and pops up a note when a new version is out; <b>Install</b> does the rest. On Windows the app closes, updates and opens again; on the Pi the update is checked before it's used, and if the new version doesn't start the previous one comes back by itself. Settings, tunes and measurements are always kept. (Following a fork instead? Set its repository there; a private one also needs a read-only token.)</p>

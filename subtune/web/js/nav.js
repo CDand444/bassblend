@@ -73,6 +73,8 @@ const MENU = [
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
      const bad = Object.values(c.verdicts).filter(v => v.status !== 'good').length; return bad ? [String(bad), 'alert'] : ['✓', '']; }},
   {grp: 'Verify', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
+  {grp: 'Verify', key: 'ab', beta: true, icon: 'match', title: 'Blind A/B', full: 'Blind A/B test', el: $('#abCard'),
+   tag: () => (S.ab || {}).active ? ['on', 'alert'] : null},
   {grp: 'Verify', key: 'levels-match', icon: 'match', title: 'Level match', full: 'Sub level match', el: $('#lmCard'), tag: () => null},
   {grp: 'Tools', key: 'measured', icon: 'measured', title: 'Measurements', full: 'Each sub, as measured', el: card('#chartA'),
    tag: () => { const n = Object.keys(S.measurements || {}).length; return n ? [`${n} spots`, ''] : null; }},
@@ -88,6 +90,8 @@ const MENU = [
   {grp: 'Tools', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
   {grp: 'Tools', key: 'updates', beta: true, icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
    tag: () => (S.update || {}).newer ? ['new', 'alert'] : null},
+  {grp: 'Tools', key: 'automation', beta: true, icon: 'gear', title: 'Automation', full: 'Automation: night mode, automatic slot, watchdog', el: $('#autoCard'),
+   tag: () => (S.night || {}).on ? ['night', 'alert'] : null},
   {grp: 'Tools', key: 'feedback', icon: 'chat', title: 'Feedback', full: 'Report a bug or send feedback', el: $('#fbCard'), tag: () => null},
   {grp: 'Tools', key: 'mcp', beta: true, icon: 'ai', title: 'MCP', full: 'Connect an AI client (MCP)', el: $('#mcpCard'),
    tag: () => (S.settings || {}).mcp_enabled ? ['on', ''] : null},
@@ -164,6 +168,7 @@ function openSheet(key, fromHash = false) {
   if (m.key === 'tunes') loadTunes();
   if (m.key === 'updates') loadUpdates();
   if (m.key === 'feedback') loadFeedback();
+  if (m.key === 'automation' || m.key === 'ab') loadAutomation();
   if (m.key === 'mcp') loadMcp();
   if (m.key === 'help' && !$('#manBody').dataset.ok && !$('#manBody').dataset.wired) {
     $('#manBody').dataset.wired = '1';        // contents links scroll in place (a #hash would change the page)
@@ -233,6 +238,12 @@ function notifyChanges() {
     const pid = CHAT.pending && CHAT.pending.id;
     if (pid && pid !== NOTE.chatPid && $('#chat').hidden) toast('The assistant is waiting for your OK', CHAT.pending.text || '', 'warn', {action: 'Open the chat', onAction: () => chatOpen(true), sticky: true, tag: 'chat'});
     NOTE.chatPid = pid;
+    const wd = S.watchdog || {};
+    if (wd.fixed_t && wd.fixed_t !== NOTE.wdSeen && NOTE.wdSeen !== undefined && (wd.fixed || []).length) toast('Watchdog put something back', wd.fixed.join(' · '), 'warn', {tag: 'watchdog'});
+    NOTE.wdSeen = wd.fixed_t;
+    const as = S.auto_slot || {};
+    if (as.t && as.t !== NOTE.asSeen && NOTE.asSeen !== undefined) toast(`Slot ${as.slot}`, `Switched automatically: ${as.because}`, '', {tag: 'autoslot'});
+    NOTE.asSeen = as.t;
     const up = S.update || {};
     if (up.newer && up.latest && up.latest !== NOTE.upSeen) { NOTE.upSeen = up.latest; toast(`htTamer ${up.latest} is available`, `You have ${up.current}.`, '', {action: 'See the update', onAction: () => openSheet('updates'), tag: 'update'}); }
   } else { NOTE.chatPid = CHAT.pending && CHAT.pending.id; }
@@ -252,6 +263,7 @@ async function poll() {
   try {
     S = st;
     safe('terms', () => renderTerms());
+    safe('night', () => renderNight());
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; safe('activity', renderLog); }
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,

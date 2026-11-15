@@ -1,0 +1,226 @@
+"""What htTamer does by itself while it runs: night mode, the automatic slot, and the setup watchdog.
+
+A server thread calls tick() every few seconds. Each part is off until the owner turns it on, nothing
+here plays sound, and everything pauses while a test, the blind A/B test or another job runs.
+
+  Night mode: the subs are cut completely, with the miniDSP's master mute. It isn't stored in any slot,
+      so slot 1 is never touched. Sound tests are refused while it's on, and it can switch itself off at
+      a set time (night_off_at, "HH:MM").
+  Automatic slot: when the receiver's input or listening mode changes, the miniDSP switches to the slot
+      the owner chose for it (auto_slot_map: {"in:<input code>": slot, "mode:<mode code>": slot}; a
+      listening-mode rule wins over an input rule). Only on a change, so a slot picked by hand stays until
+      the next one.
+  Watchdog: every WATCH_EVERY_S (and right after an input change) it checks the receiver's sub level
+      against the one to keep (watch_sub_level, else the last one htTamer set; Onkyo resets it on an
+      input change) and that night mode's mute is still on. With watchdog_fix it puts them back,
+      otherwise it only reports. The slot and the miniDSP's input are reported, never forced (the
+      input guard already handles the input).
+"""
+from __future__ import annotations
+
+import threading
+import time
+
+WATCH_EVERY_S = 60
+SUB_LEVEL_TOL_DB = 0.5
+SOUND_CMDS = {"level", "selftest", "measure", "verify", "baseline", "checkup", "levelmatch", "headroom", "tone",
+              "avrblend", "deepcheck", "allspeakers", "fixup", "liveeq", "gaincheck", "discover", "unmute"}
+
+_mem = {"seen": None, "watched": 0.0, "lock": threading.Lock()}
+
+
+# ------------------------------------------------------------------ night mode
+def night() -> dict:
+    from .state import load_state
+    return load_state().get("night") or {"on": False}
+
+
+def night_on() -> bool:
+    return bool(night().get("on"))
+
+
+def set_night(on: bool, who: str = "you", dsp=None) -> dict:
+    """Cut (or bring back) all bass from the subs: the miniDSP's master mute."""
+    from .config import load_settings
+    from .dsp import MiniDSP
+    from .state import event, update_state
+    s = load_settings()
+    d = dsp or MiniDSP(s)
+    d.batch([MiniDSP.c_master_mute(bool(on))], ("night mode on: subs muted" if on else "night mode off: subs back") + f" ({who})")
+    st = {"on": bool(on), "since": time.time(), "who": who}
+    update_state(night=st)
+    event("config", ("Night mode on: no bass from the subs" if on else "Night mode off: the subs play again") + f" ({who})")
+    return st
+
+
+def refuse_if_night(cmd: str):
+    """Sound tests wait for night mode to end."""
+    if cmd in SOUND_CMDS and night_on():
+        raise RuntimeError("Night mode is on (the subs are muted). Turn it off to run tests.")
+
+
+def _off_time_passed(n: dict, s: dict, now: float) -> bool:
+    at = (s.get("night_off_at") or "").strip()
+    if not n.get("on") or not at:
+        return False
+    try:
+        hh, mm = (int(x) for x in at.split(":"))
+    except ValueError:
+        return False
+    lt = time.localtime(now)
+    target = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, hh, mm, 0, 0, 0, -1))
+    if target > now:                                  # today's time is still ahead: was yesterday's after it started?
+        target -= 86400
+    return n.get("since", now) < target <= now
+
+
+# ------------------------------------------------------------------ automatic slot
+def wanted_slot(s: dict, input_code, mode_code):
+    m = s.get("auto_slot_map") or {}
+    for k in (f"mode:{mode_code}", f"in:{input_code}"):
+        try:
+            v = int(m.get(k) or 0)
+        except (TypeError, ValueError):
+            v = 0
+        if 1 <= v <= 4:
+            return v, k
+    return None, None
+
+
+def clean_map(m) -> dict:
+    out = {}
+    for k, v in (m or {}).items():
+        k = str(k)
+        if not (k.startswith("in:") or k.startswith("mode:")) or len(k) > 12:
+            raise ValueError(f"not a receiver input or listening mode: {k}")
+        v = int(v or 0)
+        if v:
+            if not 1 <= v <= 4:
+                raise ValueError("slots are 1-4")
+            out[k] = v
+    return out
+
+
+# ------------------------------------------------------------------ watchdog
+def keep_sub_level(s: dict):
+    """The receiver sub level to hold: the owner's choice, else the last one htTamer set."""
+    if s.get("watch_sub_level") is not None:
+        return float(s["watch_sub_level"])
+    try:
+        from . import fixlog
+        lv = [e for e in (fixlog.get() or {}).get("entries", []) if e.get("kind") == "sub_level"]
+        return float(lv[-1]["to"]) if lv else None
+    except Exception:                                 # noqa: BLE001
+        return None
+
+
+# ------------------------------------------------------------------ one pass
+def tick(busy, avr_status, receiver=None, dsp=None, now=None, refresh=lambda: None) -> dict:
+    """One pass of everything above. busy(): a job or the A/B test is using the system.
+    avr_status(): the receiver's status dict (or None). Returns what it did (for tests and the page)."""
+    from .config import load_settings
+    from .dsp import MiniDSP
+    from .state import event, update_state
+    now = now or time.time()
+    s = load_settings()
+    did = []
+    if not _mem["lock"].acquire(blocking=False):
+        return {"did": ["already running"]}
+    try:
+        n = night()
+        if _off_time_passed(n, s, now) and not busy():
+            set_night(False, f"switched off at {s.get('night_off_at')}", dsp)
+            did.append("night off (time)")
+            n = night()
+
+        if busy():
+            return {"did": did + ["paused: in use"]}
+        st = avr_status() or {}
+        on = bool(st.get("power"))
+        key = (st.get("input_code"), st.get("mode_code")) if on else None
+        changed = on and _mem["seen"] is not None and key != _mem["seen"]
+        if on:
+            _mem["seen"] = key
+
+        d = None
+        if changed and s.get("auto_slot_on"):
+            want, why = wanted_slot(s, *key)
+            if want:
+                d = dsp or MiniDSP(s)
+                cur = int(d.status()["master"].get("preset", -1)) + 1
+                if busy():
+                    return {"did": did + ["paused: in use"]}
+                if cur != want:
+                    label = (st.get("mode") if why.startswith("mode:") else st.get("input")) or why
+                    d.batch([MiniDSP.c_preset(want - 1)], f"automatic slot: {label} -> slot {want}")
+                    if n.get("on"):
+                        d.batch([MiniDSP.c_master_mute(True)], "night mode: subs stay muted after the slot change")
+                    update_state(auto_slot={"t": now, "slot": want, "because": label, "from": cur})
+                    event("info", f"Automatic slot: {label} → slot {want}")
+                    did.append(f"slot {want}")
+                    refresh()
+
+        if (changed or now - _mem["watched"] >= WATCH_EVERY_S) and (s.get("watchdog_on") or n.get("on")):
+            _mem["watched"] = now
+            did += _watch(s, st, n, receiver, d or dsp, now, busy, refresh)
+        return {"did": did}
+    finally:
+        _mem["lock"].release()
+
+
+def _watch(s, st, n, receiver, dsp, now, busy, refresh) -> list:
+    from .dsp import MiniDSP
+    from .state import event, update_state
+    did, issues, fixed = [], [], []
+    fix = bool(s.get("watchdog_fix", 1))
+    d = dsp or MiniDSP(s)
+    master = d.status().get("master") or {}
+    if busy():
+        return ["paused: in use"]
+    if n.get("on") and not master.get("mute"):        # night mode is the owner's explicit wish: always put it back
+        d.batch([MiniDSP.c_master_mute(True)], "watchdog: night mode's mute was off, muted the subs again")
+        fixed.append("Night mode: the subs had been unmuted; muted again")
+    if s.get("watchdog_on"):
+        keep = keep_sub_level(s)
+        cur = st.get("sub_level") if st.get("power") else None
+        if keep is not None and cur is not None and abs(float(cur) - keep) >= SUB_LEVEL_TOL_DB:
+            txt = f"Receiver sub level was {float(cur):+g} dB, not {keep:+g} dB"
+            if fix:
+                from . import avr
+                (receiver or avr.receiver()).set_sub_level(keep)
+                fixed.append(txt + "; set it back")
+            else:
+                issues.append(txt)
+        cur_slot = int(master.get("preset", -1)) + 1
+        mine = (s.get("preset") if s.get("preset") is not None else 2) + 1
+        if cur_slot and cur_slot != mine and not s.get("auto_slot_on"):
+            issues.append(f"The miniDSP is on slot {cur_slot}; htTamer's tune is on slot {mine}")
+        src, normal = str(master.get("source", "")).lower(), (s.get("restore_source") or "").lower()
+        if normal and src and src != normal:
+            issues.append(f"The miniDSP's input is {master.get('source')}, not the receiver")
+    for t in fixed:
+        event("warn", "Watchdog: " + t)
+    if fixed:
+        refresh()
+    update_state(watchdog={"t": now, "issues": issues, "fixed": fixed,
+                           "fixed_t": now if fixed else ((_last_watch().get("fixed_t")) or None)})
+    did += [f"fixed: {x}" for x in fixed] + [f"issue: {x}" for x in issues]
+    return did
+
+
+def _last_watch() -> dict:
+    from .state import load_state
+    return load_state().get("watchdog") or {}
+
+
+def status(s=None) -> dict:
+    from .config import load_settings
+    from .state import load_state
+    s = s or load_settings()
+    st = load_state()
+    return {"night": st.get("night") or {"on": False}, "night_off_at": s.get("night_off_at") or "",
+            "auto_slot_on": bool(s.get("auto_slot_on")), "auto_slot_map": s.get("auto_slot_map") or {},
+            "auto_slot_last": st.get("auto_slot"),
+            "watchdog_on": bool(s.get("watchdog_on")), "watchdog_fix": bool(s.get("watchdog_fix", 1)),
+            "watch_sub_level": s.get("watch_sub_level"), "keep_sub_level": keep_sub_level(s),
+            "watchdog": st.get("watchdog")}

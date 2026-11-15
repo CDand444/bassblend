@@ -60,6 +60,8 @@ header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, v
 .brand b { font-size: 17px; letter-spacing: -.015em; font-weight: 750; }
 .brand b i { font-style: normal; font-weight: 500; color: var(--text-2); }
 .brand span { color: var(--text-3); font-size: 12.5px; }
+.night-pill { cursor: pointer; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font: inherit; }
+.night-pill.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .pill { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 999px;
   background: var(--surface-2); color: var(--text-2); font-size: 12.5px; white-space: nowrap; }
 #dspPill { display: inline-block; line-height: 28px; max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
@@ -720,6 +722,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <div class="seg" id="inputSeg" role="radiogroup" aria-label="DSP input" title="What feeds the subs: your AVR (analog) or this PC (USB, used for test sweeps)">
       <button type="button" data-in="avr">AVR</button><button type="button" data-in="usb">USB</button></div>
     <span class="pill" id="micPill" title="">Mic: …</span>
+    <button type="button" class="pill night-pill" id="nightPill" title="Night mode: cut all bass from the subs" aria-pressed="false">☾ Night</button>
     <button type="button" class="pill spl-pill" id="splPill" aria-label="Sound level meter">
       <span class="dot" aria-hidden="true"></span><span id="splPillTxt">SPL –</span>
       <span class="spl-mini" aria-hidden="true"><i id="splPillBar"></i></span></button>
@@ -929,6 +932,54 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <button class="btn" id="updSave">Save</button><span class="muted small" id="updMsg"></span>
         </div>
       </details>
+    </section>
+
+    <!-- AUTOMATION -->
+    <section class="card" id="autoCard">
+      <div class="card-h"><h2>Automation</h2><span class="sub" id="autoSub"></span></div>
+      <h3 style="margin:4px 0 6px">Night mode</h3>
+      <p class="muted" style="margin:0 0 8px">Cuts all bass from the subs (the miniDSP's master mute; nothing is written to a slot). Whatever the receiver plays, the subs stay silent until you turn it off. Sound tests wait while it's on. The <b>Night</b> button at the top does the same.</p>
+      <div class="row" style="align-items:end">
+        <button class="btn primary" id="nightBtn">Turn night mode on</button>
+        <label class="f" style="width:200px">Switch off by itself at<input id="nightOff" type="time" title="Empty = stays on until you turn it off"></label>
+        <span class="muted small" id="nightMsg"></span>
+      </div>
+      <h3 style="margin:18px 0 6px">Automatic slot</h3>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="asOn"><span>Switch the miniDSP slot when the receiver's input or listening mode changes<small>For example movies on the streaming box play slot 3 and music from the CD player slot 2. It acts only when the input or mode changes, so a slot you pick by hand stays until the next change. A listening-mode rule wins over an input rule. Paused during tests.</small></span></label>
+      <div id="asRules" style="margin-top:8px"></div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="asSave">Save rules</button><span class="muted small" id="asMsg"></span></div>
+      <h3 style="margin:18px 0 6px">Watchdog</h3>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="wdOn"><span>Keep an eye on the setup<small>Every minute, and right after the receiver's input changes, htTamer checks the receiver's sub level (an Onkyo resets it when you change inputs), and tells you if the miniDSP isn't on htTamer's slot or isn't listening to the receiver. Silent: nothing plays.</small></span></label>
+      <label class="cb" style="max-width:none;margin-top:6px"><input type="checkbox" id="wdFix"><span>Put the sub level back by itself<small>Otherwise it only tells you.</small></span></label>
+      <div class="row" style="align-items:end;margin-top:6px">
+        <label class="f" style="width:230px">Receiver sub level to keep (dB)<input id="wdSub" type="number" min="-15" max="12" step="0.5"></label>
+        <button class="btn" id="wdSave">Save</button><button class="btn ghost" id="wdNow">Check now</button>
+        <span class="muted small" id="wdMsg"></span>
+      </div>
+      <div id="wdOut" style="margin-top:8px"></div>
+      <h3 style="margin:18px 0 6px">Home Assistant <span class="beta">Beta</span></h3>
+      <p class="muted" style="margin:0 0 8px">Show htTamer's slot, tune and night mode in Home Assistant, and switch them from its dashboards, scripts and automations (a "movie night" scene, say). It uses Home Assistant's built-in RESTful integration: make a token, put it in <code>secrets.yaml</code> and paste the configuration below into <code>configuration.yaml</code>. Nothing it can do plays sound.</p>
+      <div class="row"><button class="btn" id="haNew">Make a token</button><button class="btn ghost" id="haRevoke">Revoke</button><span class="muted small" id="haMsg"></span></div>
+      <div id="haTok" hidden class="notice" style="margin-top:8px"></div>
+      <details style="margin-top:8px"><summary class="small">Configuration to paste</summary><pre class="small" id="haYaml" style="white-space:pre-wrap"></pre><button class="btn ghost" id="haCopy">Copy</button></details>
+    </section>
+
+    <!-- BLIND A/B -->
+    <section class="card" id="abCard">
+      <div class="card-h"><h2>Blind A/B test</h2><span class="sub" id="abSub"></span></div>
+      <p class="muted" style="margin-top:0">Find out which of two slots you really prefer without knowing which is which. In each round the two slots hide behind buttons <b>1</b> and <b>2</b>, in a new random order. Switch between them as often as you like, then pick the one you prefer. At the end htTamer shows which slot won and how likely that is by chance, and puts the slot you were on back. It only switches slots: play your own music or film, at your usual volume. Louder usually sounds better, so compare slots at the same level.</p>
+      <div class="row" id="abSetup" style="align-items:end">
+        <label class="f" style="width:110px">Slot A<select id="abA"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+        <label class="f" style="width:110px">Slot B<select id="abB"><option selected>1</option><option>2</option><option>3</option><option>4</option></select></label>
+        <label class="f" style="width:120px">Rounds<select id="abN"><option>5</option><option selected>8</option><option>10</option><option>12</option><option>16</option></select></label>
+        <button class="btn primary" id="abStart">Start</button><span class="muted small" id="abMsg"></span>
+      </div>
+      <div id="abRun" hidden>
+        <p style="margin:6px 0" id="abRound"></p>
+        <div class="row" style="gap:12px"><button class="btn lg" id="abP1" style="min-width:120px">Play 1</button><button class="btn lg" id="abP2" style="min-width:120px">Play 2</button></div>
+        <div class="row" style="gap:12px;margin-top:12px"><button class="btn primary" id="abV1">I prefer 1</button><button class="btn primary" id="abV2">I prefer 2</button><span class="grow"></span><button class="btn ghost" id="abStop">Stop the test</button></div>
+      </div>
+      <div id="abOut" style="margin-top:12px"></div>
     </section>
 
     <!-- FEEDBACK -->

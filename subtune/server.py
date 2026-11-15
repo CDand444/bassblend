@@ -99,6 +99,14 @@ class Runner:
         self._stop = False
 
     # ---- state
+    def _popen(self, args):
+        """Start a job (python -m subtune <cmd> ...). Sound tests wait while night mode is on."""
+        from . import abtest, automation
+        automation.refuse_if_night(args[3] if len(args) > 3 else "")
+        if abtest.active():
+            raise RuntimeError("a blind A/B test is running: finish or stop it first")
+        return subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
     def running(self):
         return (self.proc is not None and self.proc.poll() is None) or \
                (self.auto is not None and self.auto["status"] in ("running", "waiting"))
@@ -111,7 +119,7 @@ class Runner:
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
         args = _cmd_args(cmd, params)
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = " ".join(args[3:])
         return self.cmd
 
@@ -132,7 +140,7 @@ class Runner:
             raise ValueError("tone must be 20-200 Hz and 1-10 seconds")
         args = [sys.executable, "-m", "subtune", "tone", "--output", str(out), "--freq", f"{freq:g}",
                 "--seconds", f"{secs:g}"]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"tone output {out} {freq:g} Hz"
         return self.cmd
 
@@ -148,7 +156,7 @@ class Runner:
         if not 1 <= pos <= 8:
             raise ValueError("spot must be 1-8")
         args = [sys.executable, "-m", "subtune", "verify", "--pos", str(pos), "--restore"]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"verify spot {pos}"
         return self.cmd
 
@@ -172,7 +180,7 @@ class Runner:
             if body.get("confirm_original") is not True:
                 raise ValueError("slot 1 holds your original setup; confirm to overwrite it")
             args.append("--allow-original")
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"apply to slot {slot}"
         return self.cmd
 
@@ -183,7 +191,11 @@ class Runner:
         if not 1 <= n <= 4:
             raise ValueError("slot must be 1-4")
         from .dsp import MiniDSP
-        MiniDSP(load_settings()).batch([MiniDSP.c_preset(n - 1)], f"active preset -> slot {n}")
+        d = MiniDSP(load_settings())
+        d.batch([MiniDSP.c_preset(n - 1)], f"active preset -> slot {n}")
+        from .automation import night_on
+        if night_on():                                   # night mode: the subs stay cut whatever the slot
+            d.batch([MiniDSP.c_master_mute(True)], "night mode: subs stay muted")
         _live["t"] = 0
 
     def start_avrblend(self, body):
@@ -198,7 +210,7 @@ class Runner:
         args = [sys.executable, "-m", "subtune", "avrblend", *pargs, "--pos", str(pos), "--speakers", spk]
         if not body.get("auto_volume") or mode == "manual":
             args.append("--no-auto-volume")
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"avr blend ({mode})"
         return self.cmd
 
@@ -213,7 +225,7 @@ class Runner:
         args = [sys.executable, "-m", "subtune", "deepcheck", *pargs, "--pos", str(pos)]
         if body.get("auto_volume") is False or mode == "manual":
             args.append("--no-auto-volume")
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"system report ({mode})"
         return self.cmd
 
@@ -228,7 +240,7 @@ class Runner:
         if body.get("auto_volume") is False or mode != "hdmi":
             args.append("--no-auto-volume")
         update_state(allspk_status={"running": True, "text": "Starting…", "mode": mode, "pos": pos})
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"all-speakers check ({mode})"
         return self.cmd
 
@@ -241,7 +253,7 @@ class Runner:
         mode, pargs = _playback(body, modes=("hdmi", "dlna"))
         update_state(fix_status={"running": True, "text": "Starting…", "pos": pos})
         args = [sys.executable, "-m", "subtune", "fixup", "--pos", str(pos), *pargs]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = "fix what htTamer can"
         return self.cmd
 
@@ -249,7 +261,7 @@ class Runner:
         if self.running() or load_state().get("busy"):
             raise RuntimeError("another step is running")
         args = [sys.executable, "-m", "subtune", "fixes", "--revert"]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = "undo fixes"
         return self.cmd
 
@@ -265,7 +277,7 @@ class Runner:
         from . import liveeq
         liveeq.touch_poll()
         update_state(live_rta_status={"running": True, "text": "Starting…", "mode": mode, "started": time.time()})
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"live analyzer ({mode})"
         return self.cmd
 
@@ -276,7 +288,7 @@ class Runner:
         mode, pargs = _playback(body, modes=("hdmi", "dlna"))
         update_state(gain_status={"running": True, "text": "Starting…"})
         args = [sys.executable, "-m", "subtune", "gaincheck", *pargs]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = f"gain check ({mode})"
         return self.cmd
 
@@ -287,7 +299,7 @@ class Runner:
         if self.running() or load_state().get("busy"):
             raise RuntimeError("stop the analyzer (or wait for the current step) first")
         args = [sys.executable, "-m", "subtune", "liveeq-bake"]
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = "save live EQ into a tune"
         return self.cmd
 
@@ -299,7 +311,7 @@ class Runner:
             m, cur = st.get("avr_blend_multi") or {}, st.get("result") or {}
             multi = bool(m) and m.get("tune_id") == cur.get("tune_id")
         args = [sys.executable, "-m", "subtune", "avrapply"] + (["--multi"] if multi else [])
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         self.cmd = "apply AVR blend"
         return self.cmd
 
@@ -394,7 +406,7 @@ class Runner:
         self._stage(sid, "running")
         args = _cmd_args(cmd, params)
         self.cmd = " ".join(args[3:])
-        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.proc = self._popen(args)
         rc = self.proc.wait()
         self.cmd = None
         if self._stop:
@@ -716,6 +728,13 @@ def build_executors(origin="assistant"):
                "receiver": avr_status()["status"], "measured_spots": len(st.get("measurements") or {}),
                "speaker_system": _system_brief(), "sub_hardware": sub_hardware(),
                "receiver_settings_slot": (s.get("preset") or 0) + 1}
+        from . import abtest, automation
+        a = automation.status(s)
+        out["automation"] = {"night_mode": a["night"], "night_off_at": a["night_off_at"],
+                             "auto_slot": {"on": a["auto_slot_on"], "rules": a["auto_slot_map"], "last": a["auto_slot_last"]},
+                             "watchdog": {"on": a["watchdog_on"], "fix": a["watchdog_fix"], "keep_sub_level": a["keep_sub_level"],
+                                          "last": a["watchdog"]},
+                             "blind_ab": abtest.view()}
         from . import coach, journal
         try:
             out["next_steps"] = [{k: x[k] for k in ("title", "why", "who", "sound", "tool", "input", "area")}
@@ -803,6 +822,11 @@ def build_executors(origin="assistant"):
     def switch_slot(slot):
         RUN.switch_slot(slot)
         return {"summary": f"slot {slot} playing"}
+
+    def night_mode(on):
+        from . import automation
+        st = automation.set_night(bool(on), "assistant")
+        return {**st, "summary": "subs muted for the night" if on else "subs playing again"}
 
     def _measure(start, key, timeout=180):
         t0 = time.time()
@@ -1121,7 +1145,7 @@ def build_executors(origin="assistant"):
 
     from . import guard
     return guard.wrap({"get_overview": overview, "list_tunes": tunes, "simulate_tune": simulate, "save_simulation": save_sim,
-            "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot,
+            "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot, "set_night_mode": night_mode,
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "keep_fixes": fixes_keep, "undo_fixes": fixes_undo,
@@ -1533,6 +1557,47 @@ class H(BaseHTTPRequestHandler):
         r = mcp_server().handle(body)
         return self._send(202, b"", "text/plain") if r is None else self._send(200, r)
 
+    def _ha_ok(self):
+        from . import ha
+        if ha.bearer_ok(self.headers.get("Authorization")):
+            return True
+        self._send(401, {"error": "Home Assistant needs htTamer's token: Authorization: Bearer hta_..."},
+                   headers=[("WWW-Authenticate", 'Bearer realm="htTamer"')])
+        return False
+
+    def _ha_state(self):
+        from . import ha
+        if not self._ha_ok():
+            return
+        try:
+            m = (_live.get("data") or {}).get("master")
+        except Exception:                                # noqa: BLE001
+            m = None
+        return self._send(200, ha.state(m, avr_status()["status"], _system_busy()))
+
+    def _ha_action(self, path, body):
+        from . import legal
+        if not self._ha_ok():
+            return
+        if not legal.accepted():
+            return self._send(403, {"error": "accept htTamer's use-at-your-own-risk terms on its page first"})
+        try:
+            if path == "/api/ha/slot":
+                RUN.switch_slot(int(body.get("slot")))
+                event("info", f"Home Assistant: slot {int(body.get('slot'))}")
+            elif path == "/api/ha/night":
+                from . import automation
+                automation.set_night(bool(body.get("on")), "Home Assistant")
+            elif path == "/api/ha/auto_slot":
+                s = load_settings(); s["auto_slot_on"] = bool(body.get("on")); save_settings(s)
+                event("config", f"Home Assistant: automatic slot {'on' if body.get('on') else 'off'}")
+            else:
+                return self._send(404, {"error": "not found"})
+        except (RuntimeError, ValueError, TypeError) as e:
+            return self._send(409, {"error": str(e)})
+        _live["t"] = 0
+        return self._send(200, {"ok": True})
+
     def _setup_status(self):
         from pathlib import Path
         from . import auth
@@ -1564,6 +1629,8 @@ class H(BaseHTTPRequestHandler):
             if not self._authed():
                 return self._send(403, builder.EXPIRED_PAGE.encode(), "text/html; charset=utf-8")
             return self._redirect("/build")
+        if u.path == "/api/ha/state":                   # Home Assistant: its token, even from this computer
+            return self._ha_state()
         if not self._gate(u.path):
             return
         if u.path == "/build":                          # the phone room builder
@@ -1631,6 +1698,8 @@ class H(BaseHTTPRequestHandler):
                                                      "restore_source", "avr_pi_input", *SETTABLE)}
             from .hdmi import hdmi_port
             st["pi_hdmi"] = hdmi_port()
+            from . import abtest
+            st["ab"] = abtest.view()
             from .legal import status as terms_status
             st["terms"] = terms_status(s)
             if st.get("update"):
@@ -1723,6 +1792,11 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, liveeq_view())
         if u.path == "/api/avr":
             return self._send(200, avr_status(force="force" in q))
+        if u.path == "/api/automation":
+            from . import abtest, automation, ha
+            return self._send(200, {**automation.status(), "ab": abtest.view(), "ha": ha.token_info(),
+                                    "ha_yaml": ha.yaml(f"http://{self.headers.get('Host') or '127.0.0.1:8765'}"),
+                                    "inputs": _input_names(), "modes": _mode_names()})
         if u.path == "/api/update":
             from . import update, version
             s = load_settings()
@@ -1835,6 +1909,8 @@ class H(BaseHTTPRequestHandler):
             return self._send(400, {"error": "bad json"})
         if path == "/mcp":                             # MCP (streamable HTTP, JSON answers) for outside AI clients
             return self._mcp(body)
+        if path.startswith("/api/ha/"):                 # Home Assistant: its token, even from this computer
+            return self._ha_action(path, body)
         if not self._gate(path):
             return
         if path == "/api/mcp":                         # the owner makes or revokes the MCP token (shown once)
@@ -1960,6 +2036,21 @@ class H(BaseHTTPRequestHandler):
                 from . import feedback
                 diag = feedback.diagnostics() if body.get("include_diagnostics", True) else None
                 return self._send(200, {"url": feedback.issue_url(body.get("kind"), body.get("title"), body.get("text"), diag)})
+            if path == "/api/automation":              # night mode, automatic slot, watchdog
+                return self._send(200, _automation_action(body))
+            if path == "/api/ab":                      # blind A/B listening test
+                return self._send(200, _ab_action(body))
+            if path == "/api/homeassistant":           # the owner makes or revokes the Home Assistant token
+                from . import ha
+                if body.get("action") == "new_token":
+                    tok = ha.new_token()
+                    event("config", "a new Home Assistant token was made (the old one no longer works)")
+                    return self._send(200, {"token": tok, **ha.token_info()})
+                if body.get("action") == "revoke":
+                    ha.revoke_token()
+                    event("config", "the Home Assistant token was revoked")
+                    return self._send(200, ha.token_info())
+                return self._send(400, {"error": "new_token or revoke"})
             if path == "/api/update":                  # over-the-air updates from GitHub releases
                 from . import update
                 act = body.get("action")
@@ -2252,6 +2343,106 @@ def input_guard_once(now=None):
     return "switched back"
 
 
+AUTOMATION = {"last": None}
+
+
+def _names(attr):
+    """The receiver's input or listening-mode codes -> names (Onkyo's are module tables in avr.py)."""
+    from . import avr
+    try:
+        r = avr.receiver()
+    except Exception:                                  # noqa: BLE001
+        r = None
+    return dict(getattr(r, attr, None) or getattr(avr, attr, None) or {})
+
+
+def _input_names():
+    return _names("INPUTS")
+
+
+def _mode_names():
+    return _names("MODES")
+
+
+def _automation_action(body):
+    from . import automation
+    act = body.get("action")
+    if act == "night":
+        if RUN.running() or load_state().get("busy"):
+            raise RuntimeError("wait for the current step to finish")
+        st = automation.set_night(bool(body.get("on")), "you")
+        _live["t"] = 0
+        return {"night": st}
+    if act == "settings":
+        s = load_settings()
+        if "auto_slot_on" in body:
+            s["auto_slot_on"] = bool(body["auto_slot_on"])
+        if "auto_slot_map" in body:
+            s["auto_slot_map"] = automation.clean_map(body["auto_slot_map"])
+        if "watchdog_on" in body:
+            s["watchdog_on"] = bool(body["watchdog_on"])
+        if "watchdog_fix" in body:
+            s["watchdog_fix"] = bool(body["watchdog_fix"])
+        if "watch_sub_level" in body:
+            v = body["watch_sub_level"]
+            if v in (None, ""):
+                s["watch_sub_level"] = None
+            else:
+                v = float(v)
+                if not -15 <= v <= 12:
+                    raise ValueError("sub level is -15 to +12 dB")
+                s["watch_sub_level"] = v
+        if "night_off_at" in body:
+            v = str(body["night_off_at"] or "").strip()
+            if v and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v):
+                raise ValueError("night mode's off time looks like 07:30")
+            s["night_off_at"] = v
+        save_settings(s)
+        event("config", "automation settings changed")
+        return automation.status(s)
+    if act == "check":
+        from . import automation as a
+        a._mem["watched"] = 0                        # run the watchdog on this pass
+        return {"result": automation_once(), **automation.status()}
+    raise ValueError("night, settings or check")
+
+
+def _ab_action(body):
+    from . import abtest
+    act = body.get("action")
+    if act == "start":
+        if RUN.running() or load_state().get("busy"):
+            raise RuntimeError("wait for the current step to finish")
+        return abtest.start(body.get("a"), body.get("b"), body.get("rounds", 8))
+    if act == "play":
+        return abtest.play(body.get("which"))
+    if act == "vote":
+        return abtest.vote(body.get("pick"))
+    if act == "stop":
+        return abtest.finish(cancelled=True)
+    raise ValueError("start, play, vote or stop")
+
+
+def _system_busy():
+    from . import abtest
+    return RUN.running() or bool(load_state().get("busy")) or abtest.active()
+
+
+def automation_once():
+    from . import automation
+    return automation.tick(_system_busy, lambda: avr_status()["status"], refresh=lambda: _live.__setitem__("t", 0))
+
+
+def _automation_loop():
+    time.sleep(10)
+    while True:
+        try:
+            AUTOMATION["last"] = automation_once()
+        except Exception as e:                       # noqa: BLE001 - no receiver or miniDSP must not stop the server
+            AUTOMATION["last"] = {"error": str(e)[:200]}
+        time.sleep(4)
+
+
 def _input_guard_loop():
     while True:
         time.sleep(30)
@@ -2277,6 +2468,7 @@ def serve(port=8765, lan=False):
     # BASSBLEND_BIND pins the address (tests run network mode on 127.0.0.1 with BASSBLEND_AUTH_LOCAL=1)
     srv = ThreadingHTTPServer((os.environ.get("BASSBLEND_BIND") or ("0.0.0.0" if lan else "127.0.0.1"), port), H)
     threading.Thread(target=_input_guard_loop, daemon=True).start()
+    threading.Thread(target=_automation_loop, daemon=True).start()
     from . import update
     threading.Thread(target=update.auto_loop, daemon=True).start()
     if lan:

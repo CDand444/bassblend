@@ -494,3 +494,89 @@ $('#fbGo').onclick = async () => {
   if (w) { w.opener = null; w.location = r.url; } else location.href = r.url;
   $('#fbMsg').textContent = 'Opened on GitHub: check it and press Submit new issue there.';
 };
+
+// ---------- automation: night mode, automatic slot, watchdog, Home Assistant; and the blind A/B test
+let AUTO = null, autoKey = null;
+async function loadAutomation() {
+  try { AUTO = await fetch('/api/automation').then(r => r.json()); } catch (e) { return; }
+  autoKey = null; renderAutomation(); renderAB();
+}
+function renderNight() {
+  const on = !!(S.night || {}).on, b = $('#nightPill');
+  b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
+  b.textContent = on ? '☾ Night: subs off' : '☾ Night';
+  const nb = $('#nightBtn'); if (nb) { nb.textContent = on ? 'Turn night mode off' : 'Turn night mode on'; nb.classList.toggle('danger', on); }
+}
+async function setNight(on) {
+  const r = await post('/api/automation', {action: 'night', on});
+  if (r.error) { toast('Night mode', r.error, 'bad'); return; }
+  toast(on ? 'Night mode on' : 'Night mode off', on ? 'The subs are muted: no bass from them until you turn it off.' : 'The subs play again.', on ? '' : 'good', {tag: 'night'});
+  await poll(); if (AUTO) loadAutomation();
+}
+$('#nightPill').onclick = () => setNight(!(S.night || {}).on);
+$('#nightBtn').onclick = () => setNight(!(S.night || {}).on);
+$('#nightOff').onchange = async () => { const r = await post('/api/automation', {action: 'settings', night_off_at: $('#nightOff').value});
+  $('#nightMsg').textContent = r.error || ($('#nightOff').value ? `Switches off by itself at ${$('#nightOff').value}.` : 'Stays on until you turn it off.'); };
+function renderAutomation() {
+  if (!AUTO) return;
+  const k = JSON.stringify(AUTO); if (k === autoKey) return; autoKey = k;
+  if (document.activeElement !== $('#nightOff')) $('#nightOff').value = AUTO.night_off_at || '';
+  $('#asOn').checked = !!AUTO.auto_slot_on; $('#wdOn').checked = !!AUTO.watchdog_on; $('#wdFix').checked = AUTO.watchdog_fix !== false;
+  if (document.activeElement !== $('#wdSub')) { $('#wdSub').value = AUTO.watch_sub_level ?? ''; $('#wdSub').placeholder = AUTO.keep_sub_level != null ? `${AUTO.keep_sub_level} (last set by htTamer)` : 'not set'; }
+  const sel = (key) => { const v = (AUTO.auto_slot_map || {})[key] || 0;
+    return `<select data-as="${esc(key)}">${[0, 1, 2, 3, 4].map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n ? 'slot ' + n : '–'}</option>`).join('')}</select>`; };
+  const rows = (pre, names) => Object.entries(names || {}).map(([c, n]) => `<tr><td>${esc(n)}</td><td style="width:120px">${sel(pre + c)}</td></tr>`).join('');
+  $('#asRules').innerHTML = `<details open><summary class="small">Inputs</summary><table class="small"><tbody>${rows('in:', AUTO.inputs)}</tbody></table></details>
+    <details><summary class="small">Listening modes (win over inputs)</summary><table class="small"><tbody>${rows('mode:', AUTO.modes)}</tbody></table></details>`;
+  const last = AUTO.auto_slot_last; $('#asMsg').textContent = last ? `Last: slot ${last.slot} for ${last.because}, ${fmtWhen(last.t)}.` : '';
+  const w = AUTO.watchdog;
+  $('#wdOut').innerHTML = !w ? '<p class="muted small">Not checked yet.</p>' :
+    `<p class="small muted" style="margin:0">Last check ${fmtWhen(w.t)}.</p>` +
+    ((w.fixed || []).length ? `<div class="notice">${w.fixed.map(esc).join('<br>')}</div>` : '') +
+    ((w.issues || []).length ? `<div class="notice warn">${w.issues.map(esc).join('<br>')}</div>` : ((w.fixed || []).length ? '' : '<p class="small" style="color:var(--good)">✓ All as it should be.</p>'));
+  $('#autoSub').textContent = [(S.night || {}).on ? 'night mode on' : '', AUTO.auto_slot_on ? 'automatic slot on' : '', AUTO.watchdog_on ? 'watchdog on' : ''].filter(Boolean).join(' · ');
+  const ha = AUTO.ha || {}; $('#haMsg').textContent = ha.has_token ? `Token made ${fmtWhen(ha.created)}.` : 'No token yet.';
+  $('#haRevoke').disabled = !ha.has_token; $('#haYaml').textContent = AUTO.ha_yaml || '';
+}
+const autoSave = async (body, msg) => { const r = await post('/api/automation', {action: 'settings', ...body}); if (r.error) { alert(r.error); return; }
+  toast(msg, '', 'good'); loadAutomation(); };
+$('#asOn').onchange = () => autoSave({auto_slot_on: $('#asOn').checked}, $('#asOn').checked ? 'Automatic slot on' : 'Automatic slot off');
+$('#asSave').onclick = () => { const m = {}; document.querySelectorAll('#asRules [data-as]').forEach(s => { if (+s.value) m[s.dataset.as] = +s.value; });
+  autoSave({auto_slot_map: m}, `Saved ${Object.keys(m).length} rule${Object.keys(m).length === 1 ? '' : 's'}`); };
+$('#wdOn').onchange = () => autoSave({watchdog_on: $('#wdOn').checked}, $('#wdOn').checked ? 'Watchdog on' : 'Watchdog off');
+$('#wdFix').onchange = () => autoSave({watchdog_fix: $('#wdFix').checked}, $('#wdFix').checked ? 'The watchdog puts the sub level back' : 'The watchdog only tells you');
+$('#wdSave').onclick = () => autoSave({watch_sub_level: $('#wdSub').value.trim()}, 'Sub level to keep saved');
+$('#wdNow').onclick = async () => { $('#wdMsg').textContent = 'Checking…'; const r = await post('/api/automation', {action: 'check'});
+  $('#wdMsg').textContent = r.error || ''; loadAutomation(); };
+$('#haNew').onclick = async () => {
+  if ((AUTO.ha || {}).has_token && !confirm('Make a new token? The old one stops working.')) return;
+  const r = await post('/api/homeassistant', {action: 'new_token'}); if (r.error) { alert(r.error); return; }
+  $('#haTok').hidden = false;
+  $('#haTok').innerHTML = `Your token (shown only now): <code style="user-select:all">${esc(r.token)}</code><br>In <code>secrets.yaml</code>: <code style="user-select:all">httamer_auth: "Bearer ${esc(r.token)}"</code>`;
+  loadAutomation(); };
+$('#haRevoke').onclick = async () => { if (!confirm('Revoke the Home Assistant token? Home Assistant loses access until you make a new one.')) return;
+  await post('/api/homeassistant', {action: 'revoke'}); $('#haTok').hidden = true; loadAutomation(); };
+$('#haCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#haYaml').textContent); toast('Configuration copied', '', 'good'); } catch (e) { toast('Couldn’t copy', 'Select the text and copy it by hand.', 'bad'); } };
+
+function renderAB() {
+  const a = (AUTO && AUTO.ab) || S.ab || {};
+  $('#abSetup').hidden = !!a.active; $('#abRun').hidden = !a.active;
+  $('#abSub').textContent = a.active ? `slot ${a.a} vs slot ${a.b}` : '';
+  if (a.active) {
+    $('#abRound').innerHTML = `<b>Round ${a.round} of ${a.rounds}.</b> ${a.playing ? `Playing <b>${a.playing}</b>. Switch as often as you like, then pick.` : 'Press 1 or 2 to start listening.'}`;
+    $('#abP1').classList.toggle('primary', a.playing === 1); $('#abP2').classList.toggle('primary', a.playing === 2);
+    $('#abV1').disabled = $('#abV2').disabled = !a.playing;
+  }
+  const L = a.last;
+  $('#abOut').innerHTML = !a.active && L ? `<div class="notice ${L.cancelled ? '' : L.p < 0.05 ? 'good' : ''}"><b>${esc(L.verdict)}</b><br>
+    Slot ${L.a}: ${L.a_votes} · slot ${L.b}: ${L.b_votes}${L.p != null ? ` · chance of a split like this with no real preference: ${Math.round(L.p * 100)}%` : ''} · ${fmtWhen(L.t)}</div>` : '';
+}
+const abDo = async body => { const r = await post('/api/ab', body); if (r.error) { $('#abMsg').textContent = r.error; toast('Blind test', r.error, 'bad'); return; }
+  $('#abMsg').textContent = ''; AUTO = {...(AUTO || {}), ab: r}; renderAB(); poll(); };
+$('#abStart').onclick = () => { if ($('#abA').value === $('#abB').value) { $('#abMsg').textContent = 'Pick two different slots.'; return; }
+  abDo({action: 'start', a: +$('#abA').value, b: +$('#abB').value, rounds: +$('#abN').value}); };
+$('#abP1').onclick = () => abDo({action: 'play', which: 1});
+$('#abP2').onclick = () => abDo({action: 'play', which: 2});
+$('#abV1').onclick = () => abDo({action: 'vote', pick: 1});
+$('#abV2').onclick = () => abDo({action: 'vote', pick: 2});
+$('#abStop').onclick = () => { if (confirm('Stop the blind test? The slot you were on comes back.')) abDo({action: 'stop'}); };
