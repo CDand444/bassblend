@@ -8,11 +8,15 @@ import shutil
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
 IS_WINDOWS = sys.platform == "win32"
+# The Windows installer runs a frozen (PyInstaller) copy: its files live in a read-only bundle
+# folder, so the data goes to %LOCALAPPDATA%\htTamer instead.
+FROZEN = bool(getattr(sys, "frozen", False))
+ROOT = Path(getattr(sys, "_MEIPASS", "")) if FROZEN else Path(__file__).resolve().parent.parent
 # Where tunes, settings and measurements live. The Pi image sets BASSBLEND_DATA
 # (e.g. /var/lib/bassblend) so the program files can stay read-only.
-DATA = Path(os.environ.get("BASSBLEND_DATA") or (ROOT / "data"))
+_default_data = (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "htTamer" / "data") if FROZEN else (ROOT / "data")
+DATA = Path(os.environ.get("BASSBLEND_DATA") or _default_data)
 
 
 def _minidsp_exe() -> Path:

@@ -5,6 +5,23 @@ mic, writes gain, delay, polarity and EQ into a miniDSP 2x4HD, blends the subs w
 the speakers through the receiver, and offers a live EQ with a live analyzer and an
 assistant. It runs on a Raspberry Pi (or Windows) and is used from a web page.
 
+## Download
+
+Get the latest build from the repository's **Releases** page:
+
+- **Raspberry Pi**: `bassblend-<version>.img.xz`. Write it to an SD card with Raspberry Pi Imager
+  (it can add Wi-Fi and SSH), plug in the miniDSP and the UMIK-1, then open `http://bassblend.local:8765`.
+  See [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md).
+- **Windows 10/11 (64-bit)**: `htTamer-<version>-windows-setup.exe`. Installs for your user only
+  (no admin rights), with Start-menu and desktop shortcuts. Start htTamer and the dashboard opens
+  in your browser; keep its window open while you use it. Settings and measurements live in
+  `%LOCALAPPDATA%\htTamer` and survive updates. The miniDSP is reached over USB with no driver.
+
+Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed (the Windows
+installer); the Pi image is built with `deploy/pi-gen/build-image.sh` and uploaded to the same release.
+
+## Documentation
+
 - User manual: `subtune/web/manual.html` (in the app under System → Manual, or at `/manual`)
 - Raspberry Pi install: [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md)
 - Receiver setup: [docs/RECEIVER_SETUP.md](docs/RECEIVER_SETUP.md)

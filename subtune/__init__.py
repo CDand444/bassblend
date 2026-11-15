@@ -2,7 +2,9 @@
 from functools import lru_cache
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
+import sys
+
+_ROOT = Path(getattr(sys, "_MEIPASS", "")) if getattr(sys, "frozen", False) else Path(__file__).resolve().parent.parent
 
 
 def version() -> str:
