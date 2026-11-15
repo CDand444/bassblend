@@ -554,7 +554,7 @@ function drawDeepChart(r) {
   lineChart(el, series, {x: r.grid, xmin: 20, xmax: 16000, ticks: el.clientWidth < 520 ? [20, 100, 1000, 10000] : [20, 50, 100, 200, 500, 1000, 2000, 5000, 10000], aria: 'Full-range frequency response',
     markers: [40, 120, 500, 2000, 6000].map(f => ({f, label: ''}))});
 }
-$('#dcMode').onchange = () => { dcKey = null; renderDeep(); };
+$('#dcMode').onchange = () => { playPicked.dc = true; dcKey = null; renderDeep(); };
 // Print / Save as PDF: the report alone, light theme, every finding opened, chart drawn at page width
 $('#dcPrint').onclick = () => {
   const r = dcSel ? (S.deep_reports || {})[dcSel] : null; if (!r) return;

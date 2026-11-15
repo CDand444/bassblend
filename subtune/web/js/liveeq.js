@@ -26,7 +26,7 @@ async function leqPoll() {
   try {
     LQ = await fetch('/api/liveeq').then(r => r.json());
     if (!leqDrag && Date.now() - leqEditT > 2500 && !leqSendT && !leqInflight && !(LQ.writer || {}).writing) { leqBands = JSON.parse(JSON.stringify(LQ.eq.bands || [])); leqBypass = !!LQ.eq.bypass; }
-    if (!leqMode) leqMode = (LQ.playback || {}).default_mode || 'dlna';
+    if (!leqMode || !playPicked.leq) leqMode = (LQ.playback || {}).pi_hdmi_connected ? 'hdmi' : 'dlna';
     renderLeq();
   } catch (e) {}
 }
@@ -217,7 +217,7 @@ $('#leqBake').onclick = async () => {
   const r = await post('/api/liveeq', {action: 'bake'}); if (r.error) alert(r.error);
   leqEditT = 0; leqBands = []; leqKey = ''; poll(); leqPoll();
 };
-document.querySelectorAll('#leqMode button').forEach(b => b.onclick = () => { leqMode = b.dataset.m; renderLeq(); });
+document.querySelectorAll('#leqMode button').forEach(b => b.onclick = () => { leqMode = b.dataset.m; playPicked.leq = true; renderLeq(); });
 $('#leqInp').addEventListener('change', () => renderLeq());
 $('#leqHold').onclick = () => {
   const r = LQ && LQ.rta;

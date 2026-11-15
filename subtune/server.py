@@ -42,7 +42,7 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
 
 def _playback(body, modes=("hdmi", "dlna", "manual")):
     """Pick how a receiver test plays its file, and the CLI args for it. With no mode given:
-    the Pi's HDMI when it's plugged in and its receiver input is known, else the network."""
+    the Pi's HDMI when it's plugged in (its receiver input known), else the network."""
     from .hdmi import HDMI_INPUTS, hdmi_port
     s = load_settings()
     mode = body.get("mode")
@@ -71,7 +71,7 @@ def _playback_info(s):
     from .hdmi import HDMI_INPUTS, hdmi_port
     port, inp = hdmi_port(), s.get("avr_pi_input")
     return {"pi_hdmi_connected": bool(port), "pi_receiver_input": HDMI_INPUTS.get(inp),
-            "default_mode": "hdmi" if port and inp in HDMI_INPUTS else "dlna"}
+            "default_mode": "hdmi" if port else "dlna"}
 
 
 def _cmd_args(cmd, params=None):

@@ -81,9 +81,11 @@ $('#smokeRun').onclick = async () => {
   finally { b.disabled = false; b.textContent = 'Check the hardware (silent)'; }
 };
 let gainKey = null, gainInit = false;
+$('#gainMode').onchange = () => { playPicked.gain = true; };
 function renderGain() {
   const g = S.gain_check, gs = S.gain_status || {}, job = S.job || {}, set = S.settings || {};
-  if (!gainInit && S.settings) { gainInit = true; if (set.listen_max_volume != null) $('#gainMax').value = set.listen_max_volume; if (!S.pi_hdmi) $('#gainMode').value = 'dlna'; }
+  if (!gainInit && S.settings) { gainInit = true; if (set.listen_max_volume != null) $('#gainMax').value = set.listen_max_volume; }
+  if (S.settings) applyPlayDefault();
   const running = gs.running && job.running;
   $('#gainRun').disabled = !!job.running || !!S.busy;
   $('#gainRun').textContent = running ? 'Checking…' : g ? 'Check again' : 'Check gain structure';

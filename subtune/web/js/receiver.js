@@ -2,18 +2,24 @@
 // top-level names are shared between the parts.
 // ---------- receiver (AVR)
 // ---------- playback source shared by every receiver test: Pi HDMI / network / USB stick
-const piReady = () => !!S.pi_hdmi && !!(S.settings || {}).avr_pi_input;
-let playInit = false;
+// Default playback for every test: the Pi's HDMI whenever it's plugged in, else the receiver's network player.
+// Follows the cable (plug/unplug) until the owner picks a mode on that test themselves.
+const playDefault = () => S.pi_hdmi ? 'hdmi' : 'dlna';
+let playAuto = null; const playPicked = {};
 function syncPlayback() {
   const hi = S.hdmi_inputs || {}, hk = JSON.stringify(hi);
   document.querySelectorAll('.piInp').forEach(x => { if (x.dataset.hk !== hk && Object.keys(hi).length) { const keep = x.value; x.dataset.hk = hk;
     x.innerHTML = '<option value="">Pick the receiver input…</option>' + Object.entries(hi).map(([c, l]) => `<option value="${esc(c)}">${esc(l)}</option>`).join(''); x.value = keep; } });
   const v = (S.settings || {}).avr_pi_input || '';
   document.querySelectorAll('.piInp').forEach(x => { if (!x.dataset.touched && v) x.value = v; });
-  if (!playInit && S.settings) {            // first load: default to the Pi's HDMI when it's ready
-    playInit = true;
-    if (piReady()) { blendMode = 'hdmi'; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x.dataset.m === 'hdmi')); $('#dcMode').value = 'hdmi'; }
-  }
+  if (S.settings) applyPlayDefault();
+}
+function applyPlayDefault() {
+  const m = playDefault(); if (m === playAuto) return; playAuto = m;
+  if (!playPicked.blend) { blendMode = m; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x.dataset.m === m)); blendKey = null; }
+  if (!playPicked.dc && $('#dcMode')) { $('#dcMode').value = m; if (typeof dcKey !== 'undefined') dcKey = null; }
+  if (!playPicked.gain && $('#gainMode')) { $('#gainMode').value = m; if (typeof gainKey !== 'undefined') gainKey = null; }
+  if (!playPicked.leq && typeof leqMode !== 'undefined') leqMode = m;
 }
 document.querySelectorAll('.piInp').forEach(x => x.onchange = () => {
   document.querySelectorAll('.piInp').forEach(y => { y.value = x.value; y.dataset.touched = '1'; });
@@ -302,7 +308,7 @@ document.querySelectorAll('#blendSpk button').forEach(b => b.onclick = () => {
   blendSpk = b.dataset.s; document.querySelectorAll('#blendSpk button').forEach(x => x.classList.toggle('on', x === b)); blendKey = null; renderBlend();
 });
 document.querySelectorAll('#blendMode button').forEach(b => b.onclick = () => {
-  blendMode = b.dataset.m; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x === b)); blendKey = null; renderBlend();
+  blendMode = b.dataset.m; playPicked.blend = true; document.querySelectorAll('#blendMode button').forEach(x => x.classList.toggle('on', x === b)); blendKey = null; renderBlend();
 });
 $('#blendRun').onclick = async () => {
   const pos = +$('#blendPos').value, auto = $('#blendAuto').checked && blendMode !== 'manual', set = S.settings || {};
