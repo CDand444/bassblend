@@ -92,6 +92,38 @@ def test_dev_copy_doesnt_self_update():
         subtune.version = real
 
 
+def test_check_gives_up_after_the_deadline():
+    import threading, time
+    real, real_to = update._req, update.CHECK_TIMEOUT_S
+    hang = threading.Event()
+
+    def slow(url, accept="", timeout=20):
+        hang.wait(5)                              # GitHub never answers
+        return Resp(b"{}")
+    try:
+        update._req, update.CHECK_TIMEOUT_S = slow, 0.3
+        t0 = time.time()
+        r = update.check()
+        assert time.time() - t0 < 2 and "within" in (r["error"] or "") and not r["newer"], r
+    finally:
+        hang.set()
+        update._req, update.CHECK_TIMEOUT_S = real, real_to
+
+
+def test_installed_update_isnt_offered_again():
+    import subtune
+    real = subtune.version
+    try:
+        last = {"current": "0.9.2", "latest": "v0.9.3", "newer": True}
+        subtune.version = lambda: "0.9.3"            # the update installed; the saved check is from 0.9.2
+        r = update.last_check(last)
+        assert not r["newer"] and r["current"] == "0.9.3" and r["latest"] == "v0.9.3"
+        subtune.version = lambda: "0.9.2"
+        assert update.last_check(last)["newer"]
+    finally:
+        subtune.version = real
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

@@ -37,7 +37,9 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "nearfield_min_q": (float, 0.5, 6),
             "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70),
             "listen_max_volume": (float, 10, 100),
-            "ai_hwdb": (int, 0, 1)}                     # let the assistant build the hardware database (and look things up)     # the loudest you listen: the gain check works out headroom there
+            "ai_hwdb": (int, 0, 1),                     # let the assistant build the hardware database (and look things up)
+            "mcp_enabled": (int, 0, 1),                 # outside AI clients may connect at /mcp (or `subtune mcp`)
+            "mcp_actions": (int, 0, 2)}                 # their sound/write tools: 0 refused, 1 ask each time, 2 client asks
 
 
 def _playback(body, modes=("hdmi", "dlna", "manual")):
@@ -759,6 +761,11 @@ def build_executors():
         return {"tune": t, "summary": f"saved as {t['name']}"}
 
     def set_target(**changes):
+        from .assistant import TOOLS
+        allowed = next(t for t in TOOLS if t["name"] == "set_target_settings")["input_schema"]["properties"]
+        bad = [k for k in changes if k not in allowed]        # never the MCP or other owner-only switches
+        if bad:
+            raise RuntimeError("not a tuning target setting: " + ", ".join(bad))
         ch = _apply_settings(changes)
         return {"changed": ch, "summary": ", ".join(f"{k} {v}" for k, v in ch.items())}
 
@@ -1113,6 +1120,35 @@ def assistant():
     return _assistant["obj"]
 
 
+_mcp = {"obj": None}
+
+
+def mcp_server():
+    """The MCP endpoint's tool runner: the assistant's executors, gated by the MCP settings."""
+    from .mcp import Server
+    if _mcp["obj"] is None:
+        _mcp["obj"] = Server(build_executors(), load_settings, log=lambda m: event("info", m))
+    return _mcp["obj"]
+
+
+def mcp_info(host_header=""):
+    """What the Tools -> MCP page shows: on/off, and the client configs to copy."""
+    import socket
+    from .assistant import TOOLS
+    from .config import FROZEN
+    from .mcp import token_info
+    s = load_settings()
+    cmd, args = sys.executable, (["mcp"] if FROZEN else ["-m", "subtune", "mcp"])
+    env = {} if FROZEN else {"PYTHONPATH": str(ROOT)}          # a source checkout: let python find the package
+    pi = sys.platform.startswith("linux") and str(ROOT).startswith("/opt/")
+    if pi:                                        # an AI client on another computer reaches the Pi over ssh
+        cmd, args, env = "ssh", [socket.gethostname() + ".local", f"cd {ROOT} && venv/bin/python3 -m subtune mcp"], {}
+    return {"enabled": bool(s.get("mcp_enabled")), "actions": int(s.get("mcp_actions") or 0),
+            "command": cmd, "args": args, "env": env, "pi": pi, "lan": NET["lan"],
+            "url": f"http://{host_header or '127.0.0.1:8765'}/mcp", "tools": len(TOOLS),
+            **token_info()}
+
+
 def avr_obj():
     from .avr import receiver
     if _avr["obj"] is None:
@@ -1433,7 +1469,7 @@ class H(BaseHTTPRequestHandler):
         if path in ("/api/setup/status", "/api/setup/pin") and (setup or self._authed()):
             return True
         if setup:
-            if path.startswith(("/api/", "/media/")):
+            if path.startswith(("/api/", "/media/", "/mcp")):
                 self._send(401, {"error": "finish setting up htTamer first", "setup": "/setup"})
             else:
                 self._redirect("/setup")
@@ -1449,11 +1485,27 @@ class H(BaseHTTPRequestHandler):
                 self._redirect("/setup")                 # finish (or skip) the first-boot steps once
                 return False
             return True
-        if path.startswith(("/api/", "/media/")):
+        if path.startswith(("/api/", "/media/", "/mcp")):
             self._send(401, {"error": "sign in first", "login": "/login"})
         else:
             self._redirect("/login")
         return False
+
+    def _mcp(self, body):
+        """POST /mcp: refused while MCP is off, and always needs a credential (the MCP token, the local
+        bridge key or a signed-in session), even from this computer."""
+        from . import auth, mcp
+        mid = body.get("id") if isinstance(body, dict) else None
+        if self._setup_needed() or not load_settings().get("mcp_enabled"):
+            return self._send(403, {"jsonrpc": "2.0", "id": mid, "error": {
+                "code": -32000, "message": "MCP is off in htTamer: turn it on under Tools -> MCP"}})
+        if not (mcp.bearer_ok(self.headers.get("Authorization"))
+                or auth.session_ok(auth.cookie_from(self.headers.get("Cookie")))):
+            return self._send(401, {"jsonrpc": "2.0", "id": mid, "error": {
+                "code": -32001, "message": "htTamer needs the MCP token (Tools -> MCP) as Authorization: Bearer <token>"}},
+                headers=[("WWW-Authenticate", 'Bearer realm="htTamer MCP"')])
+        r = mcp_server().handle(body)
+        return self._send(202, b"", "text/plain") if r is None else self._send(200, r)
 
     def _setup_status(self):
         from pathlib import Path
@@ -1528,6 +1580,11 @@ class H(BaseHTTPRequestHandler):
                                                      "restore_source", "avr_pi_input", *SETTABLE)}
             from .hdmi import hdmi_port
             st["pi_hdmi"] = hdmi_port()
+            from .legal import status as terms_status
+            st["terms"] = terms_status(s)
+            if st.get("update"):
+                from .update import last_check
+                st["update"] = last_check(st["update"])
             try:
                 from .avr import hdmi_inputs
                 st["hdmi_inputs"] = hdmi_inputs()
@@ -1621,8 +1678,15 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {"mode": update.mode(), "current": version(),
                                     "repo": s.get("update_repo") or "", "default_repo": update.DEFAULT_REPO,
                                     "has_token": bool(update.token()),
-                                    "auto": s.get("update_auto_check", True), "last": load_state().get("update"),
+                                    "auto": s.get("update_auto_check", True), "last": update.last_check(),
                                     "result": update.result()})
+        if u.path == "/api/feedback":               # what a bug report would include (scrubbed)
+            from . import feedback, update
+            return self._send(200, {"repo": update.repo_name(), "diagnostics": feedback.diagnostics()})
+        if u.path == "/mcp":                           # no server-to-client stream: answers come back on each POST
+            return self._send(405, {"error": "POST JSON-RPC messages to /mcp"}, headers=[("Allow", "POST")])
+        if u.path == "/api/mcp":
+            return self._send(200, mcp_info(self.headers.get("Host", "")))
         if u.path == "/api/hwdb":
             from . import hwdb
             return self._send(200, {**hwdb.load(), "enabled": hwdb.enabled()})
@@ -1718,8 +1782,21 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
         except json.JSONDecodeError:
             return self._send(400, {"error": "bad json"})
+        if path == "/mcp":                             # MCP (streamable HTTP, JSON answers) for outside AI clients
+            return self._mcp(body)
         if not self._gate(path):
             return
+        if path == "/api/mcp":                         # the owner makes or revokes the MCP token (shown once)
+            from . import mcp
+            if body.get("action") == "new_token":
+                tok = mcp.new_token()
+                event("config", "a new MCP token was made (the old one no longer works)")
+                return self._send(200, {"token": tok, **mcp.token_info()})
+            if body.get("action") == "revoke":
+                mcp.revoke_token()
+                event("config", "the MCP token was revoked")
+                return self._send(200, mcp.token_info())
+            return self._send(400, {"error": "action must be new_token or revoke"})
         from . import auth
         if path == "/api/login":
             try:
@@ -1748,6 +1825,14 @@ class H(BaseHTTPRequestHandler):
         if path == "/api/logout":
             auth.end_session(auth.cookie_from(self.headers.get("Cookie")))
             return self._send(200, {"ok": True}, headers=[("Set-Cookie", auth.clear_cookie())])
+        from . import legal
+        if path == "/api/terms":                       # the use-at-your-own-risk terms, accepted once per device
+            if body.get("accept") is not True or body.get("version") != legal.TERMS_VERSION:
+                return self._send(400, {"error": "tick the box to accept the current terms"})
+            return self._send(200, legal.accept(self.client_address[0]))
+        if path not in legal.OPEN_PATHS and not legal.accepted():
+            return self._send(403, {"error": "Accept the use-at-your-own-risk terms first (they're shown when the page opens).",
+                                    "terms": True})
         try:
             if path == "/api/run":
                 cmd = body.get("cmd")
@@ -1817,6 +1902,10 @@ class H(BaseHTTPRequestHandler):
                 if body.get("action") == "revert":
                     return self._send(200, {"started": RUN.start_fixes_revert()})
                 raise ValueError("action must be accept or revert")
+            if path == "/api/feedback":                # a link to a pre-filled GitHub issue; the owner submits it there
+                from . import feedback
+                diag = feedback.diagnostics() if body.get("include_diagnostics", True) else None
+                return self._send(200, {"url": feedback.issue_url(body.get("kind"), body.get("title"), body.get("text"), diag)})
             if path == "/api/update":                  # over-the-air updates from GitHub releases
                 from . import update
                 act = body.get("action")
@@ -2106,6 +2195,8 @@ def serve(port=8765, lan=False):
         update_state(busy=False, step="idle", analysis_status={"running": False},
                      suggest_status={"running": False})
     NET["lan"] = bool(lan)
+    from . import mcp
+    mcp.local_key(create=True)                     # lets `subtune mcp` run as this user authenticate
     from . import bundle
     r = bundle.import_pending()                    # settings file copied off a fresh SD card
     if r:

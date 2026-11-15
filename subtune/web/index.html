@@ -210,6 +210,17 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
 .prompt p { margin: 0 0 14px; color: var(--text-2); max-width: 70ch; }
 .beta { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; line-height: 15px; opacity: .85; }
 h2 .beta, h3 .beta { font-size: 10px; }
+.risk { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4;
+  background: color-mix(in srgb, var(--warn, #c98a00) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn, #c98a00) 45%, transparent); }
+.risk b { white-space: nowrap; }
+#terms { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(0, 0, 0, .55); }
+#terms[hidden] { display: none; }
+#terms .box { background: var(--card, #fff); color: inherit; max-width: 620px; width: 100%; max-height: calc(100vh - 32px); overflow: auto;
+  border-radius: 14px; padding: 22px 24px; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); }
+#terms h2 { margin: 0 0 10px; }
+#terms ul { padding-left: 20px; margin: 10px 0 14px; }
+#terms li { margin: 6px 0; }
 #sideNav .beta, #subNav .beta { font-size: 8.5px; padding: 0 3px; margin-left: 4px; line-height: 13px; flex: none; }
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 32px)); pointer-events: none; }
 .toast { pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--accent);
@@ -906,6 +917,35 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       </details>
     </section>
 
+    <!-- FEEDBACK -->
+    <section class="card" id="fbCard">
+      <div class="card-h"><h2>Report a bug or send feedback</h2></div>
+      <p class="muted" style="margin-top:0">This opens a new issue on htTamer's GitHub page, filled in with what you write here. You check it there and press <b>Submit new issue</b> (a free GitHub account is needed). htTamer doesn't send anything by itself.</p>
+      <div class="row" style="align-items:end">
+        <label class="f" style="width:auto">Kind<select id="fbKind"><option value="bug">Bug: something went wrong</option><option value="feedback">Feedback or an idea</option></select></label>
+        <label class="f" style="flex:1;min-width:220px">Title<input id="fbTitle" maxlength="120" placeholder="A short summary (optional)"></label>
+      </div>
+      <label class="f" style="width:100%;margin-top:8px"><span id="fbTextL">What happened, and what did you expect?</span><textarea id="fbText" rows="6" style="width:100%"></textarea></label>
+      <label class="cb" style="margin-top:8px"><input type="checkbox" id="fbDiag" checked><span>Include diagnostics<small>htTamer's version, Windows or Pi, receiver model, miniDSP slot and recent errors. No IP addresses, keys or names.</small></span></label>
+      <details style="margin-top:8px"><summary class="small">See the diagnostics</summary><pre class="small" id="fbDiagText" style="white-space:pre-wrap">Loading…</pre><button class="btn ghost" id="fbCopy">Copy diagnostics</button></details>
+      <div class="row" style="margin-top:12px"><span class="grow"></span><span class="muted small" id="fbMsg"></span><button class="btn primary" id="fbGo">Open on GitHub</button></div>
+    </section>
+
+    <!-- MCP: outside AI clients -->
+    <section class="card" id="mcpCard">
+      <div class="card-h"><h2>Connect an AI client (MCP)</h2></div>
+      <p class="muted" style="margin-top:0">MCP lets an AI app you already use, such as Claude Desktop or Claude Code, work with htTamer: read the state, results and plan, and (if you allow it) run tests and change things, with the same tools as htTamer's own assistant. It runs on your AI app's account, not htTamer's API key.</p>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="mcpOn"><span>Let AI clients connect<small>Off by default. While off, htTamer answers no MCP requests.</small></span></label>
+      <label class="f" style="width:auto;margin-top:8px">Actions (tests that play sound, writing the miniDSP or the receiver)
+        <select id="mcpAct">
+          <option value="0">Off: the AI client can only read</option>
+          <option value="1">Ask me each time (recommended)</option>
+          <option value="2">My AI client asks me before each tool</option>
+        </select></label>
+      <p class="muted small" id="mcpActNote" style="margin:6px 0 0"></p>
+      <div id="mcpHow" style="margin-top:12px"></div>
+    </section>
+
     <!-- MANUAL -->
     <section class="card" id="manCard">
       <div class="card-h"><h2>Manual</h2><span class="grow"></span><a class="btn ghost" href="/manual" target="_blank" rel="noopener">Open in a new tab</a></div>
@@ -1191,6 +1231,15 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   </form>
 </aside>
 <div id="store" hidden></div>
+<div id="terms" hidden role="dialog" aria-modal="true" aria-labelledby="termsTitle">
+  <div class="box">
+    <h2 id="termsTitle">Before you start</h2>
+    <ul id="termsPoints"></ul>
+    <p class="small muted" style="margin:0 0 12px">Full wording: the <a href="/manual#m-safety" target="_blank" rel="noopener">Safety and responsibility</a> part of the manual and the license (LICENSE.md).</p>
+    <label class="cb"><input type="checkbox" id="termsOk"><span id="termsCb"></span></label>
+    <div class="row" style="margin-top:14px"><span class="grow"></span><span class="muted small" id="termsMsg"></span><button class="btn primary" id="termsGo" disabled>Accept and continue</button></div>
+  </div>
+</div>
 <script src="/js/core.js?v=__V__"></script>
 <script src="/js/tune.js?v=__V__"></script>
 <script src="/js/room-ai.js?v=__V__"></script>

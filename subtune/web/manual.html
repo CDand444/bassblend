@@ -1,5 +1,6 @@
 <!-- htTamer manual: shown on the Manual page and at /manual. Plain HTML fragment. -->
 <nav class="man-toc" aria-label="Contents">
+  <a href="#m-safety">Safety and responsibility</a>
   <a href="#m-what">What htTamer does</a>
   <a href="#m-around">Getting around</a>
   <a href="#m-setup">First-time setup</a>
@@ -12,13 +13,27 @@
   <a href="#m-treatment">Room treatment</a>
   <a href="#m-play">How tests play through the receiver</a>
   <a href="#m-assistant">The assistant</a>
+  <a href="#m-mcp">Using htTamer from another AI app (MCP)</a>
   <a href="#m-dirac">Dirac Live</a>
   <a href="#m-updates">Updates</a>
+  <a href="#m-feedback">Bugs and feedback</a>
   <a href="#m-safety">Safety</a>
   <a href="#m-trouble">When something goes wrong</a>
   <a href="#m-words">Words used in the app</a>
   <a href="#m-license">License</a>
 </nav>
+
+<h2 id="m-safety">Safety and responsibility</h2>
+<div class="risk" role="note"><b>⚠ Use at your own risk.</b><span>htTamer is provided "as is", without warranty of any kind, under the PolyForm Noncommercial License 1.0.0. The htTamer authors are not liable for damage to equipment, property or hearing, or for any other loss, however it is caused.</span></div>
+<p>htTamer plays test tones, sweeps and noise through your receiver, speakers and subwoofers, changes the receiver's volume and input, and writes settings to your miniDSP. Loud sound, low bass especially, can damage speakers, subwoofers, amplifiers and hearing.</p>
+<ul>
+  <li><b>Start low.</b> Begin with the receiver volume low. The automatic level setting never goes above its ceiling (70 at most) and always puts your volume back afterwards, but you are responsible for what your system can take.</li>
+  <li><b>Stay safe during loud tests.</b> The sub headroom test plays loud bass on purpose. Keep people and pets out of the room, and press <b>Stop</b> at the first sign of strain: distortion, rattling, chuffing ports, or a smell of heat.</li>
+  <li><b>Check results by ear.</b> Settings are calculated from measurements and can be wrong (a moved mic, a noisy room, a cable on the wrong input). Listen before you rely on a change.</li>
+  <li><b>Your original stays put.</b> htTamer never writes miniDSP slot 1, so your own setup is always one switch away.</li>
+  <li><b>Not affiliated.</b> htTamer isn't made, endorsed or supported by Onkyo, Denon, Marantz, JBL, miniDSP, Dirac or any other company whose products it works with.</li>
+</ul>
+<p>The first time htTamer opens on a device it shows these terms and won't change anything until they're accepted. Pages that play sound or write the miniDSP carry a reminder at the top.</p>
 
 <h2 id="m-what">What htTamer does</h2>
 <p>htTamer tunes the subwoofers of a home theater. The receiver's subwoofer output goes into a <b>miniDSP 2x4HD</b>, which feeds each sub. htTamer measures every sub with a <b>UMIK-1</b> mic at your seats and works out a gain, a delay, a polarity and EQ filters for each sub. It then writes them into one of the miniDSP's four slots.</p>
@@ -155,12 +170,25 @@
 <h2 id="m-assistant">The assistant</h2>
 <p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It can read the room treatment plan, explain it and adjust it to your budget, looks and the walls you can't treat, and record what you've put up. It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
 
+<h2 id="m-mcp">Using htTamer from another AI app (MCP)</h2>
+<p><b>Tools → MCP</b> lets an AI app you already use, such as Claude Desktop or Claude Code, work with htTamer through MCP (the Model Context Protocol). It gets the same tools as htTamer's own assistant: it can read the state, results, journal, plan and reports, and, if you allow it, run tests and change things. It runs on your AI app's account, not on htTamer's API key, and htTamer has to be running while you use it.</p>
+<ul>
+<li><b>Let AI clients connect</b> turns it on. It's off until you turn it on; while off, htTamer answers no MCP requests and its MCP command won't start.</li>
+<li><b>Every connection needs a credential</b>, even from the computer htTamer runs on. <b>Make a token</b> creates an access token: it's shown once, so copy it then (htTamer keeps only a fingerprint of it). <b>Make a new token</b> replaces it and <b>Revoke the token</b> cuts off every app using it. The MCP command for Claude Desktop and Claude Code, run as you on the computer htTamer runs on, uses a private key htTamer keeps in its config folder instead, so it needs no token; HTTP clients and a Pi reached over ssh need the token.</li>
+<li><b>Actions</b> decides what happens with tools that play sound or change the miniDSP or receiver (tests, applying a tune, switching slots, receiver controls, fixes). <b>Off</b>: the AI app can only read. <b>Ask me each time</b> (recommended): before each one, htTamer asks you in the AI app with the same one-line description the assistant uses; apps that can't ask (they lack MCP "elicitation") are refused. <b>My AI client asks me</b>: htTamer relies on the AI app's own permission prompt, so don't set that app to allow htTamer's tools automatically.</li>
+<li>The rules don't change: slot 1 (your original) is never written, the receiver volume can only be lowered (tests set it with their guarded auto-level and put it back), and API keys, tokens and the PIN are never sent to the AI app.</li>
+</ul>
+<p><b>Connecting.</b> The page shows the exact text to copy. For Claude Desktop, add it to <code>claude_desktop_config.json</code> (Settings → Developer → Edit Config) and restart it. For Claude Code, run the <code>claude mcp add</code> line it shows. The app starts htTamer's <code>mcp</code> command, which passes each request to the running dashboard. On a Pi the AI app on your computer starts that command over ssh: set up ssh sign-in with a key first, then save the token on the Pi with the command the page shows (it goes in <code>~/.httamer-mcp-token</code>, readable only by you). Other MCP apps can use the HTTP address <code>/mcp</code> with the header <code>Authorization: Bearer</code> and your token.</p>
+
 <h2 id="m-dirac">Dirac Live</h2>
 <p><b>What makes Dirac out of date:</b> anything that changes the subs' <i>levels or EQ</i> after Dirac measured: a different sub tune, Live EQ bands playing, or Live EQ saved into a tune. Timing-only changes (a blend fix's delay, polarity or phase filter) keep Dirac's correction valid. htTamer asks before a change that would make Dirac out of date, and Home says when it is.</p>
 <p>Order of work: <b>sub tune first</b>, then Dirac Live with htTamer's target curve (the Dirac step gives you the file), then the blend test with Dirac on, then verify and a system report. While Dirac is measuring, close htTamer's level meter and don't start an htTamer test: both use the same mic. A new sub tune means Dirac should be run again.</p>
 
 <h2 id="m-updates">Updates</h2>
 <p><b>Tools → Updates</b> keeps the Windows app and the Pi up to date from htTamer's public GitHub releases, with nothing to set up. htTamer checks once a day and pops up a note when a new version is out; <b>Install</b> does the rest. On Windows the app closes, updates and opens again; on the Pi the update is checked before it's used, and if the new version doesn't start the previous one comes back by itself. Settings, tunes and measurements are always kept. (Following a fork instead? Set its repository there; a private one also needs a read-only token.)</p>
+
+<h2 id="m-feedback">Bugs and feedback</h2>
+<p><b>Tools → Feedback</b> turns a bug report or an idea into a new issue on htTamer's GitHub page. Pick the kind, write what happened (or your idea) and press <b>Open on GitHub</b>: the issue opens already filled in, you check it, and you press <b>Submit new issue</b> there (a free GitHub account is needed). htTamer never sends anything by itself. <b>Include diagnostics</b> adds htTamer's version, Windows or Pi, the receiver model, the miniDSP slot and the latest errors from the activity log, with IP addresses, keys, e-mail addresses and names removed; open <b>See the diagnostics</b> to read exactly what's added, or copy them if they're too long for the link.</p>
 
 <h2 id="m-safety">Safety</h2>
 <ul>

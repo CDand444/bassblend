@@ -88,9 +88,23 @@ const MENU = [
   {grp: 'Tools', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
   {grp: 'Tools', key: 'updates', beta: true, icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
    tag: () => (S.update || {}).newer ? ['new', 'alert'] : null},
+  {grp: 'Tools', key: 'feedback', icon: 'chat', title: 'Feedback', full: 'Report a bug or send feedback', el: $('#fbCard'), tag: () => null},
+  {grp: 'Tools', key: 'mcp', beta: true, icon: 'ai', title: 'MCP', full: 'Connect an AI client (MCP)', el: $('#mcpCard'),
+   tag: () => (S.settings || {}).mcp_enabled ? ['on', ''] : null},
   {grp: 'Tools', key: 'help', icon: 'book', title: 'Manual', full: 'htTamer manual', el: $('#manCard'), tag: () => null},
 ];
 const homeOf = m => m.home || $('#store');
+// Risk banners: pages that play sound or write the miniDSP say so, every time.
+const RISK = {
+  sound: 'Plays test sound through your system. Start with the volume low and press Stop if anything strains. You use htTamer at your own risk.',
+  loud: 'Plays loud bass on purpose to find your subs’ limits. Keep people and pets out of the room and stop at any distortion or rattling. You use htTamer at your own risk.',
+  dsp: 'Writes settings to your miniDSP (never slot 1, which keeps your original). Check every change by ear. You use htTamer at your own risk.',
+};
+const RISKY = {wizard: 'sound', blend: 'sound', liveeq: 'sound', report: 'sound', allspk: 'sound', checkup: 'sound', headroom: 'loud', tunes: 'dsp', filters: 'dsp'};
+MENU.forEach(m => { const r = RISKY[m.key]; if (!r || !m.el || m.el.querySelector(':scope > .risk')) return;
+  const h = m.el.querySelector(':scope > .card-h'); const n = document.createElement('div'); n.className = 'risk'; n.setAttribute('role', 'note');
+  n.innerHTML = `<b>⚠ ${r === 'dsp' ? 'Changes your DSP' : 'Plays sound'}</b><span>${RISK[r]}</span>`;
+  if (h) h.after(n); else m.el.prepend(n); });
 MENU.filter(m => m.beta).forEach(m => { const h = m.el.querySelector('h2'); if (h && !h.querySelector('.beta')) h.insertAdjacentHTML('beforeend', ' <span class="beta" title="New, or not yet proven on every system">Beta</span>'); });
 MENU.forEach(m => { if (m.key !== 'home') homeOf(m).appendChild(m.el); });   // pages wait off-screen until opened
 $('#wizTune').appendChild($('#tuneCard'));                    // auto-tune lives in wizard step 2
@@ -149,6 +163,8 @@ function openSheet(key, fromHash = false) {
   if (!fromHash && location.hash !== '#/' + m.key) history.pushState(null, '', '#/' + m.key);
   if (m.key === 'tunes') loadTunes();
   if (m.key === 'updates') loadUpdates();
+  if (m.key === 'feedback') loadFeedback();
+  if (m.key === 'mcp') loadMcp();
   if (m.key === 'help' && !$('#manBody').dataset.ok && !$('#manBody').dataset.wired) {
     $('#manBody').dataset.wired = '1';        // contents links scroll in place (a #hash would change the page)
     $('#manBody').addEventListener('click', e => { const a = e.target.closest('a[href^="#m-"]'); if (!a) return;
@@ -235,6 +251,7 @@ async function poll() {
   }
   try {
     S = st;
+    safe('terms', () => renderTerms());
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; safe('activity', renderLog); }
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
@@ -293,3 +310,24 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') { poll(); pollLive(); loadAvr(); loadTunes(); chatLoad(); }
 });
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 150); });
+
+// ---------- use-at-your-own-risk terms: shown until accepted on this device (the server refuses actions until then)
+let termsShown = 0;
+function renderTerms() {
+  const T = S.terms, box = $('#terms'); if (!T || !box) return;
+  if (T.accepted) { box.hidden = true; return; }
+  if (termsShown !== T.version) {
+    termsShown = T.version;
+    $('#termsTitle').textContent = T.title;
+    $('#termsPoints').innerHTML = T.points.map(p => `<li>${esc(p)}</li>`).join('');
+    $('#termsCb').textContent = T.checkbox;
+  }
+  box.hidden = false;
+}
+$('#termsOk').onchange = () => { $('#termsGo').disabled = !$('#termsOk').checked; };
+$('#termsGo').onclick = async () => {
+  $('#termsGo').disabled = true;
+  const r = await post('/api/terms', {accept: true, version: (S.terms || {}).version});
+  if (r.error) { $('#termsMsg').textContent = r.error; $('#termsGo').disabled = false; return; }
+  S.terms = r; $('#terms').hidden = true; poll();
+};

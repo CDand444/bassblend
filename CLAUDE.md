@@ -16,6 +16,10 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     (`build_executors`)
   - `cli.py`: every job command (`apply`, `avrblend`, `deepcheck`, `fixup`, `liveeq`, `smoke`, …).
     SIGTERM (Stop) raises SystemExit so each job's `finally` restores the receiver
+  - `mcp.py`: MCP server exposing the assistant's tools (`/mcp` on the dashboard; `subtune mcp` is a stdio
+    bridge to it that asks the owner via elicitation). Settings `mcp_enabled`, `mcp_actions` (0 off, 1 ask, 2 client).
+    Every /mcp request needs a credential, local ones too: MCP token (hash in config `mcp.json`), local key
+    (`mcp-local.key`, used by `subtune mcp` as the same user) or a session cookie
   - `assistant.py`: assistant system prompt, tool schemas (`_t`), approval descriptions;
     `ai.py`: providers (Anthropic, OpenAI, Gemini, local OpenAI-compatible)
   - DSP: `dsp.py` (minidsp-rs wrapper + device lock), `biquad.py` (RBJ, DSP_FS = 48 kHz;

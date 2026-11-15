@@ -19,6 +19,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -28,6 +29,7 @@ API = "https://api.github.com"
 DEFAULT_REPO = "danand444/bassblend"          # htTamer's public releases
 PI_UPDATER = Path("/usr/local/sbin/bassblend-update")
 CHECK_EVERY_S = 24 * 3600
+CHECK_TIMEOUT_S = 30                          # a whole update check gives up after this
 
 
 def mode() -> str:
@@ -96,6 +98,27 @@ def _req(url, accept="application/vnd.github+json", timeout=20):
     return urllib.request.urlopen(urllib.request.Request(url, headers=h), timeout=timeout)
 
 
+def _latest_release(repo, timeout=None) -> dict:
+    """GET releases/latest with a deadline for the WHOLE request (urlopen's timeout is per socket step)."""
+    timeout = timeout or CHECK_TIMEOUT_S
+    box = {}
+
+    def run():
+        try:
+            with _req(f"{API}/repos/{repo}/releases/latest", timeout=timeout) as r:
+                box["rel"] = json.loads(r.read())
+        except BaseException as e:                     # noqa: BLE001 - handed to the caller
+            box["err"] = e
+    t = threading.Thread(target=run, daemon=True, name="update-check")
+    t.start()
+    t.join(timeout)
+    if t.is_alive():
+        raise TimeoutError(f"GitHub didn't answer within {timeout} seconds")
+    if "err" in box:
+        raise box["err"]
+    return box["rel"]
+
+
 def check() -> dict:
     """Ask GitHub for the latest release. Stores and returns {current, latest, newer, notes, url, t, error}."""
     from . import version
@@ -107,8 +130,7 @@ def check() -> dict:
     repo = repo_name(s)
     out["repo"] = repo
     try:
-        with _req(f"{API}/repos/{repo}/releases/latest") as r:
-            rel = json.loads(r.read())
+        rel = _latest_release(repo)
         out.update(latest=rel.get("tag_name"), notes=(rel.get("body") or "")[:2000], published=rel.get("published_at"),
                    assets=[{"name": a["name"], "id": a["id"], "size": a["size"]} for a in rel.get("assets") or []])
         a, b = parse_version(cur), parse_version(out["latest"] or "")
@@ -118,10 +140,28 @@ def check() -> dict:
                         "GitHub refused: if the repository is private, add a read-only token" if e.code in (401, 403, 404) and not token()
                         else "GitHub's hourly limit for anonymous checks was reached; try again later" if e.code == 403
                         else f"GitHub said {e.code}: check the repository name" + (" and the token" if token() else ""))
+    except TimeoutError:
+        out["error"] = f"GitHub didn't answer within {CHECK_TIMEOUT_S:g} seconds; try again later"
     except OSError as e:
         out["error"] = f"Couldn't reach GitHub ({e.__class__.__name__})"
     update_state(update=out)
     return out
+
+
+def last_check(last=None):
+    """The stored check, compared against the version running NOW: after an update installs, a check
+    saved by the old version would otherwise keep offering the release that's already installed."""
+    from . import version
+    if last is None:
+        from .state import load_state
+        last = load_state().get("update")
+    if not last:
+        return last
+    cur = version()
+    if last.get("current") == cur:
+        return last
+    a, b = parse_version(cur), parse_version(last.get("latest") or "")
+    return {**last, "current": cur, "newer": bool(b and (a is None or b > a))}
 
 
 def _download(url, dest: Path, accept):

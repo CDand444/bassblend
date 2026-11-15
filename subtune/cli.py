@@ -525,6 +525,14 @@ def cmd_serve(a):
     serve(a.port, lan=a.lan)
 
 
+def cmd_mcp(a):
+    """MCP over stdio for local AI clients; the tools run in the dashboard (it must be running)."""
+    from .mcp import serve_stdio
+    rc = serve_stdio(a.port, a.url, a.token_file)
+    if rc:
+        sys.exit(rc)
+
+
 def cmd_set_pin(a):
     """Choose the PIN that protects the dashboard in network mode."""
     import getpass
@@ -657,6 +665,12 @@ def main(argv=None):
     s = sp.add_parser("serve"); s.add_argument("--port", type=int, default=8765)
     s.add_argument("--lan", action="store_true", help="serve your home network (needs a PIN, see set-pin)")
     s.set_defaults(fn=cmd_serve)
+    s = sp.add_parser("mcp", help="MCP server on stdin/stdout for AI clients (forwards to the running dashboard)")
+    s.add_argument("--port", type=int, default=8765, help="the dashboard's port on this computer")
+    s.add_argument("--url", help="the dashboard's /mcp address (default http://127.0.0.1:<port>/mcp)")
+    s.add_argument("--token-file", help="file holding the MCP token (used after $HTTAMER_MCP_TOKEN; then "
+                   "~/.httamer-mcp-token, else this user's local key)")
+    s.set_defaults(fn=cmd_mcp)
     s = sp.add_parser("set-pin", help="set the dashboard PIN for network mode")
     s.add_argument("--stdin", action="store_true", help="read the PIN from standard input (for setup scripts)")
     s.set_defaults(fn=cmd_set_pin)

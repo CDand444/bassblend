@@ -454,7 +454,10 @@ async function loadUpdates() {
   if (UPD.mode === 'pi' && UPD.result) h += `<details style="margin-top:10px"><summary class="small">Last update on this Pi</summary><pre class="small" style="white-space:pre-wrap">${esc(UPD.result)}</pre></details>`;
   $('#updOut').innerHTML = h;
   $('#updSetup').hidden = UPD.mode === 'dev';
-  const c = $('#updCheck'); if (c) c.onclick = async () => { c.disabled = true; c.textContent = 'Checking…'; const r = await post('/api/update', {action: 'check'}); if (r.error && !r.t) alert(r.error); await poll(); loadUpdates(); };
+  const c = $('#updCheck'); if (c) c.onclick = async () => { c.disabled = true; c.textContent = 'Checking…';
+    let r; try { r = await fetch('/api/update', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action: 'check'}), signal: AbortSignal.timeout(35000)}).then(x => x.json()); }
+    catch (e) { r = {error: 'The update check timed out (30 seconds). Check the internet connection and try again.'}; }
+    if (r.error) toast('Update check failed', r.error, 'bad'); await poll(); loadUpdates(); };
   const i = $('#updInstall'); if (i) i.onclick = async () => {
     if (!confirm(`Install ${L.latest}?\n\n${UPD.mode === 'windows' ? 'htTamer closes, the installer updates it, and it opens again in about a minute.' : 'The Pi installs it and restarts htTamer (about a minute). If the new version doesn\'t start, the old one comes back by itself.'} Your settings, tunes and measurements are kept.`)) return;
     i.disabled = true; i.textContent = 'Downloading…';
@@ -469,4 +472,25 @@ $('#updSave').onclick = async () => {
   const r = await post('/api/update', b);
   $('#updMsg').textContent = r.error || 'Saved.'; $('#updToken').value = '';
   if (!r.error) { updInit = false; await post('/api/update', {action: 'check'}); await poll(); loadUpdates(); }
+};
+
+// ---------- bug reports and feedback: a pre-filled GitHub issue the owner submits themselves
+let FB = null;
+async function loadFeedback() {
+  try { FB = await fetch('/api/feedback').then(r => r.json()); } catch (e) { FB = null; }
+  $('#fbDiagText').textContent = FB ? FB.diagnostics : 'Couldn’t read the diagnostics.';
+}
+$('#fbKind').onchange = () => { $('#fbTextL').textContent = $('#fbKind').value === 'bug' ? 'What happened, and what did you expect?' : 'Your feedback or idea'; };
+$('#fbCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('#fbDiagText').textContent); toast('Diagnostics copied', 'Paste them into the issue on GitHub if you need more than fits.', 'good'); }
+  catch (e) { toast('Couldn’t copy', 'Select the text and copy it by hand.', 'bad'); }
+};
+$('#fbGo').onclick = async () => {
+  const text = $('#fbText').value.trim();
+  if (!text) { $('#fbMsg').textContent = 'Write something first.'; $('#fbText').focus(); return; }
+  const w = window.open('', '_blank');               // open now (a click), fill in once the link is ready: popup blockers allow it
+  const r = await post('/api/feedback', {kind: $('#fbKind').value, title: $('#fbTitle').value, text, include_diagnostics: $('#fbDiag').checked});
+  if (r.error || !r.url) { if (w) w.close(); $('#fbMsg').textContent = r.error || 'Couldn’t make the link.'; return; }
+  if (w) { w.opener = null; w.location = r.url; } else location.href = r.url;
+  $('#fbMsg').textContent = 'Opened on GitHub: check it and press Submit new issue there.';
 };

@@ -1,0 +1,16 @@
+name: Feedback or idea
+description: Something that could be better, or a feature you'd like.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Your feedback
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Filled in by htTamer (Tools → Feedback), if you chose to include it.
+      render: text

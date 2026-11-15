@@ -419,3 +419,48 @@ async function renderHwdb(force) {
 }
 $('#hwOn').onchange = async () => { const r = await post('/api/settings', {ai_hwdb: $('#hwOn').checked ? 1 : 0}); if (r.error) alert(r.error); poll(); };
 setInterval(() => renderHwdb(), 4000);
+
+// ---------- MCP: outside AI clients (Claude Desktop, Claude Code, ...) use htTamer's tools
+let MCP = null, mcpNewToken = null;          // a new token lives only in this page
+const MCP_NOTE = ['The AI client can read everything but every test, miniDSP write and receiver change is refused.',
+  'Before each test or change, htTamer asks you in your AI app (it needs an app that supports MCP questions, "elicitation"; others are refused, so pick the next option for them).',
+  'htTamer relies on your AI app asking you before it runs a tool. Don\'t set that app to allow htTamer\'s tools automatically: they can play sound.'];
+const shq = a => /^[\w@%+=:,./-]+$/.test(a) ? a : `"${a}"`;      // quote paths with spaces or backslashes (cmd, PowerShell and sh all read "...")
+async function loadMcp() {
+  try { MCP = await fetch('/api/mcp').then(r => r.json()); } catch (e) { MCP = null; }
+  if (!MCP) { $('#mcpHow').innerHTML = '<p class="muted">Couldn’t read the MCP settings.</p>'; return; }
+  $('#mcpOn').checked = MCP.enabled; $('#mcpAct').value = String(MCP.actions); $('#mcpAct').disabled = !MCP.enabled;
+  $('#mcpActNote').textContent = MCP_NOTE[MCP.actions] || '';
+  const env = MCP.env || {}, srv = {command: MCP.command, args: MCP.args};
+  if (Object.keys(env).length) srv.env = env;
+  const desk = JSON.stringify({mcpServers: {httamer: srv}}, null, 2);
+  const code = `claude mcp add httamer${Object.entries(env).map(([k, v]) => ' -e ' + shq(k + '=' + v)).join('')} -- ${[MCP.command, ...MCP.args].map(shq).join(' ')}`;
+  const blk = (id, title, text, note) => `<h3 style="margin:14px 0 4px;font-size:14px">${title}</h3>${note ? `<p class="muted small" style="margin:0 0 4px">${note}</p>` : ''}<pre class="small" id="${id}" style="white-space:pre-wrap;word-break:break-all">${esc(text)}</pre><button class="btn ghost" data-mcpcopy="${id}">Copy</button>`;
+  let h = MCP.enabled ? '' : '<p class="muted">Turn on <b>Let AI clients connect</b> first; the settings below then work.</p>';
+  h += `<p class="small" style="margin:0">${MCP.tools} tools, the same as htTamer's assistant. htTamer must be running while the AI app uses it.</p>`;
+  // the token: needed by every HTTP client and by a Pi reached over ssh; shown once, right after it's made
+  const tokDate = MCP.created ? new Date(MCP.created * 1000).toLocaleString() : '';
+  h += `<h3 style="margin:14px 0 4px;font-size:14px">Access token</h3><p class="muted small" style="margin:0 0 6px">Every MCP connection needs a credential, even from this computer. ${MCP.pi ? 'An AI app on another computer needs this token.' : 'The Claude Desktop and Claude Code settings below run as you on this computer and use a private key htTamer keeps for that, so they need no token; HTTP clients do.'} htTamer keeps only a fingerprint of the token, so it's shown once: copy it when you make it. Making a new one stops the old one.</p>`;
+  h += mcpNewToken ? blk('mcpTok', 'Your new token (shown once)', mcpNewToken, 'Copy it now and keep it private, like a password.')
+    : `<p class="small" style="margin:0 0 6px">${MCP.has_token ? 'A token exists (made ' + esc(tokDate) + ').' : 'No token yet.'}</p>`;
+  h += `<div class="row" style="margin-top:6px"><button class="btn ghost" id="mcpTokNew">${MCP.has_token ? 'Make a new token' : 'Make a token'}</button>${MCP.has_token ? '<button class="btn ghost" id="mcpTokDel">Revoke the token</button>' : ''}</div>`;
+  const tok = mcpNewToken || '<token>';
+  if (MCP.pi) h += blk('mcpPiTok', 'Put the token on the Pi (once)', `ssh ${MCP.args[0]} 'install -m 600 /dev/stdin ~/.httamer-mcp-token'`,
+    'Your AI app reaches this Pi over ssh, so set up ssh sign-in with a key from that computer first (change the address if your Pi has a different user or name). Run this on that computer, paste the token, press Enter, then Ctrl+D. htTamer\'s MCP command reads it from there.');
+  h += blk('mcpDesk', 'Claude Desktop', desk, 'Settings → Developer → Edit Config, add this to <code>claude_desktop_config.json</code> (merge it with any <code>mcpServers</code> already there), then restart Claude Desktop.');
+  h += blk('mcpCode', 'Claude Code', code, 'Run this in a terminal on the computer where you use Claude Code.');
+  h += blk('mcpHttp', 'Other MCP clients (streamable HTTP)', `${MCP.url}\nAuthorization: Bearer ${tok}`, 'Address and header. For Claude Code over HTTP: <code>claude mcp add --transport http httamer ' + esc(MCP.url) + ' --header "Authorization: Bearer ' + esc(tok) + '"</code>');
+  $('#mcpHow').innerHTML = h;
+  $('#mcpHow').querySelectorAll('[data-mcpcopy]').forEach(b => b.onclick = async () => {
+    try { await navigator.clipboard.writeText($('#' + b.dataset.mcpcopy).textContent); toast('Copied', '', 'good'); }
+    catch (e) { toast('Couldn’t copy', 'Select the text and copy it by hand.', 'bad'); } });
+  $('#mcpTokNew').onclick = async () => {
+    if (MCP.has_token && !confirm('Make a new MCP token? The old one stops working, so AI apps using it must be given the new one.')) return;
+    const r = await post('/api/mcp', {action: 'new_token'}); if (r.error) { alert(r.error); return; }
+    mcpNewToken = r.token; loadMcp(); };
+  const del = $('#mcpTokDel'); if (del) del.onclick = async () => {
+    if (!confirm('Revoke the MCP token? AI apps using it are cut off.')) return;
+    const r = await post('/api/mcp', {action: 'revoke'}); if (r.error) alert(r.error); mcpNewToken = null; loadMcp(); };
+}
+$('#mcpOn').onchange = async () => { const r = await post('/api/settings', {mcp_enabled: $('#mcpOn').checked ? 1 : 0}); if (r.error) alert(r.error); await poll(); loadMcp(); };
+$('#mcpAct').onchange = async () => { const r = await post('/api/settings', {mcp_actions: Number($('#mcpAct').value)}); if (r.error) alert(r.error); await poll(); loadMcp(); };
