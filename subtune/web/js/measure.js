@@ -128,7 +128,7 @@ function renderLimiters() {
   if (!outs.length) { $('#limOut').innerHTML = ''; return; }
   const usable = outs.filter(o => props[o].threshold_db != null);
   const on = Object.keys(sv).length;
-  $('#limOut').innerHTML = `<div class="card-h" style="margin:0 0 6px"><h3 style="margin:0;font-size:14px">Protective limiters</h3>
+  $('#limOut').innerHTML = `<div class="card-h" style="margin:0 0 6px"><h3 style="margin:0;font-size:14px">Protective limiters <span class="beta">Beta</span></h3>
       <span class="sub">${on ? `${on} on` : 'off'}</span><span class="grow"></span>
       ${on ? '<button class="btn ghost" id="limOff">Switch off</button>' : ''}
       <button class="btn primary" id="limSet" ${usable.length && !job.running && !S.busy ? '' : 'disabled'}>${on ? 'Update from the latest test' : 'Set limiters'}</button></div>
@@ -450,7 +450,7 @@ function renderDeep() {
   <details style="margin-top:12px" class="dc-gloss"><summary class="muted small" style="cursor:pointer">What these words mean</summary><dl>
     <dt>Room resonance (mode)</dt><dd>A pitch where sound bouncing between walls reinforces itself: those bass notes are louder and ring longer. EQ fixes peaks well.</dd>
     <dt>Cancellation (null, dip)</dt><dd>Sound arriving by two paths cancels at your seat. EQ can't fill it; moving the seat, subs or speakers can.</dd>
-    <dt>Polarity</dt><dd>Whether a speaker cone pushes or pulls on the same signal. Both fronts must match or bass and the centre image suffer.</dd>
+    
     <dt>Early reflection</dt><dd>A bounce off a nearby surface (floor, table, side wall) arriving a few milliseconds after the direct sound. Strong ones blur the image.</dd>
     <dt>RT60</dt><dd>How long a sound takes to fade by 60 dB. Too long: echoey and boomy. Too short: dead and closed-in.</dd>
     <dt>Distortion (THD)</dt><dd>Extra tones the system adds that weren't in the signal. Rattles and straining drivers show up here.</dd>

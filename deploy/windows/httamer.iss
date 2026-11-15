@@ -24,6 +24,8 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 WizardStyle=modern
 UninstallDisplayName=htTamer
+CloseApplications=force
+RestartApplications=no
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Shortcuts:"
@@ -39,3 +41,5 @@ Name: "{userdesktop}\htTamer"; Filename: "{app}\htTamer.exe"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\htTamer.exe"; Description: "Start htTamer now"; Flags: nowait postinstall skipifsilent
+; an in-app update runs the installer silently: start htTamer again afterwards
+Filename: "{app}\htTamer.exe"; Flags: nowait runasoriginaluser; Check: WizardSilent

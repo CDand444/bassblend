@@ -201,6 +201,8 @@ function renderLive(L) {
     document.querySelectorAll('#inputSeg button').forEach(b => {
       b.classList.toggle('on', (b.dataset.in === 'usb') === isUsb);
       b.disabled = !!(L.paused || (S.job || {}).running || S.busy);
+      b.title = b.dataset.in === 'usb' ? (isUsb && L.usb_hold_s ? `On USB: back to the receiver in ${Math.ceil(L.usb_hold_s / 60)} min` : isUsb ? 'On USB for a measurement; back to the receiver when it finishes' : 'Listen to this computer (switches back to the receiver after 10 minutes)')
+        : "The subs play the receiver's bass (normal)";
     });
   }
   const row = (n, v) => { const pct = Math.max(0, Math.min(100, v + 100)), col = v > -6 ? 'var(--bad)' : v > -20 ? 'var(--warn)' : 'var(--good)';

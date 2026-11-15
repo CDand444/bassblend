@@ -57,18 +57,18 @@ const MENU = [
    tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
      const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
   {grp: 'Survey', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
-  {grp: 'Survey', key: 'treatment', icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
+  {grp: 'Survey', key: 'treatment', beta: true, icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
    tag: () => { const t = S.treatment; if (!t) return null; const n = t.items.filter(i => i.tier === 1 && !i.installed && !i.blocked).length; return n ? [String(n), ''] : ['✓', '']; }},
   {grp: 'Tune', key: 'wizard', icon: 'wand', title: 'Tune my system', full: 'Tune my system', el: $('#wizCard'), tag: () => null},
   {grp: 'Tune', key: 'tunes', icon: 'tunes', title: 'Tunes & slots', full: 'Saved tunes & DSP slots', el: $('#tunesCard'),
    tag: () => liveMaster ? [`slot ${liveMaster.preset + 1}`, ''] : null},
   {grp: 'Tune', key: 'blend', icon: 'avr', title: 'Blend test', full: 'Blend the subs with your speakers', el: $('#blendCard'), home: $('#wizBlend'),
    tag: () => (S.avr_blend_status || {}).running ? ['…', ''] : S.avr_blend ? [S.avr_blend.loss_now_db < 1 ? '✓' : '!', S.avr_blend.loss_now_db < 1 ? '' : 'alert'] : null},
-  {grp: 'Tune', key: 'liveeq', icon: 'eq', title: 'Live EQ', full: 'Live EQ', el: $('#leqCard'),
+  {grp: 'Tune', key: 'liveeq', beta: true, icon: 'eq', title: 'Live EQ', full: 'Live EQ', el: $('#leqCard'),
    tag: () => (S.live_rta_status || {}).running ? ['● live', 'live'] : (S.live_eq || {}).active ? [(S.live_eq || {}).bypass ? 'bypassed' : 'on', ''] : null},
   {grp: 'Verify', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
-  {grp: 'Verify', key: 'allspk', icon: 'speakers', title: 'Speaker check', full: 'Speaker levels, distances and LFE', el: $('#allCard'), tag: () => null},
+  {grp: 'Verify', key: 'allspk', beta: true, icon: 'speakers', title: 'Speaker check', full: 'Speaker levels, distances and LFE', el: $('#allCard'), tag: () => null},
   {grp: 'Verify', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
      const bad = Object.values(c.verdicts).filter(v => v.status !== 'good').length; return bad ? [String(bad), 'alert'] : ['✓', '']; }},
@@ -81,23 +81,24 @@ const MENU = [
   {grp: 'Tools', key: 'spl', icon: 'spl', title: 'Level meter', full: 'Sound level meter', el: $('#splCard'),
    tag: () => splState.running ? [`● ${splState.reading ? splState.reading.c.toFixed(0) + ' dB' : 'live'}`, 'live'] : null},
   {grp: 'Tools', key: 'levels', icon: 'meters', title: 'DSP meters', full: 'Live DSP meters', el: card('#meters'), tag: () => null},
-  {grp: 'Tools', key: 'manual', icon: 'manual', title: 'Manual steps', full: 'Manual steps', el: $('#manualCard'), tag: () => null},
   {grp: 'Tools', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
    tag: () => (S.analysis_status || {}).running || (S.suggest_status || {}).running ? ['…', ''] : null},
   {grp: 'Tools', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
    tag: () => { const e = events.filter(x => x.kind === 'error' && x.t > seenErrors).length; return e ? [String(e), 'alert'] : null; }},
   {grp: 'Tools', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
+  {grp: 'Tools', key: 'updates', beta: true, icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
+   tag: () => (S.update || {}).newer ? ['new', 'alert'] : null},
   {grp: 'Tools', key: 'help', icon: 'book', title: 'Manual', full: 'htTamer manual', el: $('#manCard'), tag: () => null},
 ];
 const homeOf = m => m.home || $('#store');
+MENU.filter(m => m.beta).forEach(m => { const h = m.el.querySelector('h2'); if (h && !h.querySelector('.beta')) h.insertAdjacentHTML('beforeend', ' <span class="beta" title="New, or not yet proven on every system">Beta</span>'); });
 MENU.forEach(m => { if (m.key !== 'home') homeOf(m).appendChild(m.el); });   // pages wait off-screen until opened
 $('#wizTune').appendChild($('#tuneCard'));                    // auto-tune lives in wizard step 2
-$('#manualCard').open = true;
 let sheetKey = 'home', lastInSection = {};
 try { lastInSection = JSON.parse(localStorage.getItem('httamer-last') || '{}') || {}; } catch (e) {}
 const safeTag = m => { try { return m.tag(); } catch (e) { return null; } };
 const navBtn = (m, cls = '') => { const t = safeTag(m);
-  return `<button type="button" data-k="${m.key}" class="${cls}${m.key === sheetKey ? ' on' : ''}" ${m.key === sheetKey ? 'aria-current="page"' : ''} title="${esc(m.full)}">${icon(m.icon)}<span class="lbl">${esc(m.title)}</span>${t ? `<span class="tag ${t[1]}">${esc(t[0])}</span>` : ''}</button>`; };
+  return `<button type="button" data-k="${m.key}" class="${cls}${m.key === sheetKey ? ' on' : ''}" ${m.key === sheetKey ? 'aria-current="page"' : ''} title="${esc(m.full)}">${icon(m.icon)}<span class="lbl">${esc(m.title)}</span>${m.beta ? '<span class="beta" title="New, or not yet proven on every system">Beta</span>' : ''}${t ? `<span class="tag ${t[1]}">${esc(t[0])}</span>` : ''}</button>`; };
 function renderMenu() {
   const cur = MENU.find(x => x.key === sheetKey) || MENU[0];
   // side bar: every page, grouped by section
@@ -141,12 +142,13 @@ function openSheet(key, fromHash = false) {
   $('#homeView').hidden = m.key !== 'home';
   if (m.key !== 'home' && !$('#viewBody').contains(m.el)) { $('#viewBody').innerHTML = ''; $('#viewBody').appendChild(m.el); }
   if (m.key === 'home') $('#viewBody').innerHTML = '';
-  $('#viewTitle').textContent = m.key === 'home' ? 'Home' : (m.full || m.title);
+  $('#viewTitle').innerHTML = esc(m.key === 'home' ? 'Home' : (m.full || m.title)) + (m.beta ? ' <span class="beta" title="New, or not yet proven on every system">Beta</span>' : '');
   $('#viewCrumb').textContent = m.key === 'home' ? '' : m.grp;
   document.title = m.key === 'home' ? 'htTamer' : `${m.title} · htTamer`;
   if (m.key === 'activity') { seenErrors = Date.now() / 1000; try { localStorage.setItem('subtune-seen-errors', String(seenErrors)); } catch (e) {} }
   if (!fromHash && location.hash !== '#/' + m.key) history.pushState(null, '', '#/' + m.key);
   if (m.key === 'tunes') loadTunes();
+  if (m.key === 'updates') loadUpdates();
   if (m.key === 'help' && !$('#manBody').dataset.ok && !$('#manBody').dataset.wired) {
     $('#manBody').dataset.wired = '1';        // contents links scroll in place (a #hash would change the page)
     $('#manBody').addEventListener('click', e => { const a = e.target.closest('a[href^="#m-"]'); if (!a) return;
@@ -182,6 +184,44 @@ function safe(name, fn) {
   }
 }
 let polling = false;
+// every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
+(() => {
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'receiver.js': 'renderBlend',
+                'measure.js': 'renderDeep', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
+  const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
+  if (missing.length) {
+    console.error('[htTamer] scripts that failed to load:', missing);
+    post('/api/client-error', {where: 'page load', message: 'scripts failed to load: ' + missing.join(', '), page: location.hash}).catch(() => {});
+    setTimeout(() => toast('Part of the page failed to load', 'Reload the page. If it keeps happening, the activity log says which part.', 'bad', {sticky: true}), 500);
+  }
+})();
+const NOTE = {job: null, jobStart: 0, errSeen: Date.now() / 1000, chatPid: null, first: true};
+const JOB_NAMES = [['avr blend', 'Blend test'], ['system report', 'System report'], ['all-speakers', 'Speaker check'], ['gain check', 'Gain check'],
+  ['live analyzer', 'Live analyzer'], ['headroom', 'Headroom test'], ['checkup', 'Check-up'], ['verify', 'Verify'], ['levelmatch', 'Level match'],
+  ['apply', 'Applying the tune'], ['fix what', 'Fixes'], ['undo fixes', 'Undo fixes'], ['save live eq', 'Saving the live EQ'], ['measure', 'Measurement'], ['tone', 'Test tone']];
+const jobName = c => { c = String(c || '').toLowerCase(); const m = JOB_NAMES.find(([k]) => c.startsWith(k)); return m ? m[1] : 'The step'; };
+function notifyChanges() {
+  const j = S.job || {}, a = j.auto;
+  const running = !!j.running, cmd = running ? (a ? 'auto-tune' : j.cmd) : null;
+  if (!NOTE.first) {
+    if (running && NOTE.job !== cmd) { NOTE.jobStart = Date.now() / 1000; askNotify(); }
+    if (!running && NOTE.job) {
+      const errs = events.filter(e => e.kind === 'error' && e.t >= NOTE.jobStart - 1);
+      const name = NOTE.job === 'auto-tune' ? 'Auto-tune' : jobName(NOTE.job);
+      if (errs.length) toast(`${name} stopped`, errs[errs.length - 1].msg, 'bad', {tag: 'job'});
+      else toast(`${name} finished`, 'Results are on its page.', 'good', {tag: 'job'});
+      NOTE.errSeen = Date.now() / 1000;
+    }
+    const fresh = events.filter(e => e.kind === 'error' && e.t > NOTE.errSeen && !running);
+    if (fresh.length) { NOTE.errSeen = fresh[fresh.length - 1].t; toast('Something went wrong', fresh[fresh.length - 1].msg, 'bad', {action: 'Open activity', onAction: () => openSheet('activity')}); }
+    const pid = CHAT.pending && CHAT.pending.id;
+    if (pid && pid !== NOTE.chatPid && $('#chat').hidden) toast('The assistant is waiting for your OK', CHAT.pending.text || '', 'warn', {action: 'Open the chat', onAction: () => chatOpen(true), sticky: true, tag: 'chat'});
+    NOTE.chatPid = pid;
+    const up = S.update || {};
+    if (up.newer && up.latest && up.latest !== NOTE.upSeen) { NOTE.upSeen = up.latest; toast(`htTamer ${up.latest} is available`, `You have ${up.current}.`, '', {action: 'See the update', onAction: () => openSheet('updates'), tag: 'update'}); }
+  } else { NOTE.chatPid = CHAT.pending && CHAT.pending.id; }
+  NOTE.job = cmd; NOTE.first = false;
+}
 async function poll() {
   if (polling) return;                       // never let a slow reply overwrite a newer one
   polling = true;
@@ -196,11 +236,12 @@ async function poll() {
   try {
     S = st;
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; safe('activity', renderLog); }
-    safe('settings', initSettings); safe('room', initRoom);
+    safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
       renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters};
-    for (const [n, f] of Object.entries(parts)) if (typeof f === 'function') safe(n, f);
+    for (const [n, f] of Object.entries(parts)) safe(n, () => f());
+    safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }
     safe('placement plan', () => renderPlan(roomInit ? readRoom() : null));
   } finally { polling = false; }

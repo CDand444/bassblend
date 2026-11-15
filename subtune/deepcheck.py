@@ -12,7 +12,8 @@ exact, so they share one time base) htTamer works out:
     split into deep bass / bass / low mids / mids / upper mids / highs;
   * the biggest peaks and dips, and what kind of problem each probably is
     (room resonance, wall cancellation, reflection, speaker);
-  * left/right match: level, tone, timing (is the seat centred?) and polarity
+  * left/right match: level, tone and timing (is the seat centred?). Speaker polarity isn't judged:
+    it read wrong on real systems
     (is a speaker wired backwards?);
   * how long the room rings per octave (RT60) and the strongest early reflections;
   * distortion across the range, background noise and hum, and how trustworthy
@@ -249,16 +250,6 @@ def reflections(ir, direct, max_ms=25.0):
     return out[:6], db[::max(1, int(FS / 8000))].round(1).tolist()
 
 
-def polarity_match(ir, dl, dr):
-    """+1 if left and right have the same polarity, -1 if one is wired backwards."""
-    sos = _bp(300, 3000)
-    seg = lambda d: sosfiltfilt(sos, ir[d - int(0.002 * FS): d + int(0.004 * FS)])
-    a, b = seg(dl), seg(dr)
-    best = max(range(-24, 25), key=lambda s: abs(np.dot(a, np.roll(b, s))))
-    c = np.dot(a, np.roll(b, best)) / max(np.linalg.norm(a) * np.linalg.norm(b), 1e-12)
-    return float(c)
-
-
 def noise_report(x, off):
     """Background noise: level per octave (dB SPL), overall, bass, and mains hum."""
     if len(x) < FS:
@@ -333,9 +324,8 @@ def analyse(rec, t_start, cal=None, settings=None, system=None):
     lr = {"level_db": round(float(np.mean(lr_diff[m_mid])), 1),
           "tone_spread_db": round(float(np.std(lr_diff[m_hi] - np.mean(lr_diff[m_hi]))), 1),
           "timing_ms": round(float((d["right"] - d["left"]) / FS * 1000 - OFFS["right"] * 1000), 2),
-          "polarity_corr": round(polarity_match(ir, d["left"], d["right"]), 2)}
+          }
     lr["timing_cm"] = round(lr["timing_ms"] / 1000 * C * 100, 1)
-    lr["polarity"] = "reversed" if lr["polarity_corr"] < -0.4 else "same" if lr["polarity_corr"] > 0.4 else "unclear"
     m_b = (FG >= 40) & (FG < 120)
     lr["both_gain_bass_db"] = round(float(np.mean(resp["both"][m_b] - 10 * np.log10(
         (10 ** (resp["left"][m_b] / 10) + 10 ** (resp["right"][m_b] / 10)) / 2))), 1)
@@ -469,9 +459,6 @@ def receiver_advice(r, sub_level=None, dirac_on=False):
         out.append({"kind": "auto", "what": "sub_level", "change_db": change, "to": to,
                     "text": f"Subwoofer level {change:+.1f} dB" + (f" (from {sub_level:+.1f} to {to:+.1f} dB)" if to is not None else "")
                             + " to bring the bass to your target. htTamer can do this."})
-    if lr["polarity"] == "reversed":
-        out.append({"kind": "hands", "what": "wiring",
-                    "text": "Swap the red and black wires on one front speaker (it's wired backwards), then run the report again."})
     return out
 
 
@@ -622,16 +609,6 @@ def _more_findings(out, r, dev, norm):
                       "Run the report again. If it keeps happening, tell htTamer: the lead-in can be made longer."))
     # left / right
     lr = r["lr"]
-    if lr["polarity"] == "reversed":
-        out.append(_f("stereo", "fix", "One front speaker seems wired backwards",
-                      "The left and right speakers push in opposite directions (their pulses have opposite signs).",
-                      "Reversed polarity cancels the bass and smears the centre image, so voices sound vague and 'phasey'.",
-                      "Check the + and − (red/black) wires at both speakers and the receiver. Swap them on the speaker that's reversed, then run this again."))
-    else:
-        out.append(_f("stereo", "good" if lr["polarity"] == "same" else "info", "Both front speakers have the same polarity"
-                      if lr["polarity"] == "same" else "Couldn't confirm the speakers' polarity",
-                      "Left and right push in the same direction." if lr["polarity"] == "same" else "The reflections were too strong to tell.",
-                      "", ""))
     lv = lr["level_db"]
     out.append(_f("stereo", "good" if abs(lv) < 1 else "watch" if abs(lv) < 2 else "fix",
                   "Left and right are equally loud" if abs(lv) < 1 else f"The {'left' if lv > 0 else 'right'} speaker is {abs(lv):.1f} dB louder",

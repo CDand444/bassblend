@@ -61,6 +61,33 @@ fi
 if [ -f "$APP/deploy/linux/bassblend-update" ] && ! cmp -s "$APP/deploy/linux/bassblend-update" /usr/local/sbin/bassblend-update; then
   install -m 0755 "$APP/deploy/linux/bassblend-update" /usr/local/sbin/bassblend-update
 fi
+# in-app updates from GitHub: the helper and its systemd path unit (added in 0.9.2; installed here on older Pis)
+DATADIR="$(grep -oE 'BASSBLEND_DATA=[^ ]+' /etc/systemd/system/bassblend.service 2>/dev/null | head -1 | cut -d= -f2)"
+if [ -n "$DATADIR" ] && [ -f "$APP/deploy/linux/bassblend-ota" ]; then
+  if ! cmp -s "$APP/deploy/linux/bassblend-ota" /usr/local/sbin/bassblend-ota || [ ! -f /etc/systemd/system/bassblend-ota.path ]; then
+    install -m 0755 "$APP/deploy/linux/bassblend-ota" /usr/local/sbin/bassblend-ota
+    install -d -m 0755 "$DATADIR/update"; chown --reference="$DATADIR" "$DATADIR/update" 2>/dev/null || true
+    printf '[Unit]
+Description=htTamer: install a downloaded update
+
+[Path]
+PathExists=%s/update/incoming.version
+Unit=bassblend-ota.service
+
+[Install]
+WantedBy=multi-user.target
+' "$DATADIR" > /etc/systemd/system/bassblend-ota.path
+    printf '[Unit]
+Description=htTamer: install a downloaded update
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bassblend-ota %s
+' "$DATADIR" > /etc/systemd/system/bassblend-ota.service
+    systemctl daemon-reload; systemctl enable --now bassblend-ota.path >/dev/null 2>&1 || true
+    echo "In-app updates installed (bassblend-ota.path)"
+  fi
+fi
 
 if printf '%s\n' "$FILES" | grep -qvE '^(subtune/web/|docs/|tests/|deploy/pi-gen/|[^/]*\.md$)'; then
   PORT="$(grep -oE -- '--port [0-9]+' /etc/systemd/system/bassblend.service | awk '{print $2}' || true)"

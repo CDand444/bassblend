@@ -6,6 +6,24 @@
 const $ = s => document.querySelector(s);
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+// ---------- notifications: toasts in the page, browser notifications while the tab is in the background
+function toast(title, body = '', kind = '', opts = {}) {
+  let box = document.querySelector('.toasts');
+  if (!box) { box = document.createElement('div'); box.className = 'toasts'; box.setAttribute('role', 'status'); box.setAttribute('aria-live', 'polite'); document.body.appendChild(box); }
+  const el = document.createElement('div'); el.className = 'toast ' + kind;
+  el.innerHTML = `<div><b>${esc(title)}</b>${body ? esc(body) : ''}${opts.action ? `<div class="act"><button class="btn ghost" style="height:26px">${esc(opts.action)}</button></div>` : ''}</div><button class="x" aria-label="Dismiss">×</button>`;
+  const close = () => el.remove();
+  el.querySelector('.x').onclick = close;
+  if (opts.action && opts.onAction) el.querySelector('.act button').onclick = () => { close(); opts.onAction(); };
+  box.appendChild(el); while (box.children.length > 4) box.firstChild.remove();
+  if (!opts.sticky) setTimeout(close, kind === 'bad' ? 12000 : 7000);
+  if (document.visibilityState !== 'visible' && 'Notification' in window && Notification.permission === 'granted') {
+    try { new Notification('htTamer: ' + title, {body: body || '', icon: '/logo.svg', tag: opts.tag || title}); } catch (e) {}
+  }
+}
+function askNotify() {        // asked the first time the owner starts something (needs a click)
+  try { if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+}
 const post = (url, body) => fetch(url, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body || {})}).then(r => r.json());
 const SUBC = ['--s1', '--s2', '--s3', '--s4'];
 const FT = 0.3048;

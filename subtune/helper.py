@@ -36,8 +36,8 @@ DEFS = {
                  "and ring longer (boomy). EQ can pull these peaks down well; moving subs or seats changes which pitch booms.",
     "null": "A null (dip, cancellation) is where sound arriving by two paths cancels at your seat. EQ can't fill it: boosting "
             "just wastes power. Moving the seat, a sub or a speaker changes it; several subs (like yours) help smooth them out.",
-    "polarity": "Polarity is whether a speaker's cone pushes or pulls on the same signal. If one speaker is wired backwards "
-                "(red and black swapped) bass cancels and voices sound vague. The system report checks the front pair.",
+    "polarity": "Polarity is whether a speaker's cone pushes or pulls on the same signal. htTamer sets each sub's polarity "
+                "itself so the subs add up; it doesn't judge your speakers' wiring.",
     "phase": "Phase is the timing of a sound wave at each pitch. Around the crossover, subs and speakers must be in step "
              "(in phase) to add up; out of step they cancel. The blend test finds the sub delay/polarity that keeps them in step.",
     "rt60": "RT60 is how long a sound takes to fade by 60 dB. Home theatres sound best around 0.2-0.4 s above 250 Hz. "

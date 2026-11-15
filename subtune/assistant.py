@@ -184,8 +184,8 @@ Dirac goes out of date when the subs' EQ or levels change after it ran (a new tu
 Music Optimizer, dialogue enhance. htTamer's tests switch them off and restore them. If something \
 sounds dull, boomy or squashed, check these first.
 - System report: full range for the front left/right speakers plus subs: response vs target per range, \
-peaks and dips classified (room resonance, wall cancellation, reflection), left/right level, timing and \
-polarity, RT60, early reflections, distortion, noise and hum, bass extension, receiver_advice (exact \
+peaks and dips classified (room resonance, wall cancellation, reflection), left/right level and timing \
+(speaker polarity isn't judged: it read wrong on real systems), RT60, early reflections, distortion, noise and hum, bass extension, receiver_advice (exact \
 menu numbers, and the sub level htTamer can set). Separate what EQ/Dirac can fix (peaks) from what \
 needs placement (dips/cancellations) or hands (wiring, receiver menu, furnishings). Treble readings \
 depend on mic position: confirm at a second spot before acting on them. It doesn't cover the centre, \

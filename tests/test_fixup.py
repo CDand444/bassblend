@@ -109,7 +109,7 @@ def test_receiver_advice_numbers():
     with_dirac = deepcheck.receiver_advice(report(lr=lr), dirac_on=True)
     assert all("re-run Dirac" in a["text"] for a in with_dirac if a["kind"] == "menu")
     rev = deepcheck.receiver_advice(report(bass=0.2, lr=dict(LR_OK, polarity="reversed")))
-    assert [a["what"] for a in rev] == ["wiring"]
+    assert not [a for a in rev if a["what"] == "wiring"], "no wiring advice from a polarity guess"
 
 
 def test_measured_dirac_target_follows_the_report():

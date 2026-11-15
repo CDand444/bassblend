@@ -13,6 +13,7 @@
   <a href="#m-play">How tests play through the receiver</a>
   <a href="#m-assistant">The assistant</a>
   <a href="#m-dirac">Dirac Live</a>
+  <a href="#m-updates">Updates</a>
   <a href="#m-safety">Safety</a>
   <a href="#m-trouble">When something goes wrong</a>
   <a href="#m-words">Words used in the app</a>
@@ -30,8 +31,10 @@
   <li><b>Survey</b>: the checklist (with the silent hardware check and gain structure), the receiver, the room and subs, your speakers, speaker placement and room treatment.</li>
   <li><b>Tune</b>: the guided <i>Tune my system</i> wizard, saved tunes and slots, the blend test and <b>Live EQ</b>.</li>
   <li><b>Verify</b>: the system report, the speaker check (levels, distances and LFE), check-up, sub headroom (and the protective limiters) and level match.</li>
-  <li><b>Tools</b>: raw measurements, the miniDSP filters and meters, the sound level meter, manual steps, AI room analysis, the activity log, the settings file and this manual.</li>
+  <li><b>Tools</b>: raw measurements, the miniDSP filters and meters, the sound level meter, AI room analysis and the hardware database, the activity log, the settings file, <b>Updates</b> and this manual.</li>
 </ul>
+<p><b>Beta</b> marks features that are new or not yet proven on every system (for example a receiver brand htTamer hasn't been tried with). They work, but check their results with a little extra care, and tell us what you find.</p>
+<p><b>Notifications</b>: when a test finishes or fails, an error appears, an update is ready or the assistant waits for your OK, a note pops up in the corner. If the tab is in the background your browser can show it too (it asks the first time you start a test).</p>
 <p>On a phone the sections are along the bottom and each section's pages are pills at the top. The round chat button opens the <b>assistant</b> from any page. The header shows whether htTamer is busy, the miniDSP input (AVR or USB), the mic calibration and a small sound level meter. <b>Stop</b> in the header ends whatever test is running and puts the receiver back.</p>
 
 <h2 id="m-setup">First-time setup</h2>
@@ -156,6 +159,9 @@
 <p><b>What makes Dirac out of date:</b> anything that changes the subs' <i>levels or EQ</i> after Dirac measured: a different sub tune, Live EQ bands playing, or Live EQ saved into a tune. Timing-only changes (a blend fix's delay, polarity or phase filter) keep Dirac's correction valid. htTamer asks before a change that would make Dirac out of date, and Home says when it is.</p>
 <p>Order of work: <b>sub tune first</b>, then Dirac Live with htTamer's target curve (the Dirac step gives you the file), then the blend test with Dirac on, then verify and a system report. While Dirac is measuring, close htTamer's level meter and don't start an htTamer test: both use the same mic. A new sub tune means Dirac should be run again.</p>
 
+<h2 id="m-updates">Updates</h2>
+<p><b>Tools → Updates</b> keeps the Windows app and the Pi up to date from htTamer's public GitHub releases, with nothing to set up. htTamer checks once a day and pops up a note when a new version is out; <b>Install</b> does the rest. On Windows the app closes, updates and opens again; on the Pi the update is checked before it's used, and if the new version doesn't start the previous one comes back by itself. Settings, tunes and measurements are always kept. (Following a fork instead? Set its repository there; a private one also needs a read-only token.)</p>
+
 <h2 id="m-safety">Safety</h2>
 <ul>
   <li>Nothing plays unless you start it (or approve it in the chat).</li>
@@ -166,6 +172,7 @@
 </ul>
 
 <h2 id="m-trouble">When something goes wrong</h2>
+<p>The miniDSP listens to the receiver normally. htTamer switches it to USB only while it measures, and switches it back by itself as soon as nothing needs USB; if you pick USB yourself at the top of the page, it goes back to the receiver after 10 minutes.</p>
 <ul>
   <li><b>Start with Setup → Check the hardware (silent)</b>. It reads the miniDSP (slot, input, mute) and the receiver, listens to the mic for a second, and checks the Pi's HDMI, without playing anything or changing anything. On the Pi, <code>subtune smoke</code> does the same from a terminal.</li>
   <li><b>A test hears nothing</b>: is the receiver on, unmuted and on the right input? For Pi HDMI, the receiver should show a PCM signal while the test plays.</li>

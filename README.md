@@ -7,7 +7,7 @@ assistant. It runs on a Raspberry Pi (or Windows) and is used from a web page.
 
 ## Download
 
-Get the latest build from the repository's **Releases** page:
+Get the latest build from **[Releases](https://github.com/danand444/bassblend/releases/latest)**. Installed copies update themselves from there (Tools → Updates), with nothing to set up:
 
 - **Raspberry Pi**: `bassblend-<version>.img.xz`. Write it to an SD card with Raspberry Pi Imager
   (it can add Wi-Fi and SSH), plug in the miniDSP and the UMIK-1, then open `http://bassblend.local:8765`.

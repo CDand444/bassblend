@@ -176,8 +176,36 @@ $HARDEN
 WantedBy=multi-user.target
 UNIT
 live && systemctl daemon-reload
+ota_units() {   # in-app updates: the locked-down dashboard drops a download in $1/update, a root path unit installs it
+  install -m 0755 "$APP/deploy/linux/bassblend-ota" /usr/local/sbin/bassblend-ota
+  install -d -m 0755 "$1/update"
+  chown --reference="$1" "$1/update" 2>/dev/null || true
+  cat > /etc/systemd/system/bassblend-ota.path <<OTAP
+[Unit]
+Description=htTamer: install a downloaded update
+
+[Path]
+PathExists=$1/update/incoming.version
+Unit=bassblend-ota.service
+
+[Install]
+WantedBy=multi-user.target
+OTAP
+  cat > /etc/systemd/system/bassblend-ota.service <<OTAS
+[Unit]
+Description=htTamer: install a downloaded update
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bassblend-ota $1
+OTAS
+}
 if [ "$DEV" -eq 0 ]; then                     # over-the-air updates pushed from your computer (deploy/push-update.sh)
   install -m 0755 "$APP/deploy/linux/bassblend-update" /usr/local/sbin/bassblend-update
+  ota_units "$DATA"                              # ... and from GitHub, started in the app
+  live && systemctl daemon-reload
+  systemctl enable bassblend-ota.path >/dev/null 2>&1 || true
+  live && systemctl start bassblend-ota.path || true
 fi
 systemctl enable bassblend.service >/dev/null
 

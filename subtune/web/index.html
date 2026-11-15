@@ -208,6 +208,16 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
   border-radius: 12px; padding: 16px 18px; }
 .prompt h4 { margin: 0 0 4px; font-size: 16px; }
 .prompt p { margin: 0 0 14px; color: var(--text-2); max-width: 70ch; }
+.beta { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; line-height: 15px; opacity: .85; }
+h2 .beta, h3 .beta { font-size: 10px; }
+#sideNav .beta, #subNav .beta { font-size: 8.5px; padding: 0 3px; margin-left: 4px; line-height: 13px; flex: none; }
+.toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 32px)); pointer-events: none; }
+.toast { pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--accent);
+  border-radius: 10px; padding: 10px 12px; font-size: 13px; box-shadow: 0 6px 24px rgba(0,0,0,.14); animation: toastIn .18s ease-out; }
+.toast.good { border-left-color: var(--good); } .toast.bad { border-left-color: var(--bad); } .toast.warn { border-left-color: var(--warn); }
+.toast b { display: block; margin-bottom: 2px; } .toast .x { margin-left: auto; background: none; border: 0; color: var(--text-3); cursor: pointer; font-size: 16px; line-height: 1; padding: 0 2px; }
+.toast .act { margin-top: 6px; } @keyframes toastIn { from { opacity: 0; transform: translateY(6px); } }
+@media (max-width: 900px) { .toasts { bottom: 76px; right: 12px; left: 12px; max-width: none; } }
 .notice { border-radius: 10px; padding: 10px 12px; font-size: 13px; background: var(--surface-2); color: var(--text-2); }
 .notice.warn { background: color-mix(in srgb, var(--warn) 13%, var(--surface)); }
 .notice.bad { background: color-mix(in srgb, var(--bad) 12%, var(--surface)); }
@@ -807,7 +817,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <span class="muted small">Reads the miniDSP and receiver, listens to the mic for a second, and checks the Pi's HDMI. Plays nothing and changes nothing.</span>
       </div>
       <div id="smokeOut" style="margin-top:10px"></div>
-      <div class="card-h" style="margin:18px 0 6px"><h3 style="margin:0;font-size:14px">Gain structure</h3><span class="sub" id="gainSub"></span></div>
+      <div class="card-h" style="margin:18px 0 6px"><h3 style="margin:0;font-size:14px">Gain structure <span class="beta">Beta</span></h3><span class="sub" id="gainSub"></span></div>
       <p class="muted small" style="margin:0 0 8px">Can the receiver's sub output overload the miniDSP's input at the loudest you listen? Clipping there happens before any tune and can't be fixed by EQ. Plays a quiet 40 Hz tone through the receiver for a few seconds (volume set automatically and put back).</p>
       <div class="row" style="align-items:end">
         <label class="f" style="width:auto">Plays from<select id="gainMode"><option value="hdmi">Pi HDMI</option><option value="dlna">Network</option></select></label>
@@ -845,7 +855,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <details class="avrset" id="avrSet">
         <summary><span id="avrSetSum">Receiver settings</span></summary>
         <div class="grid g3" style="margin-top:10px">
-          <label class="f">Make<select id="avrMake"><option value="Auto">Auto-detect</option><option>Onkyo</option><option>Integra</option><option>Pioneer</option><option>Denon</option><option>Marantz</option><option>JBL Synthesis</option></select><span class="hint">Onkyo/Integra/Pioneer tested; Denon/Marantz and JBL Synthesis (SDP-55/58, SDR-35/38) follow the makers' protocols (turn network/RS232 control on in the unit)</span></label>
+          <label class="f">Make<select id="avrMake"><option value="Auto">Auto-detect</option><option>Onkyo</option><option>Integra</option><option>Pioneer</option><option value="Denon">Denon (beta)</option><option value="Marantz">Marantz (beta)</option><option value="JBL Synthesis">JBL Synthesis (beta)</option></select><span class="hint">Onkyo/Integra/Pioneer tested; Denon/Marantz and JBL Synthesis (SDP-55/58, SDR-35/38) follow the makers' protocols (turn network/RS232 control on in the unit)</span></label>
           <label class="f">Model<input id="avrModel" list="avrModels" placeholder="TX-RZ50"><datalist id="avrModels"><option value="TX-RZ50"></option></datalist></label>
           <label class="f">IP address<input id="avrHost" placeholder="192.168.1.50" inputmode="decimal" spellcheck="false"><span class="hint">shown in the receiver's Network menu</span></label>
         </div>
@@ -879,6 +889,21 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       </div>
       <p class="muted small" id="blendModeHint" style="margin:8px 0 0"></p>
       <div id="blendOut" style="margin-top:14px"></div>
+    </section>
+
+    <!-- UPDATES -->
+    <section class="card" id="updCard">
+      <div class="card-h"><h2>Updates</h2><span class="sub" id="updSub"></span></div>
+      <div id="updOut"></div>
+      <details style="margin-top:14px" id="updSetup"><summary class="small">Where updates come from</summary>
+        <p class="muted small" style="margin:8px 0">htTamer updates from its public GitHub releases: nothing to set up. Only change this to follow a fork; a <b>private</b> fork also needs a read-only token (GitHub → Settings → Developer settings → Fine-grained tokens, that repository only, <b>Contents: Read-only</b>), kept on this device only and never shown again.</p>
+        <div class="row" style="align-items:end">
+          <label class="f" style="width:220px">Repository<input id="updRepo" placeholder="htTamer's own" spellcheck="false"></label>
+          <label class="f" style="width:260px">Token (private forks only)<input id="updToken" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+          <label class="cb" style="max-width:200px"><input type="checkbox" id="updAuto" checked><span>Check once a day</span></label>
+          <button class="btn" id="updSave">Save</button><span class="muted small" id="updMsg"></span>
+        </div>
+      </details>
     </section>
 
     <!-- MANUAL -->
@@ -1061,7 +1086,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <button class="btn primary" id="aiBtn">Analyse</button>
       </div>
       <div id="aiNote" style="margin-top:10px"></div>
-      <div class="card-h" style="margin:16px 0 4px"><h3 style="margin:0;font-size:14px">Hardware database</h3><span class="sub" id="hwSub"></span></div>
+      <div class="card-h" style="margin:16px 0 4px"><h3 style="margin:0;font-size:14px">Hardware database <span class="beta">Beta</span></h3><span class="sub" id="hwSub"></span></div>
       <label class="cb" style="max-width:none"><input type="checkbox" id="hwOn"><span>Let the assistant build the hardware database<small>When your receiver, subs or speakers come up in the chat and htTamer doesn't know them, the assistant looks up their specs (on the web, with Claude) and records them, with the source. That's how support for unknown hardware grows: a receiver's control protocol, a ported sub's safe EQ limit, speaker specs for advice. Every entry is listed below and in the journal. Web lookups use your AI provider's credit.</small></span></label>
       <div id="hwList" class="small" style="margin-top:8px"></div>
       <div class="md" id="aiOut" style="margin-top:6px"></div>

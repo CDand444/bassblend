@@ -433,3 +433,38 @@ function renderWizVerify(done) {
     const r = await post('/api/verify', {pos: 1}); if (r.error) alert(r.error); wvKey = null; poll();
   };
 }
+
+// ---------- updates: from the GitHub releases, for the Windows app and the Pi
+let UPD = null, updInit = false;
+async function loadUpdates() {
+  try { UPD = await fetch('/api/update').then(r => r.json()); } catch (e) { return; }
+  const kind = {windows: 'Windows app', pi: 'Raspberry Pi', dev: 'developer copy'}[UPD.mode] || UPD.mode;
+  $('#updSub').textContent = `${UPD.current} · ${kind}`;
+  if (!updInit) { updInit = true; $('#updRepo').value = UPD.repo; $('#updAuto').checked = UPD.auto !== false;
+    $('#updToken').placeholder = UPD.has_token ? 'saved (enter a new one to replace it)' : 'not needed'; $('#updRepo').placeholder = UPD.default_repo || 'owner/name'; }
+  const L = UPD.last, busy = (S.job || {}).running || S.busy;
+  let h = '';
+  if (UPD.mode === 'dev') h += '<p class="muted">This is a developer copy: update it with git. The Windows app and the Pi image update themselves from here.</p>';
+  else if (L && L.error) h += `<div class="notice warn">${esc(L.error)}</div>`;
+  else if (L && L.newer) h += `<div class="notice"><b>htTamer ${esc(L.latest)} is available</b> (you have ${esc(L.current)}).${L.notes ? `<div class="md small" style="margin-top:6px;max-height:180px;overflow:auto">${md(L.notes)}</div>` : ''}</div>`;
+  else if (L && L.latest) h += `<p><span style="color:var(--good)">✓</span> Up to date: ${esc(L.current)} (latest release ${esc(L.latest)}).</p>`;
+  if (UPD.mode !== 'dev') h += `<div class="row" style="margin-top:10px"><button class="btn" id="updCheck">Check now</button>${L && L.newer ? `<button class="btn primary" id="updInstall" ${busy ? 'disabled title="Wait for the current step to finish"' : ''}>Install ${esc(L.latest)}</button>` : ''}<span class="muted small">${L && L.t ? 'Checked ' + new Date(L.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}) : ''}</span></div>`;
+  if (UPD.mode === 'pi' && UPD.result) h += `<details style="margin-top:10px"><summary class="small">Last update on this Pi</summary><pre class="small" style="white-space:pre-wrap">${esc(UPD.result)}</pre></details>`;
+  $('#updOut').innerHTML = h;
+  $('#updSetup').hidden = UPD.mode === 'dev';
+  const c = $('#updCheck'); if (c) c.onclick = async () => { c.disabled = true; c.textContent = 'Checking…'; const r = await post('/api/update', {action: 'check'}); if (r.error && !r.t) alert(r.error); await poll(); loadUpdates(); };
+  const i = $('#updInstall'); if (i) i.onclick = async () => {
+    if (!confirm(`Install ${L.latest}?\n\n${UPD.mode === 'windows' ? 'htTamer closes, the installer updates it, and it opens again in about a minute.' : 'The Pi installs it and restarts htTamer (about a minute). If the new version doesn\'t start, the old one comes back by itself.'} Your settings, tunes and measurements are kept.`)) return;
+    i.disabled = true; i.textContent = 'Downloading…';
+    const r = await post('/api/update', {action: 'install'});
+    if (r.error) { alert(r.error); loadUpdates(); return; }
+    toast(`Installing ${r.started}`, r.how, '', {sticky: true, tag: 'update'});
+  };
+}
+$('#updSave').onclick = async () => {
+  const b = {action: 'configure', repo: $('#updRepo').value.trim(), auto: $('#updAuto').checked};
+  if ($('#updToken').value.trim()) b.token = $('#updToken').value.trim();
+  const r = await post('/api/update', b);
+  $('#updMsg').textContent = r.error || 'Saved.'; $('#updToken').value = '';
+  if (!r.error) { updInit = false; await post('/api/update', {action: 'check'}); await poll(); loadUpdates(); }
+};

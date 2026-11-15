@@ -5,3 +5,4 @@
 # Windows launcher
 *.cmd       text eol=crlf
 deploy/linux/bassblend-update text eol=lf
+deploy/linux/bassblend-ota text eol=lf

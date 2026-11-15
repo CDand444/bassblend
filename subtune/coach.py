@@ -86,10 +86,6 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
                          f"Their knobs and switches change how they play ({what}). Once htTamer knows them it can protect "
                          "the drivers, spot conflicts and suggest better settings. Room & subs → Controls on the sub.",
                          who="owner", open="room"))
-    if rep and rep.get("lr", {}).get("polarity") == "reversed":
-        out.append(_step(0, "polarity", "safety", "One front speaker is wired backwards",
-                         "Swap red and black on one front speaker, then run the system report again.", who="owner", open="report"))
-
     # ---- hardware suggestions grounded in the maker's guidance and the room
     rm = room.get("room") or {}
     vol = (rm.get("length_m") or 0) * (rm.get("width_m") or 0) * (rm.get("height_m") or 0)

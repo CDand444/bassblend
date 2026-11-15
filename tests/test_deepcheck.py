@@ -77,20 +77,14 @@ def test_clean_room_is_flat_and_matched():
     m = (g > 30) & (g < 15000)
     assert np.max(np.abs(both[m])) < 1.5, np.max(np.abs(both[m]))
     lr = r["lr"]
-    assert abs(lr["level_db"]) < 0.3 and abs(lr["timing_ms"]) < 0.05 and lr["polarity"] == "same", lr
+    assert abs(lr["level_db"]) < 0.3 and abs(lr["timing_ms"]) < 0.05 and "polarity" not in lr, lr          # speaker polarity is no longer judged
     assert 5.0 < lr["both_gain_bass_db"] < 7.0, lr                      # coherent sum: +6 dB
     assert not [f for f in r["findings"] if f["status"] == "fix"], titles(r)
 
 
-def test_finds_reversed_speaker():
+def test_no_speaker_polarity_verdicts():
     r = report(R={"invert": True})
-    assert r["lr"]["polarity"] == "reversed", r["lr"]
-    assert any("wired backwards" in t for t in titles(r))
-    assert r["areas"]["stereo"]["status"] == "fix"
-    # the cancellation it causes must not also be reported as tonal problems
-    assert not any(t.startswith(("Bass is light", "Hole at")) for t in titles(r)), titles(r)
-    assert r["bass_extension_hz"] <= 25, r["bass_extension_hz"]
-
+    assert "polarity" not in r["lr"] and not any("wired backwards" in x or "polarity" in x.lower() for x in titles(r)), titles(r)
 
 def test_treble_ripple_is_summarised():
     r = report(L={"refl": (1.8, -4.0)}, R={"refl": (1.8, -4.0)})

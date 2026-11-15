@@ -308,6 +308,7 @@ class Runner:
             raise ValueError("input must be avr or usb")
         from .dsp import MiniDSP
         MiniDSP(s).batch([MiniDSP.c_source(src)], f"input switched to {'AVR (analog)' if which == 'avr' else 'USB'}")
+        INPUT_GUARD["hold_until"] = time.time() + MANUAL_USB_HOLD_S if which == "usb" else 0.0
         _live["t"] = 0                               # refresh the header right away
 
     # ---- stop anything
@@ -1282,7 +1283,8 @@ def _live_levels():
                 _live["data"], _live["err"] = MiniDSP().status(), None
             except Exception as e:   # device unplugged etc.
                 _live["err"] = str(e)[:200]
-        return {"paused": False, "error": _live["err"], **(_live["data"] or {})}
+        hold = max(0, int(INPUT_GUARD["hold_until"] - time.time()))
+        return {"paused": False, "error": _live["err"], "usb_hold_s": hold, **(_live["data"] or {})}
 
 
 def _events(since: float, limit=300):
@@ -1534,6 +1536,10 @@ class H(BaseHTTPRequestHandler):
             from pathlib import Path
             st["settings"]["cal_ok"] = bool(s.get("cal_file")) and Path(s["cal_file"]).is_file()
             st["job"] = RUN.view()
+            for rep in (st.get("deep_reports") or {}).values():      # older reports judged speaker polarity: hide it
+                rep["findings"] = [f for f in rep.get("findings") or [] if "polarity" not in f.get("title", "").lower()
+                                   and "wired backwards" not in f.get("title", "").lower()]
+                rep["receiver_advice"] = [a for a in rep.get("receiver_advice") or [] if a.get("what") != "wiring"]
             try:
                 from . import equip
                 st["speaker_channels"] = [{"ch": c, "name": equip.names().get(c, c)} for c in equip.channels()]
@@ -1609,6 +1615,14 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, liveeq_view())
         if u.path == "/api/avr":
             return self._send(200, avr_status(force="force" in q))
+        if u.path == "/api/update":
+            from . import update, version
+            s = load_settings()
+            return self._send(200, {"mode": update.mode(), "current": version(),
+                                    "repo": s.get("update_repo") or "", "default_repo": update.DEFAULT_REPO,
+                                    "has_token": bool(update.token()),
+                                    "auto": s.get("update_auto_check", True), "last": load_state().get("update"),
+                                    "result": update.result()})
         if u.path == "/api/hwdb":
             from . import hwdb
             return self._send(200, {**hwdb.load(), "enabled": hwdb.enabled()})
@@ -1803,6 +1817,22 @@ class H(BaseHTTPRequestHandler):
                 if body.get("action") == "revert":
                     return self._send(200, {"started": RUN.start_fixes_revert()})
                 raise ValueError("action must be accept or revert")
+            if path == "/api/update":                  # over-the-air updates from GitHub releases
+                from . import update
+                act = body.get("action")
+                if act == "configure":
+                    update.configure(body.get("repo"), body.get("token"), body.get("auto"))
+                    return self._send(200, {"ok": True})
+                if act == "check":
+                    return self._send(200, update.check())
+                if act == "install":
+                    if RUN.running() or load_state().get("busy"):
+                        raise RuntimeError("wait for the current step to finish, then update")
+                    r = update.install()
+                    if update.mode() == "windows":               # let the installer replace this program
+                        threading.Thread(target=lambda: (time.sleep(2), os._exit(0)), daemon=True).start()
+                    return self._send(200, r)
+                raise ValueError("action must be configure, check or install")
             if path == "/api/hwdb":                    # the hardware database: the owner adds or removes entries
                 from . import hwdb
                 act, kind, model = body.get("action"), str(body.get("kind") or ""), str(body.get("model") or "")
@@ -2032,6 +2062,43 @@ class H(BaseHTTPRequestHandler):
         self._send(404, {"error": "not found"})
 
 
+# The subs only get the receiver's bass when the miniDSP listens to it. htTamer switches to USB to measure,
+# so whenever nothing in htTamer needs USB any more, it switches back to the receiver by itself. Picking USB
+# by hand (the header switch) is honoured for MANUAL_USB_HOLD_S, then it switches back too.
+MANUAL_USB_HOLD_S = 600
+INPUT_GUARD = {"hold_until": 0.0, "last": None, "checked": 0.0}
+
+
+def input_guard_once(now=None):
+    """One check: back to the receiver if the miniDSP is on USB and nothing needs it. Returns what it did."""
+    now = now or time.time()
+    s = load_settings()
+    normal = (s.get("restore_source") or "").lower()
+    if not normal or normal == "usb" or not s.get("subs"):
+        return "not set up"
+    if RUN.running() or load_state().get("busy") or now < INPUT_GUARD["hold_until"]:
+        return "in use"
+    from .dsp import MiniDSP
+    d = MiniDSP(s)
+    src = str(d.status()["master"].get("source", "")).lower()
+    if src == normal:
+        return "on the receiver"
+    if RUN.running() or load_state().get("busy"):    # a job started while we looked
+        return "in use"
+    d.batch([MiniDSP.c_source(normal)], "miniDSP input back to the receiver (htTamer no longer needs USB)")
+    _live["t"] = 0
+    return "switched back"
+
+
+def _input_guard_loop():
+    while True:
+        time.sleep(30)
+        try:
+            INPUT_GUARD["last"] = input_guard_once()
+        except Exception as e:                       # noqa: BLE001 - a missing miniDSP must not stop the server
+            INPUT_GUARD["last"] = f"error: {e}"[:200]
+
+
 def serve(port=8765, lan=False):
     """lan=False: this computer only. lan=True: your home network, PIN required."""
     from . import auth
@@ -2045,6 +2112,9 @@ def serve(port=8765, lan=False):
         print("Imported the settings file from the SD card: " + ", ".join(r["imported"]), flush=True)
     # BASSBLEND_BIND pins the address (tests run network mode on 127.0.0.1 with BASSBLEND_AUTH_LOCAL=1)
     srv = ThreadingHTTPServer((os.environ.get("BASSBLEND_BIND") or ("0.0.0.0" if lan else "127.0.0.1"), port), H)
+    threading.Thread(target=_input_guard_loop, daemon=True).start()
+    from . import update
+    threading.Thread(target=update.auto_loop, daemon=True).start()
     if lan:
         import socket
         name = socket.gethostname()
