@@ -612,7 +612,20 @@ details.lastone > summary { cursor: pointer; font-weight: 600; font-size: 13.5px
 .room-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
 @media (max-width: 800px) { .room-top { grid-template-columns: minmax(0, 1fr); } }
 .plan { background: var(--surface-2); border-radius: 12px; padding: 10px; min-height: 200px; display: grid; place-items: center; }
-.plan svg { width: 100%; height: auto; max-height: 380px; display: block; }
+.plan svg { width: 100%; height: auto; max-height: 380px; display: block; touch-action: none; }
+.plan .vh { cursor: grab; }
+.plan3d { display: block; padding: 0; overflow: hidden; } .plan3d canvas { width: 100%; height: 360px; display: block; cursor: grab; }
+.buildqr { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 14px; align-items: center; background: var(--surface-2); border-radius: 12px; padding: 12px; }
+.buildqr svg { width: 168px; height: 168px; display: block; border-radius: 6px; flex: none; }
+.buildqr > div { flex: 1 1 220px; min-width: 0; }
+.plan .vh:hover, .plan .vh.drag { fill: var(--accent); }
+.plan .eh { cursor: copy; opacity: .55; }
+.plan .eh:hover { opacity: 1; }
+.shape { margin-top: 12px; display: grid; gap: 10px; }
+.shape .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.shape .crow { display: grid; grid-template-columns: 28px repeat(2, minmax(0, 1fr)) 32px; gap: 6px; align-items: center; margin-bottom: 6px; }
+.shape .orow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) 32px; gap: 6px; align-items: end; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.shape details > summary { cursor: pointer; font-weight: 600; font-size: 13px; }
 .subs { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .subcard { border: 1px solid var(--border); border-radius: 12px; padding: 14px; background: var(--surface); }
 .subcard.off { background: var(--surface-2); }
@@ -1152,16 +1165,26 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <section class="card" id="roomCard">
       <div class="card-h"><h2>Room and subs</h2><span class="sub">feet, measured from the left wall and the front (screen) wall</span></div>
       <div class="room-top">
-        <div class="plan" id="plan"></div>
+        <div>
+          <div class="row" style="margin-bottom:8px;gap:8px">
+            <div class="seg" id="planView" role="radiogroup" aria-label="Room view"><button type="button" data-pv="2d" class="on">Plan</button><button type="button" data-pv="3d">3D</button></div>
+            <span class="grow"></span>
+            <button type="button" class="btn ghost" id="buildPhone" title="Photograph the room with your phone; the AI assistant turns it into this outline">Build with your phone</button>
+          </div>
+          <div class="plan" id="plan"></div>
+          <div class="plan plan3d" id="plan3dBox" hidden><canvas id="plan3d" aria-label="The room in 3D: drag to turn"></canvas></div>
+          <div id="buildBox"></div>
+        </div>
         <div>
           <div class="grid g3">
             <label class="f">Length<span class="unit" data-u="ft"><input id="rL" type="number" step="0.1" min="0"></span><span class="hint">front to back</span></label>
             <label class="f">Width<span class="unit" data-u="ft"><input id="rW" type="number" step="0.1" min="0"></span><span class="hint">left to right</span></label>
-            <label class="f">Height<span class="unit" data-u="ft"><input id="rH" type="number" step="0.1" min="0"></span></label>
+            <label class="f">Height<span class="unit" data-u="ft"><input id="rH" type="number" step="0.1" min="0"></span><span class="hint">highest point</span></label>
           </div>
+          <div id="shapeBox"></div>
           <div class="grid" style="margin-top:12px">
             <label class="f">Walls and floor<input id="rC" placeholder="Drywall on studs, carpet over slab"></label>
-            <label class="f">Openings<input id="rO" placeholder="Open to the kitchen at the back right"></label>
+            <label class="f">Notes on openings<input id="rO" placeholder="Kitchen beyond the back opening, door usually shut"></label>
             <label class="f">AVR<input id="rAvr" placeholder="Model, sub out, crossover setting"></label>
             <label class="f">What you want<input id="rGoals" placeholder="Movies at the MLP, tight bass, second row matters too"></label>
           </div>
@@ -1248,6 +1271,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <div class="row" style="margin-top:14px"><span class="grow"></span><span class="muted small" id="termsMsg"></span><button class="btn primary" id="termsGo" disabled>Accept and continue</button></div>
   </div>
 </div>
+<script src="/js/room3d.js?v=__V__"></script>
 <script src="/js/core.js?v=__V__"></script>
 <script src="/js/tune.js?v=__V__"></script>
 <script src="/js/room-ai.js?v=__V__"></script>

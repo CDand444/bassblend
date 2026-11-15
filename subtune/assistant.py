@@ -163,6 +163,10 @@ network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
+- Room shape: rooms needn't be boxes. update_room can record the floor outline (outline_ft, an L, an alcove, a \
+cut-off corner), openings on its walls (open to another space, door, window) and a sloped or vaulted ceiling. \
+Reflection points, treatment zones, corners and speaker placement then use the real walls; for an irregular room \
+the room modes are an estimate from its main box (room_modes says so), and measurements are the real answer.
 - Room treatment (get_treatment_plan, set_treatment_constraints, record_treatment; get_overview -> room_treatment): \
 htTamer's own offline planner ranks what acoustic treatment would help, from the room geometry (first-reflection \
 points of the front speakers at every seat on the side walls, ceiling and floor; corners; back wall), the room modes \
@@ -221,6 +225,24 @@ def _t(name, desc, props=None, required=None, approval=False):
 
 
 SPOT = {"type": "integer", "description": "Mic spot: 1 = main listening position (MLP), 2-8 others"}
+def spend_ai_call():
+    """Count one AI request against the owner's daily budget (a runaway loop can't drain the credit).
+    Shared by the assistant and the room builder."""
+    from .config import load_settings
+    from .state import modify_state
+    cap = int(load_settings().get("ai_daily_calls") or DAILY_CALLS)
+    day = time.strftime("%Y-%m-%d")
+    box = {}
+
+    def bump(u):
+        u = u if isinstance(u, dict) and u.get("day") == day else {"day": day, "n": 0}
+        box["n"] = u["n"] + 1
+        return {"day": day, "n": min(box["n"], cap)}
+    modify_state("ai_calls", bump)
+    if box["n"] > cap:
+        raise RuntimeError(f"the assistant reached today's limit of {cap} AI requests (change it under Tools → AI analysis)")
+
+
 TOOLS = [
     _t("get_overview", "Current state: playing slot and tune, its predicted and verified results, last "
        "check-up, level match, AVR blend test, room and subs, receiver status and target settings."),
@@ -328,7 +350,15 @@ TOOLS = [
        []),
     _t("update_room", "Record or correct the room, seats, subs, receiver description or goals. Partial: only what's given "
        "changes. Lengths may be given in feet (*_ft) or metres (*_m). No sound.",
-       {"room": {"type": "object", "description": "length_ft, width_ft, height_ft, construction, openings, notes"},
+       {"room": {"type": "object", "description": "length_ft, width_ft, height_ft (the highest point), construction, "
+                 "openings (free-text notes), notes. Real shape (optional): outline_ft = floor corners in order "
+                 "[[x_ft, y_ft], ...] (x from the left wall, y from the front/screen wall, e.g. an L: "
+                 "[[0,0],[20,0],[20,13],[13,13],[13,23],[0,23]]; length/width then come from it; null = back to a rectangle), "
+                 "shape (rect, l, alcove, cut, custom), wall_openings = the full list [{wall (0-based edge: edge i runs "
+                 "from corner i to corner i+1; a rectangle's are 0 front, 1 right, 2 back, 3 left), from_ft (along that "
+                 "edge from its first corner), width_ft, height_ft (omit = floor to ceiling), kind: opening (open to "
+                 "another space), door or window}], ceiling {kind flat|slope|vault, low_ft, low_side front|back|left|right "
+                 "(slope), ridge length|width (vault)}"},
         "seat": {"type": "object", "description": "one seat to add or update, matched by name: name, x_ft, y_ft, z_ft (ear height)"},
         "seats": {"type": "array", "items": {"type": "object"}, "description": "replace the whole seat list (first = MLP)"},
         "subs": {"type": "object", "description": "1-based sub output -> fields: model, driver, enclosure, location, x_ft, y_ft, "
@@ -591,20 +621,7 @@ class Assistant:
         return ai.chat(SYSTEM, self.messages, tools)
 
     def _spend(self):
-        """Count one AI request against the owner's daily budget (a runaway loop can't drain the credit)."""
-        from .config import load_settings
-        from .state import modify_state
-        cap = int(load_settings().get("ai_daily_calls") or DAILY_CALLS)
-        day = time.strftime("%Y-%m-%d")
-        box = {}
-
-        def bump(u):
-            u = u if isinstance(u, dict) and u.get("day") == day else {"day": day, "n": 0}
-            box["n"] = u["n"] + 1
-            return {"day": day, "n": min(box["n"], cap)}
-        modify_state("ai_calls", bump)
-        if box["n"] > cap:
-            raise RuntimeError(f"the assistant reached today's limit of {cap} AI requests (change it under Tools → AI analysis)")
+        spend_ai_call()
 
     def _exec(self, name, inp):
         from .mcp import scrub

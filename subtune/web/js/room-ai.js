@@ -118,6 +118,9 @@ function initRoom() {
   const r = S.room, rm = r.room, subs = (S.settings || {}).subs || [];
   $('#rL').value = toFt(rm.length_m); $('#rW').value = toFt(rm.width_m); $('#rH').value = toFt(rm.height_m);
   $('#rC').value = rm.construction || ''; $('#rO').value = rm.openings || ''; $('#rAvr').value = r.avr || ''; $('#rGoals').value = r.goals || '';
+  const cp = v => v == null ? v : JSON.parse(JSON.stringify(v));
+  roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null};
+  renderShapeEditor(); planKey = null;
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
@@ -154,7 +157,10 @@ function readRoom() {
   document.querySelectorAll('#subRows .subcard').forEach(d => { const o = {}; d.querySelectorAll('[data-f]').forEach(i => o[i.dataset.f] = val(i));
     if (d.querySelector('[data-c]')) o.controls = hwRead(d);
     if (Object.values(o).some(v => v !== '' && v != null)) subs[d.dataset.o] = o; });
-  return {room: {length_m: toM($('#rL').value), width_m: toM($('#rW').value), height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: ''},
+  const sh = roomShape, [ow, ol] = sh.outline ? extentOf(sh.outline) : [toM($('#rW').value), toM($('#rL').value)];
+  return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
+                 outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0),
+                 ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
           seats, subs, avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
 $('#roomSave').onclick = async () => {
@@ -164,31 +170,272 @@ $('#roomSave').onclick = async () => {
   $('#roomMsg').textContent = r.error ? r.error : 'Saved.';
   if (!r.error) { roomInit = false; await poll(); }
 };
+// ---------- room shape: floor outline (corners in metres, in order around the room), openings, ceiling
+let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null}, planDrag = null, planKey = null;
+const SHAPES = [['rect', 'Rectangle'], ['l', 'L-shape'], ['alcove', 'Alcove'], ['cut', 'Cut corner'], ['custom', 'Custom']];
+const OPEN_KINDS = [['opening', 'Opening (no wall)'], ['door', 'Door'], ['window', 'Window']];
+const rectPts = (W, L) => [[0, 0], [W, 0], [W, L], [0, L]];
+const outlineOf = rm => rm && rm.outline && rm.outline.length >= 3 ? rm.outline : (rm && rm.width_m && rm.length_m ? rectPts(rm.width_m, rm.length_m) : null);
+const extentOf = pts => [Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
+const r3 = v => Math.round(v * 1000) / 1000;
+function presetPts(kind, W, L) {
+  if (kind === 'l') { const x = r3(W * .62), y = r3(L * .6); return [[0, 0], [W, 0], [W, y], [x, y], [x, L], [0, L]]; }
+  if (kind === 'alcove') { const d = r3(Math.min(4 * FT, L * .25)), a = r3(W * .3), b = r3(W * .7);
+    return [[0, 0], [W, 0], [W, r3(L - d)], [b, r3(L - d)], [b, L], [a, L], [a, r3(L - d)], [0, r3(L - d)]]; }
+  if (kind === 'cut') { const c = r3(Math.min(3 * FT, W / 4, L / 4)); return [[0, 0], [r3(W - c), 0], [W, c], [W, L], [0, L]]; }
+  return rectPts(W, L);
+}
+function edgesOf(pts) {
+  return pts.map((a, i) => { const b = pts[(i + 1) % pts.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
+    const d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len], n = [d[1], -d[0]];
+    const side = Math.abs(n[1]) >= Math.abs(n[0]) - 1e-9 ? (n[1] < 0 ? 'front' : 'back') : (n[0] < 0 ? 'left' : 'right');
+    return {i, a, b, len, d, n, side, angled: Math.min(Math.abs(n[0]), Math.abs(n[1])) > .02}; });
+}
+const edgeLabel = e => `Wall ${e.i + 1}: ${e.angled ? 'angled ' : ''}${e.side} · ${fmtFt(e.len)}`;
+function insidePts(pts, x, y) {
+  let k = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[j];
+    if ((ay > y) !== (by > y) && x < ax + (y - ay) * (bx - ax) / (by - ay)) k = !k;
+  }
+  return k;
+}
+const signedArea = pts => pts.reduce((s, p, i) => { const q = pts[(i + 1) % pts.length]; return s + p[0] * q[1] - q[0] * p[1]; }, 0) / 2;
+function normPts(pts) {         // leftmost wall at x = 0, front-most at y = 0, the order the server stores
+  const x0 = Math.min(...pts.map(p => p[0])), y0 = Math.min(...pts.map(p => p[1]));
+  let o = pts.map(p => [r3(p[0] - x0), r3(p[1] - y0)]);
+  if (signedArea(o) < 0) o.reverse();
+  return o;
+}
+function syncExtent() {         // length/width boxes show the outline's overall size
+  if (!roomShape.outline) return;
+  const [W, L] = extentOf(roomShape.outline);
+  if (document.activeElement !== $('#rW')) $('#rW').value = toFt(W);
+  if (document.activeElement !== $('#rL')) $('#rL').value = toFt(L);
+}
+function renderShapeEditor() {
+  const sh = roomShape, pts = sh.outline, ops = sh.wall_openings || [], c = sh.ceiling || {kind: 'flat'};
+  const all = pts || (toM($('#rW').value) && toM($('#rL').value) ? rectPts(toM($('#rW').value), toM($('#rL').value)) : null);
+  const es = all ? edgesOf(all) : [];
+  const ftIn = (attr, v, ph = '') => `<span class="unit" data-u="ft"><input type="number" step="0.1" min="0" ${attr} value="${v == null ? '' : toFt(v)}" placeholder="${ph}"></span>`;
+  let h = `<div class="row"><span class="muted small">Shape</span><div class="seg" role="radiogroup" aria-label="Room shape">${SHAPES.map(([k, n]) =>
+    `<button type="button" data-shape="${k}" class="${(sh.shape || 'rect') === k ? 'on' : ''}">${n}</button>`).join('')}</div></div>`;
+  if (pts) h += `<details open><summary>Corners (${pts.length})</summary>
+    <p class="muted small" style="margin:6px 0">In order around the room, feet from the left wall and the front (screen) wall. Drag them on the plan, or click + on a wall to add a corner.</p>
+    <div class="crow muted small" aria-hidden="true"><span>#</span><span>From left</span><span>From front</span><span></span></div>
+    ${pts.map((p, i) => `<div class="crow"><b>${i + 1}</b>${ftIn(`data-cx="${i}" aria-label="Corner ${i + 1} from left"`, p[0])}${ftIn(`data-cy="${i}" aria-label="Corner ${i + 1} from front"`, p[1])}
+      <button type="button" class="btn icon ghost" data-cdel="${i}" aria-label="Remove corner ${i + 1}" ${pts.length <= 3 ? 'disabled' : ''}>✕</button></div>`).join('')}</details>`;
+  h += `<details ${ops.length ? 'open' : ''}><summary>Openings, doors and windows (${ops.length})</summary>
+    <p class="muted small" style="margin:6px 0">An opening to another room or an open-plan space has no wall: no reflection, no panel, no corner trap there. Distance is along the wall from its first corner (the corner with the same number). Leave the height empty for floor to ceiling.</p>
+    ${ops.map((o, j) => `<div class="orow">
+      <select data-ow="${j}" aria-label="Wall" style="grid-column:span 2">${es.map(e => `<option value="${e.i}" ${e.i === o.wall ? 'selected' : ''}>${esc(edgeLabel(e))}</option>`).join('')}</select>
+      <select data-ok="${j}" aria-label="What it is">${OPEN_KINDS.map(([k, n]) => `<option value="${k}" ${k === o.kind ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <button type="button" class="btn icon ghost" data-odel="${j}" aria-label="Remove opening">✕</button>
+      <label class="f">From corner${ftIn(`data-of="${j}"`, o.from_m)}</label><label class="f">Width${ftIn(`data-owd="${j}"`, o.width_m)}</label><label class="f">Height${ftIn(`data-oh="${j}"`, o.height_m, 'full')}</label></div>`).join('')}
+    <button type="button" class="btn ghost" id="addOpening" ${es.length ? '' : 'disabled title="Enter the room size first"'}>Add opening</button></details>`;
+  h += `<div class="row"><span class="muted small">Ceiling</span><select id="ceilK" aria-label="Ceiling"><option value="flat">Flat</option><option value="slope" ${c.kind === 'slope' ? 'selected' : ''}>Sloped</option><option value="vault" ${c.kind === 'vault' ? 'selected' : ''}>Vaulted (peaked)</option></select>`;
+  if (c.kind === 'slope' || c.kind === 'vault') {
+    h += `<label class="f" style="flex:0 1 120px">Low side height${ftIn('id="ceilLow"', c.low_m)}</label>`;
+    h += c.kind === 'slope'
+      ? `<label class="f" style="flex:0 1 130px">Low side<select id="ceilSide">${['front', 'back', 'left', 'right'].map(s => `<option ${c.low_side === s ? 'selected' : ''}>${s}</option>`).join('')}</select></label>`
+      : `<label class="f" style="flex:0 1 150px">Peak runs<select id="ceilRidge"><option value="length">front to back</option><option value="width" ${c.ridge === 'width' ? 'selected' : ''}>left to right</option></select></label>`;
+    h += `<span class="muted small" style="flex-basis:100%">Height above is the highest point.</span>`;
+  }
+  h += '</div>';
+  $('#shapeBox').className = 'shape'; $('#shapeBox').innerHTML = h;
+}
+function setPts(pts, rerender = true) { roomShape.outline = pts; syncExtent(); if (rerender) renderShapeEditor(); planKey = null; renderPlan(readRoom()); }
+function moveOpeningsOnInsert(i, half) {        // edge i was split at `half` metres: later edges shift by one
+  roomShape.wall_openings.forEach(o => { if (o.wall > i) o.wall++; else if (o.wall === i && o.from_m + o.width_m / 2 > half) { o.wall++; o.from_m = Math.max(0, r3(o.from_m - half)); } });
+}
+function moveOpeningsOnRemove(i, prevLen) {     // corner i removed: edges i-1 and i merge
+  const n = roomShape.outline.length;
+  roomShape.wall_openings.forEach(o => { if (o.wall === i) { o.wall = (i - 1 + n) % n; o.from_m = r3(o.from_m + prevLen); } else if (o.wall > i) o.wall--; });
+}
+$('#shapeBox').addEventListener('click', e => {
+  const b = e.target.closest('[data-shape]');
+  if (b) {
+    const k = b.dataset.shape, W = toM($('#rW').value), L = toM($('#rL').value);
+    if (k !== 'rect' && !(W && L)) { $('#roomMsg').textContent = 'Enter the length and width first, then pick a shape and adjust it.'; return; }
+    roomShape.shape = k;
+    if (k === 'rect') { const [w, l] = roomShape.outline ? extentOf(roomShape.outline) : [W, L]; roomShape.outline = null; if (w) { $('#rW').value = toFt(w); $('#rL').value = toFt(l); } }
+    else if (k !== 'custom' || !roomShape.outline) { roomShape.outline = k === 'custom' ? rectPts(W, L) : presetPts(k, W, L); }
+    roomShape.wall_openings = roomShape.wall_openings.filter(o => o.wall < (roomShape.outline || [0, 0, 0, 0]).length);
+    setPts(roomShape.outline); return;
+  }
+  const del = e.target.closest('[data-cdel]');
+  if (del) { const i = +del.dataset.cdel, pts = roomShape.outline; if (pts.length <= 3) return;
+    const es = edgesOf(pts), prevLen = es[(i - 1 + pts.length) % pts.length].len;
+    moveOpeningsOnRemove(i, prevLen); pts.splice(i, 1); roomShape.shape = 'custom'; setPts(pts); return; }
+  if (e.target.closest('#addOpening')) {
+    const all = outlineOf({outline: roomShape.outline, width_m: toM($('#rW').value), length_m: toM($('#rL').value)});
+    const es = edgesOf(all), back = es.filter(x => x.side === 'back').sort((a, b) => b.len - a.len)[0] || es[0];
+    roomShape.wall_openings.push({wall: back.i, from_m: r3(Math.max(0, back.len / 2 - 0.45)), width_m: Math.min(0.9, r3(back.len)), height_m: 2.03, kind: 'door'});
+    renderShapeEditor(); renderPlan(readRoom()); return;
+  }
+  const od = e.target.closest('[data-odel]');
+  if (od) { roomShape.wall_openings.splice(+od.dataset.odel, 1); renderShapeEditor(); renderPlan(readRoom()); }
+});
+$('#shapeBox').addEventListener('input', e => {
+  const t = e.target, d = t.dataset, v = toM(t.value);
+  if (d.cx != null || d.cy != null) { const i = +(d.cx ?? d.cy); if (v == null) return;
+    roomShape.outline[i][d.cx != null ? 0 : 1] = v; roomShape.shape = 'custom'; syncExtent();
+    document.querySelectorAll('#shapeSeg button, #shapeBox [data-shape]').forEach(x => x.classList.toggle('on', x.dataset.shape === 'custom')); return; }
+  const j = +(d.of ?? d.owd ?? d.oh ?? -1);
+  if (j >= 0) { const o = roomShape.wall_openings[j]; o[d.of != null ? 'from_m' : d.owd != null ? 'width_m' : 'height_m'] = v; return; }
+  if (t.id === 'ceilLow') roomShape.ceiling.low_m = v;
+});
+$('#shapeBox').addEventListener('change', e => {
+  const t = e.target, d = t.dataset;
+  if (d.ow != null) roomShape.wall_openings[+d.ow].wall = +t.value;
+  else if (d.ok != null) roomShape.wall_openings[+d.ok].kind = t.value;
+  else if (t.id === 'ceilK') { roomShape.ceiling = t.value === 'flat' ? null : {kind: t.value, low_m: (roomShape.ceiling || {}).low_m ?? null, low_side: 'back', ridge: 'length'}; renderShapeEditor(); }
+  else if (t.id === 'ceilSide') roomShape.ceiling.low_side = t.value;
+  else if (t.id === 'ceilRidge') roomShape.ceiling.ridge = t.value;
+  else if (d.cx != null || d.cy != null) { setPts(roomShape.outline); return; }
+  else return;
+  renderPlan(readRoom());
+});
+['#rW', '#rL'].forEach((id, k) => $(id).addEventListener('input', () => {   // resizing a drawn outline stretches it
+  const pts = roomShape.outline, v = toM($(id).value); if (!pts || !v) return;
+  const cur = extentOf(pts)[k]; if (!cur) return;
+  pts.forEach(p => p[k] = r3(p[k] * v / cur));
+  roomShape.wall_openings.forEach(o => { const e = edgesOf(pts)[o.wall]; if (e) { o.from_m = Math.min(o.from_m, r3(e.len)); } });
+  renderShapeEditor();
+}));
+// dragging corners on the plan (snaps to 3 in. and to the neighbouring corners' lines, keeping walls square)
+$('#plan').addEventListener('pointerdown', e => {
+  const h = e.target.closest('.vh'), add = e.target.closest('.eh');
+  if (add && roomShape.outline) {
+    const i = +add.dataset.e, pts = roomShape.outline, a = pts[i], b = pts[(i + 1) % pts.length];
+    moveOpeningsOnInsert(i, Math.hypot(b[0] - a[0], b[1] - a[1]) / 2);
+    pts.splice(i + 1, 0, [r3((a[0] + b[0]) / 2), r3((a[1] + b[1]) / 2)]); roomShape.shape = 'custom'; setPts(pts); return;
+  }
+  if (!h || !roomShape.outline) return;
+  e.preventDefault();
+  const svg = $('#plan svg'), v = svg.dataset;
+  planDrag = {i: +h.dataset.v, svg, pad: +v.pad, sc: +v.sc, el: h};
+  h.classList.add('drag');
+  svg.setPointerCapture(e.pointerId);
+});
+$('#plan').addEventListener('pointermove', e => {
+  if (!planDrag) return;
+  const {svg, pad, sc, i} = planDrag, pts = roomShape.outline, pt = svg.createSVGPoint();
+  pt.x = e.clientX; pt.y = e.clientY;
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse()), snap = 0.25 * FT, tol = 8 / sc;
+  let x = Math.max(0, Math.round((p.x - pad) / sc / snap) * snap), y = Math.max(0, Math.round((p.y - pad) / sc / snap) * snap);
+  [pts[(i - 1 + pts.length) % pts.length], pts[(i + 1) % pts.length]].forEach(q => { if (Math.abs(q[0] - x) < tol) x = q[0]; if (Math.abs(q[1] - y) < tol) y = q[1]; });
+  pts[i] = [r3(x), r3(y)];
+  roomShape.shape = 'custom';
+  svg.querySelector('#roomPoly').setAttribute('d', pts.map((q, k) => (k ? 'L' : 'M') + (pad + q[0] * sc).toFixed(1) + ' ' + (pad + q[1] * sc).toFixed(1)).join('') + 'Z');
+  planDrag.el.setAttribute('cx', pad + x * sc); planDrag.el.setAttribute('cy', pad + y * sc);
+  const ix = document.querySelector(`#shapeBox [data-cx="${i}"]`), iy = document.querySelector(`#shapeBox [data-cy="${i}"]`);
+  if (ix) ix.value = toFt(x); if (iy) iy.value = toFt(y);
+});
+const endDrag = () => { if (!planDrag) return; planDrag = null;
+  const pts = roomShape.outline, ok = Math.abs(signedArea(pts)) > 1;
+  setPts(ok ? normPts(pts) : pts);
+  if (!ok) $('#roomMsg').textContent = 'That outline is too small or folds over itself; move the corner back.'; };
+$('#plan').addEventListener('pointerup', endDrag); $('#plan').addEventListener('pointercancel', endDrag);
+
 function renderPlan(r) {
+  if (planDrag) return;                          // don't rebuild the drawing under the pointer
   r = r || S.room; if (!r) return;
-  const L = r.room.length_m, W = r.room.width_m, el = $('#plan');
-  if (!L || !W) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
+  const pts = outlineOf(r.room), el = $('#plan');
+  const spk = Object.entries(r.speakers || (S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
+  // suggested spots come from the saved room: while the outline is being edited, hide the ones now outside it
+  const sug = spk.length || !pts ? [] : ((S.placement || {}).speakers || []).filter(s => insidePts(pts, s.x_m, s.y_m)).map(s => ({...s, rec: false}));
+  const key = JSON.stringify([r.room, r.seats, r.subs, spk, sug, roomShape.outline ? 1 : 0]);
+  if (key === planKey && el.querySelector('svg')) return; planKey = key;
+  plan3d(r, spk.concat(sug));
+  if (!pts) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
+  const rect = !(r.room.outline && r.room.outline.length >= 3), [W, L] = extentOf(pts), edit = !!roomShape.outline;
   const pad = 34, sc = Math.min(380 / W, 320 / L), Wp = W * sc + 2 * pad, Hp = L * sc + 2 * pad;
-  const X = x => pad + x * sc, Y = y => pad + y * sc;
-  let g = `<rect x="${X(0)}" y="${Y(0)}" width="${W * sc}" height="${L * sc}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" rx="3"/>`;
-  g += `<line x1="${X(W * .3)}" x2="${X(W * .7)}" y1="${Y(0) + 4}" y2="${Y(0) + 4}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>`;
-  g += `<text x="${X(W / 2)}" y="${Y(0) - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">Screen · ${fmtFt(W)} wide</text>`;
-  g += `<text x="${X(0) - 12}" y="${Y(L / 2)}" text-anchor="middle" font-size="11" fill="var(--text-3)" transform="rotate(-90 ${X(0) - 12} ${Y(L / 2)})">${fmtFt(L)} long</text>`;
-  g += `<line x1="${X(0)}" x2="${X(W)}" y1="${Y(L / 2)}" y2="${Y(L / 2)}" stroke="var(--text-3)" stroke-dasharray="3 4" opacity=".55"/><line x1="${X(W / 2)}" x2="${X(W / 2)}" y1="${Y(0)}" y2="${Y(L)}" stroke="var(--text-3)" stroke-dasharray="3 4" opacity=".55"/>`;
+  const X = x => pad + x * sc, Y = y => pad + y * sc, es = edgesOf(pts);
+  const d = pts.map((p, k) => (k ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('') + 'Z';
+  let g = `<path id="roomPoly" d="${d}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" stroke-linejoin="round"/>`;
+  const front = es.filter(e => e.side === 'front' && !e.angled).sort((a, b) => a.a[1] - b.a[1] || b.len - a.len)[0];
+  if (front) { const x0 = Math.min(front.a[0], front.b[0]), x1 = Math.max(front.a[0], front.b[0]), y = front.a[1], w = x1 - x0;
+    g += `<line x1="${X(x0 + w * .3)}" x2="${X(x0 + w * .7)}" y1="${Y(y) + 4}" y2="${Y(y) + 4}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>`;
+    g += `<text x="${X(x0 + w / 2)}" y="${Y(y) - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">Screen${rect ? ` · ${fmtFt(W)} wide` : ''}</text>`; }
+  if (rect) {
+    g += `<text x="${X(0) - 12}" y="${Y(L / 2)}" text-anchor="middle" font-size="11" fill="var(--text-3)" transform="rotate(-90 ${X(0) - 12} ${Y(L / 2)})">${fmtFt(L)} long</text>`;
+    g += `<line x1="${X(0)}" x2="${X(W)}" y1="${Y(L / 2)}" y2="${Y(L / 2)}" stroke="var(--text-3)" stroke-dasharray="3 4" opacity=".55"/><line x1="${X(W / 2)}" x2="${X(W / 2)}" y1="${Y(0)}" y2="${Y(L)}" stroke="var(--text-3)" stroke-dasharray="3 4" opacity=".55"/>`;
+  } else es.forEach(e => { if (e === front) return;     // a third of the way along, clear of the + at the middle
+    const mx = e.a[0] + (e.b[0] - e.a[0]) * .3, my = e.a[1] + (e.b[1] - e.a[1]) * .3, tx = X(mx) + e.n[0] * 15, ty = Y(my) + e.n[1] * 15 + 3.5;
+    g += `<text x="${tx}" y="${ty}" text-anchor="middle" font-size="9.5" fill="var(--text-3)" stroke="var(--surface-2)" stroke-width="3" paint-order="stroke">${fmtFt(e.len)}</text>`; });
+  g += openingMarks(r.room.wall_openings || [], es, X, Y, 'var(--surface-2)');
+  spk.concat(sug).forEach(s => { const c = s.kind === 'height' ? 'var(--s4)' : 'var(--s1)';
+    g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 4.5 : 5}" fill="${s.rec ? c : 'var(--surface)'}" stroke="${c}" stroke-width="1.5"${s.rec ? '' : ' stroke-dasharray="2 2"'}><title>${esc(s.id)}${s.rec ? '' : ' (suggested spot)'}</title></circle>
+      <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < L / 2 ? 15 : -8)}" text-anchor="middle" font-size="8.5" fill="var(--text-3)">${esc(s.id)}</text>`; });
   (r.seats || []).forEach(s => { if (s.x_m == null || s.y_m == null) return;
-    g += `<rect x="${X(s.x_m) - 8}" y="${Y(s.y_m) - 8}" width="16" height="16" rx="4" fill="var(--surface)" stroke="var(--text)" stroke-width="1.5"/><text x="${X(s.x_m)}" y="${Y(s.y_m) + 21}" text-anchor="middle" font-size="9.5" fill="var(--text-2)" stroke="var(--surface)" stroke-width="3" paint-order="stroke">${esc(s.name.replace(/^Seat\s*/i, 'S'))}</text>`; });
+    g += `<rect x="${X(s.x_m) - 8}" y="${Y(s.y_m) - 8}" width="16" height="16" rx="4" fill="var(--surface)" stroke="var(--text)" stroke-width="1.5"/><text x="${X(s.x_m)}" y="${Y(s.y_m) + 21}" text-anchor="middle" font-size="9.5" fill="var(--text-2)" stroke="var(--surface)" stroke-width="3" paint-order="stroke">${esc((s.name || '').replace(/^Seat\s*/i, 'S'))}</text>`; });
   Object.entries(r.subs || {}).forEach(([o, s]) => { if (s.x_m == null || s.y_m == null) return;
     g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="10" fill="${css(SUBC[+o % 4])}" stroke="var(--surface)" stroke-width="2"/><text x="${X(s.x_m)}" y="${Y(s.y_m) + 4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">${+o + 1}</text>`; });
-  el.innerHTML = `<svg viewBox="0 0 ${Wp} ${Hp}" role="img" aria-label="Room plan seen from above">${g}</svg><p class="muted" style="margin:4px 0 0;text-align:center">Dashed: half length and half width, where the first front-back and side-to-side modes cancel.</p>`;
+  if (edit) {
+    es.forEach(e => { const mx = X((e.a[0] + e.b[0]) / 2), my = Y((e.a[1] + e.b[1]) / 2);
+      g += `<g class="eh" data-e="${e.i}"><circle cx="${mx}" cy="${my}" r="7" fill="var(--surface)" stroke="var(--accent)" stroke-width="1.2"/><path d="M${mx - 3.5} ${my}H${mx + 3.5}M${mx} ${my - 3.5}V${my + 3.5}" stroke="var(--accent)" stroke-width="1.4"/><title>Add a corner on wall ${e.i + 1}</title></g>`; });
+    pts.forEach((p, i) => g += `<circle class="vh" data-v="${i}" cx="${X(p[0])}" cy="${Y(p[1])}" r="6.5" fill="var(--text)" stroke="var(--surface)" stroke-width="2"><title>Corner ${i + 1}: drag to move</title></circle>`);
+  }
+  const cap = edit ? 'Drag the corners to match your room; + on a wall adds a corner. Numbers are wall lengths.'
+    : 'Dashed: half length and half width, where the first front-back and side-to-side modes cancel.';
+  el.innerHTML = `<svg viewBox="0 0 ${Wp} ${Hp}" data-pad="${pad}" data-sc="${sc}" role="img" aria-label="Room plan seen from above">${g}</svg><p class="muted" style="margin:4px 0 0;text-align:center">${cap}${spk.length || sug.length ? ` Speakers: ${spk.length ? 'where you recorded them' : 'dashed = suggested spots'}.` : ''}</p>`;
+}
+// ---- the same room in 3D (RoomView, js/room3d.js), and the phone room builder's QR code
+let planMode = '2d', plan3dView = null, plan3dLast = null;
+try { planMode = localStorage.getItem('htPlanView') === '3d' ? '3d' : '2d'; } catch (e) { planMode = '2d'; }
+function plan3d(r, spk) {
+  plan3dLast = [r, spk];
+  if (planMode !== '3d' || !window.RoomView) return;
+  if (!plan3dView) plan3dView = RoomView.view3d($('#plan3d'));
+  const rm = r.room, marks = (r.seats || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'seat'}))
+    .concat(Object.entries(r.subs || {}).map(([o, s]) => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'sub', label: `${+o + 1}`, color: css(SUBC[+o % 4])})))
+    .concat((spk || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.kind === 'height' ? null : s.z_m, kind: s.kind === 'height' ? 'height' : 'speaker', label: s.id})));
+  plan3dView.set({...rm, outline: rm.outline || null}, marks);
+}
+function setPlanMode(m) {
+  planMode = m; try { localStorage.setItem('htPlanView', m); } catch (e) { /* private mode */ }
+  document.querySelectorAll('#planView button').forEach(b => b.classList.toggle('on', b.dataset.pv === m));
+  $('#plan').hidden = m === '3d'; $('#plan3dBox').hidden = m !== '3d';
+  if (m === '3d' && plan3dLast) plan3d(...plan3dLast);
+}
+$('#planView').addEventListener('click', e => { const b = e.target.closest('[data-pv]'); if (b) setPlanMode(b.dataset.pv); });
+setPlanMode(planMode);
+$('#buildPhone').addEventListener('click', async () => {
+  const box = $('#buildBox');
+  if (!S.ai_api) { box.innerHTML = '<div class="hwnote warn" style="margin-top:10px">The room builder needs the AI assistant: add an API key under Tools → AI analysis first.</div>'; return; }
+  box.innerHTML = '<p class="muted" style="margin:10px 0 0"><span class="spin"></span> Making a code…</p>';
+  const r = await post('/api/build/pair', {});
+  if (r.error) { box.innerHTML = `<div class="hwnote warn" style="margin-top:10px">${esc(r.error)}</div>`; return; }
+  box.innerHTML = `<div class="buildqr">${r.svg}<div><b>Scan with your phone's camera</b>
+    <p class="muted small" style="margin:4px 0 8px">Opens the room builder on your phone (same Wi-Fi): take photos, add sizes and notes, and your AI assistant draws the room in 2D and 3D. Nothing is saved until you press Save there. The code works once, for ${Math.round(r.expires_s / 60)} minutes.</p>
+    <p class="small" style="margin:0;word-break:break-all">${r.urls.map(u => `<code>${esc(u)}</code>`).join('<br>')}</p>
+    <button type="button" class="btn ghost" style="margin-top:8px" id="buildClose">Done</button></div></div>`;
+});
+$('#buildBox').addEventListener('click', e => { if (e.target.closest('#buildClose')) { $('#buildBox').innerHTML = ''; roomInit = false; poll(); } });
+// openings drawn on a wall: a gap for an opening, a door swing, a double line for a window
+function openingMarks(ops, es, X, Y, bg) {
+  let g = '';
+  ops.forEach(o => { const e = es[o.wall]; if (!e) return;
+    const p = s => [e.a[0] + e.d[0] * s, e.a[1] + e.d[1] * s], [x0, y0] = p(o.from_m), [x1, y1] = p(Math.min(e.len, o.from_m + o.width_m));
+    const ln = (sw, c, extra = '') => `<line x1="${X(x0)}" y1="${Y(y0)}" x2="${X(x1)}" y2="${Y(y1)}" stroke="${c}" stroke-width="${sw}"${extra}/>`;
+    if (o.kind === 'opening') g += ln(5, bg) + ln(1.2, 'var(--text-3)', ' stroke-dasharray="3 3"');
+    else if (o.kind === 'window') g += ln(5, bg) + ln(4, 'var(--s3)', ' stroke-opacity=".55"');
+    else { const r = Math.hypot(X(x1) - X(x0), Y(y1) - Y(y0)), ix = -e.n[0], iy = -e.n[1];
+      g += ln(5, bg) + `<path d="M${X(x0)} ${Y(y0)}L${X(x0) + ix * r} ${Y(y0) + iy * r}A${r} ${r} 0 0 ${signedArea([[0, 0], e.d, [ix, iy]]) > 0 ? 1 : 0} ${X(x1)} ${Y(y1)}" fill="none" stroke="var(--text-3)" stroke-width="1"/>`; }
+  });
+  return g;
 }
 function renderModes() {
   const m = S.modes, el = $('#modesBox');
   if (!m) { el.innerHTML = ''; return; }
   const name = x => x.n[1] ? `Length × ${x.n[1]}` : x.n[0] ? `Width × ${x.n[0]}` : `Height × ${x.n[2]}`;
   const tag = x => x.n[1] ? 'L' + x.n[1] : x.n[0] ? 'W' + x.n[0] : 'H' + x.n[2];
-  let h = `<h3>Room modes</h3><p class="muted" style="margin:0 0 8px">Calculated from the dimensions (L = length, W = width, H = height). Above about ${m.schroeder_hz} Hz they blur together.</p><div class="chips">`;
+  let h = `<h3>Room modes${m.estimate ? ' (estimate)' : ''}</h3><p class="muted" style="margin:0 0 8px">${m.estimate ? `Estimated for the main ${fmtFt(m.main_box.L)} × ${fmtFt(m.main_box.W)} part of your room` : 'Calculated from the dimensions'} (L = length, W = width, H = height). Above about ${m.schroeder_hz} Hz they blur together.</p><div class="chips">`;
   m.axial.filter(x => x.f <= 150).forEach(x => h += `<span class="chip" title="${name(x)}"><b>${tag(x)}</b><span class="num">${x.f.toFixed(1)} Hz</span></span>`);
+  (m.extra || []).forEach(x => h += `<span class="chip" style="border-style:dashed" title="Rough: ${esc(x.why)}"><b>~${x.dim === 'length' ? 'L' : 'W'}${x.n}</b><span class="num">${x.f.toFixed(1)} Hz</span></span>`);
   h += '</div>';
+  if ((m.notes || []).length) h += `<ul class="wins" style="margin-top:10px">${m.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>`;
   if (m.sub_to_main_seat) h += `<p class="muted">Distance to the MLP: ${Object.entries(m.sub_to_main_seat).map(([k, v]) => `Out ${k.replace('out', '')} ${fmtFt(v.m)} (${v.ms} ms)`).join(' · ')}</p>`;
   el.innerHTML = h;
 }

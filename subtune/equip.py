@@ -142,15 +142,42 @@ def sizes_from_receiver(details: dict) -> dict:
     return update_speakers(ups, who="receiver")
 
 
+def room_shape_m(rm: dict) -> dict:
+    """Room fields with the shape in metres: outline_ft [[x, y], ...] -> outline, openings' and the
+    ceiling's *_ft -> *_m, plus the plain *_ft sizes. outline [] or null goes back to a rectangle."""
+    rm = dict(rm)
+    if "outline_ft" in rm:
+        o = rm.pop("outline_ft")
+        rm["outline"] = [[round(float(p[0]) * FT, 3), round(float(p[1]) * FT, 3)] for p in o] if o else None
+    if "outline_m" in rm:
+        rm["outline"] = rm.pop("outline_m")
+    if rm.get("outline") is None and "outline" in rm:
+        rm.setdefault("shape", "rect")
+    for k in ("wall_openings", "openings_list"):
+        if k in rm:
+            rm["wall_openings"] = [_feet(o) for o in rm.pop(k) or []]
+    if isinstance(rm.get("ceiling"), dict):
+        rm["ceiling"] = _feet(rm["ceiling"])
+    return _feet({k: v for k, v in rm.items() if k not in ("outline", "wall_openings", "ceiling")}) | \
+        {k: rm[k] for k in ("outline", "wall_openings", "ceiling") if k in rm}
+
+
 def update_room(patch: dict, who="page") -> dict:
     """Partial update of room details, seats, goals, receiver text and subs (by 1-based output).
-    patch keys: room {length/width/height_m|_ft, construction, openings, notes}, seats [full list] or
+    patch keys: room {length/width/height_m|_ft, construction, openings (notes), notes, outline_ft|outline
+    [[x, y], ...], shape, wall_openings [{wall, from_ft, width_ft, height_ft, kind}], ceiling {kind, low_ft,
+    low_side, ridge}}, seats [full list] or
     seat {name, x/y/z_m|_ft} (update or add by name), goals, avr, subs {"1": {model, location, x_m.., controls{}}}."""
     from .room import load_room, save_room
     before = load_room()
     body = json.loads(json.dumps(before))
     if "room" in patch:
-        body["room"].update(_feet(patch["room"] or {}))
+        rp = room_shape_m(patch["room"] or {})
+        if body["room"].get("outline") and "outline" not in rp and \
+                any(rp.get(k) not in (None, body["room"].get(k)) for k in ("length_m", "width_m")):
+            raise ValueError("this room has a drawn outline, so its length and width come from it: send the corrected "
+                             "outline (outline_ft), or outline null to go back to a plain rectangle")
+        body["room"].update(rp)
     if "seats" in patch:
         body["seats"] = [_feet(s) for s in patch["seats"] or []]
     if "seat" in patch:
@@ -228,7 +255,8 @@ def _log(who, what, changed):
         return
     from . import journal
     from .state import event
-    txt = ({"assistant": "The assistant updated", "receiver": "From the receiver:"}.get(who, "You updated")
+    txt = ({"assistant": "The assistant updated", "receiver": "From the receiver:",
+            "builder": "You saved from the room builder (AI plan)"}.get(who, "You updated")
            + f" {what}: " + "; ".join(changed))
     event("config", txt[:400])
     journal.add("data", txt[:400])

@@ -11,6 +11,10 @@ Coordinates as everywhere in htTamer: metres, x from the left wall, y from the
 front (screen) wall, z from the floor. The result gives each speaker an ideal
 spot, the acceptable range, and notes when the room can't reach the ideal (a
 seat against the back wall, a low ceiling).
+
+A plain rectangle uses the box walls directly. An irregular outline (shape.py) casts the
+same rays from the seat to the real walls: a speaker never lands outside the room or in
+an opening, and height speakers sit at the ceiling height above their spot.
 """
 from __future__ import annotations
 
@@ -46,16 +50,52 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
     seat = next((s for s in room.get("seats") or [] if s.get("x_m") is not None and s.get("y_m") is not None), None)
     if not (L and W and H and seat and beds in BED):
         return None
+    from . import shape
     mx, my = seat["x_m"], seat["y_m"]
     ez = seat.get("z_m") or EAR
     spk, notes = [], []
+    poly = not shape.is_rect(rm) or bool(shape.openings(rm))
+    pts = shape.outline(rm)
     back = L - my
+    if poly:
+        bh = shape.ray_to_wall(rm, mx, my, 0.0, 1.0)
+        back = bh["dist"] if bh and not bh["opening"] else max(back, 2.0)
 
     WALLS = {"FL": "front", "FR": "front", "C": "front", "WL": "side", "WR": "side", "SL": "side", "SR": "side",
              "BL": "back", "BR": "back"}
 
+    def on_wall_poly(az, wall):
+        """The same for an irregular outline: the first real wall the ray meets, set off from it."""
+        a = math.radians(az)
+        dx, dy = math.sin(a), -math.cos(a)
+        h = shape.ray_to_wall(rm, mx, my, dx, dy)
+        if not h or h["opening"]:
+            return None
+        e = h["edge"]
+        kind = "side" if e["side"] in ("left", "right") else e["side"]
+        if kind != wall:
+            return None
+        gap = SIDE_GAP if wall == "front" else WALL_SET
+        if not gap - 1e-6 <= h["s_m"] <= e["len"] - gap + 1e-6:
+            return None
+        if any(o["from_m"] - gap < h["s_m"] < o["from_m"] + o["width_m"] + gap for o in e["openings"] if o["kind"] == "opening"):
+            return None
+        off = FRONT_SET if wall == "front" else WALL_SET
+        cosn = dx * e["n"][0] + dy * e["n"][1]               # how squarely the ray meets the wall (normal points out)
+        if cosn <= 1e-3:
+            return None
+        t = h["dist"] - off / cosn
+        if t <= 0:
+            return None
+        x, y = mx + dx * t, my + dy * t
+        if not shape.point_in(pts, x, y):
+            return None
+        return x, y, t
+
     def on_wall(az, wall):
         """Point where the ray at azimuth `az` meets `wall`, or None if it hits another wall first."""
+        if poly:
+            return on_wall_poly(az, wall)
         a = math.radians(az)
         dx, dy = math.sin(a), -math.cos(a)                      # y grows towards the back
         if wall == "front":
@@ -97,6 +137,12 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
                 hit = on_wall(ideal, w2)
                 if hit:
                     break
+            if not hit and poly:                                 # irregular room: any wall at an angle in range
+                hit = next((h for c in cands for w2 in ("front", "side", "back") for h in [on_wall(c, w2)] if h), None)
+            if not hit:
+                notes.append(f"{NAMES[k]}: no wall within Dolby's range from your seat (an opening or the room's shape "
+                             "is in the way); place it on a stand at about that angle.")
+                continue
             notes.append(f"{NAMES[k]}: your room can't reach Dolby's {abs(lo)}-{abs(hi)}° on the {wall} wall; "
                          f"placed as close as possible.")
         x, y, dist = hit
@@ -110,7 +156,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
 
     fl = next((s for s in spk if s["id"] == "FL"), None)
     lat = abs(mx - fl["x_m"]) if fl else W / 4
-    rise = H - ez
+    rise = (shape.ceiling_z(rm, mx, my) if poly or shape.ceiling(rm)["kind"] != "flat" else H) - ez
     if rise < 1.0:
         notes.append(f"The ceiling is only {_ft(rise)} ft above ear height: height speakers will sound close and "
                      "directional. Angled in-ceiling or upfiring modules help.")
@@ -131,13 +177,21 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
                          f"(Dolby allows {elo}-{ehi}°).")
             y = y_clamped
         x = mx + side * lat
-        spk.append({"id": k, "name": NAMES[k], "x_m": round(x, 2), "y_m": round(y, 2), "z_m": round(H, 2),
-                    "x_ft": _ft(x), "y_ft": _ft(y), "z_ft": _ft(H), "elevation": ideal_el, "range": [elo, ehi], "kind": "height"})
+        if poly and not shape.point_in(pts, x, y):
+            notes.append(f"{NAMES[k]}: the ideal ceiling spot is outside your room's outline; put it on the nearest "
+                         "ceiling inside the room.")
+            continue
+        zc = shape.ceiling_z(rm, x, y) if (poly or shape.ceiling(rm)["kind"] != "flat") else H
+        spk.append({"id": k, "name": NAMES[k], "x_m": round(x, 2), "y_m": round(y, 2), "z_m": round(zc, 2),
+                    "x_ft": _ft(x), "y_ft": _ft(y), "z_ft": _ft(zc), "elevation": ideal_el, "range": [elo, ehi], "kind": "height"})
     if my < L * 0.35 or my > L * 0.85:
         notes.append("The main seat is far from the middle of the room front-to-back, so some surround angles stretch "
                      "the guideline; small compromises are normal.")
     if abs(my - L / 2) < 0.15 * L:
         notes.append("The main seat is near the middle of the room front-to-back: that's where the first room mode has "
                      "a bass null. If bass is thin at the MLP, moving the seat forward or back a foot or two helps.")
+    if poly:
+        notes.append("Your room isn't a plain box: positions come from rays to the real walls of your outline.")
     return {"seat": {"x_m": mx, "y_m": my, "z_m": ez}, "room": {"L": L, "W": W, "H": H}, "speakers": spk, "notes": notes,
+            "outline": pts, "openings": shape.openings(rm),
             "source": "Dolby Atmos home theater installation guidelines (speaker angles from the main seat)"}

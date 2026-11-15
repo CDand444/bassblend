@@ -65,6 +65,10 @@ def build(st: dict, settings: dict, room: dict, rx: dict | None = None) -> str:
     # --- summary
     rm = room.get("room") or {}
     dims = " × ".join(f"{(rm.get(k) or 0) / 0.3048:.1f}" for k in ("length_m", "width_m", "height_m")) + " ft" if rm.get("length_m") else "not recorded"
+    if rm.get("length_m"):
+        from . import shape
+        sh = shape.describe(rm)
+        dims += f" ({sh})" if sh else ""
     dev = ((rx or {}).get("details") or {}).get("device") or {}
     subs = room.get("subs") or {}
     rows = [("Layout", sy.get("label") or "–"), ("Room", dims), ("Seats", ", ".join(s.get("name", "?") for s in room.get("seats") or []) or "–"),

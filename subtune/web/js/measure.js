@@ -155,7 +155,7 @@ function renderPlacement() {
   if (key === placeKey) return; placeKey = key;
   if (!p) { $('#placeOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and the main seat position in Room & subs, and the speaker layout in Tune my system.'); return; }
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
-  let g = `<rect x="${X(0)}" y="${Y(0)}" width="${W * sc}" height="${L * sc}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" rx="3"/>
+  let g = roomOutlineSvg(p.outline, p.openings, W, L, X, Y) + `
     <line x1="${X(W * .25)}" x2="${X(W * .75)}" y1="${Y(0) + 3}" y2="${Y(0) + 3}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   p.speakers.forEach(s => {
@@ -179,29 +179,42 @@ const TRT_WALLS = ['left', 'right', 'front', 'back', 'ceiling', 'floor'];
 const trtColor = i => i.installed ? 'var(--good)' : i.blocked ? 'var(--text-3)' : i.tier === 1 ? 'var(--s2)' : i.tier === 2 ? 'var(--s1)' : 'var(--s4)';
 const ftRange = r => `${fmtFt(r[0])}–${fmtFt(r[1])}`;
 function trtWhere(i) {
-  const z = i.zone; if (!z) return i.id === 'corner_traps' ? 'All four floor-to-ceiling corners (wall-to-ceiling corners also work)' : '';
-  if (i.wall === 'left' || i.wall === 'right') return `${i.wall} wall, ${ftRange(z.a)} from the front wall, ${ftRange(z.b)} up from the floor`;
-  if (i.wall === 'front' || i.wall === 'back') return `${i.wall} wall, ${ftRange(z.a)} from the left wall, ${ftRange(z.b)} up`;
+  const z = i.zone; if (!z) return i.id === 'corner_traps' ? `${(i.corners || []).length === 4 ? 'All four' : `These ${(i.corners || []).length}`} floor-to-ceiling corners${(i.corners || []).length !== 4 ? ': ' + i.corners.map(c => c.name).join('; ') : ''} (wall-to-ceiling corners also work)` : '';
+  const wn = z.wall_name || `${i.wall} wall`, over = (z.overlaps || []).length ? ` (${z.overlaps.join(', ')} in this area)` : '';
+  if (z.axis && z.axis[0] === 's_m') return `${wn}, ${ftRange(z.a)} along it from corner ${z.edge + 1}, ${ftRange(z.b)} up from the floor${over}`;
+  if (i.wall === 'left' || i.wall === 'right') return `${wn}, ${ftRange(z.a)} from the front wall, ${ftRange(z.b)} up from the floor${over}`;
+  if (i.wall === 'front' || i.wall === 'back') return `${wn}, ${ftRange(z.a)} from the left wall, ${ftRange(z.b)} up${over}`;
   return `${i.wall === 'ceiling' ? 'ceiling' : 'floor'}, ${ftRange(z.a)} from the left wall, ${ftRange(z.b)} from the front wall`;
+}
+// the room's real outline (a plain rectangle when there's none) with its openings, for the plan drawings
+function roomOutlineSvg(outline, openings, W, L, X, Y) {
+  if (!outline || outline.length < 3) return `<rect x="${X(0)}" y="${Y(0)}" width="${X(W) - X(0)}" height="${Y(L) - Y(0)}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" rx="3"/>`;
+  const d = outline.map((q, k) => (k ? 'L' : 'M') + X(q[0]).toFixed(1) + ' ' + Y(q[1]).toFixed(1)).join('') + 'Z';
+  return `<path d="${d}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" stroke-linejoin="round"/>` +
+    openingMarks(openings || [], edgesOf(outline), X, Y, 'var(--surface)');
 }
 function trtDrawing(p) {
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
-  let g = `<rect x="${X(0)}" y="${Y(0)}" width="${W * sc}" height="${L * sc}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" rx="3"/>
+  const sh = p.shape || {};
+  let g = roomOutlineSvg(sh.outline, sh.openings, W, L, X, Y) + `
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   const items = p.items;
   // floor and ceiling zones first (underneath)
   items.filter(i => i.rect && (i.wall === 'floor' || i.wall === 'ceiling')).forEach(i => { const r = i.rect;
     g += `<rect x="${X(r.x0)}" y="${Y(r.y0)}" width="${(r.x1 - r.x0) * sc}" height="${(r.y1 - r.y0) * sc}" fill="${trtColor(i)}" fill-opacity="${i.wall === 'floor' ? .08 : .14}" stroke="${trtColor(i)}" stroke-dasharray="${i.wall === 'floor' ? '1 3' : '5 4'}" rx="4"><title>${esc(i.title)}</title></rect>`; });
-  items.filter(i => i.rect && !['floor', 'ceiling'].includes(i.wall)).forEach(i => { const r = i.rect, inset = 4;
-    const x0 = r.x0 === 0 && r.x1 === 0 ? X(0) + inset : r.x0 === W && r.x1 === W ? X(W) - inset : X(r.x0);
-    const x1 = r.x0 === r.x1 ? x0 : X(r.x1), y0 = r.y0 === 0 && r.y1 === 0 ? Y(0) + inset : r.y0 === L && r.y1 === L ? Y(L) - inset : Y(r.y0), y1 = r.y0 === r.y1 ? y0 : Y(r.y1);
+  items.filter(i => i.rect && !['floor', 'ceiling'].includes(i.wall)).forEach(i => { const r = i.rect, inset = 4, n = r.n || [0, 0];
+    const x0 = X(r.x0) - n[0] * inset, x1 = X(r.x1) - n[0] * inset, y0 = Y(r.y0) - n[1] * inset, y1 = Y(r.y1) - n[1] * inset;
     g += `<line x1="${x0}" y1="${y0}" x2="${x1}" y2="${y1}" stroke="${trtColor(i)}" stroke-width="7" stroke-linecap="round"${i.kind === 'diffuser' ? ' stroke-dasharray="6 3"' : ''}><title>${esc(i.title)}</title></line>`; });
   const ct = items.find(i => i.id === 'corner_traps');
-  if (ct) (ct.corners || []).forEach(c => { const s = 0.45 * sc, cx = X(c.x_m), cy = Y(c.y_m), dx = c.x_m > 0 ? -s : s, dy = c.y_m > 0 ? -s : s;
-    g += `<path d="M${cx} ${cy}L${cx + dx} ${cy}L${cx} ${cy + dy}Z" fill="${trtColor(ct)}" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"><title>Corner bass trap (${esc(c.name)})</title></path>`; });
+  const ol = sh.outline && sh.outline.length >= 3 ? sh.outline : rectPts(W, L);
+  if (ct) (ct.corners || []).forEach(c => { const s = 0.45 * sc, cx = X(c.x_m), cy = Y(c.y_m);
+    const k = ol.findIndex(q => Math.abs(q[0] - c.x_m) < .01 && Math.abs(q[1] - c.y_m) < .01); if (k < 0) return;
+    const a = ol[(k - 1 + ol.length) % ol.length], b = ol[(k + 1) % ol.length], u = q => { const l = Math.hypot(q[0] - c.x_m, q[1] - c.y_m) || 1; return [(q[0] - c.x_m) / l * s, (q[1] - c.y_m) / l * s]; };
+    const [ax, ay] = u(a), [bx, by] = u(b);
+    g += `<path d="M${cx} ${cy}L${cx + ax} ${cy + ay}L${cx + bx} ${cy + by}Z" fill="${trtColor(ct)}" stroke="var(--text)" stroke-width="1.5" stroke-linejoin="round"><title>Corner bass trap (${esc(c.name)})</title></path>`; });
   // reflection points on the side walls (main seat, front speakers)
   items.filter(i => i.wall === 'left' || i.wall === 'right').forEach(i => (i.points || []).forEach(pt => {
-    g += `<circle cx="${X(pt.x_m) + (pt.x_m < 0.01 ? 4 : -4)}" cy="${Y(pt.y_m)}" r="2.6" fill="var(--text)"><title>${esc(pt.speaker)} → ${esc(pt.seat)}: ${pt.ms} ms later</title></circle>`; }));
+    g += `<circle cx="${X(pt.x_m) - (i.rect && i.rect.n ? i.rect.n[0] * 4 : (pt.x_m < 0.01 ? -4 : 4))}" cy="${Y(pt.y_m) - (i.rect && i.rect.n ? i.rect.n[1] * 4 : 0)}" r="2.6" fill="var(--text)"><title>${esc(pt.speaker)} → ${esc(pt.seat)}: ${pt.ms} ms later</title></circle>`; }));
   (p.speakers || []).filter(s => s.kind === 'bed').forEach(s => g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="5" fill="var(--surface)" stroke="var(--text-2)" stroke-width="1.5"><title>${esc(s.id)} (${s.source})</title></circle>
     <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < L / 2 ? 16 : -9)}" text-anchor="middle" font-size="9" fill="var(--text-3)">${esc(s.id)}</text>`);
   (p.subs || []).forEach(s => g += `<rect x="${X(s.x_m) - 6}" y="${Y(s.y_m) - 6}" width="12" height="12" rx="2" fill="var(--text-2)"><title>Sub out ${s.out}</title></rect>`);

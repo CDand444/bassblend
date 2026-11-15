@@ -670,6 +670,22 @@ def treatment_plan(st=None):
     return treatment.plan(room, st, layout.plan(room, sy.get("beds"), sy.get("heights")), modal_report(room, 200))
 
 
+def _shape_brief():
+    """The room's real shape in feet for the assistant (None for a plain box)."""
+    from . import shape
+    from .room import load_room
+    rm = load_room()["room"]
+    if shape.is_rect(rm) and not shape.openings(rm) and shape.ceiling(rm)["kind"] == "flat":
+        return None
+    es = shape.edges(rm)
+    return {"describe": shape.describe(rm),
+            "outline_ft": [[round(x / 0.3048, 1), round(y / 0.3048, 1)] for x, y in shape.outline(rm) or []],
+            "walls": [f"{e['i']}: {e['name']} ({e['len'] / 0.3048:.1f} ft)" for e in es],
+            "wall_openings": [{"wall": o["wall"], "kind": o["kind"], "from_ft": round(o["from_m"] / 0.3048, 1),
+                               "width_ft": round(o["width_m"] / 0.3048, 1)} for o in shape.openings(rm)],
+            "ceiling": shape.ceiling(rm)}
+
+
 def build_executors(origin="assistant"):
     from . import library
     from .room import load_room, modal_report
@@ -695,6 +711,8 @@ def build_executors(origin="assistant"):
                                                          "level_err_db", "advice")},
                "avr_blend_seats_status": st.get("avr_blend_seats"),
                "room": load_room(), "room_modes_hz": [m["f"] for m in (modal_report(load_room()) or {}).get("axial", [])[:10]],
+               "room_modes_note": " ".join((modal_report(load_room()) or {}).get("notes") or []) or None,
+               "room_shape": _shape_brief(),
                "receiver": avr_status()["status"], "measured_spots": len(st.get("measurements") or {}),
                "speaker_system": _system_brief(), "sub_hardware": sub_hardware(),
                "receiver_settings_slot": (s.get("preset") or 0) + 1}
@@ -1072,10 +1090,15 @@ def build_executors(origin="assistant"):
         return {"problems": p["problems"], "items": [trim(i) for i in p["items"]], "notes": p["notes"],
                 "installed": p["installed"], "constraints": p["constraints"], "before_after": p["compare"],
                 "measured": p["metrics"], "cost_and_value": p["costs"], "first_reflection_zones_ft": {
-                    i["id"]: {"wall": i["wall"], "along_ft": [round(v / 0.3048, 1) for v in i["zone"]["a"]],
-                              "up_ft": [round(v / 0.3048, 1) for v in i["zone"]["b"]]} for i in p["items"] if i.get("zone")},
+                    i["id"]: {"wall": i["zone"].get("wall_name") or i["wall"],
+                              "along_ft": [round(v / 0.3048, 1) for v in i["zone"]["a"]],
+                              "up_ft": [round(v / 0.3048, 1) for v in i["zone"]["b"]],
+                              **({"overlaps": i["zone"]["overlaps"]} if i["zone"].get("overlaps") else {})}
+                    for i in p["items"] if i.get("zone")},
                 "zone_note": "along_ft is from the front wall on side walls, from the left wall on the front/back wall and "
-                             "ceiling; up_ft is height from the floor on walls, distance from the front wall on the ceiling/floor.",
+                             "ceiling (an angled wall: along it from its first corner); up_ft is height from the floor on "
+                             "walls, distance from the front wall on the ceiling/floor.",
+                "room_shape": p["shape"]["describe"] or "rectangle",
                 "honesty": p["honesty"], "summary": p["summary"]}
 
     def treatment_constraints(**c):
@@ -1491,7 +1514,7 @@ class H(BaseHTTPRequestHandler):
         if path.startswith(("/api/", "/media/", "/mcp")):
             self._send(401, {"error": "sign in first", "login": "/login"})
         else:
-            self._redirect("/login")
+            self._redirect("/login?next=/build" if path == "/build" else "/login")
         return False
 
     def _mcp(self, body):
@@ -1527,8 +1550,33 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         u = urlparse(self.path)
         q = parse_qs(u.query)
+        if u.path in ("/build.webmanifest", "/apple-touch-icon.png"):   # what a phone fetches to add the page to its home screen
+            from . import builder
+            if u.path == "/apple-touch-icon.png":
+                return self._send(200, builder.touch_icon(), "image/png")
+            return self._send(200, builder.MANIFEST, "application/manifest+json")
+        if u.path == "/build" and q.get("pair"):        # a phone scanned the room builder's QR code
+            from . import auth, builder
+            if not self._setup_needed() and builder.use_pair(q["pair"][0]):
+                tok = auth.new_session()
+                event("config", f"a phone signed in with the room builder's QR code ({self.client_address[0]})")
+                return self._send(303, b"", "text/plain", [("Location", "/build"), ("Set-Cookie", auth.set_cookie(tok))])
+            if not self._authed():
+                return self._send(403, builder.EXPIRED_PAGE.encode(), "text/html; charset=utf-8")
+            return self._redirect("/build")
         if not self._gate(u.path):
             return
+        if u.path == "/build":                          # the phone room builder
+            return self._send(200, (WEB_DIR / "build.html").read_bytes(), "text/html; charset=utf-8")
+        if u.path == "/api/build/status":
+            from . import ai, builder, legal
+            from .room import load_room
+            rm = load_room()["room"]
+            ft = lambda v: None if v is None else round(v / 0.3048, 1)
+            return self._send(200, {"ai": ai.key_source() is not None, "provider": ai.PROVIDERS[ai.active()]["label"],
+                                    "terms": legal.accepted(), "labels": builder.LABELS,
+                                    "room": {"length_ft": ft(rm.get("length_m")), "width_ft": ft(rm.get("width_m")),
+                                             "height_ft": ft(rm.get("height_m")), "notes": rm.get("openings") or ""}})
         if u.path == "/api/setup/status":
             return self._send(200, self._setup_status())
         if u.path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):
@@ -1779,7 +1827,7 @@ class H(BaseHTTPRequestHandler):
         if origin and urlparse(origin).netloc != self.headers.get("Host", ""):
             return self._send(403, {"error": "forbidden"})
         n = int(self.headers.get("Content-Length", 0) or 0)
-        if n > (12_000_000 if path == "/api/config/import" else 4_000_000):
+        if n > (12_000_000 if path in ("/api/config/import", "/api/build/analyze") else 4_000_000):
             return self._send(413, {"error": "too large"})
         try:
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
@@ -2084,6 +2132,25 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True, "system": sy})
             if path == "/api/settings":
                 return self._send(200, {"changed": _apply_settings(body)})
+            if path == "/api/build/pair":                # dashboard: a one-time QR code for the phone room builder
+                from . import builder
+                if not NET["lan"]:
+                    raise ValueError("htTamer only listens to this computer right now, so a phone can't reach it. "
+                                     "The room builder works when htTamer runs on the Pi (or in network mode).")
+                return self._send(200, builder.pair_info(self.server.server_address[1], self.headers.get("Host")))
+            if path == "/api/build/analyze":             # phone: photos + measurements + notes -> the AI's floor plan
+                from . import ai, builder
+                try:
+                    r = builder.analyze(body.get("dims") or {}, str(body.get("notes") or ""), body.get("photos") or [],
+                                        body.get("previous"), str(body.get("correction") or ""))
+                except ai.AIError as e:
+                    raise RuntimeError(str(e))
+                event("config", f"room builder: the AI drew a floor plan ({len(body.get('photos') or [])} photos)")
+                return self._send(200, r)
+            if path == "/api/build/save":                # phone: the owner approved the plan
+                from . import builder
+                r = builder.save(body.get("proposal") or {})
+                return self._send(200, {"ok": True, **r})
             if path == "/api/room":
                 from .room import load_room, save_room
                 before = load_room().get("subs") or {}

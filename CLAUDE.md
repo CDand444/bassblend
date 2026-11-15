@@ -29,6 +29,12 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     `avrmeasure.py` + `blendmulti.py` (blend), `deepcheck.py` (system report), `fixup.py`,
     `fixlog.py` (fix ledger vs baseline), `allspk.py`
   - `liveeq.py`: live EQ layer (free top PEQ bands), analyzer (`run_rta`), `autofit`
+  - Room shape: `shape.py` (outline polygon, openings on walls, sloped/vaulted ceiling; reflections off real
+    walls, corners, main box). No outline = the plain L×W rectangle, so old rooms are unchanged. Room modes for
+    irregular rooms are an estimate from the main box (labelled so).
+  - `builder.py` + `web/build.html`: phone room builder. The dashboard shows a one-time QR (`qr.py`, own encoder)
+    that signs a phone in (`/build?pair=`), photos + sizes + notes -> `ai.vision` -> a checked plan the owner saves.
+    Needs an AI key; counts against `assistant.spend_ai_call` (the daily budget). Only in network mode (the Pi).
   - `rxinfo.py`: what the receiver reports about itself (SPI speaker setup, IFA/IFV signal, NRI/FWV, TPD),
     decoded and cross-checked. The RZ50 can't report distances, per-speaker levels or crossovers over
     eISCP (SPD/TCL get no reply; port 80 web setup needs a password) — the owner copies them onto the
@@ -43,8 +49,9 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
 - `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 8 parts, loaded in order as
-  classic scripts sharing globals: core, tune, room-ai, receiver, measure, setup-home, liveeq, nav),
-  `manual.html` (user manual, also `/manual`), `setup.html`, `logo.svg`
+  classic scripts sharing globals: core, tune, room-ai, receiver, measure, setup-home, liveeq, nav; plus
+  `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
+  `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`
 - `tests/test_*.py`: offline, no hardware, no sound; each file runs on its own
 - `deploy/`: `push-update.sh` (OTA to the Pi), `linux/` (install, updater), `pi-gen/` (SD image),
   `windows/` (PyInstaller spec + launcher + Inno Setup script; built by `.github/workflows/release.yml` on v* tags)

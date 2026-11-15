@@ -173,6 +173,7 @@ document.getElementById('f').onsubmit = async e => {
   e.preventDefault(); const err = document.getElementById('err'); err.textContent = '';
   const r = await fetch('/api/login', {method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({pin: document.getElementById('pin').value})}).then(r => r.json()).catch(() => ({error: 'htTamer is not answering'}));
-  if (r.ok) location.href = '/'; else { err.textContent = r.error || 'That PIN is not right.'; document.getElementById('pin').select(); }
+  const next = new URLSearchParams(location.search).get('next');
+  if (r.ok) location.href = next === '/build' ? '/build' : '/'; else { err.textContent = r.error || 'That PIN is not right.'; document.getElementById('pin').select(); }
 };
 </script></body></html>"""

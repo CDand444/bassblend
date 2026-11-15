@@ -88,6 +88,10 @@ def _dims(room):
     return {"L": L, "W": W, "H": H} if (L and W and H) else None
 
 
+def _rm(room):
+    return room.get("room") or {}
+
+
 def seats_of(room):
     out = []
     for s in room.get("seats") or []:
@@ -113,10 +117,15 @@ def speakers_of(room, placement=None):
 
 
 def first_reflections(room, placement=None, channels=("FL", "FR", "C"), walls=("left", "right", "ceiling", "floor")):
-    """Every first reflection of the given speakers at every seat, per wall."""
+    """Every first reflection of the given speakers at every seat, per wall side, off the room's real walls
+    (shape.reflections: the outline's edges, a sloped ceiling, openings and walls in the way all count).
+    Each point also says which wall (edge number and name) it is on. For a plain rectangle this is the
+    same as reflection_point() off the four walls."""
+    from . import shape
     dims = _dims(room)
     if not dims:
         return {}
+    rm = _rm(room)
     spk = speakers_of(room, placement)
     out = {w: [] for w in walls}
     for st in seats_of(room):
@@ -125,18 +134,39 @@ def first_reflections(room, placement=None, channels=("FL", "FR", "C"), walls=("
             s = spk.get(ch)
             if not s:
                 continue
-            for w in walls:
-                r = reflection_point((s["x_m"], s["y_m"], s["z_m"]), lis, w, dims)
-                if r:
-                    out[w].append({**r, "speaker": ch, "seat": st["name"], "source": s["source"]})
+            for r in shape.reflections(rm, (s["x_m"], s["y_m"], s["z_m"]), lis):
+                if r["wall"] in out:
+                    out[r["wall"]].append({**r, "speaker": ch, "seat": st["name"], "source": s["source"]})
     return out
 
 
-def _zone(points, wall, dims, margin=0.3):
-    """Panel area that covers a set of reflection points on one wall (with a margin for head movement)."""
+def _edge_axis(e):
+    """How a zone on wall edge e is measured along the wall: y for left/right walls, x for front/back
+    walls, distance from the wall's first corner (s) for angled ones. Returns (key, lo, hi)."""
+    if e["angled"]:
+        return "s_m", 0.0, e["len"]
+    k = 1 if e["side"] in ("left", "right") else 0
+    lo, hi = sorted((e["a"][k], e["b"][k]))
+    return ("y_m" if k else "x_m"), lo, hi
+
+
+def _edge_top(room, e):
+    """Lowest ceiling height along a wall (a sloped ceiling makes walls shorter at the low side)."""
+    from . import shape
+    rm = _rm(room)
+    return min(shape.ceiling_z(rm, *e["a"]), shape.ceiling_z(rm, *e["b"]))
+
+
+def _zone(points, wall, dims, margin=0.3, edge=None, top=None):
+    """Panel area that covers a set of reflection points on one wall (with a margin for head movement).
+    With `edge` (a shape.edges() wall) the zone stays within that wall."""
     if not points:
         return None
-    if wall in ("left", "right"):
+    alo = 0.0
+    if edge is not None:
+        a, alo, alim = _edge_axis(edge)
+        b, blim = "z_m", top or dims["H"]
+    elif wall in ("left", "right"):
         a, b = "y_m", "z_m"
         alim, blim = dims["L"], dims["H"]
     elif wall in ("front", "back"):
@@ -145,19 +175,54 @@ def _zone(points, wall, dims, margin=0.3):
     else:
         a, b = "x_m", "y_m"
         alim, blim = dims["W"], dims["L"]
-    lo_a = max(0.0, min(p[a] for p in points) - margin)
+    lo_a = max(alo, min(p[a] for p in points) - margin)
     hi_a = min(alim, max(p[a] for p in points) + margin)
     lo_b = max(0.0, min(p[b] for p in points) - margin)
     hi_b = min(blim, max(p[b] for p in points) + margin)
     if hi_a - lo_a < PANEL[0]:                         # at least one panel wide
         mid = (lo_a + hi_a) / 2
-        lo_a, hi_a = max(0.0, mid - PANEL[0] / 2), min(alim, mid + PANEL[0] / 2)
+        lo_a, hi_a = max(alo, mid - PANEL[0] / 2), min(alim, mid + PANEL[0] / 2)
     if hi_b - lo_b < PANEL[1] * (0.5 if wall in ("ceiling", "floor") else 1):
         mid = (lo_b + hi_b) / 2
         need = PANEL[1] * (0.5 if wall in ("ceiling", "floor") else 1)
         lo_b, hi_b = max(0.0, mid - need / 2), min(blim, mid + need / 2)
-    return {"axis": [a, b], "a": [round(lo_a, 2), round(hi_a, 2)], "b": [round(lo_b, 2), round(hi_b, 2)],
-            "area_m2": round((hi_a - lo_a) * (hi_b - lo_b), 2)}
+    z = {"axis": [a, b], "a": [round(lo_a, 2), round(hi_a, 2)], "b": [round(lo_b, 2), round(hi_b, 2)],
+         "area_m2": round((hi_a - lo_a) * (hi_b - lo_b), 2)}
+    if edge is not None:
+        z.update(_edge_extra(edge, z))
+    return z
+
+
+def _edge_extra(e, z):
+    """Edge number and name, and any door/window/opening that overlaps the zone."""
+    a = z["axis"][0]
+    if a == "s_m":
+        s0, s1 = z["a"]
+    else:
+        k = 0 if a == "x_m" else 1
+        d = e["dir"][k]
+        s0, s1 = sorted(((v - e["a"][k]) / d for v in z["a"])) if abs(d) > 1e-9 else (0.0, e["len"])
+    hits = [o for o in e["openings"] if o["from_m"] < s1 and o["from_m"] + o["width_m"] > s0]
+    out = {"edge": e["i"], "wall_name": e["name"], "s": [round(s0, 2), round(s1, 2)]}
+    if hits:
+        out["overlaps"] = sorted({o["kind"] for o in hits})
+    return out
+
+
+def _seg_rect(e, z):
+    """Drawing segment (top-down, metres) of a zone on wall edge e, with the wall's outward normal."""
+    s0, s1 = z["s"]
+    p = lambda s: (round(e["a"][0] + e["dir"][0] * s, 3), round(e["a"][1] + e["dir"][1] * s, 3))
+    (x0, y0), (x1, y1) = p(s0), p(s1)
+    if not e["angled"]:                              # keep the old orientation: low to high coordinate
+        x0, x1 = sorted((x0, x1))
+        y0, y1 = sorted((y0, y1))
+    return {"x0": x0, "x1": x1, "y0": y0, "y1": y1, "edge": e["i"], "n": [round(v, 3) for v in e["n"]]}
+
+
+OVERLAP_NOTE = {"window": "a window is in this area: panels can't go on glass, so use heavy curtains or a freestanding panel there",
+                "door": "a door is in this area: skip the panel over the door, or use one on the door itself",
+                "opening": "part of this area is an opening to another space: there's no wall to treat there"}
 
 
 def _panels(area_m2):
@@ -345,9 +410,10 @@ def problems(room: dict, state: dict, modal: dict | None = None, refl: dict | No
                       True, [], spread_db=sp))
     # 7. geometry-only: seat close to the back wall
     st = seats_of(room)
-    if dims and st and dims["L"] - max(s["y_m"] for s in st) < 0.9:
+    gap = min((h["dist"] for h in (_behind(room, s) for s in st) if h and not h["opening"]), default=None) if dims else None
+    if gap is not None and gap < 0.9:
         out.append(_p("seat_near_back", "Seats close to the back wall", 35,
-                      f"The back row is {_ft(dims['L'] - max(s['y_m'] for s in st))} ft from the back wall.",
+                      f"The back row is {_ft(gap)} ft from the back wall.",
                       "Sound bouncing straight back off the wall arrives almost with the direct sound, and bass piles up there.",
                       "EQ can't fix it; thick absorption right behind the heads does.", False, ["rear_wall"]))
     out.sort(key=lambda p: -p["score"])
@@ -355,6 +421,12 @@ def problems(room: dict, state: dict, modal: dict | None = None, refl: dict | No
 
 
 # ------------------------------------------------------------------ the plan
+def _behind(room, seat, dy=1.0):
+    """The wall straight behind (dy=1) or in front of (dy=-1) a seat: shape.ray_to_wall's hit."""
+    from . import shape
+    return shape.ray_to_wall(_rm(room), seat["x_m"], seat["y_m"], 0.0, dy)
+
+
 def _rect(wall, z, dims):
     """Drawing rectangle (top-down, metres) for a zone on a wall."""
     if not z:
@@ -542,16 +614,32 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
                                  if kind in ("absorber", "cloud") else "Skip it, or use a freestanding version.")
         items.append(it)
 
-    # side walls: first reflections of the front three
+    from . import shape
+    rm = _rm(room)
+    walls = {e["i"]: e for e in shape.edges(rm)}
+
+    def overlap_note(z):
+        for k in (z or {}).get("overlaps") or []:
+            notes.append(f"{z['wall_name'].capitalize()}: {OVERLAP_NOTE[k]}.")
+
+    # side walls: first reflections of the front three, on whichever wall (part) they land
     for w in ("left", "right"):
-        z = _zone(refl.get(w) or [], w, dims)
-        if z:
-            n = _panels(z["area_m2"])
-            add("side_panels" if w == "left" else "side_panels_r", f"{w.title()} side wall: first-reflection panels", "absorber", w, z,
-                n, "2 x 4 ft", 4, 2,
+        by_edge = {}
+        for pt in refl.get(w) or []:
+            by_edge.setdefault(pt["edge"], []).append(pt)
+        main_e = max(by_edge, key=lambda k: (len(by_edge[k]), walls[k]["len"]), default=None)
+        for ei in sorted(by_edge, key=lambda k: k != main_e):
+            e, pts_ = walls[ei], by_edge[ei]
+            z = _zone(pts_, w, dims, edge=e, top=_edge_top(room, e))
+            base_id = "side_panels" if w == "left" else "side_panels_r"
+            iid = base_id if ei == main_e else f"{base_id}_e{ei}"
+            label = f"{w.title()} side wall" if e["name"] == f"{w} wall" else e["name"].capitalize()
+            add(iid, f"{label}: first-reflection panels", "absorber", w, z,
+                _panels(z["area_m2"]), "2 x 4 ft", 4, 2,
                 "Clearer dialogue and a sharper, steadier centre image; takes out the comb ripples in the treble.",
                 45, "The first reflections of the front speakers off the side walls arrive within a few milliseconds and blur the image.",
-                rect=_rect(w, z, dims), points=refl.get(w))
+                rect=_seg_rect(e, z), points=pts_)
+            overlap_note(z)
     # ceiling cloud
     z = _zone(refl.get("ceiling") or [], "ceiling", dims)
     if z:
@@ -561,11 +649,16 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             rect=_rect("ceiling", z, dims), points=refl.get("ceiling"))
         if any(s["kind"] == "height" for s in spk.values()):
             notes.append("Don't cover the ceiling right under or in front of the height speakers; a cloud between them is fine.")
-    # corner bass traps
+        if shape.ceiling(rm)["kind"] != "flat":
+            notes.append("Your ceiling slopes: hang the cloud level (deeper on the high side) or follow the slope; "
+                         "either way keep it over the reflection points shown.")
+    # corner bass traps: every corner of the real outline that points out of the room (under 180°);
+    # inside corners (an L's inner corner) aren't pressure maxima, and corners open to another space don't exist
     ring = next((p for p in probs if p["id"] == "bass_ringing"), None)
     f = (ring or {}).get("f") or 60
     depth = float(round(min(24.0, max(6.0, depth_for_hz(max(f, 40))))))
-    corners = [(0.0, 0.0, "front left"), (dims["W"], 0.0, "front right"), (0.0, dims["L"], "back left"), (dims["W"], dims["L"], "back right")]
+    cs = sorted((c for c in shape.corners(rm) if c["convex"] and not c["open"]), key=lambda c: (c["y_m"], c["x_m"]))
+    corners = [(c["x_m"], c["y_m"], c["name"], c["angle"]) for c in cs]
     sub_corner = []
     for k, s in (room.get("subs") or {}).items():
         if s.get("x_m") is not None and s.get("y_m") is not None:
@@ -574,27 +667,55 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
            if f >= 60 else
            f"Helps the ringing a bit; around {f:g} Hz porous traps this size do less, so tuned membrane (pressure) traps or "
            "the subs and EQ do the heavy lifting.")
-    add("corner_traps", "Corner bass traps, floor to ceiling", "bass trap", "corners", None, 4, f"{depth:.0f} in. across the corner, floor to ceiling",
+    n_angled = sum(1 for c in corners if abs(c[3] - 90) > 5)
+    add("corner_traps", "Corner bass traps, floor to ceiling", "bass trap", "corners", None, max(1, len(corners)),
+        f"{depth:.0f} in. across the corner, floor to ceiling",
         depth, 0, eff, 40,
         "Every room mode has its maximum pressure in the corners, so that's where a trap works hardest. "
-        "Wall-to-ceiling corners (soffits) work too.",
-        corners=[{"x_m": c[0], "y_m": c[1], "name": c[2], "sub_here": c[2] in sub_corner} for c in corners],
+        "Wall-to-ceiling corners (soffits) work too."
+        + (f" {n_angled} of your corners are angled: a trap across them works as well, just wider." if n_angled else ""),
+        corners=[{"x_m": c[0], "y_m": c[1], "name": c[2], "sub_here": c[2] in sub_corner,
+                  **({"angle": c[3]} if abs(c[3] - 90) > 5 else {})} for c in corners],
         membrane_hz=f if f < 60 else None)
-    # rear wall
-    back = dims["L"] - max((s["y_m"] for s in seats), default=dims["L"] / 2)
+    if shape.open_width(rm):
+        notes.append("Corners where the room opens to another space aren't real corners, so they get no trap; the "
+                     "opening already lets some bass out.")
+    # rear wall: the wall straight behind the seats (none when the room opens up behind them)
+    hits = [(s, _behind(room, s)) for s in seats]
+    hits = [(s, h) for s, h in hits if h]
+    back_hit = min(hits, key=lambda sh: sh[1]["dist"], default=(None, None))
+    back = back_hit[1]["dist"] if back_hit[1] else dims["L"] - max((s["y_m"] for s in seats), default=dims["L"] / 2)
+    rear_open = bool(back_hit[1] and back_hit[1]["opening"])
     if back < 0.9:
         rk, rthick, rgap, reff = "absorber", 4, 2, "Removes the slap right behind your head; the image and dialogue get clearer."
     elif back >= 1.8 and (rt is None or rt <= 0.45):
         rk, rthick, rgap, reff = "diffuser", 6, 0, "Spreads the rear-wall reflection out so the room keeps life without echo."
     else:
         rk, rthick, rgap, reff = "absorber", 4, 2, "Less echo from behind; surround effects get more precise."
-    zr = {"axis": ["x_m", "z_m"], "a": [round(max(0.0, dims["W"] / 2 - 1.2), 2), round(min(dims["W"], dims["W"] / 2 + 1.2), 2)],
-          "b": [0.6, min(dims["H"], 1.8)], "area_m2": None}
-    zr["area_m2"] = round((zr["a"][1] - zr["a"][0]) * (zr["b"][1] - zr["b"][0]), 2)
-    add("rear_wall", f"Back wall behind the seats: {'diffusion' if rk == 'diffuser' else 'absorption'}", rk, "back", zr,
-        _panels(zr["area_m2"]), "2 x 4 ft", rthick, rgap, reff, 35 if back < 0.9 else 20,
-        f"Your back row is {_ft(back)} ft from the back wall." + (" Close walls need thick absorption." if back < 0.9 else ""),
-        rect=_rect("back", zr, dims))
+    be = back_hit[1]["edge"] if back_hit[1] else walls.get(2)
+    if rear_open:
+        notes.append("Behind the seats the room opens into another space, so there's no back wall to treat; a freestanding "
+                     "panel or a heavy curtain behind the back row can stand in for it.")
+    elif be is not None:
+        key, lo, hi = _edge_axis(be)
+        if key == "s_m":
+            mid = be["len"] / 2
+        else:
+            mid = (lo + hi) / 2
+            seat_c = back_hit[0]["x_m"] if back_hit[0] and key == "x_m" else mid
+            if not shape.is_rect(rm) and abs(seat_c - mid) > 1.2:   # a long wall: keep the zone behind the seats
+                mid = seat_c
+        top = _edge_top(room, be)
+        zr = {"axis": [key, "z_m"], "a": [round(max(lo, mid - 1.2), 2), round(min(hi, mid + 1.2), 2)],
+              "b": [0.6, min(top, 1.8)], "area_m2": None}
+        zr["area_m2"] = round((zr["a"][1] - zr["a"][0]) * (zr["b"][1] - zr["b"][0]), 2)
+        zr.update(_edge_extra(be, zr))
+        add("rear_wall", f"{'Back wall' if be['side'] == 'back' and not be['angled'] else be['name'].capitalize()} behind the seats: "
+            f"{'diffusion' if rk == 'diffuser' else 'absorption'}", rk, be["side"], zr,
+            _panels(zr["area_m2"]), "2 x 4 ft", rthick, rgap, reff, 35 if back < 0.9 else 20,
+            f"Your back row is {_ft(back)} ft from the back wall." + (" Close walls need thick absorption." if back < 0.9 else ""),
+            rect=_seg_rect(be, zr))
+        overlap_note(zr)
     # floor
     zf = _zone(refl.get("floor") or [], "floor", dims, margin=0.4)
     if zf and not carpet:
@@ -604,12 +725,17 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             "A hard floor reflects the speakers' sound to your ears like a mirror.", rect=_rect("floor", zf, dims), points=refl.get("floor"))
     # front wall behind the speakers
     if any(p["id"] == "boundary_dip" for p in probs) or any(s["y_m"] < 0.9 for k, s in spk.items() if k in ("FL", "FR")):
-        zfw = {"axis": ["x_m", "z_m"], "a": [0.0, dims["W"]], "b": [0.3, min(dims["H"], 1.5)], "area_m2": None}
-        zfw["area_m2"] = round(dims["W"] * (zfw["b"][1] - zfw["b"][0]), 2)
-        add("front_wall", "Front wall behind the speakers", "absorber", "front", zfw, 2 if dims["W"] < 4.5 else 3, "2 x 4 ft",
+        fh = _behind(room, seats[0], -1.0) if seats else None
+        fe = fh["edge"] if fh and not fh["opening"] else walls.get(0)
+        key, lo, hi = _edge_axis(fe)
+        top = _edge_top(room, fe)
+        zfw = {"axis": [key, "z_m"], "a": [round(lo, 2), round(hi, 2)], "b": [0.3, min(top, 1.5)], "area_m2": None}
+        zfw["area_m2"] = round((hi - lo) * (zfw["b"][1] - zfw["b"][0]), 2)
+        zfw.update(_edge_extra(fe, zfw))
+        add("front_wall", "Front wall behind the speakers", "absorber", "front", zfw, 2 if fe["len"] < 4.5 else 3, "2 x 4 ft",
             6, 4, "A little more body where the wall-bounce dip is, and a cleaner image depth. Moving the speakers helps more.",
             15, "The wall behind the speakers bounces bass back that cancels the direct sound at one pitch.",
-            rect=_rect("front", zfw, dims))
+            rect=_seg_rect(fe, zfw))
     # merge the right-side panels into the left item for ranking (one row each, same score)
     for it in items:
         if it["id"] == "side_panels_r":
@@ -651,12 +777,25 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
         notes.append("No measurements yet: this plan is from the room geometry only. A system report and a check-up "
                      "rank it by what your room really does.")
     items.sort(key=lambda i: (i["installed"], i["tier"], -i["score"]))
-    return {"room": dims, "seats": seats, "speakers": list(spk.values()),
+    return {"room": dims, "shape": shape_view(rm), "seats": seats, "speakers": list(spk.values()),
             "subs": [{"out": int(k) + 1, "x_m": s["x_m"], "y_m": s["y_m"]} for k, s in (room.get("subs") or {}).items()
                      if s.get("x_m") is not None and s.get("y_m") is not None],
             "problems": probs, "items": items, "notes": notes, "tiers": TIER, "installed": inst, "constraints": cons,
             "metrics": room_metrics(state), "compare": compare(tr, state), "honesty": HONESTY, "costs": costs,
             "summary": _summary(probs, items)}
+
+
+def shape_view(rm: dict) -> dict:
+    """The outline, walls and openings for the drawing (metres)."""
+    from . import shape
+    es = shape.edges(rm)
+    ops = []
+    for e in es:
+        for o in e["openings"]:
+            p = lambda s: [round(e["a"][0] + e["dir"][0] * s, 3), round(e["a"][1] + e["dir"][1] * s, 3)]
+            ops.append({**o, "p0": p(o["from_m"]), "p1": p(o["from_m"] + o["width_m"])})
+    return {"outline": shape.outline(rm), "rect": shape.is_rect(rm), "openings": ops,
+            "walls": [{"i": e["i"], "name": e["name"], "side": e["side"]} for e in es], "describe": shape.describe(rm)}
 
 
 HONESTY = ("EQ fixes peaks; treatment fixes ringing, reflections and decay. Thin panels (1-2 in.) only work in the "

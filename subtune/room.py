@@ -15,7 +15,9 @@ ROOM_FILE = DATA / "room.json"
 C = 343.0
 
 EMPTY = {
-    "room": {"length_m": None, "width_m": None, "height_m": None, "construction": "", "openings": "", "notes": ""},
+    "room": {"length_m": None, "width_m": None, "height_m": None, "construction": "", "openings": "", "notes": "",
+             # optional real shape (shape.py): floor outline, openings on its walls, sloped/vaulted ceiling
+             "outline": None, "shape": "rect", "wall_openings": [], "ceiling": None},
     "seats": [{"name": "Main seat", "x_m": None, "y_m": None, "z_m": 1.0}],
     "subs": {},          # "0".."3" -> sub description (output index, 0-based)
     "avr": "",
@@ -60,6 +62,7 @@ def save_room(body: dict) -> dict:
     r["room"] = {"length_m": _num(rm.get("length_m"), 1, 50), "width_m": _num(rm.get("width_m"), 1, 50),
                  "height_m": _num(rm.get("height_m"), 1.5, 15), "construction": _txt(rm.get("construction")),
                  "openings": _txt(rm.get("openings")), "notes": _txt(rm.get("notes"), 1000)}
+    r["room"].update(clean_shape(rm, r["room"]))
     seats = []
     for s in (body.get("seats") or [])[:8]:
         seats.append({"name": _txt(s.get("name"), 40) or f"Seat {len(seats) + 1}",
@@ -94,6 +97,31 @@ def save_room(body: dict) -> dict:
     return r
 
 
+def clean_shape(rm: dict, base: dict) -> dict:
+    """The optional real shape: outline (the overall length/width then come from it), openings, ceiling.
+    A rectangular outline is stored as no outline, exactly like a room saved before shapes existed."""
+    from . import shape
+    out = {}
+    o = shape.clean_outline(rm.get("outline"))
+    if o:
+        W, L = shape.extent(o)
+        if not (1 <= W <= 50 and 1 <= L <= 50):
+            raise ValueError("the outline must be 1-50 m each way")
+        base["width_m"], base["length_m"] = round(W, 3), round(L, 3)
+        if shape.is_rect({"outline": o}):
+            o = None
+    sh = str(rm.get("shape") or ("custom" if o else "rect")).lower()
+    out["outline"] = o
+    out["shape"] = sh if (o and sh in ("l", "alcove", "cut", "custom")) else ("custom" if o else "rect")
+    pts = o or (shape.rect(base["width_m"], base["length_m"]) if base.get("width_m") and base.get("length_m") else None)
+    ops = rm.get("wall_openings") or []
+    if ops and not pts:
+        raise ValueError("enter the room size before adding openings")
+    out["wall_openings"] = shape.clean_openings(ops, pts) if pts else []
+    out["ceiling"] = shape.clean_ceiling(rm.get("ceiling"), base.get("height_m"))
+    return out
+
+
 def write_room(r: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
     ROOM_FILE.write_text(json.dumps(r, indent=2))
@@ -122,16 +150,27 @@ def mode_pressure(mode, x, y, z, W, L, H):
 
 
 def modal_report(room: dict, fmax=150.0) -> dict | None:
+    """Room modes. A rectangle gets the classic rectangular-room calculation. An irregular room gets the
+    same calculation for its main box (the biggest rectangle inside the outline), labelled as an
+    estimate, plus the rough extra modes its other parts add; measurements stay the authority."""
+    from . import shape
     rm = room["room"]
-    L, W, H = rm.get("length_m"), rm.get("width_m"), rm.get("height_m")
-    if not (L and W and H):
+    if not (rm.get("length_m") and rm.get("width_m") and rm.get("height_m")):
         return None
+    box = shape.main_box(rm)
+    irregular = not shape.is_rect(rm)
+    sloped = shape.ceiling(rm)["kind"] != "flat"
+    L, W, H = box["L"], box["W"], shape.mean_height(rm)
+    ox, oy = box["x0"], box["y0"]
     modes = room_modes(L, W, H, fmax)
     axial = [m for m in modes if m["type"] == "axial"]
+    vol = shape.volume(rm) or L * W * H
     # Schroeder frequency (rough, assumes RT60 ~0.4 s)
-    schroeder = 2000 * math.sqrt(0.4 / (L * W * H))
+    schroeder = 2000 * math.sqrt(0.4 / vol)
     rep = {"modes": modes, "axial": axial, "schroeder_hz": round(schroeder, 0),
-           "volume_m3": round(L * W * H, 1), "coupling": {}}
+           "volume_m3": round(vol, 1), "coupling": {}}
+    if irregular or sloped or shape.open_width(rm):
+        rep.update(_irregular_notes(rm, box, axial, irregular, sloped, fmax))
     # how strongly each sub drives / each seat hears the first axial + tangential modes
     key = [m for m in modes if m["type"] != "oblique"][:12]
     pts = {}
@@ -142,7 +181,9 @@ def modal_report(room: dict, fmax=150.0) -> dict | None:
         if s.get("x_m") is not None and s.get("y_m") is not None:
             pts[f"seat:{s['name']}"] = (s["x_m"], s["y_m"], s.get("z_m") or 1.0)
     for name, (x, y, z) in pts.items():
-        rep["coupling"][name] = {f"{m['f']}Hz{tuple(m['n'])}": round(mode_pressure(m, x, y, z, W, L, H), 2)
+        if not (ox - 0.05 <= x <= ox + W + 0.05 and oy - 0.05 <= y <= oy + L + 0.05):
+            continue                                     # outside the main box: its mode shapes don't apply there
+        rep["coupling"][name] = {f"{m['f']}Hz{tuple(m['n'])}": round(mode_pressure(m, x - ox, y - oy, z, W, L, H), 2)
                                  for m in key}
     # straight-line distance sub -> main seat (expected arrival time)
     seat = next((s for s in room["seats"] if s.get("x_m") is not None and s.get("y_m") is not None), None)
@@ -155,3 +196,40 @@ def modal_report(room: dict, fmax=150.0) -> dict | None:
                 dist[f"out{int(k) + 1}"] = {"m": round(d, 2), "ms": round(d / C * 1e3, 2)}
         rep["sub_to_main_seat"] = dist
     return rep
+
+
+def _irregular_notes(rm, box, axial, irregular, sloped, fmax) -> dict:
+    """Honest labels and rough extra modes for a room that isn't a plain box."""
+    from . import shape
+    FT = 0.3048
+    out = {"estimate": True, "main_box": {k: round(box[k], 3) for k in ("x0", "y0", "x1", "y1", "W", "L")}, "extra": []}
+    notes = []
+    if irregular:
+        notes.append(f"Your room isn't a plain box, so these modes are an estimate from its main box "
+                     f"({box['L'] / FT:.1f} x {box['W'] / FT:.1f} ft). Measured responses (check-up, system report) "
+                     "show the real ones.")
+        W, L = shape.extent(shape.outline(rm))
+        seen = {round(m["f"], 1) for m in axial}
+        for dim, span, inner in (("length", L, box["L"]), ("width", W, box["W"])):
+            if span - inner > 0.3:
+                k = 1
+                while k * C / (2 * span) <= min(fmax, 120):
+                    f = round(k * C / (2 * span), 1)
+                    if f not in seen:
+                        out["extra"].append({"f": f, "dim": dim, "n": k,
+                                             "why": f"the full {dim} including the extra part ({span / FT:.1f} ft)"})
+                    k += 1
+        if out["extra"]:
+            notes.append("The extra part of the room adds or shifts modes, roughly around "
+                         + ", ".join(f"{x['f']:g}" for x in out["extra"][:4]) + " Hz (rough: the real ones depend on how "
+                         "the parts connect).")
+    if sloped:
+        c = shape.ceiling(rm)
+        notes.append(f"The ceiling isn't flat ({c['low_m'] / FT:.1f}-{rm['height_m'] / FT:.1f} ft): the height modes use "
+                     "the average height; in reality they spread out and are usually weaker than in a flat room.")
+    ow = shape.open_width(rm)
+    if ow:
+        notes.append(f"Openings to other spaces ({ow / FT:.1f} ft in all) let bass leak out: modes along that direction are "
+                     "usually weaker and a little lower than calculated, and the space next door joins in.")
+    out["notes"] = notes
+    return out

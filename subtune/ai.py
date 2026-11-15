@@ -518,6 +518,52 @@ def complete(system: str, user: str, json_schema: dict | None = None) -> Reply:
     raise AIError("unknown provider")
 
 
+def vision(system: str, text: str, images: list[tuple[str, str]], json_schema: dict | None = None) -> Reply:
+    """One question about some photos (the room builder). images: [(media_type, base64 data)].
+    Every provider here takes images; a local model without vision answers with an error."""
+    p = active()
+    if p == "anthropic":
+        from .analysis import _call_claude
+        blocks = [{"type": "image", "source": {"type": "base64", "media_type": mt, "data": b64}} for mt, b64 in images]
+        blocks.append({"type": "text", "text": text})
+        msg = _call_claude(system, blocks, {"type": "json_schema", "schema": json_schema} if json_schema else None)
+        out = "".join(b.text for b in msg.content if b.type == "text").strip()
+        return Reply(out, msg.stop_reason, msg.model, msg.usage.input_tokens, msg.usage.output_tokens,
+                     getattr(msg, "_request_id", None))
+    if json_schema:
+        text += ("\n\nReply with ONLY a JSON object (no prose, no code fences) that follows this JSON schema:\n"
+                 + json.dumps(json_schema))
+    if p in ("openai", "local"):
+        content = [{"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}"}} for mt, b64 in images]
+        content.append({"type": "text", "text": text})
+        body = {"model": _need_model(p), "messages": [{"role": "system", "content": system},
+                                                       {"role": "user", "content": content}]}
+        body["max_completion_tokens" if p == "openai" else "max_tokens"] = 16000
+        if json_schema:
+            body["response_format"] = {"type": "json_object"}
+        r = _http(_openai_base(p) + "/chat/completions", body, _openai_headers(p))
+        out = from_openai(r)
+        u = r.get("usage") or {}
+        t = "".join(b["text"] for b in out["content"] if b["type"] == "text").strip()
+        return Reply(_json_text(t) if json_schema else t, out["stop_reason"], r.get("model") or body["model"],
+                     u.get("prompt_tokens"), u.get("completion_tokens"))
+    if p == "gemini":
+        gc = {"maxOutputTokens": 16000}
+        if json_schema:
+            gc["responseMimeType"] = "application/json"
+        parts = [{"inline_data": {"mime_type": mt, "data": b64}} for mt, b64 in images] + [{"text": text}]
+        body = {"systemInstruction": {"parts": [{"text": system}]}, "contents": [{"role": "user", "parts": parts}],
+                "generationConfig": gc}
+        model = _need_model(p)
+        r = _http(f"{PROVIDERS['gemini']['base']}/models/{model}:generateContent", body, _gemini_headers())
+        out = from_gemini(r)
+        u = r.get("usageMetadata") or {}
+        t = "".join(b["text"] for b in out["content"] if b["type"] == "text").strip()
+        return Reply(_json_text(t) if json_schema else t, out["stop_reason"], model,
+                     u.get("promptTokenCount"), u.get("candidatesTokenCount"))
+    raise AIError("unknown provider")
+
+
 def test() -> str:
     """A tiny request to confirm key + model work."""
     r = complete("You are a connection test.", "Reply with the single word: OK")

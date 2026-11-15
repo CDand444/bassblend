@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Room builder · htTamer</title>
+<link rel="icon" href="/logo.svg" type="image/svg+xml">
+<link rel="manifest" href="/build.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Room builder">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#2a78d6">
+<style>
+:root { color-scheme: light;
+  --bg: #f3f2ef; --surface: #fcfcfb; --surface-2: #f0efeb; --border: #e1dfd9; --border-strong: #cfccc4;
+  --text: #121211; --text-2: #4f4e4a; --text-3: #7a7974; --accent: #2a78d6; --accent-soft: #e4eefb;
+  --s1: #2a78d6; --s3: #1baf7a; --s4: #eda100; --good: #1f8a3a; --warn: #b26b00; --bad: #c4312d; }
+@media (prefers-color-scheme: dark) { :root { color-scheme: dark;
+  --bg: #111110; --surface: #1a1a19; --surface-2: #222220; --border: #2c2c29; --border-strong: #3b3b37;
+  --text: #f0efec; --text-2: #c3c2b9; --text-3: #8d8c85; --accent: #3987e5; --accent-soft: #1d2b3d;
+  --s1: #3987e5; --s3: #199e70; --s4: #c98500; --good: #3fb15a; --warn: #d9932a; --bad: #e66767; } }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.45 -apple-system, system-ui, "Segoe UI", sans-serif;
+  padding: env(safe-area-inset-top) 0 calc(24px + env(safe-area-inset-bottom)); -webkit-text-size-adjust: 100%; }
+header { display: flex; align-items: center; gap: 10px; padding: 14px 16px 6px; }
+header h1 { font-size: 19px; margin: 0; } header .sub { color: var(--text-3); font-size: 13px; }
+main { max-width: 620px; margin: 0 auto; padding: 0 16px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; margin: 12px 0; }
+h2 { font-size: 16px; margin: 0 0 6px; } p { margin: 0 0 10px; } .muted { color: var(--text-2); font-size: 14px; } .small { font-size: 13px; }
+.grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+label.f { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+input, select, textarea { font: inherit; font-size: 16px; color: var(--text); background: var(--bg); border: 1px solid var(--border-strong);
+  border-radius: 10px; padding: 9px 10px; width: 100%; min-width: 0; }
+textarea { min-height: 88px; resize: vertical; }
+.btn { appearance: none; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); border-radius: 11px;
+  font: inherit; font-weight: 600; padding: 11px 14px; min-height: 44px; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn:disabled { opacity: .5; cursor: default; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; } .grow { flex: 1; }
+.photos { display: grid; gap: 10px; margin-top: 10px; }
+.ph { display: grid; grid-template-columns: 84px minmax(0, 1fr) 36px; gap: 10px; align-items: start; }
+.ph img { width: 84px; height: 84px; object-fit: cover; border-radius: 10px; background: var(--surface-2); }
+.ph .x { width: 36px; height: 36px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2); font-size: 16px; }
+.ph .fields { display: grid; gap: 6px; }
+.tips { margin: 6px 0 0; padding-left: 18px; color: var(--text-2); font-size: 14px; } .tips li { margin: 2px 0; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; color: var(--text-2); font: inherit; font-size: 14px; padding: 6px 14px; border-radius: 8px; }
+.seg button.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.1); }
+.view { background: var(--surface-2); border-radius: 12px; margin-top: 10px; overflow: hidden; }
+.view svg { width: 100%; height: auto; display: block; max-height: 420px; }
+.view canvas { width: 100%; height: 340px; display: block; }
+.chip { display: inline-block; font-size: 12.5px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+.chip.high { color: var(--good); } .chip.low { color: var(--warn); }
+.msg { border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 8px 0; background: var(--surface-2); }
+.msg.bad { color: var(--bad); } .msg.good { color: var(--good); }
+ul.list { margin: 4px 0 10px; padding-left: 18px; font-size: 14px; color: var(--text-2); }
+.spin { display: inline-block; width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; vertical-align: -2px; }
+@keyframes s { to { transform: rotate(360deg); } }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header><img src="/logo.svg" alt="" width="32" height="32"><div><h1>Room builder</h1><div class="sub">htTamer · photos, sizes and notes → your room's shape</div></div></header>
+<main>
+  <div id="gate" class="card" hidden></div>
+
+  <section class="card" id="sizeCard">
+    <h2>1 · Sizes and notes</h2>
+    <p class="muted">Feet, as measured. The longest straight distance front to back (the screen wall is the front) and side to side, and the ceiling height at its highest. What you type wins over what the AI sees in photos.</p>
+    <div class="grid3">
+      <label class="f">Length<input id="dL" type="number" inputmode="decimal" step="0.1" min="0" placeholder="ft"></label>
+      <label class="f">Width<input id="dW" type="number" inputmode="decimal" step="0.1" min="0" placeholder="ft"></label>
+      <label class="f">Height<input id="dH" type="number" inputmode="decimal" step="0.1" min="0" placeholder="ft"></label>
+    </div>
+    <label class="f" style="margin-top:10px">Notes: anything that isn't a box
+      <textarea id="notes" placeholder="L-shaped: the back right 7 × 10 ft is open to the kitchen. A window on the left wall. Ceiling slopes down to 7 ft at the back. The door is at the back left."></textarea></label>
+  </section>
+
+  <section class="card" id="photoCard">
+    <h2>2 · Photos</h2>
+    <p class="muted">Stand in a corner and photograph the wall opposite, then the next corner, until every wall is covered. Add the openings and doors, and the ceiling if it slopes. Up to 8 photos; they're shrunk on this phone before sending.</p>
+    <div class="row">
+      <label class="btn primary" style="display:inline-flex;align-items:center">Take photo<input id="cam" type="file" accept="image/*" capture="environment" hidden></label>
+      <label class="btn" style="display:inline-flex;align-items:center">From library<input id="lib" type="file" accept="image/*" multiple hidden></label>
+      <span class="muted small" id="pcount"></span>
+    </div>
+    <div class="photos" id="photos"></div>
+    <ul class="tips"><li>Tell the AI which wall each photo shows (the screen wall is the front).</li><li>A tape measure in the shot helps.</li></ul>
+  </section>
+
+  <section class="card">
+    <div class="row"><button class="btn primary grow" id="go">Build my room with AI</button></div>
+    <p class="muted small" style="margin:8px 0 0" id="goNote">Uses your AI assistant (one request). Nothing is saved until you press Save.</p>
+    <div id="busy" class="msg" hidden><span class="spin"></span> The AI is looking at your room. This can take a minute…</div>
+    <div id="err" class="msg bad" hidden role="alert"></div>
+  </section>
+
+  <section class="card" id="result" hidden>
+    <div class="row"><h2 class="grow" style="margin:0">3 · Your room</h2><span class="chip" id="conf"></span></div>
+    <p id="summary" style="margin:8px 0"></p>
+    <div class="row"><div class="seg" role="tablist"><button type="button" data-v="3d" class="on">3D</button><button type="button" data-v="2d">2D plan</button></div></div>
+    <div class="view" id="v3"><canvas id="c3" aria-label="The room in 3D: drag to turn, pinch to zoom"></canvas></div>
+    <div class="view" id="v2" hidden></div>
+    <div id="probs"></div>
+    <div id="details"></div>
+    <label class="f" style="margin-top:10px">Something off? Tell the AI and rebuild
+      <textarea id="fix" placeholder="The alcove is 4 ft deep, not 6. The opening on the right is 8 ft wide."></textarea></label>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="refine">Rebuild with my corrections</button>
+      <button class="btn primary grow" id="save">Save to htTamer</button>
+    </div>
+    <div id="saved" class="msg good" hidden></div>
+  </section>
+
+  <p class="muted small" style="text-align:center;margin-top:16px">LiDAR scanning isn't available to web pages on iPhone (only native apps can use it), so this builder works from photos, sizes and notes. Fine-tune the result any time on the dashboard under Room and subs.</p>
+</main>
+<script src="/js/room3d.js"></script>
+<script>
+'use strict';
+const $ = s => document.querySelector(s), FT = 0.3048;
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+let LABELS = ['front wall (screen)', 'left wall', 'right wall', 'back wall', 'corner', 'ceiling', 'opening / doorway', 'other'];
+const photos = [];
+let last = null, view = null, mode = '3d';
+const api = (path, body) => fetch(path, body ? {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)} : {})
+  .then(async r => { let j = {}; try { j = await r.json(); } catch (e) { j = {error: `htTamer answered ${r.status}`}; } if (r.status === 401) j.error = 'Signed out: scan a new QR code from the dashboard.'; return j; })
+  .catch(() => ({error: 'htTamer is not answering. Is this phone on the same Wi-Fi?'}));
+
+async function init() {
+  const s = await api('/api/build/status');
+  if (s.error) return gate(esc(s.error));
+  LABELS = s.labels || LABELS;
+  const r = s.room || {};
+  if (r.length_ft) $('#dL').value = r.length_ft; if (r.width_ft) $('#dW').value = r.width_ft; if (r.height_ft) $('#dH').value = r.height_ft;
+  if (r.notes && !$('#notes').value) $('#notes').value = r.notes;
+  if (!s.ai) gate('<h2>Needs the AI assistant</h2><p class="muted">The room builder uses your AI assistant to read the photos. On the dashboard, open <b>Tools → AI analysis</b> and add an API key (Claude, ChatGPT or Gemini), then reload this page.</p>');
+  else if (!s.terms) gate('<h2>Accept the terms first</h2><p class="muted">Open htTamer\'s dashboard once and accept the use-at-your-own-risk terms, then reload this page.</p>');
+  else $('#goNote').textContent = `Uses your AI assistant (${s.provider}, one request). Nothing is saved until you press Save.`;
+}
+function gate(html) { $('#gate').innerHTML = html; $('#gate').hidden = false; $('#go').disabled = true; }
+
+// ---- photos: shrink to 1280 px JPEG on the phone
+function shrink(file) {
+  return new Promise((ok, bad) => { const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const k = Math.min(1, 1280 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', 0.72)); };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error('that photo could not be read')); }; img.src = url; });
+}
+async function add(files) {
+  for (const f of files) { if (photos.length >= 8) break;
+    try { photos.push({data: await shrink(f), label: guessLabel(), note: ''}); } catch (e) { showErr(e.message); } }
+  drawPhotos();
+}
+const guessLabel = () => ['front wall (screen)', 'right wall', 'back wall', 'left wall'][photos.length] || 'other';
+function drawPhotos() {
+  $('#pcount').textContent = photos.length ? `${photos.length} of 8` : '';
+  $('#photos').innerHTML = photos.map((p, i) => `<div class="ph"><img src="${p.data}" alt="Photo ${i + 1}">
+    <div class="fields"><select data-l="${i}" aria-label="What photo ${i + 1} shows">${LABELS.map(l => `<option ${l === p.label ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select>
+    <input data-n="${i}" value="${esc(p.note)}" placeholder="Note (optional): door on the left, 3 ft wide"></div>
+    <button class="x" data-x="${i}" aria-label="Remove photo ${i + 1}">✕</button></div>`).join('');
+}
+$('#cam').onchange = e => { add([...e.target.files]); e.target.value = ''; };
+$('#lib').onchange = e => { add([...e.target.files]); e.target.value = ''; };
+$('#photos').addEventListener('change', e => { if (e.target.dataset.l) photos[+e.target.dataset.l].label = e.target.value; });
+$('#photos').addEventListener('input', e => { if (e.target.dataset.n) photos[+e.target.dataset.n].note = e.target.value; });
+$('#photos').addEventListener('click', e => { const x = e.target.closest('[data-x]'); if (x) { photos.splice(+x.dataset.x, 1); drawPhotos(); } });
+
+// ---- ask the AI
+const showErr = t => { $('#err').textContent = t; $('#err').hidden = !t; };
+async function build(refine) {
+  showErr(''); $('#saved').hidden = true;
+  const dims = {length_ft: +$('#dL').value || null, width_ft: +$('#dW').value || null, height_ft: +$('#dH').value || null};
+  if (!refine && !photos.length && !$('#notes').value.trim()) return showErr('Add some photos or describe the room first.');
+  ['#go', '#refine', '#save'].forEach(s => $(s).disabled = true); $('#busy').hidden = false;
+  const r = await api('/api/build/analyze', {dims, notes: $('#notes').value, photos: photos.map(p => ({data: p.data, label: p.label, note: p.note})),
+    previous: refine && last ? last.proposal : null, correction: refine ? $('#fix').value : ''});
+  $('#busy').hidden = true; ['#go', '#refine', '#save'].forEach(s => $(s).disabled = false);
+  if (r.error) return showErr(r.error);
+  last = r; if (refine) $('#fix').value = ''; show(r);
+}
+$('#go').onclick = () => build(false);
+$('#refine').onclick = () => { if (!$('#fix').value.trim()) return showErr('Say what is wrong first.'); build(true); };
+
+function show(r) {
+  const p = r.proposal, rm = r.room;
+  $('#result').hidden = false;
+  $('#conf').textContent = `${p.confidence} confidence`; $('#conf').className = 'chip ' + p.confidence;
+  $('#summary').textContent = p.summary + (r.describe ? ` (${r.describe})` : '');
+  $('#probs').innerHTML = (r.problems || []).map(t => `<div class="msg bad">Can't save yet: ${esc(t)}. Tell the AI below.</div>`).join('');
+  const ops = p.openings || [];
+  $('#details').innerHTML = (ops.length ? `<h2 style="margin-top:12px">Openings</h2><ul class="list">${ops.map(o => `<li>${esc(o.kind)} on wall ${o.wall + 1}: ${o.width_ft} ft wide, ${o.from_ft} ft from its corner${o.height_ft ? `, ${o.height_ft} ft high` : ''}${o.note ? ` (${esc(o.note)})` : ''}</li>`).join('')}</ul>` : '')
+    + ((p.assumptions || []).length ? `<h2>The AI assumed</h2><ul class="list">${p.assumptions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '')
+    + ((p.questions || []).length ? `<h2>Please check</h2><ul class="list">${p.questions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '');
+  $('#save').disabled = !!(r.problems || []).length;
+  const room = {...rm, outline: rm.outline || (rm.width_m ? [[0, 0], [rm.width_m, 0], [rm.width_m, rm.length_m], [0, rm.length_m]] : null)};
+  $('#v2').innerHTML = RoomView.svg2d(room, []);
+  if (!view) view = RoomView.view3d($('#c3'));
+  setMode(mode); view.set(room, []);
+  $('#result').scrollIntoView({behavior: 'smooth', block: 'start'});
+}
+function setMode(m) { mode = m; document.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.v === m));
+  $('#v3').hidden = m !== '3d'; $('#v2').hidden = m !== '2d'; if (m === '3d' && view) view.draw(); }
+document.querySelector('.seg').onclick = e => { const b = e.target.closest('button'); if (b) setMode(b.dataset.v); };
+
+$('#save').onclick = async () => {
+  if (!last) return;
+  $('#save').disabled = true;
+  const r = await api('/api/build/save', {proposal: last.proposal});
+  $('#save').disabled = false;
+  if (r.error) return showErr(r.error);
+  $('#saved').hidden = false;
+  $('#saved').innerHTML = 'Saved. The dashboard shows the new shape under <b>Room and subs</b> (reload it if it was open), where you can fine-tune corners and openings and place the seats.';
+};
+init();
+</script>
+</body>
+</html>

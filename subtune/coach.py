@@ -88,7 +88,8 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
                          who="owner", open="room"))
     # ---- hardware suggestions grounded in the maker's guidance and the room
     rm = room.get("room") or {}
-    vol = (rm.get("length_m") or 0) * (rm.get("width_m") or 0) * (rm.get("height_m") or 0)
+    from . import shape
+    vol = shape.volume(rm) or 0                        # the real floor area x average height (a box: L x W x H)
     for k, d in subs_room.items():
         if d.get("catalog") != "hsu-vtf3-mk5-hp" or not d.get("controls") or int(k) not in sub_outs:
             continue
