@@ -70,7 +70,11 @@ rm -rf "$WORK/stage-bassblend"
 cp -R "$HERE/stage-bassblend" "$WORK/stage-bassblend"
 SRC="$WORK/stage-bassblend/00-bassblend/files/bassblend"
 mkdir -p "$SRC"
-(cd "$ROOT" && git ls-files -z --cached --others --exclude-standard) | (cd "$ROOT" && xargs -0 tar -cf - --) | tar -xf - -C "$SRC"
+# every tracked or new file, minus the development-only ones marked export-ignore in .gitattributes
+(cd "$ROOT" && git ls-files -z --cached --others --exclude-standard \
+   | git check-attr -z --stdin export-ignore \
+   | awk 'BEGIN { RS = "\0" } NR % 3 == 1 { f = $0 } NR % 3 == 0 && $0 != "set" { printf "%s%c", f, 0 }') \
+  | (cd "$ROOT" && xargs -0 tar -cf - --) | tar -xf - -C "$SRC"
 rm -rf "$SRC/build" "$SRC/dist" "$SRC/data" "$SRC/tools"
 printf '%s\n' "$VERSION" > "$SRC/VERSION"
 CFG="$WORK/stage-bassblend/00-bassblend/files/bassblend-config.json"

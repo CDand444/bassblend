@@ -211,16 +211,17 @@ input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--accent); }
 .beta { display: inline-block; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--accent); border: 1px solid currentColor; border-radius: 6px; padding: 0 5px; margin-left: 6px; vertical-align: 2px; line-height: 15px; opacity: .85; }
 h2 .beta, h3 .beta { font-size: 10px; }
 .risk { display: flex; gap: 8px; align-items: flex-start; margin: 0 0 12px; padding: 8px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4;
-  background: color-mix(in srgb, var(--warn, #c98a00) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn, #c98a00) 45%, transparent); }
+  background: color-mix(in srgb, var(--warn) 12%, transparent); border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
 .risk b { white-space: nowrap; }
 #terms { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px;
   background: rgba(0, 0, 0, .55); }
 #terms[hidden] { display: none; }
-#terms .box { background: var(--card, #fff); color: inherit; max-width: 620px; width: 100%; max-height: calc(100vh - 32px); overflow: auto;
+#terms .box { background: var(--surface); color: var(--text); border: 1px solid var(--border); max-width: 620px; width: 100%; max-height: calc(100vh - 32px); overflow: auto;
   border-radius: 14px; padding: 22px 24px; box-shadow: 0 10px 40px rgba(0, 0, 0, .35); }
 #terms h2 { margin: 0 0 10px; }
 #terms ul { padding-left: 20px; margin: 10px 0 14px; }
 #terms li { margin: 6px 0; }
+#terms .cb { max-width: none; }
 #sideNav .beta, #subNav .beta { font-size: 8.5px; padding: 0 3px; margin-left: 4px; line-height: 13px; flex: none; }
 .toasts { position: fixed; right: 16px; bottom: 16px; z-index: 60; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 32px)); pointer-events: none; }
 .toast { pointer-events: auto; display: flex; gap: 10px; align-items: flex-start; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-left: 4px solid var(--accent);
