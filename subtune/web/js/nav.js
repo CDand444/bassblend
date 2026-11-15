@@ -40,13 +40,25 @@ try {   // first visit: count only errors from now on, not old history
 // grouped by what you're doing; `home` is where a card lives when the menu closes
 const SECTIONS = [
   {grp: 'Home', icon: 'home', first: 'home'},
+  {grp: 'Survey', icon: 'gear', first: 'setup'},
   {grp: 'Tune', icon: 'tune', first: 'wizard'},
-  {grp: 'Measure', icon: 'report', first: 'report'},
-  {grp: 'Setup', icon: 'gear', first: 'setup'},
-  {grp: 'System', icon: 'chip', first: 'activity'},
+  {grp: 'Verify', icon: 'report', first: 'report'},
+  {grp: 'Tools', icon: 'chip', first: 'measured'},
 ];
 const MENU = [
   {grp: 'Home', key: 'home', icon: 'home', title: 'Home', full: 'Home', el: $('#homeView'), tag: () => null},
+  {grp: 'Survey', key: 'setup', icon: 'gear', title: 'Checklist', full: 'Setup checklist', el: $('#setupCard'),
+   tag: () => { const n = setupItems().filter(i => !i.ok && !i.optional).length; return n ? [String(n), 'alert'] : ['✓', '']; }},
+  {grp: 'Survey', key: 'avr', icon: 'avr', title: 'Receiver', full: 'Receiver', el: $('#avrCard'),
+   tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
+  {grp: 'Survey', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
+   tag: () => { const n = Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
+  {grp: 'Survey', key: 'speakers', icon: 'speakers', title: 'Speakers', full: 'Your speakers', el: $('#spkCard'),
+   tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
+     const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
+  {grp: 'Survey', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
+  {grp: 'Survey', key: 'treatment', icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
+   tag: () => { const t = S.treatment; if (!t) return null; const n = t.items.filter(i => i.tier === 1 && !i.installed && !i.blocked).length; return n ? [String(n), ''] : ['✓', '']; }},
   {grp: 'Tune', key: 'wizard', icon: 'wand', title: 'Tune my system', full: 'Tune my system', el: $('#wizCard'), tag: () => null},
   {grp: 'Tune', key: 'tunes', icon: 'tunes', title: 'Tunes & slots', full: 'Saved tunes & DSP slots', el: $('#tunesCard'),
    tag: () => liveMaster ? [`slot ${liveMaster.preset + 1}`, ''] : null},
@@ -54,40 +66,28 @@ const MENU = [
    tag: () => (S.avr_blend_status || {}).running ? ['…', ''] : S.avr_blend ? [S.avr_blend.loss_now_db < 1 ? '✓' : '!', S.avr_blend.loss_now_db < 1 ? '' : 'alert'] : null},
   {grp: 'Tune', key: 'liveeq', icon: 'eq', title: 'Live EQ', full: 'Live EQ', el: $('#leqCard'),
    tag: () => (S.live_rta_status || {}).running ? ['● live', 'live'] : (S.live_eq || {}).active ? [(S.live_eq || {}).bypass ? 'bypassed' : 'on', ''] : null},
-  {grp: 'Tune', key: 'filters', icon: 'filters', title: 'Filters', full: 'Filters on the DSP', el: card('#filters'),
-   tag: () => S.result && S.result.slot ? [`slot ${S.result.slot}`, ''] : null},
-  {grp: 'Tune', key: 'manual', icon: 'manual', title: 'Manual steps', full: 'Manual steps', el: $('#manualCard'), tag: () => null},
-  {grp: 'Measure', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
+  {grp: 'Verify', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
-  {grp: 'Measure', key: 'allspk', icon: 'speakers', title: 'All speakers', full: 'All speakers', el: $('#allCard'), tag: () => null},
-  {grp: 'Measure', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
+  {grp: 'Verify', key: 'allspk', icon: 'speakers', title: 'Speaker check', full: 'Speaker levels, distances and LFE', el: $('#allCard'), tag: () => null},
+  {grp: 'Verify', key: 'checkup', icon: 'checkup', title: 'Check-up', full: 'Check-up', el: $('#checkCard'),
    tag: () => { const c = (S.checkups || []).slice(-1)[0]; if (!c) return null;
      const bad = Object.values(c.verdicts).filter(v => v.status !== 'good').length; return bad ? [String(bad), 'alert'] : ['✓', '']; }},
-  {grp: 'Measure', key: 'measured', icon: 'measured', title: 'Measurements', full: 'Each sub, as measured', el: card('#chartA'),
+  {grp: 'Verify', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
+  {grp: 'Verify', key: 'levels-match', icon: 'match', title: 'Level match', full: 'Sub level match', el: $('#lmCard'), tag: () => null},
+  {grp: 'Tools', key: 'measured', icon: 'measured', title: 'Measurements', full: 'Each sub, as measured', el: card('#chartA'),
    tag: () => { const n = Object.keys(S.measurements || {}).length; return n ? [`${n} spots`, ''] : null; }},
-  {grp: 'Measure', key: 'levels-match', icon: 'match', title: 'Level match', full: 'Sub level match', el: $('#lmCard'), tag: () => null},
-  {grp: 'Measure', key: 'headroom', icon: 'meters', title: 'Sub headroom', full: 'Sub headroom (how loud, cleanly)', el: $('#headCard'), tag: () => null},
-  {grp: 'Measure', key: 'spl', icon: 'spl', title: 'Level meter', full: 'Sound level meter', el: $('#splCard'),
+  {grp: 'Tools', key: 'filters', icon: 'filters', title: 'Filters', full: 'Filters on the DSP', el: card('#filters'),
+   tag: () => S.result && S.result.slot ? [`slot ${S.result.slot}`, ''] : null},
+  {grp: 'Tools', key: 'spl', icon: 'spl', title: 'Level meter', full: 'Sound level meter', el: $('#splCard'),
    tag: () => splState.running ? [`● ${splState.reading ? splState.reading.c.toFixed(0) + ' dB' : 'live'}`, 'live'] : null},
-  {grp: 'Setup', key: 'setup', icon: 'gear', title: 'Checklist', full: 'Setup checklist', el: $('#setupCard'),
-   tag: () => { const n = setupItems().filter(i => !i.ok && !i.optional).length; return n ? [String(n), 'alert'] : ['✓', '']; }},
-  {grp: 'Setup', key: 'avr', icon: 'avr', title: 'Receiver', full: 'Receiver', el: $('#avrCard'),
-   tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
-  {grp: 'Setup', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
-   tag: () => { const n = Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
-  {grp: 'Setup', key: 'speakers', icon: 'speakers', title: 'Speakers', full: 'Your speakers', el: $('#spkCard'),
-   tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
-     const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
-  {grp: 'Setup', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
-  {grp: 'Setup', key: 'treatment', icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
-   tag: () => { const t = S.treatment; if (!t) return null; const n = t.items.filter(i => i.tier === 1 && !i.installed && !i.blocked).length; return n ? [String(n), ''] : ['✓', '']; }},
-  {grp: 'Setup', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
+  {grp: 'Tools', key: 'levels', icon: 'meters', title: 'DSP meters', full: 'Live DSP meters', el: card('#meters'), tag: () => null},
+  {grp: 'Tools', key: 'manual', icon: 'manual', title: 'Manual steps', full: 'Manual steps', el: $('#manualCard'), tag: () => null},
+  {grp: 'Tools', key: 'ai', icon: 'ai', title: 'AI analysis', full: 'Room analysis (AI)', el: card('#aiQ'),
    tag: () => (S.analysis_status || {}).running || (S.suggest_status || {}).running ? ['…', ''] : null},
-  {grp: 'System', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
+  {grp: 'Tools', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
    tag: () => { const e = events.filter(x => x.kind === 'error' && x.t > seenErrors).length; return e ? [String(e), 'alert'] : null; }},
-  {grp: 'System', key: 'levels', icon: 'meters', title: 'DSP meters', full: 'Live DSP meters', el: card('#meters'), tag: () => null},
-  {grp: 'System', key: 'help', icon: 'book', title: 'Manual', full: 'htTamer manual', el: $('#manCard'), tag: () => null},
-  {grp: 'System', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
+  {grp: 'Tools', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
+  {grp: 'Tools', key: 'help', icon: 'book', title: 'Manual', full: 'htTamer manual', el: $('#manCard'), tag: () => null},
 ];
 const homeOf = m => m.home || $('#store');
 MENU.forEach(m => { if (m.key !== 'home') homeOf(m).appendChild(m.el); });   // pages wait off-screen until opened
@@ -170,18 +170,40 @@ new ResizeObserver(() => document.documentElement.style.setProperty('--hbar-h', 
 openSheet(routeKey() || 'home', true);
 
 // ---------- polling
+// Each part of the page redraws on its own: one that fails is logged (browser console, and once to
+// htTamer's activity log) and the others still update. Before, one error stopped every part after it
+// until the page was reloaded.
+const renderErrs = new Set();
+function safe(name, fn) {
+  try { fn(); } catch (e) {
+    console.error(`[htTamer] ${name} failed:`, e);
+    const msg = `${name}: ${e && e.message || e}`;
+    if (!renderErrs.has(msg)) { renderErrs.add(msg); post('/api/client-error', {where: name, message: String(e && e.message || e).slice(0, 300), page: sheetKey}).catch(() => {}); }
+  }
+}
+let polling = false;
 async function poll() {
+  if (polling) return;                       // never let a slow reply overwrite a newer one
+  polling = true;
+  let st, ev;
   try {
-    const [st, ev] = await Promise.all([fetch('/api/state').then(r => r.json()), fetch('/api/events?since=' + lastEv).then(r => r.json())]);
+    [st, ev] = await Promise.all([fetch('/api/state').then(r => r.json()), fetch('/api/events?since=' + lastEv).then(r => r.json())]);
+  } catch (e) {
+    polling = false;
+    $('#busyDot').className = 'dot'; $('#busyTxt').textContent = 'Dashboard server not reachable';
+    return;
+  }
+  try {
     S = st;
-    if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; renderLog(); }
-    initSettings(); initRoom();
-    render(); renderAuto(); renderAI(); renderModes(); renderSuggest(); renderTones(); renderMatch();
-    renderCoach(); renderPlacement(); renderTreatment(); renderHeadroom(); renderAllSpk(); renderFixLog(); renderSpeakers(); renderCheckup(); renderDeep(); renderLevelMatch(); renderBlend(); renderSetup(); renderHome(); renderWizard();
-    renderMenu();
-    if (S.updated !== plainKey) { plainKey = S.updated; renderPlain(); }
-    renderPlan(roomInit ? readRoom() : null);
-  } catch (e) { $('#busyDot').className = 'dot'; $('#busyTxt').textContent = 'Dashboard server not reachable'; }
+    if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; safe('activity', renderLog); }
+    safe('settings', initSettings); safe('room', initRoom);
+    const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
+      renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
+      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters};
+    for (const [n, f] of Object.entries(parts)) if (typeof f === 'function') safe(n, f);
+    if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }
+    safe('placement plan', () => renderPlan(roomInit ? readRoom() : null));
+  } finally { polling = false; }
 }
 document.querySelectorAll('#inputSeg button').forEach(b => b.onclick = async () => {
   if (b.classList.contains('on')) return;
@@ -222,4 +244,11 @@ function renderMatch() {
 async function pollLive() { try { renderLive(await fetch('/api/live').then(r => r.json())); } catch (e) {} }
 poll(); pollLive(); loadTunes(); loadAvr(); chatLoad();
 setInterval(poll, 1000); setInterval(pollLive, 1500);
+// the receiver and the saved tunes show up on many pages, so keep them fresh everywhere (their own
+// pages still refresh faster); and catch up at once when the tab or phone comes back
+setInterval(() => { if (document.visibilityState === 'visible' && sheetKey !== 'avr') loadAvr(); }, 10000);
+setInterval(() => { if (document.visibilityState === 'visible' && sheetKey !== 'tunes') loadTunes(); }, 10000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') { poll(); pollLive(); loadAvr(); loadTunes(); chatLoad(); }
+});
 let rz; addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(render, 150); });

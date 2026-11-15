@@ -35,7 +35,8 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "mlp_weight": (float, 1, 4), "nearfield_max_cut_db": (float, 0, 12),
             "nearfield_max_boost_db": (float, 0, 6), "nearfield_max_eq_cut_db": (float, 1, 10),
             "nearfield_min_q": (float, 0.5, 6),
-            "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70)}
+            "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70),
+            "listen_max_volume": (float, 10, 100)}     # the loudest you listen: the gain check works out headroom there
 
 
 def _playback(body, modes=("hdmi", "dlna", "manual")):
@@ -255,6 +256,17 @@ class Runner:
         update_state(live_rta_status={"running": True, "text": "Starting…", "mode": mode, "started": time.time()})
         self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         self.cmd = f"live analyzer ({mode})"
+        return self.cmd
+
+    def start_gaincheck(self, body):
+        """Gain structure: a quiet 40 Hz tone through the receiver, the miniDSP's input meter read."""
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        mode, pargs = _playback(body, modes=("hdmi", "dlna"))
+        update_state(gain_status={"running": True, "text": "Starting…"})
+        args = [sys.executable, "-m", "subtune", "gaincheck", *pargs]
+        self.proc = subprocess.Popen(args, cwd=str(ROOT), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self.cmd = f"gain check ({mode})"
         return self.cmd
 
     def analyzer_running(self):
@@ -489,7 +501,7 @@ def mic_free() -> bool:
 
 
 for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup",
-              "start_allspk", "start_liveeq"):
+              "start_allspk", "start_liveeq", "start_gaincheck"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -799,7 +811,9 @@ def build_executors():
 
     def avr_st():
         st = avr_status(force=True)
-        return {**(st["status"] or {}), "error": st["error"], "summary": "receiver " + ("on" if (st["status"] or {}).get("power") else "standby/unknown")}
+        rx = receiver_details()                          # its speaker setup, live signal and cross-checks
+        return {**(st["status"] or {}), "error": st["error"], "setup": rx["details"], "setup_checks": rx["checks"],
+                "summary": "receiver " + ("on" if (st["status"] or {}).get("power") else "standby/unknown")}
 
     def avr_ctl(action, value):
         body = {"action": action, "value": value}
@@ -1082,6 +1096,27 @@ def avr_obj():
     if _avr["obj"] is None:
         _avr["obj"] = Onkyo()
     return _avr["obj"]
+
+
+_rxd = {"t": 0, "data": None, "err": None}
+_cerr: list = []                                         # recent page-error reports (rate limit)
+
+
+def receiver_details(force=False):
+    """What the receiver reports about its setup (read-only), decoded and checked against
+    htTamer's records. Cached for a minute: speaker setup rarely changes."""
+    from . import dirac, rxinfo
+    from .room import load_room
+    if force or time.time() - _rxd["t"] > 60 or _rxd["data"] is None:
+        _rxd["t"] = time.time()
+        try:
+            _rxd["data"], _rxd["err"] = rxinfo.read(avr_obj()), None
+        except Exception as e:                           # noqa: BLE001
+            _rxd["err"] = str(e)
+    room = load_room()
+    d = _rxd["data"] or {}
+    return {"details": d, "error": _rxd["err"],
+            "checks": rxinfo.check(d, dirac.system(), room.get("speakers") or {}, room.get("seats") or [])}
 
 
 def avr_status(force=False):
@@ -1412,6 +1447,23 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, self._setup_status())
         if u.path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):
             return self._send(200, (WEB_DIR / "logo.svg").read_bytes(), "image/svg+xml")
+        if u.path == "/report":                         # printable calibration report (nothing measured or changed)
+            from . import coach, dirac, report
+            from .room import load_room
+            st = load_state()
+            st["system"] = dirac.system()
+            st["system"]["dirac_stale"] = dirac.dirac_stale_reason(st["system"], st.get("result") or {}, st)
+            st["system"]["dirac_current"] = st["system"]["dirac_stale"] is None
+            room, s = load_room(), load_settings()
+            try:
+                st["coach"] = coach.plan(st, {**s, "cal_ok": True}, room, _avr.get("data") or {}, _live.get("data"))
+            except Exception:                            # noqa: BLE001
+                st["coach"] = []
+            try:
+                rx = receiver_details()
+            except Exception:                            # noqa: BLE001
+                rx = None
+            return self._send(200, report.build(st, s, room, rx).encode("utf-8"), "text/html; charset=utf-8")
         if u.path == "/manual.html":                    # the manual as a fragment, for the Manual page
             return self._send(200, (WEB_DIR / "manual.html").read_bytes(), "text/html; charset=utf-8")
         if u.path == "/manual":                         # the same manual as its own page (print, new tab)
@@ -1458,6 +1510,11 @@ class H(BaseHTTPRequestHandler):
                 st["fix_summary"] = fixlog.summary(st.get("fix_ledger"), (_avr.get("data") or {}).get("sub_level"))
             except Exception as e:                       # noqa: BLE001
                 st["fix_summary"] = {"error": str(e)}
+            try:
+                from . import limiter
+                st["limiters"] = {"proposals": limiter.proposals(st), "saved": limiter.saved(s)}
+            except Exception as e:                       # noqa: BLE001
+                st["limiters"] = {"error": str(e)}
             from .analysis import key_source
             from .room import load_room, modal_report
             room = load_room()
@@ -1470,7 +1527,8 @@ class H(BaseHTTPRequestHandler):
                                 for k, d in (room.get("subs") or {}).items() if d.get("catalog") in vendors.CATALOG}
             from . import dirac
             st["system"] = dirac.system()
-            st["system"]["dirac_current"] = dirac.dirac_current(st["system"], st.get("result") or {})
+            st["system"]["dirac_stale"] = dirac.dirac_stale_reason(st["system"], st.get("result") or {}, st)
+            st["system"]["dirac_current"] = st["system"]["dirac_stale"] is None
             st["net"] = {"lan": NET["lan"], "signed_in": NET["lan"] and not self._local()}
             st["ai_key"] = key_source()          # "environment" | "saved" | "local" | None (never the key)
             from . import ai
@@ -1517,6 +1575,8 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, liveeq_view())
         if u.path == "/api/avr":
             return self._send(200, avr_status(force="force" in q))
+        if u.path == "/api/receiver/details":
+            return self._send(200, receiver_details(force="force" in q))
         if u.path == "/api/chat":
             return self._send(200, assistant().view())
         if u.path.startswith("/media/"):               # test files to download (e.g. for a USB stick)
@@ -1663,6 +1723,9 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"started": RUN.start_verify(body)})
             if path == "/api/avr":
                 return self._send(200, avr_action(body))
+            if path == "/api/receiver/sizes":              # copy the receiver's speaker sizes to the Speakers page
+                from . import equip
+                return self._send(200, equip.sizes_from_receiver(receiver_details(force=True)["details"]))
             if path == "/api/chat":
                 from .analysis import key_source
                 text = str(body.get("message") or "").strip()[:2000]
@@ -1703,6 +1766,28 @@ class H(BaseHTTPRequestHandler):
                 if body.get("action") == "revert":
                     return self._send(200, {"started": RUN.start_fixes_revert()})
                 raise ValueError("action must be accept or revert")
+            if path == "/api/gaincheck":
+                return self._send(200, {"started": RUN.start_gaincheck(body)})
+            if path == "/api/limiters":                # protective limiters from the headroom test
+                from . import limiter
+                if RUN.running() or load_state().get("busy"):
+                    raise RuntimeError("wait for the current step to finish")
+                act = body.get("action")
+                if act == "apply":
+                    outs = body.get("outputs")
+                    return self._send(200, {"saved": limiter.apply([int(o) for o in outs] if outs else None, force=body.get("force") is True)})
+                if act == "remove":
+                    return self._send(200, {"saved": limiter.remove()})
+                raise ValueError("action must be apply or remove")
+            if path == "/api/client-error":            # a part of the page failed to draw: log it once
+                now = time.time()
+                _cerr[:] = [t for t in _cerr if now - t < 60]
+                if len(_cerr) < 20:
+                    _cerr.append(now)
+                    clip = lambda v, n: re.sub(r"[\r\n\t]+", " ", str(v or ""))[:n]
+                    event("warn", f"page: {clip(body.get('where'), 40)} failed on {clip(body.get('page'), 30)}: "
+                                  f"{clip(body.get('message'), 300)}")
+                return self._send(200, {"ok": True})
             if path == "/api/smoke":                   # silent hardware check
                 from . import smoke
                 r = smoke.run(mic_busy=not mic_free() or METER.running)

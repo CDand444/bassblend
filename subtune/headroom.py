@@ -116,18 +116,25 @@ def run(rig, out: int, freqs=None, log=None) -> dict:
     d = rig.dsp
     off = spl_offset(rig.cal)
     res = []
+    cur = load_state().get("result") or {}
+    sub = next((x for x in cur.get("subs") or [] if x["output"] == out), None)
+    # the tune playing during the test: the limiter maths needs its gain and EQ for this output
+    tune = {"tune_id": cur.get("tune_id"), "gain_db": sub["gain_db"], "biquads": sub["biquads"]} if sub else None
+    from . import limiter
     try:
         rig.wake()                                # subs with auto-standby ignore quiet bursts until woken
-        d.batch([d.c_preset(rig.s["preset"]), d.c_source("usb")] + rig.mute_except([out]),
+        d.batch([d.c_preset(rig.s["preset"]), d.c_source("usb")] + rig.mute_except([out])
+                + [f"output {out} compressor -b on"],                    # measure the sub, not the limiter
                 f"headroom test: output {out + 1} only, rising tone bursts")
         quiet = _playrec(rig, np.zeros(int(BURST_S * FS)))          # the room alone, for the noise reference
         for f in freqs:
             res.append(run_freq(lambda x: _playrec(rig, x), f, off, log=log, noise=harmonics(quiet, f)))
     finally:
-        d.batch(rig.mute_except(rig.subs), "headroom test done: all subs unmuted")
+        d.batch(rig.mute_except(rig.subs) + limiter.commands(out, limiter.saved().get(str(out))),
+                "headroom test done: all subs unmuted, limiter as before")
     st = load_state()
     hr = st.get("headroom") or {}
-    hr[str(out)] = {"t": time.time(), "output": out, "results": res}
+    hr[str(out)] = {"t": time.time(), "output": out, "results": res, "tune": tune}
     update_state(headroom=hr)
     from . import journal
     journal.add("headroom", summary_text(out, res), output=out + 1)

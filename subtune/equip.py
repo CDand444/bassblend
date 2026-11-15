@@ -17,7 +17,9 @@ FT = 0.3048
 KINDS = ("tower", "bookshelf", "centre", "on-wall", "in-wall", "in-ceiling", "atmos module", "satellite", "other")
 SIZES = ("large", "small")
 SPK_FIELDS = {"model": str, "kind": str, "size": str, "crossover_hz": float, "x_m": float, "y_m": float, "z_m": float,
-              "aim": str, "amp": str, "notes": str}
+              "aim": str, "amp": str, "notes": str,
+              # copied from the receiver's Speaker Setup menu (it can't report them over the network)
+              "rx_distance_m": float, "rx_level_db": float}
 TEXT_LEN = {"model": 80, "aim": 120, "amp": 120, "notes": 500}
 
 
@@ -73,6 +75,10 @@ def clean_speaker(ch: str, d: dict, old: dict | None = None) -> dict:
             v = _num(v, 0, 50, f"{ch} {f[0]} position")
         elif f == "z_m":
             v = _num(v, 0, 15, f"{ch} height")
+        elif f == "rx_distance_m":
+            v = _num(v, 0, 15, f"{ch} receiver distance")
+        elif f == "rx_level_db":
+            v = _num(v, -12, 12, f"{ch} receiver level")
         else:
             v = str(v or "")[:TEXT_LEN.get(f, 200)]
         out[f] = v
@@ -109,6 +115,17 @@ def update_speakers(updates: dict | None = None, remove: list | None = None, who
     write_room(r)
     _log(who, "speakers", changed)
     return {"speakers": spk, "changed": changed}
+
+
+def sizes_from_receiver(details: dict) -> dict:
+    """Copy the speaker sizes the receiver reports (SPI) onto the Speakers records of this layout."""
+    from .rxinfo import channel_sizes
+    spi = (details or {}).get("speakers")
+    if not spi:
+        raise ValueError("the receiver didn't report its speaker setup (is it on?)")
+    mine = set(channels())
+    ups = {ch: {"size": s} for ch, s in channel_sizes(spi).items() if ch in mine and s in SIZES}
+    return update_speakers(ups, who="receiver")
 
 
 def update_room(patch: dict, who="page") -> dict:
@@ -193,6 +210,7 @@ def _log(who, what, changed):
         return
     from . import journal
     from .state import event
-    txt = f"{'The assistant' if who == 'assistant' else 'You'} updated {what}: " + "; ".join(changed)
+    txt = ({"assistant": "The assistant updated", "receiver": "From the receiver:"}.get(who, "You updated")
+           + f" {what}: " + "; ".join(changed))
     event("config", txt[:400])
     journal.add("data", txt[:400])

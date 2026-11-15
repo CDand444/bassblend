@@ -14,6 +14,9 @@ from .dsp import MiniDSP
 from .state import event, load_state, update_state
 
 PRE, GAP, TAIL = 0.5, 3.0, 2.5
+RETAKES = 2                  # extra takes when the reference sweep doesn't repeat (noise, a door, a moved mic)
+REPEAT_TOL_DB = 1.0
+DRIFT_DB = 1.5               # a re-verification this far (RMS, shape only) from the first one: something changed
 
 
 class Rig:
@@ -145,34 +148,39 @@ class Rig:
         self.wake()                      # mic moves can take minutes; subs may have dozed off
         for o in order:
             pair = o != self.ref
-            sig = np.concatenate([pre, sw] + ([np.zeros(D - n), sw] if pair else []) + [np.zeros(int(TAIL * FS))])
-            self.dsp.batch(self.mute_except([self.ref]), f"pos {pos}: only ref output {self.ref + 1} on")
-            cues = []
-            if pair:
-                switch = self.mute_except([o])
-                cues = [(len(pre) + n + int(1.0 * FS),
-                         lambda c=switch, o=o: self.dsp.batch(c, f"gap: switch to output {o + 1}"))]
-            event("measure", f"pos {pos}: sweeping output {o + 1}" + (f" (+ ref {self.ref + 1})" if pair else ""))
-            rec = audio.playrec(self._stereo(sig), self.play, self.rec, cues)
-            ir = audio.deconvolve(rec, sw, f1, f2)
-            s0 = len(pre)
-            a = audio.find_arrival(ir, s0, s0 + int(1.5 * FS))
-            Href = audio.apply_cal(audio.window_response(ir, a), self.cal)
-            if not pair:
-                canon = Href
-                H[o] = Href
-                q = self._quality(rec, a, a + n)
-            else:
+            best = None
+            for take in range(1 + (RETAKES if pair else 0)):   # a take whose reference doesn't repeat is re-taken
+                sig = np.concatenate([pre, sw] + ([np.zeros(D - n), sw] if pair else []) + [np.zeros(int(TAIL * FS))])
+                self.dsp.batch(self.mute_except([self.ref]), f"pos {pos}: only ref output {self.ref + 1} on")
+                cues = []
+                if pair:
+                    switch = self.mute_except([o])
+                    cues = [(len(pre) + n + int(1.0 * FS),
+                             lambda c=switch, o=o: self.dsp.batch(c, f"gap: switch to output {o + 1}"))]
+                event("measure", f"pos {pos}: sweeping output {o + 1}" + (f" (+ ref {self.ref + 1})" if pair else "")
+                      + (f", take {take + 1}" if take else ""))
+                rec = audio.playrec(self._stereo(sig), self.play, self.rec, cues)
+                ir = audio.deconvolve(rec, sw, f1, f2)
+                s0 = len(pre)
+                a = audio.find_arrival(ir, s0, s0 + int(1.5 * FS))
+                Href = audio.apply_cal(audio.window_response(ir, a), self.cal)
+                if not pair:
+                    canon = Href
+                    best = (0.0, Href, self._quality(rec, a, a + n))
+                    break
                 tau = audio.residual_delay(Href, canon)
                 Ht = audio.apply_cal(audio.window_response(ir, a + D), self.cal)
-                H[o] = Ht * np.exp(2j * np.pi * GRID * tau)
                 m = (GRID > 20) & (GRID < 150)
                 ref_dev = float(np.sqrt(np.mean((audio.smooth_db(Href)[m] - audio.smooth_db(canon)[m]) ** 2)))
                 q = self._quality(rec, a + D, a + D + n)
-                q.update(ref_repeat_db=round(ref_dev, 2), timing_fix_ms=round(tau * 1e3, 3))
-                if ref_dev > 1.0:
-                    event("warn", f"pos {pos} output {o + 1}: reference sweep repeat differs by {ref_dev:.1f} dB "
-                                  "(noise or something moved?)")
+                q.update(ref_repeat_db=round(ref_dev, 2), timing_fix_ms=round(tau * 1e3, 3), takes=take + 1)
+                if best is None or ref_dev < best[0]:
+                    best = (ref_dev, Ht * np.exp(2j * np.pi * GRID * tau), q)
+                if ref_dev <= REPEAT_TOL_DB:
+                    break
+                event("warn", f"pos {pos} output {o + 1}: reference sweep repeat differs by {ref_dev:.1f} dB "
+                              "(noise or something moved?)" + (" - measuring it again" if take < RETAKES else " - kept the best take"))
+            H[o], q = best[1], best[2]
             quality[o] = q
             event("measure", f"pos {pos} output {o + 1}: SNR {q['snr_db']} dB", **q)
         self.dsp.batch(self.mute_except(self.subs), "unmute all subs")
@@ -193,9 +201,30 @@ class Rig:
         v = st.get("verify", {})
         v.setdefault(tag, {})[str(pos)] = np.round(audio.smooth_db(Hc, 12), 2).tolist()
         meta = st.get("verify_meta") or {}
+        extra = {}
         if tag == "after":
-            meta[str(pos)] = __import__("time").time()
-        update_state(verify=v, verify_meta=meta, grid=np.round(GRID, 3).tolist())
+            now = __import__("time").time()
+            meta[str(pos)] = now
+            # drift: compare with the FIRST verification of this tune at this spot (shape only, in the tuned band)
+            tid = (st.get("result") or {}).get("tune_id")
+            first = st.get("verify_first") or {}
+            mine = first.setdefault(str(tid), {})
+            cur = v[tag][str(pos)]
+            if str(pos) not in mine:
+                mine[str(pos)] = {"t": now, "db": cur}
+            else:
+                lo, hi = self.s.get("fmin", 20), self.s.get("fmax", 120)
+                mask = (GRID >= lo) & (GRID <= hi)
+                d = np.asarray(cur)[mask] - np.asarray(mine[str(pos)]["db"])[mask]
+                rms = float(np.sqrt(np.mean((d - d.mean()) ** 2)))
+                drift = st.get("verify_drift") or {}
+                drift[str(pos)] = {"t": now, "rms_db": round(rms, 2), "since": mine[str(pos)]["t"], "tune_id": tid}
+                extra["verify_drift"] = drift
+                if rms > DRIFT_DB:
+                    event("warn", f"pos {pos}: the response has drifted {rms:.1f} dB since this tune was first verified "
+                                  "(something moved: a sub, a knob, furniture, the mic spot?)")
+            extra["verify_first"] = {k: x for k, x in first.items() if k == str(tid)}   # keep only the playing tune's
+        update_state(verify=v, verify_meta=meta, grid=np.round(GRID, 3).tolist(), **extra)
         event("measure", f"{tag}: combined response at pos {pos} captured")
         return Hc
 

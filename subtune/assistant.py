@@ -167,6 +167,18 @@ system report and check-up so before_after can show the change; read before_afte
 will it cost / is it worth it", answer from cost_and_value: lead with its verdict (the sweet spot), then the items \
 marked great or good value, and name the poor-value ones plainly. Prices are rough US ranges; say so once. If the \
 owner would build panels, set build "diy" (much cheaper).
+- Receiver setup (avr_status -> setup, setup_checks): what the receiver reports itself: sub present, each speaker \
+group's size (small/large), height positions (e.g. Top Front + Top Rear), crossover (or "set per speaker"), bi-amp, \
+sub and center level, the live input signal and listening mode, model and firmware. It can't report speaker \
+distances, per-speaker levels or per-speaker crossovers over the network; those come from the owner copying them \
+from Speaker Setup onto the Speakers page (get_equipment -> rx_distance_m, rx_level_db, crossover_hz), and \
+setup_checks compares them with the recorded positions. Raise setup_checks with status "fix" first.
+- Protection and records (get_overview): protective limiters per sub are set from the headroom test (Verify -> Sub \
+headroom, "Set limiters"; no sound); the gain-structure check (Survey -> Checklist) says whether the receiver's sub \
+output can clip the miniDSP's input at the owner's loudest volume with full-scale LFE (fix = lower the receiver's sub \
+level and make it up in the miniDSP); the speaker check also verifies the LFE plays ~+10 dB over redirected bass; \
+re-verifications report drift from the first verification of the tune; Home -> Calibration report is a printable record. \
+Dirac goes out of date when the subs' EQ or levels change after it ran (a new tune, live EQ), not with timing-only blend fixes.
 - Receiver processing (avr_status): tone, Late Night (compression), Cinema Filter (softens treble), \
 Music Optimizer, dialogue enhance. htTamer's tests switch them off and restore them. If something \
 sounds dull, boomy or squashed, check these first.

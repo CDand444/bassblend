@@ -322,7 +322,13 @@ def fit_now() -> dict:
     n = min(MAX_BANDS, len(slots_for(cur)))
     if not n:
         raise RuntimeError("the playing tune leaves no free EQ bands")
-    out = autofit(r["f"], r["db"], r["goal"], r["band"], n, playing, protect_hz(cur))
+    # live EQ only changes the subs: above the crossover the mic mostly hears the mains, so cutting there
+    # can't help (seen on a real system: a -7 dB band at 112 Hz made the curve worse). Fit below ~1.25 x crossover.
+    from .dirac import system
+    xo = system().get("crossover_hz")
+    band = [r["band"][0], min(r["band"][1], round(1.25 * xo))] if xo else r["band"]
+    out = autofit(r["f"], r["db"], r["goal"], band, n, playing, protect_hz(cur))
+    out["fit_band"] = band
     out["n_slots"] = n
     return out
 

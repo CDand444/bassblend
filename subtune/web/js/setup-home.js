@@ -80,8 +80,28 @@ $('#smokeRun').onclick = async () => {
   try { const r = await post('/api/smoke'); if (r.error) alert(r.error); else { S.smoke = r; renderSmoke(); } }
   finally { b.disabled = false; b.textContent = 'Check the hardware (silent)'; }
 };
+let gainKey = null, gainInit = false;
+function renderGain() {
+  const g = S.gain_check, gs = S.gain_status || {}, job = S.job || {}, set = S.settings || {};
+  if (!gainInit && S.settings) { gainInit = true; if (set.listen_max_volume != null) $('#gainMax').value = set.listen_max_volume; if (!S.pi_hdmi) $('#gainMode').value = 'dlna'; }
+  const running = gs.running && job.running;
+  $('#gainRun').disabled = !!job.running || !!S.busy;
+  $('#gainRun').textContent = running ? 'Checking…' : g ? 'Check again' : 'Check gain structure';
+  const key = JSON.stringify([g && g.t, running, gs.text, gs.error]); if (key === gainKey) return; gainKey = key;
+  const col = {good: 'var(--good)', watch: 'var(--warn)', fix: 'var(--bad)'};
+  $('#gainSub').textContent = g ? (g.status === 'good' ? '✓ fine' : g.status === 'fix' ? 'would clip' : 'check') : '';
+  $('#gainOut').innerHTML = running ? `<div class="notice"><span class="spin"></span>&nbsp; ${esc(gs.text || 'Working…')}</div>`
+    : (gs.error ? `<div class="notice bad">The check stopped: ${esc(gs.error)}</div>` : '')
+    + (g ? `<div class="notice ${g.status === 'good' ? '' : g.status === 'fix' ? 'bad' : 'warn'}"><b style="color:${col[g.status]}">${g.headroom_db >= 0 ? g.headroom_db.toFixed(1) + ' dB headroom' : 'Clips by ' + (-g.headroom_db).toFixed(1) + ' dB'}</b> at the miniDSP input · ${esc(g.text)}
+        <div class="muted small" style="margin-top:4px">Measured ${esc(new Date(g.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}))} at receiver volume ${g.test_volume}, sub level ${g.sub_level ?? '?'} dB; worked out for volume ${g.max_volume}${g.max_volume_assumed ? ' (assumed: enter the loudest you listen above)' : ''} with full-scale LFE.</div></div>` : '');
+}
+$('#gainMax').onchange = async () => { const v = $('#gainMax').value; if (v === '') return; const r = await post('/api/settings', {listen_max_volume: +v}); if (r.error) alert(r.error); };
+$('#gainRun').onclick = async () => {
+  if (!confirm('Check the gain structure?\n\nhtTamer sets the volume with soft pink noise, then plays a quiet 40 Hz tone through the receiver for about 8 seconds while it reads the miniDSP\'s input meter. Everything is put back afterwards.')) return;
+  const r = await post('/api/gaincheck', {mode: $('#gainMode').value, avr_input: (S.settings || {}).avr_pi_input}); if (r.error) alert(r.error); gainKey = null; poll();
+};
 function renderSetup() {
-  renderSmoke();
+  renderSmoke(); renderGain();
   const key = JSON.stringify(setupItems());
   if (key === setupKey) return; setupKey = key;
   $('#setupList').innerHTML = setupHtml(); $('#wizSetup').innerHTML = setupHtml();
@@ -103,13 +123,15 @@ function renderSpeakers() {
   $('#spkSub').textContent = chans.length ? `${done} of ${chans.length} recorded` : '';
   if (!chans.length) { $('#spkOut').innerHTML = empty('Speaker layout not set', 'Set your layout (for example 7.1.4) in Setup → Checklist → Speakers and Dirac Live first.'); return; }
   const opt = (list, v) => list.map(x => `<option value="${x}" ${x === (v || '') ? 'selected' : ''}>${x || '–'}</option>`).join('');
-  $('#spkOut').innerHTML = `<div class="tw"><table class="dc-tbl spk-tbl"><thead><tr><th>Speaker</th><th>Model</th><th>Kind</th><th>Receiver size</th><th>Crossover</th><th>From left</th><th>From front</th><th>Height</th><th>Notes</th></tr></thead><tbody>
+  $('#spkOut').innerHTML = `<div class="tw"><table class="dc-tbl spk-tbl"><thead><tr><th>Speaker</th><th>Model</th><th>Kind</th><th>Receiver size</th><th>Crossover</th><th title="From the receiver's Speaker Setup → Distance (it can't report these over the network)">Receiver distance</th><th title="From the receiver's Speaker Setup → Level Calibration">Receiver level</th><th>From left</th><th>From front</th><th>Height</th><th>Notes</th></tr></thead><tbody>
     ${chans.map(c => { const r = rec[c.ch] || {};
       return `<tr data-ch="${c.ch}"><td><b>${esc(c.name)}</b><div class="muted small">${c.ch}</div></td>
         <td><input data-f="model" value="${esc(r.model || '')}" placeholder="Make and model" style="min-width:150px"></td>
         <td><select data-f="kind" style="min-width:128px">${opt(SPK_KINDS, r.kind)}</select></td>
         <td><select data-f="size" style="min-width:84px">${opt(['', 'small', 'large'], r.size)}</select></td>
         <td><span class="unit" data-u="Hz"><input data-f="crossover_hz" type="number" min="40" max="250" step="10" value="${r.crossover_hz ?? ''}" style="width:88px"></span></td>
+        <td><span class="unit" data-u="ft"><input data-f="rx_distance_ft" type="number" step="0.1" min="0" max="49" value="${ftOf(r.rx_distance_m)}" style="width:84px"></span></td>
+        <td><span class="unit" data-u="dB"><input data-f="rx_level_db" type="number" step="0.5" min="-12" max="12" value="${r.rx_level_db ?? ''}" style="width:80px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="x_ft" type="number" step="0.1" min="0" value="${ftOf(r.x_m)}" style="width:84px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="y_ft" type="number" step="0.1" min="0" value="${ftOf(r.y_m)}" style="width:84px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="z_ft" type="number" step="0.1" min="0" value="${ftOf(r.z_m)}" style="width:84px"></span></td>

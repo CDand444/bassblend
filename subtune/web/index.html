@@ -707,6 +707,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- SYSTEM MAP + HEALTH -->
     <section class="card" id="mapCard">
       <div class="card-h"><h2>Your system</h2><span class="sub" id="mapSub"></span><span class="grow"></span>
+        <a class="btn ghost" href="/report" target="_blank" rel="noopener" title="A printable record of the calibration: tune, blend, gain structure, receiver and what's left">Calibration report</a>
         <button class="btn ghost ask" data-ask="Give me a quick health check of my whole system in plain words.">Ask about this</button></div>
       <div class="sysmap" id="sysmap"></div>
       <div class="health" id="health"></div>
@@ -765,6 +766,12 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <button class="btn primary lg" id="aStart">Start auto-tune</button>
         </div>
         <div class="drawer" id="targetDrawer" hidden>
+          <div class="row" style="margin-bottom:10px;align-items:center">
+            <span class="small muted">Target</span>
+            <div class="seg" id="tgtPresets" role="radiogroup" aria-label="Target preset"></div>
+            <span class="grow"></span>
+            <span class="small muted" id="tgtXo"></span>
+          </div>
           <div class="grid g4" id="setForm">
             <label class="f">Lowest frequency<span class="unit" data-u="Hz"><input data-k="fmin" type="number" step="1"></span></label>
             <label class="f">Highest frequency<span class="unit" data-u="Hz"><input data-k="fmax" type="number" step="1"></span></label>
@@ -800,6 +807,14 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <span class="muted small">Reads the miniDSP and receiver, listens to the mic for a second, and checks the Pi's HDMI. Plays nothing and changes nothing.</span>
       </div>
       <div id="smokeOut" style="margin-top:10px"></div>
+      <div class="card-h" style="margin:18px 0 6px"><h3 style="margin:0;font-size:14px">Gain structure</h3><span class="sub" id="gainSub"></span></div>
+      <p class="muted small" style="margin:0 0 8px">Can the receiver's sub output overload the miniDSP's input at the loudest you listen? Clipping there happens before any tune and can't be fixed by EQ. Plays a quiet 40 Hz tone through the receiver for a few seconds (volume set automatically and put back).</p>
+      <div class="row" style="align-items:end">
+        <label class="f" style="width:auto">Plays from<select id="gainMode"><option value="hdmi">Pi HDMI</option><option value="dlna">Network</option></select></label>
+        <label class="f" style="width:190px">Loudest you listen (receiver volume)<input id="gainMax" type="number" min="10" max="100" step="0.5" placeholder="e.g. 70"></label>
+        <span class="grow"></span><button class="btn" id="gainRun">Check gain structure</button>
+      </div>
+      <div id="gainOut" style="margin-top:10px"></div>
     </section>
 
     <!-- PLAIN-LANGUAGE SUMMARY -->
@@ -842,6 +857,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         </div>
       </details>
       <div id="avrCtl"></div>
+      <div id="rxSetup" style="margin-top:16px"></div>
     </section>
 
     <!-- BLEND TEST (shown in the wizard and the menu) -->
@@ -875,7 +891,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <section class="card" id="leqCard">
       <div class="card-h"><h2>Live EQ</h2><span class="sub" id="leqSub"></span><span class="grow"></span>
         <button class="btn ghost ask" data-ask="Look at my live EQ and the live analyzer and tell me which band to add or change next.">Ask about this</button></div>
-      <p class="lead" style="margin-bottom:10px">Add your own EQ bands on top of the playing tune. Every change reaches the miniDSP within a second, so you can adjust while music plays. Start the analyzer to watch the bass at the mic change as you go.</p>
+      <p class="lead" style="margin-bottom:10px">A touch-up tool: your own EQ bands on top of the playing tune, reaching the miniDSP within a second, with a live analyzer to watch the bass at the mic. The tune itself balances every seat; use this for a last tweak at one seat or to experiment. If you use Dirac Live, bands that you keep mean running Dirac again.</p>
       <div id="leqNote"></div>
       <div class="row" style="align-items:end">
         <label class="f" style="width:auto">Analyzer plays from
@@ -967,6 +983,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="lead">How loud each sub can play cleanly in your room. Tone bursts at 25, 40 and 63 Hz start quiet and rise 3 dB at a time; the test stops by itself at the first sign of strain (distortion, the sub no longer getting louder, the mic close to overload, or 105 dB at the mic). <b>It gets loud.</b></p>
       <div class="row"><label class="f" style="width:170px">Sub<select id="hrOut"></select></label><span class="grow"></span><button class="btn primary lg" id="hrRun">Run headroom test</button></div>
       <div id="hrOut2" style="margin-top:14px"></div>
+      <div id="limOut" style="margin-top:16px"></div>
     </section>
 
     <section class="card" id="placeCard">

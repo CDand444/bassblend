@@ -20,6 +20,14 @@ const subName = o => {
 };
 const spotName = k => +k === 1 ? 'MLP' : `Spot ${k}`;
 
+// ---------- Dirac order: warn before a change that makes Dirac's correction out of date
+// (sub EQ or level changes after Dirac ran; timing-only blend fixes keep it valid)
+function diracOk(what) {
+  const sy = S.system || {};
+  if (!sy.dirac || !sy.dirac_current) return true;
+  return confirm(`Dirac Live was run with what's playing now.\n\n${what}\n\nGo ahead?`);
+}
+
 // ---------- theme
 try { const t = localStorage.getItem('subtune-theme'); if (t) document.documentElement.dataset.theme = t; } catch (e) {}
 $('#themeBtn').onclick = () => {

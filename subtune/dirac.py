@@ -104,15 +104,31 @@ def save_system(body: dict) -> dict:
     return system()
 
 
-def dirac_current(sy=None, res=None) -> bool:
+def dirac_current(sy=None, res=None, st=None) -> bool:
     """True when Dirac Live was run with the sub tune that's playing. A blend fix
     (delay / polarity / all-pass) changes only the subs' timing, not their
-    level, so a tune derived that way keeps Dirac's correction valid."""
+    level, so a tune derived that way keeps Dirac's correction valid. EQ changes
+    after Dirac (live EQ bands playing, or a tune they were baked into) do not."""
+    return dirac_stale_reason(sy, res, st) is None
+
+
+def dirac_stale_reason(sy=None, res=None, st=None) -> str | None:
+    """Why Dirac's correction no longer fits what plays, or None when it does (or Dirac isn't used/run)."""
     from .state import load_state
     sy = sy or system()
-    res = res if res is not None else (load_state().get("result") or {})
     d = sy.get("dirac_done")
-    return bool(d and d.get("tune_id") and d["tune_id"] in (res.get("tune_id"), res.get("base_tune_id")))
+    if not d or not d.get("tune_id"):
+        return "Dirac Live hasn't been run with htTamer yet"
+    st = st if st is not None else load_state()
+    res = res if res is not None else (st.get("result") or {})
+    if d["tune_id"] not in (res.get("tune_id"), res.get("base_tune_id")):
+        return "the sub tune changed since Dirac measured"
+    if res.get("live_eq") and d["tune_id"] != res.get("tune_id"):
+        return "live EQ bands were saved into the tune after Dirac measured"
+    le = st.get("live_eq") or {}
+    if le.get("active") and not le.get("bypass") and any(b.get("on", True) for b in le.get("bands") or []):
+        return "live EQ bands are playing on top of the tune Dirac measured"
+    return None
 
 
 # ---------------------------------------------------------------- target curve

@@ -54,6 +54,8 @@ function renderLeq(eqOnly = false) {
   if (LQ.unavailable) notes.push(['warn', esc(LQ.unavailable[0].toUpperCase() + LQ.unavailable.slice(1)) + '.']);
   else if (!LQ.slots) notes.push(['warn', `The playing tune uses all ${LQ.peq_bands} EQ bands on a sub, so there is no room for live bands. Re-tune with fewer bands (Settings: shared + per-sub bands) to make room.`]);
   if (LQ.eq.note && !LQ.eq.active) notes.push(['', esc(LQ.eq.note)]);
+  const sy = S.system || {};
+  if (sy.dirac && /live EQ/.test(sy.dirac_stale || '')) notes.push(['warn', `Dirac Live's correction doesn't fit while these bands play (${esc(sy.dirac_stale)}). Fine for experimenting; to keep them, save them into a tune and run Dirac again. Bypass compares with what Dirac measured.`]);
   if (rs.error && !run) notes.push(['bad', 'The analyzer stopped: ' + esc(rs.error)]);
   const nk = JSON.stringify(notes);
   if ($('#leqNote').dataset.k !== nk) { $('#leqNote').dataset.k = nk; $('#leqNote').innerHTML = notes.map(n => `<div class="notice ${n[0]}" style="margin-bottom:10px">${n[1]}</div>`).join(''); }
@@ -176,7 +178,9 @@ $('#leqBands').addEventListener('click', e => {
   const d = e.target.closest('[data-del]'); if (!d) return;
   leqBands.splice(+d.dataset.del, 1); leqKey = ''; leqSend(true);
 });
+const LEQ_DIRAC = 'Live EQ bands change the subs\' EQ, so Dirac\'s correction no longer fits while they play. Use them to experiment, or save them into a tune and run Dirac again.';
 $('#leqAdd').onclick = () => {
+  if (!leqBands.some(b => b.on !== false) && !diracOk(LEQ_DIRAC)) return;
   let b = {fc: 40, q: 4, gain_db: -3, on: true};
   const r = LQ && LQ.rta;
   if (r && r.db) {                 // start on the biggest peak above the goal in the tuned band
@@ -188,6 +192,7 @@ $('#leqAdd').onclick = () => {
 };
 $('#leqBypass').onclick = () => { leqBypass = !leqBypass; leqSend(true); };
 $('#leqFit').onclick = async () => {
+  if (!diracOk(LEQ_DIRAC)) return;
   leqFitting = true; renderLeq();
   try {
     const r = await post('/api/liveeq', {action: 'fit'});

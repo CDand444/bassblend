@@ -155,6 +155,8 @@ def full_slot_cmds(d, slot0, r, lpf=None):
     """Every write needed to make a DSP slot hold exactly this tune: the DSP
     can't report what's already there, so nothing is left to chance."""
     from .config import N_OUTPUTS
+    from . import limiter
+    lims = limiter.saved()
     subs = [x["output"] for x in r["subs"]]
     cmds = [d.c_preset(slot0)]
     for i in (0, 1):
@@ -167,7 +169,7 @@ def full_slot_cmds(d, slot0, r, lpf=None):
         sub = next((x for x in r["subs"] if x["output"] == o), None)
         if sub:
             cmds += d.write_sub_filters(o, sub["gain_db"], sub["delay_ms"], sub["invert"], sub["biquads"], lpf)
-            cmds += [f"output {o} fir bypass on", f"output {o} compressor -b on", d.c_out_mute(o, False)]
+            cmds += [f"output {o} fir bypass on", *limiter.commands(o, lims.get(str(o))), d.c_out_mute(o, False)]
         else:
             cmds.append(d.c_out_mute(o, True))
     return cmds
@@ -265,6 +267,16 @@ def cmd_liveeq(a):
     except BaseException as e:
         if not (isinstance(e, SystemExit) and str(e) == "stopped"):
             update_state(live_rta_status={"running": False, "error": str(e) or type(e).__name__})
+        raise
+
+
+def cmd_gaincheck(a):
+    from . import gaincheck
+    try:
+        with busy("gain structure check"):
+            print(json.dumps(gaincheck.run(a.mode, a.avr_input), indent=1))
+    except BaseException as e:
+        update_state(gain_status={"running": False, "error": str(e) or type(e).__name__})
         raise
 
 
@@ -664,6 +676,10 @@ def main(argv=None):
     s.add_argument("--speed", choices=["fast", "normal", "slow"], default="normal")
     s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
     s.set_defaults(fn=cmd_liveeq)
+    s = sp.add_parser("gaincheck", help="can the receiver's sub output overload the miniDSP's input? (plays a quiet tone)")
+    s.add_argument("--mode", choices=["hdmi", "dlna"], default="hdmi")
+    s.add_argument("--avr-input", default=None)
+    s.set_defaults(fn=cmd_gaincheck)
     sp.add_parser("smoke", help="silent hardware check: miniDSP, receiver, mic, Pi HDMI, storage").set_defaults(fn=cmd_smoke)
     s = sp.add_parser("liveeq-bake", help="save the live EQ bands into a new tune and apply it")
     s.set_defaults(fn=cmd_liveeq_bake)

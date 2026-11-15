@@ -119,6 +119,29 @@ function renderHeadroom() {
     ${outs.map(o => `<tr><td>Out ${+o + 1}</td>${hr[o].results.map(x => `<td title="${esc('Limited by: ' + x.limited_by)}">${x.max_clean_spl != null ? `<b>${x.max_clean_spl.toFixed(0)} dB</b><br><span class="muted small">${esc(x.limited_by)}</span>` : `<span class="muted">–</span><br><span class="muted small">${esc(x.limited_by)}</span>`}</td>`).join('')}<td class="muted small">${new Date(hr[o].t * 1000).toLocaleString([], {dateStyle: 'short', timeStyle: 'short'})}</td></tr>`).join('')}</tbody></table></div>
     <p class="muted small" style="margin:8px 0 0">The loudest level each sub played cleanly at your seat, and what stopped it. A sub that limits much earlier than the others holds the whole system back at that pitch.</p>`;
 }
+// ---------- protective limiters, set from the headroom results
+let limKey = null;
+function renderLimiters() {
+  const L = S.limiters || {}, props = L.proposals || {}, sv = L.saved || {}, job = S.job || {};
+  const key = JSON.stringify([L, !!job.running, !!S.busy]); if (key === limKey) return; limKey = key;
+  const outs = Object.keys(props).sort();
+  if (!outs.length) { $('#limOut').innerHTML = ''; return; }
+  const usable = outs.filter(o => props[o].threshold_db != null);
+  const on = Object.keys(sv).length;
+  $('#limOut').innerHTML = `<div class="card-h" style="margin:0 0 6px"><h3 style="margin:0;font-size:14px">Protective limiters</h3>
+      <span class="sub">${on ? `${on} on` : 'off'}</span><span class="grow"></span>
+      ${on ? '<button class="btn ghost" id="limOff">Switch off</button>' : ''}
+      <button class="btn primary" id="limSet" ${usable.length && !job.running && !S.busy ? '' : 'disabled'}>${on ? 'Update from the latest test' : 'Set limiters'}</button></div>
+    <p class="muted small" style="margin:0 0 8px">A limiter on each sub output, just below where that sub started to strain, so a loud scene or a slip of the volume can't push it into damage. Normal listening never reaches it. It stays with every tune you apply.</p>
+    <table class="small"><tbody>${outs.map(o => { const p = props[o], s = sv[o];
+      return `<tr><td style="width:70px"><b>Out ${+o + 1}</b></td><td>${p.threshold_db != null ? `limit at <b>${p.threshold_db} dBFS</b>` : '<span class="muted">no limit from this test</span>'}${s ? ` <span style="color:var(--good)">● set${s.threshold_db !== p.threshold_db ? ` (at ${s.threshold_db} dBFS)` : ''}</span>` : ''}</td><td class="muted">${esc(p.why)}</td></tr>`; }).join('')}</tbody></table>`;
+  const set = $('#limSet'); if (set) set.onclick = async () => {
+    if (!confirm('Set the protective limiters on the miniDSP? Nothing plays; they only act if a sub is pushed past where it started to strain.')) return;
+    const r = await post('/api/limiters', {action: 'apply'}); if (r.error) alert(r.error); limKey = null; poll(); };
+  const off = $('#limOff'); if (off) off.onclick = async () => {
+    if (!confirm('Switch the protective limiters off?')) return;
+    const r = await post('/api/limiters', {action: 'remove'}); if (r.error) alert(r.error); limKey = null; poll(); };
+}
 $('#hrRun').onclick = async () => {
   const o = +$('#hrOut').value;
   if (!confirm(`Run the headroom test on out ${o}?\n\nTone bursts at 25, 40 and 63 Hz start quiet and rise 3 dB at a time. It GETS LOUD (up to about 105 dB at the mic) and stops by itself at the first sign of strain. About a minute.\n\nKeep the mic at your seat. Check nobody is asleep nearby.`)) return;
@@ -320,11 +343,12 @@ function renderFix(r, running) {
       <button class="btn primary" id="fixRun" ${job.running || S.busy ? 'disabled' : ''}>Fix it for me</button></div>`;
     if (fs.error) h += `<div class="notice bad" style="margin-top:8px">The fixes stopped: ${esc(fs.error)}</div>`;
     if (fr && fr.pos === r.pos) {
-      const b = fr.before, a = fr.after, f = v => (v > 0 ? '+' : '') + v.toFixed(1);
+      // a reading can be missing (a report from an older htTamer): show a dash, don't stop the page
+      const b = fr.before || {}, a = fr.after || {}, f = v => v == null || !isFinite(v) ? '–' : (v > 0 ? '+' : '') + (+v).toFixed(1);
       h += `<div class="dc-fixres"><b>Last fixes</b> <span class="muted small">${esc(new Date(fr.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}))}</span>
-        <ul>${fr.steps.map(s => `<li class="${s.done ? 'ok' : ''}">${s.done ? '✓' : '–'} <b>${esc(s.step)}:</b> ${esc(s.text)}</li>`).join('')}</ul>
+        <ul>${(fr.steps || []).map(s => `<li class="${s.done ? 'ok' : ''}">${s.done ? '✓' : '–'} <b>${esc(s.step)}:</b> ${esc(s.text)}</li>`).join('')}</ul>
         <p class="small">Bass vs your target: <b>${f(b.bass_vs_target_db)} → ${f(a.bass_vs_target_db)} dB</b> · things to fix: ${b.fix} → ${a.fix} · to look at: ${b.watch} → ${a.watch}</p>
-        ${fr.still_to_do.length ? `<p class="small" style="margin:6px 0 2px"><b>Still yours to do:</b></p><ul>${fr.still_to_do.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>`;
+        ${(fr.still_to_do || []).length ? `<p class="small" style="margin:6px 0 2px"><b>Still yours to do:</b></p><ul>${fr.still_to_do.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : ''}</div>`;
     }
   }
   el.innerHTML = h;

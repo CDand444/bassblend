@@ -108,7 +108,8 @@ def analyse(rec, t_start, cal=None):
         quiet = np.take(ir, np.arange(rough - int(1.2 * FS), rough - int(0.4 * FS)), mode="wrap")
         heard = float(np.max(np.abs(seg[: int(0.05 * FS)]))) / max(float(np.std(quiet)) * 6, 1e-12)
         expected = (fl_direct if ch != "LFE" else a0) + int(OFFS[ch] * FS)
-        out[ch] = {"name": NAMES[ch], "level_db": round(float(level), 1), "arrival_ms": round((arr - expected) / FS * 1000, 2),
+        out[ch] = {"name": NAMES[ch], "level_db": round(float(level), 1), "bass_db": round(float(band_mean(FG, db, 30, 80)), 1),
+                   "arrival_ms": round((arr - expected) / FS * 1000, 2),
                    "heard": bool(heard > 1.0), "snr_x": round(heard, 1),
                    "curve": (db - band_mean(FG, db, 500, 2000) if ch != "LFE" else db - level).round(1)[::2].tolist()}
     ref = out["FL"]
@@ -147,10 +148,41 @@ def advice(out):
                          f"{'later' if r['arrival_vs_fl_ms'] > 0 else 'earlier'} than the front left. "
                          f"{'Increase' if r['arrival_vs_fl_ms'] > 0 else 'Decrease'} its distance setting by about {ft:.1f} ft "
                          "(or let Dirac set distances)."})
-    if not tips:
-        tips.append({"ch": "", "status": "good", "text": "Every bed speaker plays, matches the front left within 1 dB, arrives "
-                     "in step."})
+    odd = [r["name"] for ch, r in out.items() if ch not in ("FL", "LFE") and r.get("heard")
+           and (abs(r.get("arrival_vs_fl_ms") or 0) > 5 or abs(r.get("level_vs_fl_db") or 0) > 4)]
+    if odd:
+        tips.insert(0, {"ch": "", "status": "fix", "text": f"{', '.join(odd)}: far too early/loud to be a distance or level "
+                        "setting (that would mean metres out). Check which speaker is wired to which terminal and the receiver's "
+                        "speaker assignment (e.g. surround back vs. zone 2 / bi-amp) before changing any setting."})
+    tips += lfe_check(out)
+    if not [t for t in tips if t["status"] != "good"]:
+        tips.insert(0, {"ch": "", "status": "good", "text": "Every bed speaker plays, matches the front left within 1 dB, arrives "
+                        "in step."})
     return tips
+
+
+LFE_GAIN_DB = 10.0           # the LFE channel plays 10 dB above a main channel at the same digital level
+
+
+def lfe_check(out):
+    """Bass management and the LFE: the front left's deep bass (redirected to the subs) against the LFE
+    channel at the same digital level, 30-80 Hz. Expected: LFE about 10 dB louder."""
+    lfe, fl = out.get("LFE") or {}, out.get("FL") or {}
+    if not lfe.get("heard") or fl.get("bass_db") is None or lfe.get("level_db") is None:
+        return []
+    gap = round(lfe["level_db"] - fl["bass_db"], 1)
+    lfe["vs_redirected_bass_db"] = gap
+    err = gap - LFE_GAIN_DB
+    if abs(err) <= 3:
+        return [{"ch": "LFE", "status": "good", "text": f"LFE and bass management: the LFE channel plays {gap:+.1f} dB over the "
+                 f"front left's redirected bass (expected about +{LFE_GAIN_DB:g}). Both reach the subs correctly."}]
+    if gap < 3:
+        return [{"ch": "LFE", "status": "fix", "text": f"The LFE channel plays only {gap:+.1f} dB over the front left's bass; it "
+                 f"should be about +{LFE_GAIN_DB:g}. Explosions and effects will be thin. Check the receiver's LFE level "
+                 "(Speaker Setup / Audio Adjust → LFE Level) is 0 dB, not -10 or -15."}]
+    return [{"ch": "LFE", "status": "watch", "text": f"The LFE channel plays {gap:+.1f} dB over the front left's bass, "
+             f"{'more' if err > 0 else 'less'} than the usual +{LFE_GAIN_DB:g}. Check the receiver's LFE level setting, "
+             "and that the front left is set to Small (if it's Large, its bass stays in the speaker)."}]
 
 
 def stereo_only(out) -> bool:

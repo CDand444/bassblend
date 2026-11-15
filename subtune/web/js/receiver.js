@@ -22,7 +22,46 @@ let AVR = {}, avrKey = null, blendMode = 'dlna', blendSpk = 'LR', blendSide = 'L
 const blendFile = () => blendSpk === 'LR' ? 'bassblend_blend_test_left_right.wav' : 'bassblend_blend_test.wav';
 const MODE_OPTS = [['00', 'Stereo'], ['01', 'Direct'], ['0C', 'All Ch Stereo'], ['11', 'Pure Audio'], ['80', 'Dolby Surround'], ['82', 'DTS:X / Neural:X'], ['FF', 'Auto Surround']];
 const INPUT_OPTS = [['10', 'BD/DVD'], ['12', 'TV'], ['01', 'CBL/SAT'], ['11', 'STRM BOX'], ['02', 'GAME'], ['05', 'PC'], ['03', 'AUX'], ['23', 'CD'], ['2B', 'NET'], ['22', 'PHONO']];
-async function loadAvr(force) { try { AVR = await fetch('/api/avr' + (force ? '?force=1' : '')).then(r => r.json()); } catch (e) {} avrKey = null; renderAvr(); }
+async function loadAvr(force) { try { AVR = await fetch('/api/avr' + (force ? '?force=1' : '')).then(r => r.json()); } catch (e) {} avrKey = null; safe('receiver', renderAvr);
+  if (typeof sheetKey !== 'undefined' && sheetKey === 'avr') loadRxSetup(force); }
+// ---------- what the receiver reports about its own setup (read-only), checked against htTamer's records
+let RXD = null, rxKey = null;
+async function loadRxSetup(force) {
+  try { RXD = await fetch('/api/receiver/details' + (force ? '?force=1' : '')).then(r => r.json()); } catch (e) { return; }
+  renderRxSetup();
+}
+function renderRxSetup() {
+  const el = $('#rxSetup'); if (!el || !RXD) return;
+  const k = JSON.stringify(RXD); if (k === rxKey) return; rxKey = k;
+  const d = RXD.details || {}, s = d.speakers, a = d.audio, dev = d.device || {};
+  if (!d.power) { el.innerHTML = RXD.error ? `<p class="muted small">Couldn't read the receiver's setup: ${esc(RXD.error)}</p>` : '<p class="muted small">Switch the receiver on to see what it reports about its speaker setup.</p>'; return; }
+  const cap = x => x ? x[0].toUpperCase() + x.slice(1) : '–';
+  const row = (l, v) => `<tr><td class="muted" style="width:170px">${l}</td><td>${v}</td></tr>`;
+  const sizes = s ? Object.entries({Front: s.sizes.front, Center: s.sizes.center, Surround: s.sizes.surround, 'Surround back': s.sizes.surround_back,
+    [`Height 1${s.height1_position ? ' (' + s.height1_position + ')' : ''}`]: s.sizes.height1, [`Height 2${s.height2_position ? ' (' + s.height2_position + ')' : ''}`]: s.sizes.height2})
+    .filter(([, v]) => v && v !== 'none').map(([n, v]) => `${esc(n)}: <b>${cap(v)}</b>`).join(' · ') : '–';
+  const lvl = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(1) + ' dB';
+  const ic = {fix: ['!', 'var(--bad)'], watch: ['!', 'var(--warn)'], info: ['i', 'var(--text-3)']};
+  el.innerHTML = `<div class="card-h" style="margin:0 0 6px"><h3 style="margin:0;font-size:14px">What the receiver reports</h3><span class="grow"></span>
+      <button class="btn ghost" id="rxRefresh">Refresh</button>${s ? '<button class="btn ghost" id="rxSizes" title="Copy these speaker sizes onto the Speakers page">Copy sizes to Speakers</button>' : ''}</div>
+    <table class="small"><tbody>
+      ${row('Receiver', esc([dev.brand, dev.model, dev.year ? '(' + dev.year + ')' : ''].filter(Boolean).join(' ') || '–') + (d.firmware ? ` · firmware ${esc(d.firmware)}` : ''))}
+      ${row('Subwoofer', s ? (s.subwoofer ? `Yes${s.subwoofer === 2 ? ', 2 outputs' : ''} · level ${lvl(d.sub_level)}` : '<b style="color:var(--bad)">No</b>') : '–')}
+      ${row('Speakers', sizes)}
+      ${row('Crossover', s ? (s.crossover_hz ? s.crossover_hz + ' Hz' : esc(s.crossover_note || '–')) : '–')}
+      ${row('Center level', lvl(d.center_level))}
+      ${s && s.bi_amp ? row('Bi-amp', esc(s.bi_amp)) : ''}
+      ${row('Playing now', a ? esc([a.input, a.format, a.sample_rate, a.input_channels].filter(Boolean).join(' · ') || 'nothing') + (a.listening_mode ? ` → <b>${esc(a.listening_mode)}</b>` : '') + (a.output_channels ? `, ${esc(a.output_channels)}` : '') : '–')}
+      ${d.temp_c != null ? row('Temperature', d.temp_c + ' °C inside') : ''}
+    </tbody></table>
+    <p class="muted small" style="margin:6px 0 0">Not available over the network on this receiver: ${esc((d.not_readable || []).join(', '))}. Copy them from Speaker Setup onto the <a href="#/speakers">Speakers</a> page and htTamer checks them against where the speakers are.</p>
+    ${(RXD.checks || []).length ? `<table class="small" style="margin-top:8px"><tbody>${RXD.checks.map(c => `<tr><td style="width:22px;font-weight:700;color:${ic[c.status][1]}">${ic[c.status][0]}</td><td>${esc(c.text)}</td></tr>`).join('')}</tbody></table>` : ''}`;
+  $('#rxRefresh').onclick = () => { rxKey = null; loadRxSetup(true); };
+  const cs = $('#rxSizes'); if (cs) cs.onclick = async () => {
+    const r = await post('/api/receiver/sizes'); if (r.error) { alert(r.error); return; }
+    alert(r.changed && r.changed.length ? `Copied the receiver's speaker sizes to ${r.changed.length} speaker${r.changed.length === 1 ? '' : 's'}.` : 'The Speakers page already matches the receiver.'); poll();
+  };
+}
 async function avrDo(body) {
   const r = await post('/api/avr', body);
   if (r.error) alert(r.error); else { AVR = r; avrKey = null; renderAvr(); }
@@ -276,7 +315,7 @@ setInterval(() => { if (sheetKey === 'avr') loadAvr(); }, 5000);
 
 // ---------- saved tunes + DSP slots
 let TUNES = {tunes: [], slots: {}, original_slot: 1, owned_slot: 4}, tunesKey = null, liveMaster = null;
-async function loadTunes() { try { TUNES = await fetch('/api/tunes').then(r => r.json()); } catch (e) {} tunesKey = null; renderTunes(); }
+async function loadTunes() { try { TUNES = await fetch('/api/tunes').then(r => r.json()); } catch (e) {} tunesKey = null; safe('tunes', renderTunes); }
 const fmtWhen = t => new Date(t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'});
 function slotLabel(n) {
   const s = TUNES.slots[String(n)];
@@ -341,6 +380,7 @@ function renderTunes() {
           body.confirm_original = true;
         } else if (!confirm(`Apply “${t.name}” to slot ${slot}?\n\nSlot ${slot} currently holds: ${cur}.\nThe whole slot is rewritten and becomes the one playing.`)) return;
         else if (slot === TUNES.original_slot) body.confirm_original = true;
+        if (!diracOk('A different sub tune changes the subs\' levels and EQ, so Dirac\'s correction will no longer fit until you run Dirac again.')) return;
         const r = await post('/api/apply', body); if (r.error) alert(r.error);
         setTimeout(loadTunes, 4000); poll();
       } else if (act === 'rename') {

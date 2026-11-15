@@ -151,8 +151,9 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
 
     # ---- Dirac
     if sy.get("dirac") and tuned and not sy.get("dirac_current"):
+        why = sy.get("dirac_stale") or "the sub tune changed since Dirac measured"
         out.append(_step(10, "dirac", "dirac", "Run Dirac Live with htTamer's target",
-                         "The sub tune changed since Dirac last measured, so its correction no longer fits.",
+                         f"Dirac's correction no longer fits what plays: {why}.",
                          who="dirac", open="wiz:dirac", ask="Walk me through running Dirac Live with htTamer's target curve."))
 
     # ---- system report and what it found
@@ -182,6 +183,42 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
         out.append(_step(15, "tone", "receiver", "The receiver's tone controls aren't flat",
                          f"Bass {a.get('tone_bass'):+d} dB, treble {a.get('tone_treble'):+d} dB on top of your tuning.",
                          open="avr"))
+    # ---- drift: re-verify now and then; flag a verification that moved from the first one
+    import time as _t
+    vt = (st.get("verify_meta") or {}).get("1")
+    dr = (st.get("verify_drift") or {}).get("1") or {}
+    if tuned and dr.get("tune_id") == tid and dr.get("rms_db", 0) > 1.5:
+        out.append(_step(4, "drift", "verify", f"The bass at the MLP has drifted {dr['rms_db']:.1f} dB",
+                         "Since this tune was first verified, the response changed shape: a sub, a knob, furniture or the mic "
+                         "spot moved. Check the subs' settings, then re-measure if it persists.", open="wizard"))
+    elif tuned and vt and _t.time() - vt > 30 * 86400:
+        out.append(_step(18, "drift_check", "verify", "Re-verify for drift (it's been a month)",
+                         "One sweep at the MLP compared with the first verification catches a knob or a sub that moved.",
+                         sound=True, open="wiz:verify", tool="run_verify", inp={"pos": 1}))
+    # ---- gain structure: the receiver's sub out must not overload the miniDSP's input
+    g = st.get("gain_check")
+    if tuned and settings.get("avr_host") and not g:
+        out.append(_step(13, "gain_check", "safety", "Check the gain structure",
+                         "Makes sure the receiver's sub output can't overload the miniDSP's input at the loudest you "
+                         "listen: that clipping happens before any tune. A quiet tone for a few seconds.",
+                         sound=True, open="setup"))
+    elif g and g.get("status") == "fix":
+        out.append(_step(2, "gain_fix", "safety", "The miniDSP's input would clip", g["text"], who="receiver_menu", open="setup"))
+    # ---- protect the subs: measure their headroom, then a limiter just under it
+    if tuned and sub_outs and not st.get("headroom"):
+        out.append(_step(17, "headroom", "safety", "Measure each sub's headroom (loud)",
+                         "Finds how loud each sub plays cleanly in your room; htTamer then sets a protective limiter just below "
+                         "that so a loud scene can't push a sub into damage.", sound=True, open="headroom",
+                         tool="run_headroom", inp={"output": sub_outs[0] + 1}))
+    try:
+        from . import limiter
+        props = limiter.proposals(st)
+        if any(p["threshold_db"] is not None and not p.get("check") for p in props.values()) and not settings.get("sub_limiters"):
+            out.append(_step(5, "limiters", "safety", "Set the protective limiters",
+                             "The headroom test found where your subs start to strain. A limiter just below that protects them; "
+                             "normal listening never reaches it. No sound.", open="headroom"))
+    except Exception:                               # noqa: BLE001 - advice must never break the plan
+        pass
     if not st.get("checkups"):
         out.append(_step(16, "checkup", "verify", "Run a check-up", "Room noise, distortion and how long bass rings: 20 seconds.",
                          sound=True, open="checkup", tool="run_checkup", inp={"pos": 1}))

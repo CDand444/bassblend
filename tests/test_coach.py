@@ -27,7 +27,8 @@ LIVE = {"master": {"preset": 2}}
 TUNED = {"result": {"applied": 2000.0, "tune_id": "T2", "base_tune_id": "T1", "slot": 3},
          "verify": {"after": {"1": [0]}}, "avr_blend": {"tune_id": "T2", "loss_now_db": 0.6, "loss_best_db": 0.5, "delay_ms": 0},
          "avr_blend_seats": {"measured": ["1", "2", "3"]}, "system": {"dirac": True, "dirac_current": True},
-         "checkups": [{}], "deep_reports": {"1": {"t": 3000.0, "pos": 1, "lr": {"polarity": "same"}, "findings": [], "receiver_advice": [],
+         "checkups": [{}], "gain_check": {"status": "good"}, "headroom": {"0": {"t": 1.0, "results": [], "tune": {"gain_db": 0.0, "biquads": []}}},
+         "deep_reports": {"1": {"t": 3000.0, "pos": 1, "lr": {"polarity": "same"}, "findings": [], "receiver_advice": [],
                                                   "bass_vs_target_db": 0.3}}}
 
 

@@ -25,6 +25,10 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     `avrmeasure.py` + `blendmulti.py` (blend), `deepcheck.py` (system report), `fixup.py`,
     `fixlog.py` (fix ledger vs baseline), `allspk.py`
   - `liveeq.py`: live EQ layer (free top PEQ bands), analyzer (`run_rta`), `autofit`
+  - `rxinfo.py`: what the receiver reports about itself (SPI speaker setup, IFA/IFV signal, NRI/FWV, TPD),
+    decoded and cross-checked. The RZ50 can't report distances, per-speaker levels or crossovers over
+    eISCP (SPD/TCL get no reply; port 80 web setup needs a password) — the owner copies them onto the
+    Speakers page (`rx_distance_m`, `rx_level_db`).
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`

@@ -26,11 +26,11 @@
 
 <h2 id="m-around">Getting around</h2>
 <ul>
-  <li><b>Home</b>: what's playing, the next best step, and what htTamer has changed.</li>
-  <li><b>Tune</b>: the guided <i>Tune my system</i> wizard, saved tunes and slots, the blend test, <b>Live EQ</b>, the filters on the miniDSP, and manual steps.</li>
-  <li><b>Measure</b>: the system report, the all-speakers check, check-up, raw measurements, level match, sub headroom and the sound level meter.</li>
-  <li><b>Setup</b>: the checklist, the receiver, the room and subs, your speakers, speaker placement and AI analysis.</li>
-  <li><b>System</b>: the activity log, the miniDSP's live meters, the settings file and this manual.</li>
+  <li><b>Home</b>: what's playing, the next best step, what htTamer has changed, and the calibration report.</li>
+  <li><b>Survey</b>: the checklist (with the silent hardware check and gain structure), the receiver, the room and subs, your speakers, speaker placement and room treatment.</li>
+  <li><b>Tune</b>: the guided <i>Tune my system</i> wizard, saved tunes and slots, the blend test and <b>Live EQ</b>.</li>
+  <li><b>Verify</b>: the system report, the speaker check (levels, distances and LFE), check-up, sub headroom (and the protective limiters) and level match.</li>
+  <li><b>Tools</b>: raw measurements, the miniDSP filters and meters, the sound level meter, manual steps, AI room analysis, the activity log, the settings file and this manual.</li>
 </ul>
 <p>On a phone the sections are along the bottom and each section's pages are pills at the top. The round chat button opens the <b>assistant</b> from any page. The header shows whether htTamer is busy, the miniDSP input (AVR or USB), the mic calibration and a small sound level meter. <b>Stop</b> in the header ends whatever test is running and puts the receiver back.</p>
 
@@ -39,7 +39,7 @@
 <ol>
   <li><b>Mic calibration</b>: upload your UMIK-1's calibration file (the one for its serial number). Every measurement uses it.</li>
   <li><b>miniDSP</b>: connected over USB to the Pi. htTamer owns one slot (slot 3 here). <b>Slot 1 keeps your original setup and htTamer never writes to it.</b></li>
-  <li><b>Receiver</b>: its network address, so htTamer can switch inputs, set the test volume and read the sub level.</li>
+  <li><b>Receiver</b>: its network address, so htTamer can switch inputs, set the test volume and read the sub level. The Receiver page also shows <b>what the receiver reports about itself</b>: whether it has a sub, each speaker's size (Small/Large), where the height speakers are, the crossover, the sub and center levels, the signal playing now and the model/firmware. htTamer checks that against your records (for example, the layout or a speaker set to Large) and can copy the sizes onto the Speakers page. The receiver can't report <b>speaker distances, per-speaker levels or per-speaker crossovers</b> over the network. Copy them from its Speaker Setup menu onto the Speakers page, and htTamer compares the distances with where the speakers actually are.</li>
   <li><b>Room and subs</b>: the room size, your seats, and each sub's model and knob settings (ports, EQ mode, Q). Some sub modes forbid EQ boost below a frequency. htTamer obeys that everywhere.</li>
   <li><b>Speakers</b>: the model and position of each speaker. This doesn't change tuning, but the assistant uses it for advice.</li>
   <li><b>Pi HDMI</b> (recommended): a cable from the Pi's micro-HDMI port next to the USB-C power into a free receiver HDMI input. Pick that input once on any test page. Receiver tests then play from the Pi and htTamer switches the input for you.</li>
@@ -99,6 +99,15 @@
   <li>If the analyzer says the noise is only a few dB above the room, raise the volume a little.</li>
 </ul>
 
+<h2 id="m-calreport">Calibration report</h2>
+<p><b>Home → Calibration report</b> opens one printable page with everything about the current calibration: the system, the playing tune (with its predicted, goal and measured curves), the blend across seats, gain structure and protective limiters, the receiver's speaker settings, what the fixes changed, open findings and next steps. Every figure is dated with the measurement it came from. Use <b>Print / save as PDF</b> to keep a copy.</p>
+
+<h2 id="m-protect">Protecting the subs</h2>
+<ul>
+  <li><b>Protective limiters</b> (Measure → Sub headroom): after the headroom test, htTamer can set a limiter on each sub output just below where that sub started to strain. Normal listening never reaches it; it only stops a loud scene or a volume slip from pushing a sub into damage. It stays with every tune you apply.</li>
+  <li><b>Gain structure</b> (Setup → Checklist): checks that the receiver's sub output can't overload the miniDSP's input at the loudest you listen, with full-scale LFE. Clipping there happens before any tune, so EQ can't fix it. It plays a quiet 40 Hz tone for a few seconds.</li>
+</ul>
+
 <h2 id="m-report">System report and fixes</h2>
 <p><b>Measure → System report</b> plays full-range sweeps on the left, right and both front speakers with the subs. It reports the response against your goal per range, peaks and dips and their likely cause (room resonance, wall cancellation, reflection), left/right balance and timing, reverberation, distortion, noise, and bass extension. Each finding says who can fix it: htTamer, Dirac, the receiver menu (with the exact setting), or your hands (placement, furnishings, wiring).</p>
 <p><b>Fix what htTamer can</b> does the automatic part: sets the receiver's sub level, runs a blend test and applies the blend fix, then runs the report again.</p>
@@ -140,6 +149,7 @@
 <p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It can read the room treatment plan, explain it and adjust it to your budget, looks and the walls you can't treat, and record what you've put up. It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
 
 <h2 id="m-dirac">Dirac Live</h2>
+<p><b>What makes Dirac out of date:</b> anything that changes the subs' <i>levels or EQ</i> after Dirac measured: a different sub tune, Live EQ bands playing, or Live EQ saved into a tune. Timing-only changes (a blend fix's delay, polarity or phase filter) keep Dirac's correction valid. htTamer asks before a change that would make Dirac out of date, and Home says when it is.</p>
 <p>Order of work: <b>sub tune first</b>, then Dirac Live with htTamer's target curve (the Dirac step gives you the file), then the blend test with Dirac on, then verify and a system report. While Dirac is measuring, close htTamer's level meter and don't start an htTamer test: both use the same mic. A new sub tune means Dirac should be run again.</p>
 
 <h2 id="m-safety">Safety</h2>
