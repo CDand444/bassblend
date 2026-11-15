@@ -82,6 +82,11 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
 - Assistant: strict tool schemas only where every property is required, at most 20
   (`MAX_STRICT`); new tools need an executor in `server.build_executors`, a `_brief` label, and a
   `DESCRIBE` entry if `approval=True`. `test_coach.py` checks names and limits.
+- AI hardening lives in `guard.py`, wrapped around every executor (assistant and MCP alike): read-only
+  mode, argument caps, the sound budget, hwdb changes that only make things safer, an activity-log line
+  per action. A new tool that plays sound or changes anything must be added to `guard.SOUND`/`CHANGES`
+  (and given limits in `guard.check` if its arguments can do harm). The assistant adds its own
+  per-message caps, approval expiry, Stop and the daily request budget; `test_guard.py` covers both.
 - Applying any tune rewrites all PEQ bands (live EQ switches off).
 
 ## Hardware facts

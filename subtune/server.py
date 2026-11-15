@@ -37,7 +37,9 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "nearfield_min_q": (float, 0.5, 6),
             "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70),
             "listen_max_volume": (float, 10, 100),
-            "ai_hwdb": (int, 0, 1),                     # let the assistant build the hardware database (and look things up)
+            "ai_hwdb": (int, 0, 1),
+            "ai_read_only": (int, 0, 1),                 # the assistant (and MCP clients) can only read and advise
+            "ai_daily_calls": (int, 20, 2000),          # AI requests per day for the assistant (protects your credit)                     # let the assistant build the hardware database (and look things up)
             "mcp_enabled": (int, 0, 1),                 # outside AI clients may connect at /mcp (or `subtune mcp`)
             "mcp_actions": (int, 0, 2)}                 # their sound/write tools: 0 refused, 1 ask each time, 2 client asks
 
@@ -668,7 +670,7 @@ def treatment_plan(st=None):
     return treatment.plan(room, st, layout.plan(room, sy.get("beds"), sy.get("heights")), modal_report(room, 200))
 
 
-def build_executors():
+def build_executors(origin="assistant"):
     from . import library
     from .room import load_room, modal_report
 
@@ -1094,7 +1096,8 @@ def build_executors():
         except Exception:
             return tid
 
-    return {"get_overview": overview, "list_tunes": tunes, "simulate_tune": simulate, "save_simulation": save_sim,
+    from . import guard
+    return guard.wrap({"get_overview": overview, "list_tunes": tunes, "simulate_tune": simulate, "save_simulation": save_sim,
             "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot,
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
@@ -1107,7 +1110,7 @@ def build_executors():
             "stop_live_analyzer": leq_stop, "save_live_eq": leq_save,
             "get_treatment_plan": treatment_get, "set_treatment_constraints": treatment_constraints,
             "record_treatment": treatment_record,
-            "_tune_name": tune_name}
+            "_tune_name": tune_name}, origin)
 
 
 _assistant = {"obj": None}
@@ -1116,7 +1119,7 @@ _assistant = {"obj": None}
 def assistant():
     from .assistant import Assistant
     if _assistant["obj"] is None:
-        _assistant["obj"] = Assistant(build_executors())
+        _assistant["obj"] = Assistant(build_executors("assistant"))
     return _assistant["obj"]
 
 
@@ -1127,7 +1130,7 @@ def mcp_server():
     """The MCP endpoint's tool runner: the assistant's executors, gated by the MCP settings."""
     from .mcp import Server
     if _mcp["obj"] is None:
-        _mcp["obj"] = Server(build_executors(), load_settings, log=lambda m: event("info", m))
+        _mcp["obj"] = Server(build_executors("mcp"), load_settings, log=lambda m: event("info", m))
     return _mcp["obj"]
 
 
@@ -1879,6 +1882,9 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, assistant().view())
             if path == "/api/chat/answer":
                 assistant().answer(str(body.get("id")), body.get("approve") is True)
+                return self._send(200, assistant().view())
+            if path == "/api/chat/stop":               # stop the assistant now: no more AI calls or tools
+                assistant().stop()
                 return self._send(200, assistant().view())
             if path == "/api/chat/reset":
                 assistant().reset()

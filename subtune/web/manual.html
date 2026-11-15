@@ -17,7 +17,7 @@
   <a href="#m-dirac">Dirac Live</a>
   <a href="#m-updates">Updates</a>
   <a href="#m-feedback">Bugs and feedback</a>
-  <a href="#m-safety">Safety</a>
+  <a href="#m-guards">Built-in safeguards</a>
   <a href="#m-trouble">When something goes wrong</a>
   <a href="#m-words">Words used in the app</a>
   <a href="#m-license">License</a>
@@ -169,6 +169,17 @@
 
 <h2 id="m-assistant">The assistant</h2>
 <p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It can read the room treatment plan, explain it and adjust it to your budget, looks and the walls you can't treat, and record what you've put up. It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
+<p><b>What keeps it safe.</b> The assistant only acts through htTamer's own tools, and htTamer checks every one itself, whatever the AI says:</p>
+<ul>
+  <li><b>Your approval</b> for anything that plays sound or changes the miniDSP, the receiver or a tune. An approval you don't answer within 15 minutes expires, and after 4 approval requests for one message it has to stop and talk to you.</li>
+  <li><b>Hard limits</b>: never slot 1; the receiver volume can't be raised; receiver sub and centre level at most +6 dB, tone at most +6; live EQ boosts at most +3 dB and none where a ported sub could be damaged; test tones only on a sub output, 20-200 Hz.</li>
+  <li><b>Rest breaks</b>: at most 8 sound tests in 10 minutes, from the chat or a connected AI app.</li>
+  <li><b>Your hardware records stay yours</b>: the assistant can add specs, but only you can change a receiver's control protocol or lower a sub's protection limit.</li>
+  <li><b>It ignores instructions in data</b>: web pages, notes and results are treated as information, never as orders; keys and tokens are removed before anything reaches the AI.</li>
+  <li><b>Stop</b>: the Stop button in the chat ends the current request at once (no more AI requests or actions).</li>
+  <li><b>Read and advise only</b> (Tools → AI analysis → Assistant safety): it can look and explain but not act. Also there: a daily cap on AI requests (300 by default) so a stuck conversation can't run up your bill.</li>
+  <li>Every action it takes, and everything it was refused, is in the activity log.</li>
+</ul>
 
 <h2 id="m-mcp">Using htTamer from another AI app (MCP)</h2>
 <p><b>Tools → MCP</b> lets an AI app you already use, such as Claude Desktop or Claude Code, work with htTamer through MCP (the Model Context Protocol). It gets the same tools as htTamer's own assistant: it can read the state, results, journal, plan and reports, and, if you allow it, run tests and change things. It runs on your AI app's account, not on htTamer's API key, and htTamer has to be running while you use it.</p>
@@ -190,7 +201,7 @@
 <h2 id="m-feedback">Bugs and feedback</h2>
 <p><b>Tools → Feedback</b> turns a bug report or an idea into a new issue on htTamer's GitHub page. Pick the kind, write what happened (or your idea) and press <b>Open on GitHub</b>: the issue opens already filled in, you check it, and you press <b>Submit new issue</b> there (a free GitHub account is needed). htTamer never sends anything by itself. <b>Include diagnostics</b> adds htTamer's version, Windows or Pi, the receiver model, the miniDSP slot and the latest errors from the activity log, with IP addresses, keys, e-mail addresses and names removed; open <b>See the diagnostics</b> to read exactly what's added, or copy them if they're too long for the link.</p>
 
-<h2 id="m-safety">Safety</h2>
+<h2 id="m-guards">Built-in safeguards</h2>
 <ul>
   <li>Nothing plays unless you start it (or approve it in the chat).</li>
   <li>Slot 1 (your original setup) is never written.</li>

@@ -354,6 +354,7 @@ function renderChat() {
   $('#chatDot').hidden = !(CHAT.pending && $('#chat').hidden);
   $('#chatState').innerHTML = busy ? '<span class="spin"></span> working…' : CHAT.pending ? 'waiting for your OK' : '';
   $('#chatSend').disabled = !!busy || !!CHAT.pending;
+  $('#chatStop').hidden = !busy && !CHAT.pending;
   if (key === chatKey) return; chatKey = key;
   const log = $('#chatLog');
   let h = '';
@@ -406,6 +407,8 @@ async function renderHwdb(force) {
   if (sheetKey !== 'ai' && !force) return;
   const set = S.settings || {};
   if (document.activeElement !== $('#hwOn')) $('#hwOn').checked = !!set.ai_hwdb;
+  if (document.activeElement !== $('#aiRO')) $('#aiRO').checked = !!set.ai_read_only;
+  if (document.activeElement !== $('#aiCalls')) $('#aiCalls').value = set.ai_daily_calls || '';
   let d; try { d = await fetch('/api/hwdb').then(r => r.json()); } catch (e) { return; }
   const k = JSON.stringify(d); if (k === hwKey) return; hwKey = k;
   const n = ['receivers', 'subs', 'speakers'].map(x => Object.keys(d[x] || {}).length);
@@ -464,3 +467,10 @@ async function loadMcp() {
 }
 $('#mcpOn').onchange = async () => { const r = await post('/api/settings', {mcp_enabled: $('#mcpOn').checked ? 1 : 0}); if (r.error) alert(r.error); await poll(); loadMcp(); };
 $('#mcpAct').onchange = async () => { const r = await post('/api/settings', {mcp_actions: Number($('#mcpAct').value)}); if (r.error) alert(r.error); await poll(); loadMcp(); };
+
+// ---------- assistant safety: read-only switch, daily request cap, Stop
+$('#aiRO').onchange = async () => { const r = await post('/api/settings', {ai_read_only: $('#aiRO').checked ? 1 : 0}); if (r.error) alert(r.error);
+  else toast($('#aiRO').checked ? 'Assistant: read and advise only' : 'Assistant can act again (with your approval)', '', 'good'); poll(); };
+$('#aiCalls').onchange = async () => { const v = $('#aiCalls').value.trim();
+  const r = await post('/api/settings', {ai_daily_calls: v ? +v : 300}); if (r.error) alert(r.error); poll(); };
+$('#chatStop').onclick = async () => { const r = await post('/api/chat/stop', {}); if (!r.error) CHAT = r; chatKey = null; renderChat(); };

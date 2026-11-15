@@ -1127,6 +1127,12 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <button class="btn primary" id="aiBtn">Analyse</button>
       </div>
       <div id="aiNote" style="margin-top:10px"></div>
+      <div class="card-h" style="margin:16px 0 4px"><h3 style="margin:0;font-size:14px">Assistant safety</h3></div>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="aiRO"><span>Read and advise only<small>The assistant (and any AI client connected over MCP) can look at everything, explain and plan, but can't play sound or change the miniDSP, the receiver or your records. Turn it on when someone else is using the chat, or when you only want advice.</small></span></label>
+      <div class="row" style="align-items:end;margin-top:6px">
+        <label class="f" style="width:200px">AI requests per day<input id="aiCalls" type="number" min="20" max="2000" step="10" placeholder="300"></label>
+        <span class="muted small" style="flex:1;min-width:220px">A cap on the assistant's requests to your AI provider, so a stuck conversation can't run up your bill. Always on, whatever you set: an approval for anything that plays sound or changes something; never slot 1; level and boost limits; at most 8 sound tests in 10 minutes; a Stop button in the chat; every action in the activity log.</span>
+      </div>
       <div class="card-h" style="margin:16px 0 4px"><h3 style="margin:0;font-size:14px">Hardware database <span class="beta">Beta</span></h3><span class="sub" id="hwSub"></span></div>
       <label class="cb" style="max-width:none"><input type="checkbox" id="hwOn"><span>Let the assistant build the hardware database<small>When your receiver, subs or speakers come up in the chat and htTamer doesn't know them, the assistant looks up their specs (on the web, with Claude) and records them, with the source. That's how support for unknown hardware grows: a receiver's control protocol, a ported sub's safe EQ limit, speaker specs for advice. Every entry is listed below and in the journal. Web lookups use your AI provider's credit.</small></span></label>
       <div id="hwList" class="small" style="margin-top:8px"></div>
@@ -1223,6 +1229,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   <span class="lbl">Ask htTamer</span><span class="chat-dot" id="chatDot" hidden></span></button>
 <aside class="chat" id="chat" role="dialog" aria-label="htTamer assistant" hidden>
   <div class="chat-top"><b>Assistant</b><span class="muted small" id="chatState"></span><span class="grow"></span>
+    <button class="btn ghost" id="chatStop" style="height:28px" hidden title="Stop the assistant now: no more requests or actions for this message">Stop</button>
     <button class="btn ghost" id="chatNew" style="height:28px">New chat</button>
     <button class="btn icon ghost" id="chatClose" aria-label="Close assistant">✕</button></div>
   <div class="chat-log" id="chatLog" aria-live="polite"></div>
