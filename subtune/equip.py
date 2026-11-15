@@ -120,10 +120,24 @@ def update_speakers(updates: dict | None = None, remove: list | None = None, who
 def sizes_from_receiver(details: dict) -> dict:
     """Copy the speaker sizes the receiver reports (SPI) onto the Speakers records of this layout."""
     from .rxinfo import channel_sizes
+    mine = set(channels())
+    chans = (details or {}).get("channels")
+    if chans:                                        # processors that report the whole speaker setup
+        ups = {}
+        for ch, d in chans.items():
+            if ch not in mine:
+                continue
+            u = {k: d[k] for k in ("size", "crossover_hz") if d.get(k) is not None}
+            if d.get("distance_m") is not None:
+                u["rx_distance_m"] = d["distance_m"]
+            if d.get("level_db") is not None:
+                u["rx_level_db"] = d["level_db"]
+            if u:
+                ups[ch] = u
+        return update_speakers(ups, who="receiver")
     spi = (details or {}).get("speakers")
     if not spi:
         raise ValueError("the receiver didn't report its speaker setup (is it on?)")
-    mine = set(channels())
     ups = {ch: {"size": s} for ch, s in channel_sizes(spi).items() if ch in mine and s in SIZES}
     return update_speakers(ups, who="receiver")
 
@@ -185,7 +199,11 @@ def summary() -> dict:
     spk = r.get("speakers") or {}
     chans = channels(sy)
     nm = names()
+    from . import hwdb
+    specs = lambda kind, m: {k: x for k, x in (hwdb.find(kind, m or "") or {}).items() if k not in ("who", "t")} or None
     return {"layout": sy.get("label"), "crossover_hz": sy.get("crossover_hz"), "dirac": sy.get("dirac"),
+            "speaker_specs": {c: specs("speakers", (spk.get(c) or {}).get("model")) for c in chans if (spk.get(c) or {}).get("model")},
+            "sub_specs": {str(int(k) + 1): specs("subs", d.get("model")) for k, d in (r.get("subs") or {}).items() if d.get("model")},
             "speakers": [{"channel": c, "name": nm.get(c, c), **(spk.get(c) or {})} for c in chans],
             "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
             "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},

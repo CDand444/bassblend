@@ -303,7 +303,8 @@ def _clean_for_anthropic(messages):
         c = m["content"]
         if isinstance(c, list):
             c = [{k: v for k, v in b.items() if not k.startswith("_")} for b in c
-                 if b.get("type") in ("text", "tool_use", "tool_result", "thinking", "redacted_thinking")]
+                 if b.get("type") in ("text", "tool_use", "tool_result", "thinking", "redacted_thinking",
+                                    "server_tool_use", "web_search_tool_result")]
             if not c:
                 continue
         out.append({"role": m["role"], "content": c})

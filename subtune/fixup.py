@@ -42,7 +42,7 @@ def run(pos=1, mode="dlna", log=None, status=None, avr_input=None):
     # 1. subwoofer level
     status("Step 1 of 3: setting the subwoofer level…")
     err = before.get("bass_vs_target_db") or 0.0
-    o = avr.Onkyo()
+    o = avr.receiver()
     cur = o.status().get("sub_level")
     measured = (before.get("avr") or {}).get("sub_level")      # the level the report heard, not today's
     if abs(err) < 1:

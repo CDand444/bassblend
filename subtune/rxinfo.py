@@ -90,7 +90,20 @@ def parse_nri(xml: str | None) -> dict:
 def read(o=None) -> dict:
     """Everything the receiver reports about its setup (read-only)."""
     from . import avr
-    o = o or avr.Onkyo()
+    o = o or avr.receiver()
+    if not isinstance(o, avr.Onkyo):                 # other makes: what their status reports, nothing more
+        st = o.status()
+        chans = None
+        if st.get("power") and hasattr(o, "speaker_settings"):
+            try:
+                ss = o.speaker_settings()
+                chans = ss.get("channels") or None
+            except (OSError, RuntimeError):
+                chans = None
+        return {"t": time.time(), "power": st.get("power"), "device": {"brand": getattr(o, "MAKE", ""), "model": st.get("model")},
+                "speakers": None, "channels": chans, "sub_level": st.get("sub_level"), "center_level": st.get("center_level"),
+                "input": st.get("input"), "mode": st.get("mode"), "audio": None, "video": None, "temp_c": None,
+                "firmware": None, "not_readable": [] if chans else ["the speaker setup", "speaker distances", "per-speaker levels"]}
     got = {}
     for r in o._xfer(["PWRQSTN"]):
         got.setdefault(r[2:5], r[5:])

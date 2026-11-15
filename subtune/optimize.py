@@ -83,7 +83,14 @@ def sub_protect(subs):
     for o in subs:
         d = room.get(str(o)) or {}
         cid = d.get("catalog") or vendors.find(d.get("model", ""))
-        out.append(vendors.protect_hz(cid, d.get("controls") or {}) if cid else None)
+        from . import hwdb
+        e = hwdb.find("subs", d.get("model", "")) or {}
+        if e.get("protect_hz") is not None:        # the exact model in the hardware database wins over a catalog guess
+            out.append(e["protect_hz"])
+        elif cid:
+            out.append(vendors.protect_hz(cid, d.get("controls") or {}))
+        else:
+            out.append(None)
     return out
 
 

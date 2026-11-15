@@ -36,7 +36,8 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "nearfield_max_boost_db": (float, 0, 6), "nearfield_max_eq_cut_db": (float, 1, 10),
             "nearfield_min_q": (float, 0.5, 6),
             "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70),
-            "listen_max_volume": (float, 10, 100)}     # the loudest you listen: the gain check works out headroom there
+            "listen_max_volume": (float, 10, 100),
+            "ai_hwdb": (int, 0, 1)}                     # let the assistant build the hardware database (and look things up)     # the loudest you listen: the gain check works out headroom there
 
 
 def _playback(body, modes=("hdmi", "dlna", "manual")):
@@ -50,7 +51,8 @@ def _playback(body, modes=("hdmi", "dlna", "manual")):
         mode = "hdmi" if "hdmi" in modes and (ready or "dlna" not in modes) else "dlna" if "dlna" in modes else modes[0]
     args = ["--mode", mode]
     if mode == "hdmi":
-        inp = str(body.get("avr_input") or s.get("avr_pi_input") or "").upper()
+        inp = str(body.get("avr_input") or s.get("avr_pi_input") or "")
+        inp = inp.upper() if inp.upper() in HDMI_INPUTS else inp
         if inp not in HDMI_INPUTS:
             raise ValueError("pick the receiver input the Pi's HDMI is plugged into")
         if s.get("avr_pi_input") != inp:
@@ -58,6 +60,11 @@ def _playback(body, modes=("hdmi", "dlna", "manual")):
             save_settings(s)
         args += ["--avr-input", inp]
     return mode, args
+
+
+def _hwdb_overview(s):
+    from . import hwdb
+    return {"enabled": hwdb.enabled(s), **hwdb.counts()}
 
 
 def _playback_info(s):
@@ -670,6 +677,7 @@ def build_executors():
         out = {"playing": _summ_result(r), "verified_spots": sorted(v.keys()),
                "settings": {k: s.get(k) for k in SETTABLE},
                "playback": _playback_info(s),
+               "hardware_database": _hwdb_overview(s),
                "last_checkup": ck and {"t": ck["t"], "pos": ck["pos"], "noise_db": ck["noise_spl"], "snr_db": ck["snr_db"],
                                        "verdicts": {k: x["text"] for k, x in ck["verdicts"].items()},
                                        "decay_t60_s": {str(d["f"]): d["t60"] for d in ck["decay"]},
@@ -997,6 +1005,18 @@ def build_executors():
         return {"bands": r["bands"], "peak_db": r["peak_db"], "on_minidsp": True,
                 "summary": liveeq.describe(r["bands"]) + (f"; peak +{r['peak_db']:g} dB, may clip" if r["peak_db"] > 0 else "")}
 
+    def hw_lookup(kind, query=""):
+        from . import hwdb
+        hits = hwdb.search(kind, query)
+        return {"enabled": hwdb.enabled(), "matches": hits[:20], "summary": f"{len(hits)} {kind} found"}
+
+    def hw_save(kind, model, data):
+        from . import hwdb
+        if not hwdb.enabled():
+            raise RuntimeError("the owner hasn't turned on 'Let the assistant build the hardware database' (Tools -> AI analysis)")
+        e = hwdb.save(kind, model, data if isinstance(data, dict) else {}, who="assistant")
+        return {"saved": e, "summary": f"recorded {kind[:-1]} {e['model']}"}
+
     def leq_fit():
         from . import liveeq
         fit = liveeq.fit_now()
@@ -1074,6 +1094,7 @@ def build_executors():
             "get_equipment": equipment, "update_speakers": speakers_set, "update_room": room_set,
             "update_system": system_set, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
+            "hw_lookup": hw_lookup, "hw_save": hw_save,
             "get_live_eq": leq_get, "set_live_eq": leq_set, "fit_live_eq": leq_fit, "start_live_analyzer": leq_start,
             "stop_live_analyzer": leq_stop, "save_live_eq": leq_save,
             "get_treatment_plan": treatment_get, "set_treatment_constraints": treatment_constraints,
@@ -1092,9 +1113,9 @@ def assistant():
 
 
 def avr_obj():
-    from .avr import Onkyo
+    from .avr import receiver
     if _avr["obj"] is None:
-        _avr["obj"] = Onkyo()
+        _avr["obj"] = receiver()
     return _avr["obj"]
 
 
@@ -1146,9 +1167,17 @@ def avr_action(body):
         except ValueError:
             if not _re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host):
                 raise ValueError("enter an IP address like 192.168.1.50 (or a network name)")
+        from . import receivers
         make = str(body.get("make") or "Onkyo")
-        if make not in ("Onkyo", "Integra", "Pioneer"):
-            raise ValueError("make must be Onkyo, Integra or Pioneer (they share the same control protocol)")
+        if make == "Auto":                                # find out which protocol answers at this address
+            found = receivers.detect(host)
+            if not found:
+                raise RuntimeError("no supported receiver answered at that address (Onkyo/Integra/Pioneer or Denon/Marantz); "
+                                   "check the address and that network control is on in its menu")
+            make = found["make"]
+            body = dict(body, model=body.get("model") or found.get("model") or "")
+        if make not in receivers.MAKES:
+            raise ValueError("make must be one of " + ", ".join(receivers.MAKES))
         s = load_settings()
         s["avr_host"], s["avr_make"], s["avr_model"] = host, make, str(body.get("model") or "")[:40]
         save_settings(s)
@@ -1497,6 +1526,11 @@ class H(BaseHTTPRequestHandler):
                                                      "restore_source", "avr_pi_input", *SETTABLE)}
             from .hdmi import hdmi_port
             st["pi_hdmi"] = hdmi_port()
+            try:
+                from .avr import hdmi_inputs
+                st["hdmi_inputs"] = hdmi_inputs()
+            except Exception:                            # noqa: BLE001
+                st["hdmi_inputs"] = {}
             from pathlib import Path
             st["settings"]["cal_ok"] = bool(s.get("cal_file")) and Path(s["cal_file"]).is_file()
             st["job"] = RUN.view()
@@ -1575,6 +1609,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, liveeq_view())
         if u.path == "/api/avr":
             return self._send(200, avr_status(force="force" in q))
+        if u.path == "/api/hwdb":
+            from . import hwdb
+            return self._send(200, {**hwdb.load(), "enabled": hwdb.enabled()})
         if u.path == "/api/receiver/details":
             return self._send(200, receiver_details(force="force" in q))
         if u.path == "/api/chat":
@@ -1766,6 +1803,14 @@ class H(BaseHTTPRequestHandler):
                 if body.get("action") == "revert":
                     return self._send(200, {"started": RUN.start_fixes_revert()})
                 raise ValueError("action must be accept or revert")
+            if path == "/api/hwdb":                    # the hardware database: the owner adds or removes entries
+                from . import hwdb
+                act, kind, model = body.get("action"), str(body.get("kind") or ""), str(body.get("model") or "")
+                if act == "save":
+                    return self._send(200, hwdb.save(kind, model, body.get("data") or {}, who="page"))
+                if act == "remove":
+                    return self._send(200, {"removed": hwdb.remove(kind, model)})
+                raise ValueError("action must be save or remove")
             if path == "/api/gaincheck":
                 return self._send(200, {"started": RUN.start_gaincheck(body)})
             if path == "/api/limiters":                # protective limiters from the headroom test

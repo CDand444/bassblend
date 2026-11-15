@@ -56,7 +56,7 @@ def receiver(s):
     from . import avr
     if not s.get("avr_host"):
         return "skip", "no receiver set up"
-    st = avr.Onkyo().status()
+    st = avr.receiver().status()
     if st.get("power") is None:
         return "fail", f"no answer from {s['avr_host']}"
     if not st["power"]:

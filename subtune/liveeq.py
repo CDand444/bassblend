@@ -452,7 +452,7 @@ def run_rta(mode="hdmi", avr_input=None, auto_volume=True, minutes=MAX_MINUTES, 
     minutes = float(min(max(minutes, 1.0), MAX_MINUTES))
     cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
     dsp = MiniDSP(s)
-    o = avr.Onkyo()
+    o = avr.receiver()
     src = hdmi.Source(mode, o, avr_input, s, log)
     if not src.auto:
         raise RuntimeError("the live analyzer plays from the Pi's HDMI or the network player")

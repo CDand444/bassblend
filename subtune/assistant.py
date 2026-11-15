@@ -173,6 +173,7 @@ sub and center level, the live input signal and listening mode, model and firmwa
 distances, per-speaker levels or per-speaker crossovers over the network; those come from the owner copying them \
 from Speaker Setup onto the Speakers page (get_equipment -> rx_distance_m, rx_level_db, crossover_hz), and \
 setup_checks compares them with the recorded positions. Raise setup_checks with status "fix" first.
+- Hardware database (hw_lookup, hw_save): extends built-in support to unknown receivers, subs and speakers. Look a model up whenever it matters for advice. When get_overview -> hardware_database.enabled is true the owner has asked you to keep it growing: whenever a receiver, sub or speaker model comes up that the database (or the built-in sub catalog) doesn't know, find its specs (web_search when available; prefer the maker's manual or spec sheet, and give the source_url), save them with hw_save, and say in one line what you recorded. For a receiver also record its control protocol: Onkyo/Integra/Pioneer = onkyo (eISCP, port 60128), Denon/Marantz = denon (telnet 23), JBL Synthesis SDP/SDR = jbl (port 50000); other makers = unknown (htTamer can't control those yet, but record them). For a ported sub record protect_hz (the port tuning, or the maker's lowest recommended boost point): htTamer won't EQ-boost below it. Never invent numbers. When the setting is off, hw_save is refused: offer to record it if the owner turns it on (Tools -> AI analysis).
 - Protection and records (get_overview): protective limiters per sub are set from the headroom test (Verify -> Sub \
 headroom, "Set limiters"; no sound); the gain-structure check (Survey -> Checklist) says whether the receiver's sub \
 output can clip the miniDSP's input at the owner's loudest volume with full-scale LFE (fix = lower the receiver's sub \
@@ -352,6 +353,18 @@ TOOLS = [
        "bands (as many free bands as help) that bring the response closest to the goal, and sends them to the miniDSP. "
        "Running it again refines (the bands that were playing are taken out first). Returns the bands and the expected "
        "before/after RMS against the goal. Needs the analyzer running."),
+    _t("hw_lookup", "Look up a receiver, subwoofer or speaker model in htTamer's hardware database (specs, the receiver's "
+       "control protocol, a ported sub's no-boost limit). Empty query lists everything of that kind.",
+       {"kind": {"type": "string", "enum": ["receivers", "subs", "speakers"]}, "query": {"type": "string"}}, ["kind", "query"]),
+    _t("hw_save", "Record or correct a model in the hardware database (fields merge; only what you give changes; every "
+       "change is journaled). Only works when the owner turned on 'Let the assistant build the hardware database'. "
+       "receivers: brand, model, protocol (onkyo|denon|jbl|unknown), control_port, channels, sub_outputs, "
+       "room_correction, notes, source_url. subs: brand, driver_in, amp_w, f3_hz, design (sealed|ported|passive radiator), "
+       "protect_hz (no EQ boost below this, ported designs), controls, notes, source_url. speakers: brand, kind, "
+       "sensitivity_db, impedance_ohm, low_hz, crossover_hz, notes, source_url. Only facts from the owner or a source "
+       "you cite; never guess numbers.",
+       {"kind": {"type": "string", "enum": ["receivers", "subs", "speakers"]}, "model": {"type": "string"},
+        "data": {"type": "object"}}, ["kind", "model", "data"]),
     _t("start_live_analyzer", "Start the live analyzer: plays soft bass noise (15-200 Hz) through the receiver until "
        "stopped (max 10 minutes), after setting the volume with the guarded auto-level; the mic's response then shows "
        "in get_live_eq. Needs the mic at the seat being EQ'd (normally the MLP).",
@@ -387,6 +400,7 @@ TOOLS = [
     _t("save_live_eq", "Bake the live EQ bands into a copy of the playing tune and apply it to the same slot (the "
        "old tune stays in the library). Do this only when the owner is happy with the result.", approval=True),
 ]
+WEB_SEARCH = {"type": "web_search_20260209", "name": "web_search", "max_uses": 5}
 APPROVAL = {t["name"] for t in TOOLS if t["approval"]}
 REQUIRED = {t["name"]: t["input_schema"]["required"] for t in TOOLS}
 
@@ -397,7 +411,8 @@ MAX_STRICT = 20          # the Claude API refuses a request with more strict too
 def _strict_ok(t) -> bool:
     """Strict schemas only help where there are inputs to check and every one is required."""
     sch = t["input_schema"]
-    return bool(sch["properties"]) and set(sch["required"]) == set(sch["properties"])
+    free_obj = any(p.get("type") == "object" and "properties" not in p for p in sch["properties"].values())
+    return bool(sch["properties"]) and set(sch["required"]) == set(sch["properties"]) and not free_obj
 
 
 def _api_tools(tools):
@@ -513,8 +528,11 @@ class Assistant:
 
     # ---- internals
     def _call(self):
-        from . import ai
-        return ai.chat(SYSTEM, self.messages, API_TOOLS)
+        from . import ai, hwdb
+        tools = API_TOOLS
+        if hwdb.enabled() and ai.config().get("provider") == "anthropic":
+            tools = API_TOOLS + [WEB_SEARCH]           # opted in: it may look up specs and protocols on the web
+        return ai.chat(SYSTEM, self.messages, tools)
 
     def _exec(self, name, inp):
         try:
@@ -575,6 +593,8 @@ class Assistant:
                 if msg["stop_reason"] == "refusal":
                     self.display.append({"role": "assistant", "text": "Sorry, I can't help with that.", "t": time.time()})
                     break
+                if msg["stop_reason"] == "pause_turn":       # a long web search: let the API carry on
+                    continue
                 tool_uses = [b for b in content if b.get("type") == "tool_use"]
                 if msg["stop_reason"] != "tool_use" or not tool_uses:
                     break
@@ -619,6 +639,7 @@ def _brief(name, inp, out):
              "get_live_eq": "Read the live analyzer", "set_live_eq": "Set the live EQ",
              "start_live_analyzer": "Started the live analyzer", "stop_live_analyzer": "Stopped the live analyzer",
              "save_live_eq": "Saved the live EQ into a tune",
+             "hw_lookup": "Looked in the hardware database", "hw_save": "Updated the hardware database",
              "apply_avr_blend": "Applied the blend fix", "get_treatment_plan": "Read the room treatment plan",
              "set_treatment_constraints": "Saved your treatment constraints",
              "record_treatment": "Recorded installed treatment"}.get(name, name)

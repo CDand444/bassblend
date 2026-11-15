@@ -98,11 +98,11 @@ def test_keep_and_undo():
     class Rx:
         def set_sub_level(self, db): calls.append(("sub", db))
     cli.cmd_apply = lambda a: calls.append(("apply", a.tune, a.slot))
-    avr.Onkyo = lambda *a, **k: Rx()
+    avr.receiver = lambda *a, **k: Rx()
     try:
         out = fixlog.revert(log=lambda *a: None)
     finally:
-        cli.cmd_apply, avr.Onkyo = saved
+        cli.cmd_apply, avr.receiver = saved
     assert calls == [("apply", "base1", 3), ("sub", -15.0)], calls
     assert out == {"tune": "Single MLP", "sub_level": -15.0} and state.load_state().get("fix_ledger") is None
     fixlog.note_sub_level(-15.0, -12.0)

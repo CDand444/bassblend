@@ -29,6 +29,12 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     decoded and cross-checked. The RZ50 can't report distances, per-speaker levels or crossovers over
     eISCP (SPD/TCL get no reply; port 80 web setup needs a password) — the owner copies them onto the
     Speakers page (`rx_distance_m`, `rx_level_db`).
+  - `receivers.py`: Denon/Marantz (telnet 23) and JBL Synthesis SDP/SDR (Harman binary protocol, port 50000;
+    also reads speaker types/distances/levels) drivers with the Onkyo driver's method names; `avr.receiver()` picks the driver (make, or a hwdb receiver's `protocol`);
+    `avr.hdmi_inputs()` per make. Only Onkyo is hardware-tested.
+  - `hwdb.py`: hardware database (receivers/subs/speakers) the owner or, with setting `ai_hwdb`, the
+    assistant grows (`hw_lookup`/`hw_save`, plus Claude web_search); used for driver choice and `protect_hz`.
+  - `limiter.py`, `gaincheck.py`, `report.py` (/report), drift in `measure.py`, LFE check in `allspk.py`.
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
@@ -36,7 +42,8 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
   classic scripts sharing globals: core, tune, room-ai, receiver, measure, setup-home, liveeq, nav),
   `manual.html` (user manual, also `/manual`), `setup.html`, `logo.svg`
 - `tests/test_*.py`: offline, no hardware, no sound; each file runs on its own
-- `deploy/`: `push-update.sh` (OTA to the Pi), `linux/` (install, updater), `pi-gen/` (SD image)
+- `deploy/`: `push-update.sh` (OTA to the Pi), `linux/` (install, updater), `pi-gen/` (SD image),
+  `windows/` (PyInstaller spec + launcher + Inno Setup script; built by `.github/workflows/release.yml` on v* tags)
 
 ## Commands
 - Tests (Windows): `& "$env:LOCALAPPDATA\subtune-venv\Scripts\python.exe" tests\test_X.py`.

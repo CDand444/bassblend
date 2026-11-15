@@ -93,7 +93,10 @@ def config_dir() -> Path:
     if env:
         return Path(env)
     if IS_WINDOWS:
-        return Path(os.environ.get("LOCALAPPDATA", Path.home())) / "subtune"       # where it has always been
+        base = Path(os.environ.get("LOCALAPPDATA", Path.home()))
+        # the installed app keeps its own keys and PIN: it must never pick up a developer copy's saved key
+        # (seen on a real machine: the installer looked "pre-configured" and skipped choosing an AI provider)
+        return base / "htTamer" / "config" if FROZEN else base / "subtune"          # dev: where it has always been
     return Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "bassblend"
 
 

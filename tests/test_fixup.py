@@ -43,8 +43,8 @@ def run_fix(bass, sub, blend, apply_raises=None, measured="same"):
     update_state(fix_ledger=None)                  # each run starts its own round of fixes
     rx = Rx(sub)
     applied = []
-    real = (avr.Onkyo, avrmeasure.run, deepcheck.run, cli.cmd_avrapply)
-    avr.Onkyo = lambda *a, **k: rx
+    real = (avr.receiver, avrmeasure.run, deepcheck.run, cli.cmd_avrapply)
+    avr.receiver = lambda *a, **k: rx
     avrmeasure.run = lambda *a, **k: blend
     deepcheck.run = lambda *a, **k: dict(report(bass=0.4, t=2000.0, fix=0, watch=1), receiver_advice=[
         {"kind": "menu", "text": "Increase the Left speaker's distance by 1.4 ft"}])
@@ -58,7 +58,7 @@ def run_fix(bass, sub, blend, apply_raises=None, measured="same"):
     try:
         r = fixup.run(1, log=lambda *a, **k: None, status=lambda t: None)
     finally:
-        avr.Onkyo, avrmeasure.run, deepcheck.run, cli.cmd_avrapply = real
+        avr.receiver, avrmeasure.run, deepcheck.run, cli.cmd_avrapply = real
     return r, rx, applied
 
 

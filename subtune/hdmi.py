@@ -17,7 +17,19 @@ import subprocess
 import time
 
 # Receiver inputs that take HDMI on Onkyo/Integra/Pioneer models like the TX-RZ50
-HDMI_INPUTS = {"10": "BD/DVD", "01": "CBL/SAT", "11": "STRM BOX", "02": "GAME", "05": "PC", "03": "AUX (front)"}
+class _HdmiInputs:
+    """The owner's receiver's inputs the Pi can feed, for its make (looked up each time: the make can change)."""
+    def _d(self):
+        from .avr import hdmi_inputs
+        return hdmi_inputs()
+    def __contains__(self, k): return k in self._d()
+    def __getitem__(self, k): return self._d()[k]
+    def get(self, k, default=None): return self._d().get(k, default)
+    def items(self): return self._d().items()
+    def __iter__(self): return iter(self._d())
+
+
+HDMI_INPUTS = _HdmiInputs()
 MODES = ("hdmi", "dlna", "manual")
 AUTO_MODES = ("hdmi", "dlna")          # htTamer starts playback itself (so it can also set the volume)
 DRM = pathlib.Path("/sys/class/drm")
@@ -74,7 +86,8 @@ def check(avr_input=None, settings=None):
     """Validate an HDMI run before touching anything: returns (input_code, card) or raises."""
     from .config import load_settings
     s = settings if settings is not None else load_settings()
-    inp = str(avr_input or s.get("avr_pi_input") or "").upper()
+    inp = str(avr_input or s.get("avr_pi_input") or "")
+    inp = inp.upper() if inp.upper() in HDMI_INPUTS else inp
     if inp not in HDMI_INPUTS:
         raise RuntimeError("Pick the receiver input the Pi's HDMI cable is plugged into, then run it again.")
     card = hdmi_port()

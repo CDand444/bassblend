@@ -236,7 +236,7 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
     else:
         from .avr import MEDIA
         dsp = MiniDSP(s)
-        o = avr.Onkyo()
+        o = avr.receiver()
         autolevel.build_probe()
         snap = o.snapshot()
         dsp_before = dsp.status()["master"]["source"].lower()

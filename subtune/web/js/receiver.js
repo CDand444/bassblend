@@ -5,6 +5,9 @@
 const piReady = () => !!S.pi_hdmi && !!(S.settings || {}).avr_pi_input;
 let playInit = false;
 function syncPlayback() {
+  const hi = S.hdmi_inputs || {}, hk = JSON.stringify(hi);
+  document.querySelectorAll('.piInp').forEach(x => { if (x.dataset.hk !== hk && Object.keys(hi).length) { const keep = x.value; x.dataset.hk = hk;
+    x.innerHTML = '<option value="">Pick the receiver input…</option>' + Object.entries(hi).map(([c, l]) => `<option value="${esc(c)}">${esc(l)}</option>`).join(''); x.value = keep; } });
   const v = (S.settings || {}).avr_pi_input || '';
   document.querySelectorAll('.piInp').forEach(x => { if (!x.dataset.touched && v) x.value = v; });
   if (!playInit && S.settings) {            // first load: default to the Pi's HDMI when it's ready
@@ -43,11 +46,11 @@ function renderRxSetup() {
   const lvl = v => v == null ? '–' : (v > 0 ? '+' : '') + v.toFixed(1) + ' dB';
   const ic = {fix: ['!', 'var(--bad)'], watch: ['!', 'var(--warn)'], info: ['i', 'var(--text-3)']};
   el.innerHTML = `<div class="card-h" style="margin:0 0 6px"><h3 style="margin:0;font-size:14px">What the receiver reports</h3><span class="grow"></span>
-      <button class="btn ghost" id="rxRefresh">Refresh</button>${s ? '<button class="btn ghost" id="rxSizes" title="Copy these speaker sizes onto the Speakers page">Copy sizes to Speakers</button>' : ''}</div>
+      <button class="btn ghost" id="rxRefresh">Refresh</button>${s || d.channels ? `<button class="btn ghost" id="rxSizes" title="Copy what the receiver reports onto the Speakers page">${d.channels ? 'Copy to Speakers' : 'Copy sizes to Speakers'}</button>` : ''}</div>
     <table class="small"><tbody>
       ${row('Receiver', esc([dev.brand, dev.model, dev.year ? '(' + dev.year + ')' : ''].filter(Boolean).join(' ') || '–') + (d.firmware ? ` · firmware ${esc(d.firmware)}` : ''))}
       ${row('Subwoofer', s ? (s.subwoofer ? `Yes${s.subwoofer === 2 ? ', 2 outputs' : ''} · level ${lvl(d.sub_level)}` : '<b style="color:var(--bad)">No</b>') : '–')}
-      ${row('Speakers', sizes)}
+      ${d.channels ? row('Speakers', `<table class="small"><tbody>${Object.entries(d.channels).map(([ch, c]) => `<tr><td style="width:44px"><b>${esc(ch)}</b></td><td>${cap(c.size)}${c.crossover_hz ? ' · ' + c.crossover_hz + ' Hz' : ''}</td><td>${c.distance_m != null ? (c.distance_m / 0.3048).toFixed(1) + ' ft' : ''}</td><td>${c.level_db != null ? lvl(c.level_db) : ''}</td></tr>`).join('')}</tbody></table>`) : row('Speakers', sizes)}
       ${row('Crossover', s ? (s.crossover_hz ? s.crossover_hz + ' Hz' : esc(s.crossover_note || '–')) : '–')}
       ${row('Center level', lvl(d.center_level))}
       ${s && s.bi_amp ? row('Bi-amp', esc(s.bi_amp)) : ''}

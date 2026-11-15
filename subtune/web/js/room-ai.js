@@ -399,3 +399,23 @@ $('#chatForm').onsubmit = e => { e.preventDefault(); chatSend($('#chatText').val
 $('#chatText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); chatSend($('#chatText').value); } });
 $('#chatNew').onclick = async () => { if (!confirm('Start a new conversation?')) return; const r = await post('/api/chat/reset'); if (r.error) alert(r.error); else { CHAT = r; chatKey = null; renderChat(); } };
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#chat').hidden) chatOpen(false); });
+
+// ---------- hardware database (opt-in growth by the assistant)
+let hwKey = null;
+async function renderHwdb(force) {
+  if (sheetKey !== 'ai' && !force) return;
+  const set = S.settings || {};
+  if (document.activeElement !== $('#hwOn')) $('#hwOn').checked = !!set.ai_hwdb;
+  let d; try { d = await fetch('/api/hwdb').then(r => r.json()); } catch (e) { return; }
+  const k = JSON.stringify(d); if (k === hwKey) return; hwKey = k;
+  const n = ['receivers', 'subs', 'speakers'].map(x => Object.keys(d[x] || {}).length);
+  $('#hwSub').textContent = `${n[0]} receivers · ${n[1]} subs · ${n[2]} speakers`;
+  const rows = ['receivers', 'subs', 'speakers'].flatMap(kind => Object.values(d[kind] || {}).map(e => ({kind, e})));
+  $('#hwList').innerHTML = rows.length ? `<table><tbody>${rows.map(({kind, e}) => `<tr><td class="muted" style="width:80px">${kind.slice(0, -1)}</td><td><b>${esc([e.brand, e.model].filter(Boolean).join(' '))}</b> ${esc(Object.entries(e).filter(([f]) => !['brand', 'model', 'who', 't', 'source_url', 'notes'].includes(f)).map(([f, v]) => f.replace(/_/g, ' ') + ' ' + v).join(' · '))}${e.source_url ? ` · <a href="${esc(e.source_url)}" target="_blank" rel="noopener">source</a>` : ''}<span class="muted"> · ${e.who === 'assistant' ? 'by the assistant' : 'by you'}</span></td><td style="width:70px"><button class="btn ghost" data-hwrm="${esc(kind)}|${esc(e.model)}">Remove</button></td></tr>`).join('')}</tbody></table>`
+    : '<p class="muted" style="margin:0">Nothing recorded yet. Tell the assistant your models, or turn the option on and it records them as they come up.</p>';
+  $('#hwList').querySelectorAll('[data-hwrm]').forEach(b => b.onclick = async () => {
+    const [kind, model] = b.dataset.hwrm.split('|'); if (!confirm(`Remove ${model} from the hardware database?`)) return;
+    await post('/api/hwdb', {action: 'remove', kind, model}); hwKey = null; renderHwdb(true); });
+}
+$('#hwOn').onchange = async () => { const r = await post('/api/settings', {ai_hwdb: $('#hwOn').checked ? 1 : 0}); if (r.error) alert(r.error); poll(); };
+setInterval(() => renderHwdb(), 4000);

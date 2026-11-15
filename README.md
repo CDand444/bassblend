@@ -15,7 +15,8 @@ Get the latest build from the repository's **Releases** page:
 - **Windows 10/11 (64-bit)**: `htTamer-<version>-windows-setup.exe`. Installs for your user only
   (no admin rights), with Start-menu and desktop shortcuts. Start htTamer and the dashboard opens
   in your browser; keep its window open while you use it. Settings and measurements live in
-  `%LOCALAPPDATA%\htTamer` and survive updates. The miniDSP is reached over USB with no driver.
+  `%LOCALAPPDATA%\htTamer` (keys and PIN in its own `config` folder, never shared with a
+  developer copy) and survive updates. The miniDSP is reached over USB with no driver.
 
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed (the Windows
 installer); the Pi image is built with `deploy/pi-gen/build-image.sh` and uploaded to the same release.

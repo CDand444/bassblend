@@ -461,3 +461,23 @@ class DLNARenderer:
                 return
             except Exception:
                 continue
+
+
+# ------------------------------------------------------------- any make
+def receiver(host: str | None = None):
+    """The receiver driver for the owner's make (Onkyo/Integra/Pioneer by default; Denon, Marantz,
+    Marantz through receivers.py; a model the hardware database knows can name its protocol)."""
+    from . import receivers
+    s = load_settings()
+    proto = receivers.protocol_for(s.get("avr_make"), s.get("avr_model"))
+    return Onkyo(host) if proto == "onkyo" else receivers.DRIVERS[proto](host)
+
+
+def hdmi_inputs() -> dict:
+    """The receiver inputs the Pi's HDMI can be plugged into, for the owner's make: {code: label}."""
+    from . import receivers
+    s = load_settings()
+    proto = receivers.protocol_for(s.get("avr_make"), s.get("avr_model"))
+    if proto == "onkyo":
+        return {"10": "BD/DVD", "01": "CBL/SAT", "11": "STRM BOX", "02": "GAME", "05": "PC", "03": "AUX (front)"}
+    return dict(receivers.DRIVERS[proto].HDMI_INPUTS)

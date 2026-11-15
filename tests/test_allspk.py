@@ -141,9 +141,9 @@ def test_hdmi_run_switches_input_uses_direct_mode_and_restores():
                 started()
             return full
 
-    saved = (avr.Onkyo, A.HdmiPlayer, A.hdmi_port, avrmeasure.SweepWatcher, dsp.MiniDSP, autolevel.dial_in,
+    saved = (avr.receiver, A.HdmiPlayer, A.hdmi_port, avrmeasure.SweepWatcher, dsp.MiniDSP, autolevel.dial_in,
              A.audio.find_device, autolevel.build_probe, A.time.sleep)
-    avr.Onkyo, A.HdmiPlayer, A.hdmi_port = (lambda *a, **k: Rx()), Player, (lambda: "vc4hdmi0")
+    avr.receiver, A.HdmiPlayer, A.hdmi_port = (lambda *a, **k: Rx()), Player, (lambda: "vc4hdmi0")
     avrmeasure.SweepWatcher, dsp.MiniDSP = Watcher, Dsp
     autolevel.dial_in = lambda o, dev, play, stop, *a, **k: (play(), calls.append("dial_in"), stop()) and {"start": 60.0, "volume": 64.0}
     autolevel.build_probe = lambda: None
@@ -152,7 +152,7 @@ def test_hdmi_run_switches_input_uses_direct_mode_and_restores():
     try:
         r = A.run(1, "hdmi", auto_volume=True, avr_input="10", log=lambda *a, **k: None, status=lambda t: None)
     finally:
-        (avr.Onkyo, A.HdmiPlayer, A.hdmi_port, avrmeasure.SweepWatcher, dsp.MiniDSP, autolevel.dial_in,
+        (avr.receiver, A.HdmiPlayer, A.hdmi_port, avrmeasure.SweepWatcher, dsp.MiniDSP, autolevel.dial_in,
          A.audio.find_device, autolevel.build_probe, A.time.sleep) = saved
     order = [c for c in calls if not c.startswith(("snapshot", "stop", "port"))]
     assert order == ["neutral", "input 10", "mode 00", "play bassblend_level_probe.wav", "dial_in", "mode 01",

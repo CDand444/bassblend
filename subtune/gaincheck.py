@@ -84,7 +84,7 @@ def run(mode="hdmi", avr_input=None, log=None, status=None) -> dict:
     s = load_settings()
     subs = s.get("subs") or []
     dsp = MiniDSP(s)
-    o = avr.Onkyo()
+    o = avr.receiver()
     src = hdmi.Source(mode, o, avr_input, s, log)
     if not src.auto:
         raise RuntimeError("the gain check plays from the Pi's HDMI or the network player")

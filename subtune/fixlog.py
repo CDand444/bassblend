@@ -204,7 +204,7 @@ def revert(log=print) -> dict:
         out["tune"] = led["base_tune_name"]
     if led.get("sub_level_before") is not None and any(e["kind"] == "sub_level" for e in led["entries"]):
         from . import avr
-        avr.Onkyo().set_sub_level(led["sub_level_before"])
+        avr.receiver().set_sub_level(led["sub_level_before"])
         out["sub_level"] = led["sub_level_before"]
     _save(None)
     from . import journal

@@ -211,7 +211,7 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
         raise RuntimeError("no sub outputs configured")
     cal = audio.load_cal(s["cal_file"]) if s.get("cal_file") else None
     dsp = MiniDSP(s)
-    o = avr.Onkyo()
+    o = avr.receiver()
     src = hdmi.Source(mode, o, avr_input, s, log)             # checks the HDMI cable/input before anything changes
     rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     lay = layout(speakers)

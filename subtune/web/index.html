@@ -845,7 +845,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <details class="avrset" id="avrSet">
         <summary><span id="avrSetSum">Receiver settings</span></summary>
         <div class="grid g3" style="margin-top:10px">
-          <label class="f">Make<select id="avrMake"><option>Onkyo</option><option>Integra</option><option>Pioneer</option></select><span class="hint">all use the same network control</span></label>
+          <label class="f">Make<select id="avrMake"><option value="Auto">Auto-detect</option><option>Onkyo</option><option>Integra</option><option>Pioneer</option><option>Denon</option><option>Marantz</option><option>JBL Synthesis</option></select><span class="hint">Onkyo/Integra/Pioneer tested; Denon/Marantz and JBL Synthesis (SDP-55/58, SDR-35/38) follow the makers' protocols (turn network/RS232 control on in the unit)</span></label>
           <label class="f">Model<input id="avrModel" list="avrModels" placeholder="TX-RZ50"><datalist id="avrModels"><option value="TX-RZ50"></option></datalist></label>
           <label class="f">IP address<input id="avrHost" placeholder="192.168.1.50" inputmode="decimal" spellcheck="false"><span class="hint">shown in the receiver's Network menu</span></label>
         </div>
@@ -1061,6 +1061,9 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <button class="btn primary" id="aiBtn">Analyse</button>
       </div>
       <div id="aiNote" style="margin-top:10px"></div>
+      <div class="card-h" style="margin:16px 0 4px"><h3 style="margin:0;font-size:14px">Hardware database</h3><span class="sub" id="hwSub"></span></div>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="hwOn"><span>Let the assistant build the hardware database<small>When your receiver, subs or speakers come up in the chat and htTamer doesn't know them, the assistant looks up their specs (on the web, with Claude) and records them, with the source. That's how support for unknown hardware grows: a receiver's control protocol, a ported sub's safe EQ limit, speaker specs for advice. Every entry is listed below and in the journal. Web lookups use your AI provider's credit.</small></span></label>
+      <div id="hwList" class="small" style="margin-top:8px"></div>
       <div class="md" id="aiOut" style="margin-top:6px"></div>
     </section>
 

@@ -72,6 +72,19 @@ def test_sizes_copy_to_the_speakers_page():
     assert fl["rx_distance_m"] == 3.81 and fl["rx_level_db"] == -1.5 and fl["size"] == "small"
 
 
+def test_full_speaker_setup_copies_to_the_speakers_page():
+    from subtune import dirac, equip
+    from subtune.room import load_room
+    dirac.save_system({"beds": 7, "heights": 4})
+    chans = {"FL": {"size": "small", "crossover_hz": 80.0, "distance_m": 3.5, "level_db": -1.0}, "SW": {"distance_m": 4.05}}
+    out = equip.sizes_from_receiver({"channels": chans})
+    fl = load_room()["speakers"]["FL"]
+    assert fl["crossover_hz"] == 80.0 and fl["rx_distance_m"] == 3.5 and fl["rx_level_db"] == -1.0 and fl["size"] == "small"
+    assert "SW" not in load_room()["speakers"], "only speakers of the layout"
+    assert out["changed"]
+    equip.update_speakers(remove=["FL"])                    # leave the room as other tests expect it
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
