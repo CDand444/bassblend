@@ -77,14 +77,22 @@
         });
         if (s < e.len) strip(s, e.len, 0, 'wall');
       });
+      // what the editor is pointing at (a corner's wall, or an opening) is tinted so it is easy to find
+      const H = room.hl;
+      if (H && H.k === 'corner' && es[H.i]) { const e = es[H.i], at = s => [e.a[0] + e.d[0] * s, e.a[1] + e.d[1] * s], t0 = ceilZ(room, ...at(0)), t1 = ceilZ(room, ...at(e.len));
+        out.push({kind: 'hl', poly: [[...at(0), 0], [...at(e.len), 0], [...at(e.len), t1], [...at(0), t0]], n: e.n}); }
+      if (H && H.k === 'opening' && ops[H.i] && es[ops[H.i].wall]) { const o = ops[H.i], e = es[o.wall], s0 = Math.max(0, o.from_m), s1 = Math.min(e.len, o.from_m + o.width_m);
+        const p0 = [e.a[0] + e.d[0] * s0, e.a[1] + e.d[1] * s0], p1 = [e.a[0] + e.d[0] * s1, e.a[1] + e.d[1] * s1], z = Math.min(o.height_m || ceilZ(room, ...p0), ceilZ(room, ...p0));
+        out.push({kind: 'hl', poly: [[...p0, 0], [...p1, 0], [...p1, z], [...p0, z]], n: e.n}); }
       // soffits: a box hanging under the ceiling along a wall (underside, two ends and the room-facing side)
-      (room.soffits || []).forEach(sf => {
+      (room.soffits || []).forEach((sf, si) => {
         const poly = soffitPoly(pts, sf); if (!poly) return;
+        const hl = !!(room.hl && room.hl.k === 'soffit' && room.hl.i === si);
         const lo = sf.bottom_m, hi = p => ceilZ(room, p[0], p[1]), cx = poly.reduce((t, p) => t + p[0], 0) / poly.length, cy = poly.reduce((t, p) => t + p[1], 0) / poly.length;
-        out.push({kind: 'wall', poly: poly.map(p => [p[0], p[1], lo])});
+        out.push({kind: 'wall', hl, poly: poly.map(p => [p[0], p[1], lo])});
         poly.forEach((p, i) => { const q = poly[(i + 1) % poly.length], len = Math.hypot(q[0] - p[0], q[1] - p[1]); if (len < 1e-6) return;
           let n = [(q[1] - p[1]) / len, -(q[0] - p[0]) / len]; if ((p[0] - cx) * n[0] + (p[1] - cy) * n[1] < 0) n = [-n[0], -n[1]];      // pointing away from the middle
-          out.push({kind: 'wall', poly: [[p[0], p[1], lo], [q[0], q[1], lo], [q[0], q[1], hi(q)], [p[0], p[1], hi(p)]], n}); });
+          out.push({kind: 'wall', hl, poly: [[p[0], p[1], lo], [q[0], q[1], lo], [q[0], q[1], hi(q)], [p[0], p[1], hi(p)]], n}); });
       });
       return out;
     }
@@ -134,6 +142,7 @@
         const mid = f.poly.reduce((s, q) => [s[0] + q[0] / f.poly.length, s[1] + q[1] / f.poly.length], [0, 0]);
         const facing = f.n && ((cam[0] - mid[0]) * f.n[0] + (cam[1] - mid[1]) * f.n[1]) > 0;
         path(f.pp);
+        if (f.hl || f.kind === 'hl') { ctx.fillStyle = C.accent; ctx.globalAlpha = 0.4; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = C.accent; ctx.lineWidth = 2; ctx.stroke(); return; }
         if (f.kind === 'window') { ctx.fillStyle = C.win; ctx.globalAlpha = facing ? 0.12 : 0.35; ctx.fill(); }
         else if (f.kind === 'door') { ctx.fillStyle = C.door; ctx.globalAlpha = facing ? 0.1 : 0.45; ctx.fill(); }
         else { ctx.fillStyle = C.wall; ctx.globalAlpha = facing ? 0.08 : 0.92; ctx.fill(); }
