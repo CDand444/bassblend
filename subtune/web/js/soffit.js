@@ -6,6 +6,7 @@ function soRect(s, es) {                      // a soffit's floor corners (trimm
   return RoomView.soffitPoly(es.map(e => e.a), s);
 }
 function soEditorHtml(sh, es, ftIn) {
+  soHl = null;                                // the rows are being rebuilt: nothing is pointed at
   const list = sh.soffits || [];
   return `<details ${list.length ? 'open' : ''}><summary>Soffits (${list.length})</summary>
     <p class="muted small" style="margin:6px 0">A soffit or bulkhead is a box along a wall that lowers the ceiling there (around the screen, ducts, side walls). Distance is along the wall from its first corner; the height is to its underside. It lowers the ceiling for height speakers and treatment; it does not change the bass numbers.</p>
@@ -27,6 +28,42 @@ function soPlanG(list, es, X, Y) {            // hatched footprints with a label
   });
   return g;
 }
+// ---- highlight on the plan: pointing at (or typing in) a soffit, opening or corner row lights up where it is
+let soHl = null;                              // {k: 'soffit'|'opening'|'corner', i}
+function soHlG(hl, rm, es, X, Y) {            // SVG for the highlight, drawn on top of the plan
+  if (!hl) return '';
+  const acc = 'var(--accent)', line = (e, w, o, f0 = 0, f1 = e.len) => {
+    const p = s => [e.a[0] + e.d[0] * s, e.a[1] + e.d[1] * s], [x0, y0] = p(f0), [x1, y1] = p(f1);
+    return `<line class="hl" x1="${X(x0)}" y1="${Y(y0)}" x2="${X(x1)}" y2="${Y(y1)}" stroke="${acc}" stroke-width="${w}" stroke-linecap="round" opacity="${o}"/>`; };
+  let g = '';
+  if (hl.k === 'soffit') {
+    const s = (rm.soffits || [])[hl.i], e = s && es[s.wall], r = s && e && soRect(s, es);
+    if (r) g += line(e, 6, 0.45) + `<polygon class="hl" points="${r.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')}" fill="${acc}" fill-opacity=".3" stroke="${acc}" stroke-width="2.5" stroke-linejoin="round"/>`;
+  } else if (hl.k === 'opening') {
+    const o = (rm.wall_openings || [])[hl.i], e = o && es[o.wall];
+    if (e) g += line(e, 5, 0.35) + line(e, 9, 0.9, Math.max(0, o.from_m), Math.min(e.len, o.from_m + o.width_m));
+  } else if (hl.k === 'corner') {
+    const e = es[hl.i];
+    if (e) g += line(e, 5, 0.45) + `<circle class="hl" cx="${X(e.a[0])}" cy="${Y(e.a[1])}" r="10" fill="none" stroke="${acc}" stroke-width="3"/>`;
+  }
+  return g;
+}
+function soSetHl(hl) {
+  const a = JSON.stringify(hl), b = JSON.stringify(soHl); if (a === b) return;
+  soHl = hl; planKey = null; renderPlan(readRoom());
+}
+function soRowHl(el) {                        // which highlight a row (or something inside it) stands for
+  const row = el && el.closest && el.closest('.srow, .orow, .crow'); if (!row || !$('#shapeBox').contains(row)) return null;
+  const idx = (q, a) => { const n = row.querySelector(q); return n ? +n.dataset[a] : null; };
+  if (row.classList.contains('srow')) return {k: 'soffit', i: idx('[data-sw]', 'sw')};
+  if (row.classList.contains('orow')) return {k: 'opening', i: idx('[data-ow]', 'ow')};
+  const c = row.querySelector('[data-cx]'); return c ? {k: 'corner', i: +c.dataset.cx} : null;
+}
+['focusin', 'mouseover'].forEach(ev => $('#shapeBox').addEventListener(ev, e => { const h = soRowHl(e.target); if (h) soSetHl(h); }));
+['focusout', 'mouseleave'].forEach(ev => $('#shapeBox').addEventListener(ev, e => {
+  if (ev === 'focusout' && e.relatedTarget && $('#shapeBox').contains(e.relatedTarget) && soRowHl(e.relatedTarget)) return;
+  if (ev === 'mouseleave' || !document.activeElement || !$('#shapeBox').contains(document.activeElement)) soSetHl(null);
+}));
 function soMoveOnInsert(i, half) {            // edge i was split at `half` meters: later edges shift by one
   (roomShape.soffits || []).forEach(s => { if (s.wall > i) s.wall++; else if (s.wall === i && s.from_m + s.length_m / 2 > half) { s.wall++; s.from_m = Math.max(0, r3(s.from_m - half)); } });
 }

@@ -414,7 +414,7 @@ function renderPlan(r) {
   const spk = Object.entries(r.speakers || (S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
   // suggested spots come from the saved room: while the outline is being edited, hide the ones now outside it
   const sug = spk.length || !pts ? [] : ((S.placement || {}).speakers || []).filter(s => insidePts(pts, s.x_m, s.y_m)).map(s => ({...s, rec: false}));
-  const key = JSON.stringify([swPick, r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
+  const key = JSON.stringify([swPick, soHl, r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
   if (key === planKey && el.querySelector('svg')) return; planKey = key;
   plan3d(r, spk.concat(sug));
   if (!pts) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
@@ -435,6 +435,7 @@ function renderPlan(r) {
     g += `<text x="${tx}" y="${ty}" text-anchor="middle" font-size="9.5" fill="var(--text-3)" stroke="var(--surface-2)" stroke-width="3" paint-order="stroke">${fmtFt(e.len)}</text>`; });
   g += openingMarks(r.room.wall_openings || [], es, X, Y, 'var(--surface-2)');
   g += soPlanG(r.room.soffits, es, X, Y);
+  g += soHlG(soHl, r.room, es, X, Y);
   if (swPick) es.forEach(e => { if (!e.angled) g += `<line class="swl" data-sw="${e.side}" x1="${X(e.a[0])}" y1="${Y(e.a[1])}" x2="${X(e.b[0])}" y2="${Y(e.b[1])}" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" opacity=".4" style="cursor:pointer"><title>Make this the screen wall</title></line>`; });
   g += fuPlanSvg(r.furniture, X, Y);
   spk.concat(sug).forEach(s => { const c = s.kind === 'height' ? 'var(--s4)' : 'var(--s1)';
