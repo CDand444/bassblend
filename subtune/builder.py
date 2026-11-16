@@ -118,7 +118,8 @@ def touch_icon(n: int = 180) -> bytes:
 SIDE = {"type": "string", "enum": ["front", "back", "left", "right"]}
 SCHEMA = {
     "type": "object", "additionalProperties": False,
-    "required": ["summary", "confidence", "shape", "outline_ft", "height_ft", "ceiling", "openings", "assumptions", "questions"],
+    "required": ["summary", "confidence", "shape", "outline_ft", "height_ft", "ceiling", "openings", "soffits", "screen", "furniture",
+                 "assumptions", "questions"],
     "properties": {
         "summary": {"type": "string", "description": "one or two plain sentences: what the room looks like"},
         "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
@@ -140,6 +141,26 @@ SCHEMA = {
                            "height_ft": {"type": "number", "description": "0 = floor to ceiling"},
                            "kind": {"type": "string", "enum": ["opening", "door", "window"]},
                            "note": {"type": "string"}}}},
+        "soffits": {"type": "array", "description": "bulkheads / drop ceilings along a wall (none: [])", "items": {
+            "type": "object", "additionalProperties": False, "required": ["wall", "from_ft", "length_ft", "depth_ft", "bottom_ft"],
+            "properties": {"wall": {"type": "integer", "description": "0-based wall number, as for openings"}, "from_ft": {"type": "number"},
+                           "length_ft": {"type": "number"}, "depth_ft": {"type": "number", "description": "how far it sticks out"},
+                           "bottom_ft": {"type": "number", "description": "height of its underside"}}}},
+        "screen": {"type": "object", "additionalProperties": False, "required": ["kind", "diagonal_in", "aspect", "at"],
+                   "description": "the TV or projector screen on the front wall (kind none when there isn't one or you can't tell)",
+                   "properties": {"kind": {"type": "string", "enum": ["none", "tv", "projector"]},
+                                  "diagonal_in": {"type": "number", "description": "0 when unknown"},
+                                  "aspect": {"type": "string", "enum": ["16:9", "16:10", "4:3", "1.85:1", "2.35:1", "2.40:1"]},
+                                  "at": {"type": "boolean", "description": "acoustically transparent (perforated or woven) projector screen"}}},
+        "furniture": {"type": "array", "description": "couches and seat risers (none: [])", "items": {
+            "type": "object", "additionalProperties": False, "required": ["kind", "x_ft", "y_ft", "length_ft", "depth_ft", "height_ft", "rotation"],
+            "properties": {"kind": {"type": "string", "enum": ["couch", "riser"]},
+                           "x_ft": {"type": "number", "description": "its middle, from the left wall"},
+                           "y_ft": {"type": "number", "description": "its middle, from the front wall"},
+                           "length_ft": {"type": "number", "description": "across the room (a riser's width)"},
+                           "depth_ft": {"type": "number"}, "height_ft": {"type": "number", "description": "a riser's height; 0 for a couch"},
+                           "rotation": {"type": "integer", "enum": [0, 90, 180, 270],
+                                        "description": "which way its back faces: 0 the back wall, 90 the left wall, 180 the screen, 270 the right wall"}}}},
         "assumptions": {"type": "array", "items": {"type": "string"}},
         "questions": {"type": "array", "items": {"type": "string"}, "description": "what the owner should check or tell you"},
     },
@@ -166,6 +187,16 @@ ceiling), kind: "opening" (no wall there: open doorway, arch, open plan), "door"
 height_ft is the highest point of the ceiling. ceiling.kind "flat" (then low_ft 0), "slope" (one sloping plane: \
 low_ft at the low_side) or "vault" (peaked: low_ft at the sides, ridge runs along the "length" front-to-back or \
 the "width" side-to-side). Fill unused ceiling fields with any allowed value.
+
+soffits: a bulkhead or drop ceiling along a wall (common around the screen wall or over ducts), with wall (numbered \
+as for openings), from_ft along that wall, length_ft, depth_ft (how far it sticks out) and bottom_ft (height of its \
+underside); [] when there are none. screen: the TV or projector screen on the front wall: kind "tv" or "projector" (or \
+"none" when there is none or you can't tell), diagonal_in (0 if unknown: read it from a label or the owner's notes, never \
+guess), aspect, and at = true only for a projector screen with perforated or woven acoustically transparent fabric. \
+furniture: each couch or sofa (kind "couch") and any platform the seats stand on (kind "riser"), with its middle x_ft, y_ft, \
+length_ft across the room, depth_ft, height_ft (a riser's height; 0 for couches) and rotation (which way the back faces: \
+0 the back wall, 90 the left wall, 180 the screen, 270 the right wall); [] when none are visible. Do not guess at \
+furniture you cannot see.
 
 Rules: the owner's typed measurements and notes are authoritative; use the photos for the shape, the openings and \
 the ceiling, and estimate sizes in photos from known objects (doors about 6 ft 8 in high and 2.5-3 ft wide, \
@@ -231,7 +262,24 @@ def check(prop: dict) -> dict:
     except ValueError as e:
         problems.append(str(e))
         r = {**base, "outline": None, "wall_openings": [], "ceiling": None}
-    return {"room": r, "patch": patch, "describe": shape.describe(r) if r.get("width_m") else "", "problems": problems}
+    extras = []
+    try:                                           # the screen, furniture and soffits go through the same cleaning as a saved room
+        from . import furniture, screen
+        sc = screen.clean(equip._feet(patch["screen"])) if patch.get("screen") else None
+        if sc:
+            known = bool((prop.get("screen") or {}).get("diagonal_in"))
+            extras.append(("a " + (f"{sc['diagonal_in']:.0f} in " if known else "")) + ("TV" if sc["kind"] == "tv" else "projector screen")
+                          + (" (acoustically transparent)" if sc["at"] else "") + ("" if known else " (size not read: set it on the Room page)"))
+        fu = furniture.clean_items([equip._feet(f) for f in patch.get("furniture") or []])
+        extras += [f"{f['name'].lower()}" for f in fu]
+        n_sof = len(patch["room"].get("soffits") or [])
+        if n_sof:
+            extras.append(f"{n_sof} soffit{'s' if n_sof != 1 else ''}")
+    except ValueError as e:
+        problems.append(str(e))
+    desc = shape.describe(r) if r.get("width_m") else ""
+    return {"room": r, "patch": patch, "describe": desc + (("; also: " + ", ".join(extras)) if extras and desc else ""), "extras": extras,
+            "problems": problems}
 
 
 def to_patch(prop: dict) -> dict:
@@ -245,8 +293,18 @@ def to_patch(prop: dict) -> dict:
     ops = [{"wall": int(x["wall"]), "from_ft": x.get("from_ft") or 0, "width_ft": x.get("width_ft"),
             "height_ft": x.get("height_ft") or None, "kind": x.get("kind") or "opening", "note": x.get("note") or ""}
            for x in prop.get("openings") or []]
-    return {"room": {"outline_ft": o, "shape": prop.get("shape") or "custom", "height_ft": prop.get("height_ft"),
-                     "wall_openings": ops, "ceiling": ceiling}}
+    soffits = [{"wall": int(x["wall"]), "from_ft": x.get("from_ft") or 0, "length_ft": x.get("length_ft"), "depth_ft": x.get("depth_ft"),
+                "bottom_ft": x.get("bottom_ft")} for x in prop.get("soffits") or []]
+    patch = {"room": {"outline_ft": o, "shape": prop.get("shape") or "custom", "height_ft": prop.get("height_ft"),
+                      "wall_openings": ops, "ceiling": ceiling, "soffits": soffits}}
+    sc = prop.get("screen") or {}
+    patch["screen"] = ({"kind": sc["kind"], "diagonal_in": sc.get("diagonal_in") or None, "aspect": sc.get("aspect") or "16:9",
+                        "at": bool(sc.get("at"))} if sc.get("kind") in ("tv", "projector") else None)
+    patch["furniture"] = [{"kind": f["kind"], "x_ft": f.get("x_ft"), "y_ft": f.get("y_ft"), "length_ft": f.get("length_ft"),
+                           "depth_ft": f.get("depth_ft"), "rotation": f.get("rotation") or 0,
+                           **({"height_ft": f.get("height_ft")} if f["kind"] == "riser" else {})}
+                          for f in prop.get("furniture") or [] if f.get("kind") in ("couch", "riser")]
+    return patch
 
 
 def analyze(dims: dict, notes: str, photos: list, previous: dict | None = None, correction: str = "") -> dict:

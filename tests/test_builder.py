@@ -150,6 +150,27 @@ def test_schema_is_strict_for_structured_outputs():
     walk(builder.SCHEMA)
 
 
+def test_plan_can_carry_screen_furniture_and_soffits():
+    plan = dict(L_PLAN, soffits=[{"wall": 0, "from_ft": 0, "length_ft": 20, "depth_ft": 1.2, "bottom_ft": 7.2}],
+                screen={"kind": "projector", "diagonal_in": 120, "aspect": "2.35:1", "at": True},
+                furniture=[{"kind": "couch", "x_ft": 10, "y_ft": 20, "length_ft": 7, "depth_ft": 3, "height_ft": 0, "rotation": 0},
+                           {"kind": "riser", "x_ft": 10, "y_ft": 20, "length_ft": 13, "depth_ft": 6, "height_ft": 0.7, "rotation": 0}])
+    c = builder.check(plan)
+    assert not c["problems"], c["problems"]
+    assert c["patch"]["screen"]["at"] and len(c["patch"]["furniture"]) == 2 and c["patch"]["room"]["soffits"][0]["bottom_ft"] == 7.2
+    assert any("projector screen" in e for e in c["extras"]) and "soffit" in " ".join(c["extras"]) and "also:" in c["describe"]
+    unknown = builder.check(dict(plan, screen={"kind": "tv", "diagonal_in": 0, "aspect": "16:9", "at": False}))
+    assert any("size not read" in e for e in unknown["extras"])
+    assert builder.check(dict(plan, screen={"kind": "none", "diagonal_in": 0, "aspect": "16:9", "at": False}))["patch"]["screen"] is None
+    too_long = builder.check(dict(plan, soffits=[{"wall": 0, "from_ft": 99, "length_ft": 5, "depth_ft": 1, "bottom_ft": 7}]))
+    assert too_long["problems"] and "starts past" in too_long["problems"][0]
+    builder.save(plan)
+    r = room.load_room()
+    assert r["screen"]["at"] and [f["kind"] for f in r["furniture"]] == ["couch", "riser"] and r["room"]["soffits"]
+    props = builder.SCHEMA["properties"]
+    assert {"soffits", "screen", "furniture"} <= set(props) and {"soffits", "screen", "furniture"} <= set(builder.SCHEMA["required"])
+
+
 def test_save_writes_the_room_and_journals_it():
     room.ROOM_FILE.unlink(missing_ok=True)
     room.save_room({"room": {"length_m": 6, "width_m": 4, "height_m": 2.4}, "seats": [{"name": "MLP", "x_m": 2, "y_m": 4}]})
