@@ -2300,6 +2300,15 @@ class H(BaseHTTPRequestHandler):
                 from . import builder
                 r = builder.save(body.get("proposal") or {})
                 return self._send(200, {"ok": True, **r})
+            if path == "/api/room/orient":            # turn the room, or "undo" the last turn
+                from .room import orient_room, undo_orient, orient_undo_depth
+                op = body.get("op")
+                try:
+                    r = undo_orient() if op == "undo" else orient_room(op)
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                event("config", f"room turned: {op}")
+                return self._send(200, {"ok": True, "room": r, "undo": orient_undo_depth()})
             if path == "/api/room":
                 from .room import load_room, save_room
                 before = load_room().get("subs") or {}

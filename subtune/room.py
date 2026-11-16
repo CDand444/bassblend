@@ -12,6 +12,7 @@ import math
 from .config import DATA
 
 ROOM_FILE = DATA / "room.json"
+ROOM_UNDO = DATA / "room-undo.json"
 C = 343.0
 
 EMPTY = {
@@ -125,6 +126,72 @@ def clean_shape(rm: dict, base: dict) -> dict:
 def write_room(r: dict) -> None:
     DATA.mkdir(parents=True, exist_ok=True)
     ROOM_FILE.write_text(json.dumps(r, indent=2))
+
+
+def orient_room(op: str) -> dict:
+    """Apply an orientation operation to the room and save a snapshot for undo.
+
+    Returns the new room dictionary after transformation.
+    """
+    from . import orient
+
+    # Validate first: a bad op must leave the room file and the undo file untouched
+    if op not in orient.OPS:
+        raise ValueError(f"unknown turn: {op}")
+
+    room = load_room()
+    new_room = orient.transform_room(room, op)  # may raise; then nothing below is written
+
+    # Save the old room so the turn can be undone (keep the newest 10)
+    try:
+        undo_data = json.loads(ROOM_UNDO.read_text()) if ROOM_UNDO.exists() else []
+    except (json.JSONDecodeError, FileNotFoundError):
+        undo_data = []
+    if len(undo_data) >= 10:
+        undo_data = undo_data[1:]
+    undo_data.append(room)
+    ROOM_UNDO.write_text(json.dumps(undo_data, indent=2))
+
+    write_room(new_room)
+    return new_room
+
+
+def undo_orient() -> dict:
+    """Undo the last orientation operation.
+
+    Returns the room dictionary before the last orientation operation.
+    """
+    try:
+        undo_data = json.loads(ROOM_UNDO.read_text()) if ROOM_UNDO.exists() else []
+    except (json.JSONDecodeError, FileNotFoundError):
+        undo_data = []
+
+    if not undo_data:
+        raise ValueError("nothing to undo")
+
+    # Get the last saved room from undo history
+    room = undo_data.pop()
+
+    # Remove the last entry from undo history
+    ROOM_UNDO.write_text(json.dumps(undo_data, indent=2))
+
+    # Write the restored room
+    write_room(room)
+
+    return room
+
+
+def orient_undo_depth() -> int:
+    """Return the number of available undo steps.
+
+    Returns 0 if no undo data exists.
+    """
+    try:
+        undo_data = json.loads(ROOM_UNDO.read_text()) if ROOM_UNDO.exists() else []
+    except (json.JSONDecodeError, FileNotFoundError):
+        undo_data = []
+
+    return len(undo_data)
 
 
 # ------------------------------------------------------------------ modes
