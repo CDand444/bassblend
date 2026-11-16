@@ -221,6 +221,20 @@ async function roTurn(op) {
   $('#roMsg').textContent = 'Turned.';
 }
 // ---------- room shape: floor outline (corners in meters, in order around the room), openings, ceiling
+// "Pick screen wall": click the wall the screen is on and the room turns so that wall becomes the front wall
+let swPick = false;
+const SW_TURN = {right: 'ccw', back: '180', left: 'cw'};          // a turn to the right sends front to right, so undo that
+$('#roPick').onclick = () => {
+  swPick = !swPick; planKey = null; renderPlan(readRoom());
+  $('#roMsg').textContent = swPick ? 'Click the wall the screen is on (in the plan below).' : '';
+};
+$('#plan').addEventListener('click', e => {
+  const l = e.target.closest('.swl'); if (!l || !swPick) return;
+  swPick = false; planKey = null;
+  const op = SW_TURN[l.dataset.sw];
+  if (!op) { $('#roMsg').textContent = 'That is already the front wall.'; renderPlan(readRoom()); return; }
+  roTurn(op);
+});
 let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null, soffits: []}, planDrag = null, planKey = null;
 const SHAPES = [['rect', 'Rectangle'], ['l', 'L-shape'], ['alcove', 'Alcove'], ['cut', 'Cut corner'], ['custom', 'Custom']];
 const OPEN_KINDS = [['opening', 'Opening (no wall)'], ['door', 'Door'], ['window', 'Window']];
@@ -400,7 +414,7 @@ function renderPlan(r) {
   const spk = Object.entries(r.speakers || (S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
   // suggested spots come from the saved room: while the outline is being edited, hide the ones now outside it
   const sug = spk.length || !pts ? [] : ((S.placement || {}).speakers || []).filter(s => insidePts(pts, s.x_m, s.y_m)).map(s => ({...s, rec: false}));
-  const key = JSON.stringify([r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
+  const key = JSON.stringify([swPick, r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
   if (key === planKey && el.querySelector('svg')) return; planKey = key;
   plan3d(r, spk.concat(sug));
   if (!pts) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
@@ -421,6 +435,7 @@ function renderPlan(r) {
     g += `<text x="${tx}" y="${ty}" text-anchor="middle" font-size="9.5" fill="var(--text-3)" stroke="var(--surface-2)" stroke-width="3" paint-order="stroke">${fmtFt(e.len)}</text>`; });
   g += openingMarks(r.room.wall_openings || [], es, X, Y, 'var(--surface-2)');
   g += soPlanG(r.room.soffits, es, X, Y);
+  if (swPick) es.forEach(e => { if (!e.angled) g += `<line class="swl" data-sw="${e.side}" x1="${X(e.a[0])}" y1="${Y(e.a[1])}" x2="${X(e.b[0])}" y2="${Y(e.b[1])}" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" opacity=".4" style="cursor:pointer"><title>Make this the screen wall</title></line>`; });
   g += fuPlanSvg(r.furniture, X, Y);
   spk.concat(sug).forEach(s => { const c = s.kind === 'height' ? 'var(--s4)' : 'var(--s1)';
     g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 4.5 : 5}" fill="${s.rec ? c : 'var(--surface)'}" stroke="${c}" stroke-width="1.5"${s.rec ? '' : ' stroke-dasharray="2 2"'}><title>${esc(s.id)}${s.rec ? '' : ' (suggested spot)'}</title></circle>
