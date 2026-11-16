@@ -54,6 +54,12 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
     mx, my = seat["x_m"], seat["y_m"]
     ez = seat.get("z_m") or EAR
     spk, notes = [], []
+    fset = FRONT_SET                       # how far the front speakers stand from the front wall
+    sc = room.get("screen") or {}
+    if sc.get("lcr_behind") and sc.get("at"):          # behind an acoustically transparent screen: close to the wall, a few inches off the fabric
+        fset = max(0.05, min(FRONT_SET, (sc.get("behind_m") or 0.15) - 0.1))
+        notes.append("Your front left, center and right are behind the acoustically transparent screen, so they are placed "
+                     f"{fset / 0.3048 * 12:.0f} in from the front wall to stay clear of the fabric.")
     poly = not shape.is_rect(rm) or bool(shape.openings(rm))
     pts = shape.outline(rm)
     back = L - my
@@ -80,7 +86,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
             return None
         if any(o["from_m"] - gap < h["s_m"] < o["from_m"] + o["width_m"] + gap for o in e["openings"] if o["kind"] == "opening"):
             return None
-        off = FRONT_SET if wall == "front" else WALL_SET
+        off = fset if wall == "front" else WALL_SET
         cosn = dx * e["n"][0] + dy * e["n"][1]               # how squarely the ray meets the wall (normal points out)
         if cosn <= 1e-3:
             return None
@@ -101,7 +107,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
         if wall == "front":
             if dy >= -1e-9:
                 return None
-            t = (FRONT_SET - my) / dy
+            t = (fset - my) / dy
         elif wall == "back":
             if dy <= 1e-9:
                 return None
@@ -112,7 +118,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
             t = ((W - WALL_SET if dx > 0 else WALL_SET) - mx) / dx
         x, y = mx + dx * t, my + dy * t
         side_gap = SIDE_GAP if wall == "front" else WALL_SET     # front speakers need room beside them
-        if t <= 0 or not (side_gap - 1e-6 <= x <= W - side_gap + 1e-6) or not (FRONT_SET - 1e-6 <= y <= L - WALL_SET + 1e-6):
+        if t <= 0 or not (side_gap - 1e-6 <= x <= W - side_gap + 1e-6) or not (fset - 1e-6 <= y <= L - WALL_SET + 1e-6):
             return None
         return x, y, t
 

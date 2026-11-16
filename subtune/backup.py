@@ -118,7 +118,8 @@ def make(reason: str = "manual") -> Path:
         st = load_state()
         state = {k: st[k] for k in STATE_KEYS + STATE_EXTRA if st.get(k) is not None}
         manifest = {"format": FORMAT, "version": VERSION, "app": _version(), "created": time.strftime("%Y-%m-%d %H:%M:%S"),
-                    "t": time.time(), "reason": reason, "files": [e for e, _ in entries], "state_keys": sorted(state)}
+                    "t": time.time(), "reason": reason, "files": [e for e, _ in entries], "state_keys": sorted(state),
+                    "room_has": _room_has()}
         try:
             with zipfile.ZipFile(part, "w", zipfile.ZIP_DEFLATED) as z:
                 z.writestr("manifest.json", json.dumps(manifest, indent=1))
@@ -150,6 +151,17 @@ def _unique(p: Path) -> Path:
     return p
 
 
+def _room_has() -> dict:
+    """What the saved room holds besides its size: for the Backups list."""
+    try:
+        r = json.loads((DATA / "room.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    fu = r.get("furniture") or []
+    return {"screen": bool(r.get("screen")), "couches": sum(f.get("kind") == "couch" for f in fu), "risers": sum(f.get("kind") == "riser" for f in fu),
+            "soffits": len((r.get("room") or {}).get("soffits") or []), "seats": len(r.get("seats") or []), "subs": len(r.get("subs") or {})}
+
+
 def _note_copy_error(msg) -> None:
     from .state import update_state
     update_state(backup_copy_error=msg)
@@ -176,7 +188,7 @@ def list_backups() -> list[dict]:
         out.append({"name": p.name, "size": p.stat().st_size, "t": m.get("t") or p.stat().st_mtime, "created": m.get("created"),
                     "app": m.get("app"), "reason": m.get("reason"),
                     "has": {"tunes": sum(f.startswith("library/") for f in files), "measurements": sum(f.startswith(("measurements/", "blend/")) for f in files),
-                            "room": "room.json" in files, "chat": "chat.json" in files}})
+                            "room": "room.json" in files, "chat": "chat.json" in files, **(m.get("room_has") or {})}})
     out.sort(key=lambda b: b["t"], reverse=True)
     return out
 

@@ -71,6 +71,15 @@ def test_round_trip():
     assert r["safety"] and (backup.folder() / r["safety"]).exists()     # a safety backup of the changed state was made first
 
 
+def test_list_shows_what_the_room_holds():
+    reset()
+    (DATA / "room.json").write_text(json.dumps({"room": {"length_m": 6, "soffits": [{}, {}]}, "screen": {"kind": "tv"}, "subs": {"0": {}},
+                                                "furniture": [{"kind": "couch"}, {"kind": "riser"}, {"kind": "couch"}], "seats": [{}]}))
+    backup.make("manual")
+    h = backup.list_backups()[0]["has"]
+    assert h["screen"] is True and h["couches"] == 2 and h["risers"] == 1 and h["soffits"] == 2 and h["subs"] == 1 and h["room"] is True
+
+
 def test_no_secret_in_a_backup():
     reset()
     p = backup.make("manual")

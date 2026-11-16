@@ -81,6 +81,15 @@ def test_notes():
     assert not any("fills about" in x for x in treatment.plan(base())["notes"])
 
 
+def test_layout_puts_fronts_close_behind_an_at_screen():
+    from subtune import layout
+    plain = layout.plan(base({"kind": "projector", "diagonal_in": 120, "at": True}), 5, 0)
+    behind = layout.plan(base({"kind": "projector", "diagonal_in": 120, "at": True, "lcr_behind": True}), 5, 0)
+    y = lambda p: next(s for s in p["speakers"] if s["id"] == "FL")["y_m"]
+    assert y(behind) < y(plain) and y(behind) <= 0.1 and any("behind the acoustically transparent screen" in n for n in behind["notes"])
+    assert not any("acoustically transparent" in n for n in plain["notes"])
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

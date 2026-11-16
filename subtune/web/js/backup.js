@@ -1,6 +1,8 @@
 // htTamer page script: Tools -> Backups (spec 02). Loaded after soffit.js; names start with bk.
 let BK = null;
 const bkSize = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
+const bkRoom = h => { const p = []; if (h.screen) p.push('screen'); if (h.couches) p.push(`${h.couches} couch${h.couches === 1 ? '' : 'es'}`); if (h.risers) p.push(`${h.risers} riser${h.risers === 1 ? '' : 's'}`);
+  if (h.soffits) p.push(`${h.soffits} soffit${h.soffits === 1 ? '' : 's'}`); if (h.subs) p.push(`${h.subs} sub${h.subs === 1 ? '' : 's'}`); return p.length ? ` (${p.join(', ')})` : ''; };
 const bkWhy = {manual: 'on demand', weekly: 'weekly', 'before update': 'before an update', 'before restore': 'safety copy before a restore'};
 async function bkLoad() {
   try { BK = await fetch('/api/backups').then(r => r.json()); } catch (e) { return; }
@@ -11,7 +13,7 @@ async function bkLoad() {
   el.innerHTML = (BK.copy_error ? `<div class="notice warn">The copy to your backup folder failed: ${esc(BK.copy_error)}</div>` : '') +
     (BK.backups.length ? `<div class="tw"><table class="dc-tbl"><thead><tr><th>When</th><th>Why</th><th>htTamer</th><th>Contains</th><th>Size</th><th></th></tr></thead><tbody>${BK.backups.map(b => `<tr>
       <td>${new Date(b.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}</td><td>${esc(bkWhy[b.reason] || b.reason || '')}</td><td>${esc(b.app || '')}</td>
-      <td>${b.has.room ? 'room, ' : ''}${b.has.tunes} tune${b.has.tunes === 1 ? '' : 's'}, ${b.has.measurements} measurement file${b.has.measurements === 1 ? '' : 's'}${b.has.chat ? ', chat' : ''}</td><td>${bkSize(b.size)}</td>
+      <td>${b.has.room ? 'room' + bkRoom(b.has) + ', ' : ''}${b.has.tunes} tune${b.has.tunes === 1 ? '' : 's'}, ${b.has.measurements} measurement file${b.has.measurements === 1 ? '' : 's'}${b.has.chat ? ', chat' : ''}</td><td>${bkSize(b.size)}</td>
       <td style="white-space:nowrap"><button class="btn" data-bkrestore="${esc(b.name)}" ${busy ? 'disabled' : ''}>Restore</button>
         <a class="btn ghost" href="/api/backups/download?name=${encodeURIComponent(b.name)}" download>Download</a>
         <button class="btn icon ghost" data-bkdel="${esc(b.name)}" aria-label="Delete this backup">✕</button></td></tr>`).join('')}</tbody></table></div>`
