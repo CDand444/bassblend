@@ -118,6 +118,7 @@ def make_zip(name, entries, manifest=None):
 
 def test_restore_refuses_bad_files():
     reset()
+    backup._version = lambda: "v0.9.12-3-gabc1234"          # CI builds can be a bare commit id; pin a release for the newer-version check
     junk = TMP / "junk.zip"
     junk.write_text("not a zip")
     for bad, why in ((junk, "isn't a backup"), (make_zip("other.zip", {}, {"format": "something-else"}), "isn't an htTamer backup"),

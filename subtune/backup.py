@@ -43,8 +43,10 @@ def _version() -> str:
     return version()
 
 
-def _nums(v: str) -> tuple:
-    return tuple(int(x) for x in re.findall(r"\d+", str(v))[:3])
+def _release(v: str) -> tuple | None:
+    """(major, minor, patch) from a version like v0.9.12-5-gabc123; None for anything else (a bare commit id)."""
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(v or ""))
+    return tuple(int(x) for x in m.groups()) if m else None
 
 
 def _safe_settings(s: dict) -> dict:
@@ -239,7 +241,8 @@ def check_zip(path: Path) -> dict:
         m = manifest_of(path)
         if not m:
             raise ValueError("that isn't an htTamer backup")
-        if _nums(m.get("app") or "") > _nums(_version()):
+        then, now = _release(m.get("app")), _release(_version())
+        if then and now and then > now:
             raise ValueError(f"that backup is from a newer htTamer ({m.get('app')}); update first")
         allowed = set(FILES) | {"manifest.json", "settings.json", "state.json"}
         for n in z.namelist():
