@@ -12,6 +12,7 @@
   <a href="#m-fixes">What htTamer changed</a>
   <a href="#m-measure">Other tests</a>
   <a href="#m-furniture">Couches</a>
+  <a href="#m-backups">Backups</a>
   <a href="#m-treatment">Room treatment</a>
   <a href="#m-play">How tests play through the receiver</a>
   <a href="#m-assistant">The assistant</a>
@@ -191,6 +192,15 @@
   <li><b>Back wall</b>: a tall couch filling most of the back wall lowers how high the back-wall treatment ranks (it is never removed). A couch does not absorb bass, so bass traps there still help.</li>
 </ul>
 <p>The numbers are typical published values and are rough. Turning the room (Turn left, Turn right, Mirror) turns the couches with it.</p>
+
+<h2 id="m-backups">Backups</h2>
+<p><b>Tools → Backups</b> keeps your work safe against a bad SD card or a failed update. A backup is one zip file with your room, couches and soffits, saved tunes and slots, measurements, mic calibration, results and the fix log, journal, hardware database, chat and settings. It never holds your API keys, PIN or tokens, and htTamer refuses to keep a backup that contains one, so the file is safe to copy anywhere.</p>
+<ul>
+  <li><b>When</b>: automatically every week, right before an update installs, and when you press <b>Back up now</b>. The newest five are kept (the last one made before an update is always kept).</li>
+  <li><b>Restore</b>: pick a backup and press <b>Restore</b>. htTamer first makes a safety copy of what you have now, then puts the backup back and reloads the page. Your keys, PIN and this computer's own settings (audio device, miniDSP path) are not changed. A file that isn't an htTamer backup, or comes from a newer htTamer, is refused.</li>
+  <li><b>Download and upload</b>: download a backup to keep it elsewhere, or add one from a file (up to 50 MB) and then restore it from the list.</li>
+  <li><b>A second copy</b>: under <i>Keep a second copy off this device</i> type the folder of a mounted USB stick or network share and every new backup is copied there as well.</li>
+</ul>
 
 <h2 id="m-treatment">Room treatment</h2>
 <p><b>Setup → Room treatment</b> plans acoustic treatment (bass traps, absorption panels, a ceiling cloud, the back wall, a rug) for your room. It works offline from what htTamer already knows: the room size, seats and speaker and sub positions, the room modes, and your latest system report (ring time, early reflections, left/right differences) and check-up (bass ringing per band). Nothing plays.</p>

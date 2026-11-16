@@ -44,12 +44,14 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     `avr.hdmi_inputs()` per make. Only Onkyo is hardware-tested.
   - `hwdb.py`: hardware database (receivers/subs/speakers) the owner or, with setting `ai_hwdb`, the
     assistant grows (`hw_lookup`/`hw_save`, plus Claude web_search); used for driver choice and `protect_hz`.
+  - `backup.py`: automatic backups (weekly, before an update, on demand) and restore; never holds keys/tokens/PIN
+    (`secrets_check`). Card Tools -> Backups, `/api/backups`.
   - `limiter.py`, `gaincheck.py`, `report.py` (/report), drift in `measure.py`, LFE check in `allspk.py`.
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
-- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 10 parts, loaded in order as
-  classic scripts sharing globals: core, tune, room-ai, furniture, soffit, receiver, measure, setup-home, liveeq, nav; plus
+- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 11 parts, loaded in order as
+  classic scripts sharing globals: core, tune, room-ai, furniture, soffit, backup, receiver, measure, setup-home, liveeq, nav; plus
   `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
   `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`.
   Shared globals mean a top-level name declared in two parts makes the browser drop the later file entirely

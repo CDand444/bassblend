@@ -183,6 +183,11 @@ def install(log=print) -> dict:
     if not info["newer"]:
         raise RuntimeError(f"Already up to date ({info['current']})")
     tag, repo, m = info["latest"], repo_name(), mode()
+    try:
+        from . import backup
+        backup.make("before update")
+    except Exception as e:                           # noqa: BLE001 - a backup problem is logged; the update still goes ahead
+        event("error", f"backup before the update failed: {e}")
     if m == "windows":
         asset = next((a for a in info.get("assets") or [] if a["name"].endswith("-windows-setup.exe")), None)
         if not asset:

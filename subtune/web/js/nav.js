@@ -88,6 +88,7 @@ const MENU = [
   {grp: 'Tools', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
    tag: () => { const e = events.filter(x => x.kind === 'error' && x.t > seenErrors).length; return e ? [String(e), 'alert'] : null; }},
   {grp: 'Tools', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
+  {grp: 'Tools', key: 'backups', beta: true, icon: 'file', title: 'Backups', full: 'Backups: save and restore', el: $('#bkCard'), tag: () => null},
   {grp: 'Tools', key: 'updates', icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
    tag: () => (S.update || {}).newer ? ['new', 'alert'] : null},
   {grp: 'Tools', key: 'automation', beta: true, icon: 'gear', title: 'Automation', full: 'Automation: night mode, automatic slot, watchdog', el: $('#autoCard'),
@@ -167,6 +168,7 @@ function openSheet(key, fromHash = false) {
   if (!fromHash && location.hash !== '#/' + m.key) history.pushState(null, '', '#/' + m.key);
   if (m.key === 'tunes') loadTunes();
   if (m.key === 'updates') loadUpdates();
+  if (m.key === 'backups') bkLoad();
   if (m.key === 'feedback') loadFeedback();
   if (m.key === 'automation' || m.key === 'ab') loadAutomation();
   if (m.key === 'mcp') loadMcp();
@@ -207,7 +209,7 @@ function safe(name, fn) {
 let polling = false;
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
-  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'receiver.js': 'renderBlend',
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'backup.js': 'bkLoad', 'receiver.js': 'renderBlend',
                 'measure.js': 'renderDeep', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {

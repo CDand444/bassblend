@@ -921,6 +921,18 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     </section>
 
     <!-- UPDATES -->
+    <section class="card" id="bkCard">
+      <div class="card-h"><h2>Backups</h2><span class="sub" id="bkSub"></span></div>
+      <p class="muted" style="margin:0 0 12px">Your room, tunes, measurements, results and settings, saved as a file you can restore with one click. A backup never holds your API keys, PIN or tokens, so the file is safe to copy anywhere. One is made every week, before each update, and when you press the button; the newest five are kept.</p>
+      <div class="row" style="gap:8px;align-items:center"><button class="btn primary" id="bkMake">Back up now</button>
+        <label class="btn ghost" style="cursor:pointer">Add a backup file…<input type="file" id="bkUpload" accept=".zip" hidden></label><span class="muted small" id="bkMsg"></span></div>
+      <div id="bkOut" style="margin-top:12px"></div>
+      <details style="margin-top:14px"><summary class="small">Keep a second copy off this device</summary>
+        <p class="muted small" style="margin:8px 0">Optional. Type the folder of a USB stick or network share this device has mounted; every new backup is copied there too. A failed copy is shown here, never blocks the backup.</p>
+        <div class="row" style="align-items:end"><label class="f" style="width:300px">Copy folder<input id="bkCopy" placeholder="/mnt/usb/htTamer-backups" spellcheck="false"></label>
+          <label class="cb" style="max-width:200px"><input type="checkbox" id="bkWeekly" checked><span>Weekly backup</span></label><button class="btn" id="bkSave">Save</button></div>
+      </details>
+    </section>
     <section class="card" id="updCard">
       <div class="card-h"><h2>Updates</h2><span class="sub" id="updSub"></span></div>
       <div id="updOut"></div>
@@ -1352,6 +1364,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/room-ai.js?v=__V__"></script>
 <script src="/js/furniture.js?v=__V__"></script>
 <script src="/js/soffit.js?v=__V__"></script>
+<script src="/js/backup.js?v=__V__"></script>
 <script src="/js/receiver.js?v=__V__"></script>
 <script src="/js/measure.js?v=__V__"></script>
 <script src="/js/setup-home.js?v=__V__"></script>

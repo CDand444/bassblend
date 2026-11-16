@@ -1929,6 +1929,25 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/vendors":
             from . import vendors
             return self._send(200, vendors.catalog_view())
+        if u.path == "/api/backups":
+            from . import backup
+            s = load_settings()
+            return self._send(200, {"backups": backup.list_backups(), "copy_dir": s.get("backup_copy_dir"),
+                                    "weekly": s.get("backup_weekly", True), "copy_error": load_state().get("backup_copy_error")})
+        if u.path == "/api/backups/download":          # one backup file (the name must be in the list)
+            from . import backup
+            try:
+                data = backup.path_of(q.get("name", [""])[0]).read_bytes()
+            except (ValueError, OSError):
+                return self._send(404, {"error": "no such backup"})
+            self.send_response(200)
+            self.send_header("Content-Type", "application/zip")
+            self.send_header("Content-Disposition", f'attachment; filename="{q.get("name", [""])[0]}"')
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("Content-Length", str(len(data)))
+            self.end_headers()
+            self.wfile.write(data)
+            return
         if u.path == "/api/config/export":             # settings file to download
             from . import bundle
             flag = lambda k, d: q.get(k, [d])[0] in ("1", "true", "yes")
@@ -1947,6 +1966,30 @@ class H(BaseHTTPRequestHandler):
             return
         self._send(404, {"error": "not found"})
 
+    def _backups(self, body):
+        """Make, restore, delete, upload or set the options of backups (the page's Backups card)."""
+        import base64
+        from . import backup
+        act = body.get("action")
+        try:
+            if act == "make":
+                return self._send(200, {"made": backup.make("manual").name, "backups": backup.list_backups()})
+            if act == "delete":
+                backup.delete(str(body.get("name")))
+                return self._send(200, {"backups": backup.list_backups()})
+            if act == "upload":
+                p = backup.save_upload(base64.b64decode(body.get("data") or "", validate=True))
+                return self._send(200, {"uploaded": p.name, "backups": backup.list_backups()})
+            if act == "options":
+                return self._send(200, backup.set_options(body.get("copy_dir"), body.get("weekly")))
+            if act == "restore":
+                if RUN.running() or load_state().get("busy"):
+                    raise RuntimeError("wait for the current job to finish, then restore")
+                return self._send(200, backup.restore(str(body.get("name"))))
+        except (ValueError, RuntimeError, OSError) as e:
+            return self._send(400, {"error": str(e)})
+        return self._send(400, {"error": "action must be make, delete, upload, options or restore"})
+
     def do_POST(self):
         path = urlparse(self.path).path
         # same-origin guard: only the dashboard page itself may trigger actions (a browser always
@@ -1955,7 +1998,7 @@ class H(BaseHTTPRequestHandler):
         if origin and urlparse(origin).netloc != self.headers.get("Host", ""):
             return self._send(403, {"error": "forbidden"})
         n = int(self.headers.get("Content-Length", 0) or 0)
-        if n > (12_000_000 if path in ("/api/config/import", "/api/build/analyze") else 4_000_000):
+        if n > (70_000_000 if path == "/api/backups" else 12_000_000 if path in ("/api/config/import", "/api/build/analyze") else 4_000_000):
             return self._send(413, {"error": "too large"})
         try:
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
@@ -1971,6 +2014,8 @@ class H(BaseHTTPRequestHandler):
             return self._ha_action(path, body)
         if not self._gate(path):
             return
+        if path == "/api/backups":
+            return self._backups(body)
         if path == "/api/mcp":                         # the owner makes or revokes the MCP token (shown once)
             from . import mcp
             if body.get("action") == "new_token":
@@ -2584,6 +2629,8 @@ def serve(port=8765, lan=False):
     threading.Thread(target=_post_update_thread, daemon=True).start()
     from . import update
     threading.Thread(target=update.auto_loop, daemon=True).start()
+    from . import backup
+    threading.Thread(target=backup.weekly_loop, daemon=True).start()
     if lan:
         import socket
         name = socket.gethostname()
