@@ -111,6 +111,12 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
 - miniDSP normal input is `restore_source` (i2s); USB means the subs don't get the receiver's bass.
 - Pi runs Python 3.13; Windows dev venv 3.12.
 
+## Planning documents (read these before starting a task)
+- `docs/dev/ROADMAP.md`: where things stand, what to improve in what order, and the design decisions (D1-D11).
+- `docs/dev/LOCAL_MODELS.md`: the working agreement for local coding models (hard rules, how to check your
+  work, how to report). Local models write the code; they don't commit, push, deploy or tag.
+- `docs/dev/specs/NN-*.md`: one small spec per task. Take one at a time, in order; start a fresh session per step.
+
 ## Keeping things current
 - New user-visible feature → update `subtune/web/manual.html` (and the assistant prompt if it can use it).
 - New page → card in `index.html`, entry in `MENU` (`js/nav.js`), render function in the right `js/` part.
