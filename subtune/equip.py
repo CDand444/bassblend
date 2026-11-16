@@ -156,10 +156,12 @@ def room_shape_m(rm: dict) -> dict:
     for k in ("wall_openings", "openings_list"):
         if k in rm:
             rm["wall_openings"] = [_feet(o) for o in rm.pop(k) or []]
+    if "soffits" in rm:
+        rm["soffits"] = [_feet(o) for o in rm.pop("soffits") or []]
     if isinstance(rm.get("ceiling"), dict):
         rm["ceiling"] = _feet(rm["ceiling"])
-    return _feet({k: v for k, v in rm.items() if k not in ("outline", "wall_openings", "ceiling")}) | \
-        {k: rm[k] for k in ("outline", "wall_openings", "ceiling") if k in rm}
+    return _feet({k: v for k, v in rm.items() if k not in ("outline", "wall_openings", "ceiling", "soffits")}) | \
+        {k: rm[k] for k in ("outline", "wall_openings", "ceiling", "soffits") if k in rm}
 
 
 def update_room(patch: dict, who="page") -> dict:
@@ -188,6 +190,10 @@ def update_room(patch: dict, who="page") -> dict:
             hit.update({k: v for k, v in s.items() if k != "name"})     # matched by name: keep its spelling
         else:
             body["seats"].append(s)
+    if "screen" in patch:                                       # null removes it
+        body["screen"] = _feet(patch["screen"]) if patch["screen"] else None
+    if "furniture" in patch:                                    # the full list of couches and risers
+        body["furniture"] = [_feet(i) for i in patch["furniture"] or []]
     for k in ("goals", "avr"):
         if k in patch:
             body[k] = patch[k]
@@ -234,7 +240,8 @@ def summary() -> dict:
             "speakers": [{"channel": c, "name": nm.get(c, c), **(spk.get(c) or {})} for c in chans],
             "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
             "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},
-            "room": r.get("room"), "seats": r.get("seats"), "receiver": r.get("avr"), "goals": r.get("goals")}
+            "room": r.get("room"), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"),
+            "receiver": r.get("avr"), "goals": r.get("goals")}
 
 
 def _diff(a, b, path="") -> list[str]:

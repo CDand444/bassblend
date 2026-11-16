@@ -166,7 +166,7 @@ def test_daily_budget():
 def test_every_tool_is_classified():
     """A new tool must be sorted into read-only or 'changes something' before it ships."""
     read = {"get_overview", "list_tunes", "simulate_tune", "avr_status", "get_system_report", "get_tuning_plan",
-            "get_journal", "get_equipment", "hw_lookup", "get_live_eq", "get_treatment_plan", "stop_live_analyzer"}
+            "get_journal", "get_equipment", "hw_lookup", "get_live_eq", "get_treatment_plan", "stop_live_analyzer", "list_backups"}
     names = {t["name"] for t in assistant.TOOLS}
     assert assistant.APPROVAL <= guard.CHANGES, assistant.APPROVAL - guard.CHANGES
     unsorted = names - read - guard.CHANGES

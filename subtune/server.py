@@ -1001,6 +1001,23 @@ def build_executors(origin="assistant"):
         r = equip.update_room(patch, who="assistant")
         return {"changed": r["changed"], "summary": ("; ".join(r["changed"]) or "nothing changed")[:300]}
 
+    def backups_list():
+        from . import backup
+        b = backup.list_backups()
+        return {"backups": b, "summary": f"{len(b)} backups" + (f", newest {b[0]['created']}" if b else "")}
+
+    def backup_make():
+        from . import backup
+        p = backup.make("manual")
+        return {"made": p.name, "summary": f"made {p.name}"}
+
+    def backup_restore(name):
+        from . import backup
+        if RUN.running() or load_state().get("busy"):
+            raise RuntimeError("wait for the current job to finish, then restore")
+        r = backup.restore(name)
+        return {**r, "summary": f"restored {r['restored']}; safety copy {r['safety']}"}
+
     def system_set(**patch):
         from . import equip
         r = equip.update_system(patch, who="assistant")
@@ -1168,7 +1185,7 @@ def build_executors(origin="assistant"):
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "keep_fixes": fixes_keep, "undo_fixes": fixes_undo,
             "get_equipment": equipment, "update_speakers": speakers_set, "update_room": room_set,
-            "update_system": system_set, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
+            "update_system": system_set, "list_backups": backups_list, "make_backup": backup_make, "restore_backup": backup_restore, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "hw_lookup": hw_lookup, "hw_save": hw_save,
             "get_live_eq": leq_get, "set_live_eq": leq_set, "fit_live_eq": leq_fit, "start_live_analyzer": leq_start,

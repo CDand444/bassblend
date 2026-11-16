@@ -174,6 +174,10 @@ network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
+- Screen, furniture and soffits: update_room also records the screen on the front wall (TV or projector screen: size, aspect, \
+acoustically transparent or not, speakers behind it), the couches and risers, and soffits (bulkheads) along the walls. They \
+add viewing-angle, ring-time and ceiling notes to the treatment plan; a TV cannot be acoustically transparent. get_equipment \
+shows them. Backups: list_backups and make_backup are safe; restore_backup asks the owner first.
 - Room shape: rooms needn't be boxes. update_room can record the floor outline (outline_ft, an L, an alcove, a \
 cut-off corner), openings on its walls (open to another space, door, window) and a sloped or vaulted ceiling. \
 Reflection points, treatment zones, corners and speaker placement then use the real walls; for an irregular room \
@@ -382,13 +386,30 @@ TOOLS = [
                  "from corner i to corner i+1; a rectangle's are 0 front, 1 right, 2 back, 3 left), from_ft (along that "
                  "edge from its first corner), width_ft, height_ft (omit = floor to ceiling), kind: opening (open to "
                  "another space), door or window}], ceiling {kind flat|slope|vault, low_ft, low_side front|back|left|right "
-                 "(slope), ridge length|width (vault)}"},
+                 "(slope), ridge length|width (vault)}, soffits = the full list [{wall (same numbering as wall_openings), "
+                 "from_ft, length_ft, depth_ft (how far it sticks out), bottom_ft (height of its underside)}]"},
+        "screen": {"type": ["object", "null"], "description": "the TV or projector screen on the front wall (null removes it): kind (tv or "
+                   "projector), diagonal_in, aspect (16:9, 16:10, 4:3, 1.85:1, 2.35:1, 2.40:1), at (acoustically transparent: "
+                   "projector screens only), lcr_behind (front speakers behind it; needs at), bottom_ft (lower edge above the floor), "
+                   "behind_ft (how far its face is in front of the wall), x_ft (its middle along the wall; omit = centered), notes"},
+        "furniture": {"type": "array", "items": {"type": "object"}, "description": "the full list of couches and risers. Couch: kind "
+                      "couch, name, x_ft, y_ft (its middle), length_ft, depth_ft, seat_h_ft, back_h_ft, fabric (fabric, microfiber, "
+                      "velvet, linen, leather, vinyl), rotation (0 back toward the back wall, 90 left wall, 180 the screen, 270 right wall), "
+                      "against_wall. Riser (a platform the seats stand on): kind riser, name, x_ft, y_ft, length_ft (across), depth_ft, "
+                      "height_ft, rotation, against_wall"},
         "seat": {"type": "object", "description": "one seat to add or update, matched by name: name, x_ft, y_ft, z_ft (ear height)"},
         "seats": {"type": "array", "items": {"type": "object"}, "description": "replace the whole seat list (first = MLP)"},
         "subs": {"type": "object", "description": "1-based sub output -> fields: model, driver, enclosure, location, x_ft, y_ft, "
                                                   "facing, role (main or nearfield), notes, controls {knob: value}"},
         "goals": {"type": "string"}, "avr": {"type": "string", "description": "receiver model and notes"}},
        []),
+    _t("list_backups", "The saved backups (newest first): when, why, which htTamer version and what each holds. Keys, PIN and tokens "
+       "are never in a backup. No sound."),
+    _t("make_backup", "Make a backup of the room, tunes, measurements, results and settings now (kept with the others in Tools → "
+       "Backups). No sound; changes nothing else."),
+    _t("restore_backup", "Put a saved backup back (from list_backups): a safety copy of the current state is made first and keys, PIN "
+       "and this computer's own settings are not touched. The owner is asked to approve it.",
+       {"name": {"type": "string", "description": "the backup's name exactly as list_backups gives it"}}, ["name"], approval=True),
     _t("update_system", "Change the speaker layout and receiver facts: beds (2, 3, 5, 7, 9), heights (0, 2, 4, 6), "
        "crossover_hz, dirac (bool), dlbc_license, dlbc, treble. Only what's given changes. No sound.",
        {"beds": {"type": "integer"}, "heights": {"type": "integer"}, "crossover_hz": {"type": "number"},
@@ -507,6 +528,7 @@ DESCRIBE = {
                                  "add": f"Use output {i['output']} as a sub again (nothing written to the miniDSP)",
                                  "mute": f"Mute output {i['output']} on the miniDSP (htTamer's slot only)"}.get(
                                      i.get("action"), f"Change sub output {i['output']}"),
+    "restore_backup": lambda i: f"Restore the backup {i['name']}: your room, tunes, measurements and settings go back to that moment (a safety copy is made first)",
     "set_night_mode": lambda i: ("Night mode ON: mute the subs completely (no bass from them)" if i["on"]
                                  else "Night mode OFF: the subs play again"),
     "run_checkup": lambda i: f"Run a check-up at spot {i['pos']} (one sweep through the subs)",
@@ -784,7 +806,8 @@ def _brief(name, inp, out):
              "hw_lookup": "Looked in the hardware database", "hw_save": "Updated the hardware database",
              "apply_avr_blend": "Applied the blend fix", "get_treatment_plan": "Read the room treatment plan",
              "set_treatment_constraints": "Saved your treatment constraints",
-             "record_treatment": "Recorded installed treatment"}.get(name, name)
+             "record_treatment": "Recorded installed treatment", "list_backups": "Read the backups",
+             "make_backup": "Made a backup", "restore_backup": "Restored a backup"}.get(name, name)
     extra = ""
     if isinstance(out, dict) and out.get("summary"):
         extra = ": " + str(out["summary"])[:160]
