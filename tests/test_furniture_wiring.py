@@ -83,6 +83,14 @@ def test_estimate_and_back_at_ears_notes():
     assert any("reflects sound at your ears" in n for n in p["notes"])
 
 
+def test_riser_turns_and_notes():
+    r = base({"id": "r1", "kind": "riser", "x_m": 2.0, "y_m": 4.0, "length_m": 4.0, "depth_m": 1.2, "height_m": 0.4, "rotation": 0, "against_wall": "back"})
+    cw = orient.transform_room(r, "cw")["furniture"][0]
+    assert cw["kind"] == "riser" and cw["rotation"] == 90 and cw["against_wall"] == "left"
+    p = treatment.plan(r)
+    assert any("riser" in n for n in p["notes"])                      # the seat (ear 1.0 m) is on it and doesn't include it
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

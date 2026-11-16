@@ -91,6 +91,39 @@ def test_rear_wall_cover():
     assert fu.rear_wall_cover(room(couch(length_m=3.0, against_wall="back", back_h_m=0.9))) is None   # too low
 
 
+def riser(**kw):
+    d = {"kind": "riser", "x_m": 2.0, "y_m": 5.0, "length_m": 4.0, "depth_m": 1.2, "height_m": 0.2, "rotation": 0}
+    d.update(kw)
+    return fu.clean_item(d)
+
+
+def test_riser_clean_and_limits():
+    r = fu.clean_item({"kind": "riser", "length_m": 99, "depth_m": 0.1, "height_m": 5, "fabric": "velvet"})
+    assert r["kind"] == "riser" and r["length_m"] == 8.0 and r["depth_m"] == 0.6 and r["height_m"] == 0.6 and "fabric" not in r
+    items = fu.clean_items([{"kind": "riser"}, {"kind": "couch"}, {"kind": "table"}])
+    assert [i["kind"] for i in items] == ["riser", "couch"]
+    try:
+        fu.clean_item({"kind": "table"})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown kind accepted")
+
+
+def test_riser_height_and_note():
+    r = room(riser(), couch())
+    assert fu.riser_at(r, 2.0, 5.0) == 0.2 and fu.riser_at(r, 2.0, 2.0) == 0.0 and fu.riser_at(r, 4.5, 5.0) == 0.0
+    assert fu.riser_at(room(riser(rotation=90)), 2.0 + 0.5, 5.0 + 1.5) == 0.2       # turned: 1.2 along x, 4.0 along y
+    assert "riser" in fu.riser_note(r, {"name": "MLP", "x_m": 2.0, "y_m": 5.0, "z_m": 0.8})
+    assert fu.riser_note(r, {"name": "MLP", "x_m": 2.0, "y_m": 5.0, "z_m": 1.0}) is None      # already includes the riser
+    assert fu.riser_note(r, {"name": "MLP", "x_m": 2.0, "y_m": 1.0, "z_m": 1.0}) is None
+    assert fu.couches(r) and len(fu.couches(r)) == 1                                 # a riser is not a couch
+
+
+def test_riser_does_not_change_the_rt60_estimate():
+    assert fu.room_rt60(room(riser()))["mid_s"] == fu.room_rt60(room())["mid_s"]
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

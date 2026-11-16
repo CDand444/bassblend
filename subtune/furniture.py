@@ -14,6 +14,9 @@ WALLS = ("front", "back", "left", "right")
 ROTATIONS = (0, 90, 180, 270)
 MAX_ITEMS = 12
 LIMITS = {"length_m": (0.6, 4.5), "depth_m": (0.6, 1.4), "seat_h_m": (0.3, 0.6), "back_h_m": (0.6, 1.3)}
+# a riser is a low platform the seats stand on: width across the room, depth front to back, height of its top
+RISER_LIMITS = {"length_m": (0.6, 8.0), "depth_m": (0.6, 4.0), "height_m": (0.05, 0.6)}
+KINDS = ("couch", "riser")
 
 # absorption coefficient per octave band (BANDS_HZ), per m2 of the couch's surface
 FABRICS = {
@@ -45,7 +48,10 @@ def _clamp(v, lo, hi, default):
 
 
 def clean_item(d: dict, n: int = 1) -> dict:
-    """One couch, cleaned. Numbers are clamped into their limits; a rotation other than 0/90/180/270 is an error."""
+    """One couch or riser, cleaned. Numbers are clamped into their limits; a rotation other than 0/90/180/270 is an error."""
+    kind = d.get("kind", "couch")
+    if kind not in KINDS:
+        raise ValueError(f"furniture kind must be one of {KINDS}")
     rot = d.get("rotation", 0)
     try:
         rot = int(rot)
@@ -53,15 +59,16 @@ def clean_item(d: dict, n: int = 1) -> dict:
         raise ValueError(f"couch rotation must be one of {ROTATIONS}")
     if rot not in ROTATIONS:
         raise ValueError(f"couch rotation must be one of {ROTATIONS}")
-    out = {"id": str(d.get("id") or f"couch-{n}")[:40], "kind": "couch",
-           "name": str(d.get("name") or f"Couch {n}")[:40]}
+    out = {"id": str(d.get("id") or f"{kind}-{n}")[:40], "kind": kind,
+           "name": str(d.get("name") or f"{kind.capitalize()} {n}")[:40]}
     for k in ("x_m", "y_m"):
         v = d.get(k)
         out[k] = None if v in (None, "") else _clamp(v, 0, 50, None)
-    for k, (lo, hi) in LIMITS.items():
+    for k, (lo, hi) in (RISER_LIMITS if kind == "riser" else LIMITS).items():
         out[k] = _clamp(d.get(k), lo, hi, lo)
-    fab = str(d.get("fabric") or "").lower()
-    out["fabric"] = fab if fab in FABRICS else DEFAULT_FABRIC
+    if kind == "couch":
+        fab = str(d.get("fabric") or "").lower()
+        out["fabric"] = fab if fab in FABRICS else DEFAULT_FABRIC
     out["rotation"] = rot
     out["against_wall"] = d.get("against_wall") if d.get("against_wall") in WALLS else None
     out["notes"] = str(d.get("notes") or "")[:300]
@@ -69,14 +76,14 @@ def clean_item(d: dict, n: int = 1) -> dict:
 
 
 def clean_items(items) -> list[dict]:
-    """The room's furniture list: only couches, at most MAX_ITEMS, ids made unique."""
+    """The room's furniture list: couches and risers (other kinds are dropped), at most MAX_ITEMS, ids made unique."""
     out, seen = [], set()
     for d in (items or []):
-        if not isinstance(d, dict) or d.get("kind", "couch") != "couch" or len(out) >= MAX_ITEMS:
+        if not isinstance(d, dict) or d.get("kind", "couch") not in KINDS or len(out) >= MAX_ITEMS:
             continue
         it = clean_item(d, len(out) + 1)
         while it["id"] in seen:
-            it["id"] = f"couch-{len(out) + 1}-{len(seen)}"
+            it["id"] = f"{it['kind']}-{len(out) + 1}-{len(seen)}"
         seen.add(it["id"])
         out.append(it)
     return out
@@ -84,6 +91,36 @@ def clean_items(items) -> list[dict]:
 
 def couches(room: dict) -> list[dict]:
     return [i for i in (room.get("furniture") or []) if i.get("kind") == "couch"]
+
+
+def risers(room: dict) -> list[dict]:
+    return [i for i in (room.get("furniture") or []) if i.get("kind") == "riser"]
+
+
+def riser_at(room: dict, x: float, y: float) -> float:
+    """Height (m) of the tallest riser under the floor point (x, y); 0 when there is none."""
+    best = 0.0
+    for r in risers(room):
+        if r["x_m"] is None or r["y_m"] is None:
+            continue
+        u, v = _uv(x - r["x_m"], y - r["y_m"], *_DIR[r["rotation"]])
+        if abs(u) <= r["length_m"] / 2 and abs(v) <= r["depth_m"] / 2:
+            best = max(best, r["height_m"])
+    return best
+
+
+def riser_note(room: dict, seat: dict) -> str | None:
+    """A reminder when a seat stands on a riser: ear height counts from the floor, not from the riser."""
+    if seat.get("x_m") is None or seat.get("y_m") is None:
+        return None
+    h = riser_at(room, seat["x_m"], seat["y_m"])
+    if not h:
+        return None
+    z = seat.get("z_m")
+    if z is not None and z >= h + 0.7:
+        return None                                    # the ear height already includes the riser
+    return (f"{seat.get('name') or 'This seat'} stands on a {h / 0.3048:.1f} ft riser. Ear height is measured from the floor, so it "
+            f"should be the riser plus sitting height (about {(h + 0.95) / 0.3048:.1f} ft).")
 
 
 def surface_area_m2(item: dict) -> float:
