@@ -5,6 +5,7 @@ are updated to reflect the new orientation.
 """
 
 import copy
+import math
 
 from subtune import shape
 
@@ -104,6 +105,88 @@ def transform_room(room: dict, op: str) -> dict:
     if op in ("cw", "ccw"):
         # Swap width and length
         rm["width_m"], rm["length_m"] = rm["length_m"], rm["width_m"]
+
+    # Handle ceiling turn if present
+    if isinstance(rm.get("ceiling"), dict):
+        ceiling = rm["ceiling"]
+        if "low_side" in ceiling:
+            low_side = ceiling["low_side"]
+            if op == "cw":
+                mapping = {"front": "right", "right": "back", "back": "left", "left": "front"}
+                ceiling["low_side"] = mapping[low_side]
+            elif op == "ccw":
+                mapping = {"front": "left", "left": "back", "back": "right", "right": "front"}
+                ceiling["low_side"] = mapping[low_side]
+            elif op == "180":
+                mapping = {"front": "back", "back": "front", "left": "right", "right": "left"}
+                ceiling["low_side"] = mapping[low_side]
+            elif op == "mirror":
+                ceiling["low_side"] = low_side  # mirror doesn't change low_side direction
+
+        # Handle ridge turn for vault ceilings
+        if "ridge" in ceiling:
+            ridge = ceiling["ridge"]
+            if op in ("cw", "ccw") and ridge == "length":
+                ceiling["ridge"] = "width"
+            elif op in ("cw", "ccw") and ridge == "width":
+                ceiling["ridge"] = "length"
+            elif op == "180":  # 180 doesn't change ridge
+                pass
+            # mirror also doesn't change ridge for vault ceilings
+
+    # Handle openings turn if present
+    if "wall_openings" in rm and rm["wall_openings"] is not None:
+        openings = rm["wall_openings"]
+
+        # Determine which case we're in: use stored outline (not shape.outline)
+        stored_outline = rm.get("outline")
+
+        new_openings = []
+        for opening in openings:
+            wall = opening.get("wall")
+            if wall is not None:
+                # Apply transformation based on operation
+                if stored_outline is not None:
+                    # Case A: outline present
+                    if op == "mirror":
+                        n = len(stored_outline)
+                        new_wall = (n - 2 - wall) % n
+                        # Adjust from_m for mirror operation using old edge length
+                        if "from_m" in opening and "width_m" in opening:
+                            # Calculate the OLD edge length before transformation
+                            old_edge_length = math.dist(stored_outline[wall], stored_outline[(wall + 1) % len(stored_outline)])
+                            opening["from_m"] = old_edge_length - opening["from_m"] - opening["width_m"]
+                    else:
+                        # For cw, ccw, 180: no changes to wall or from_m (outline points keep their order)
+                        new_wall = wall
+                else:
+                    # Case B: outline None (plain rectangle)
+                    if op == "cw":
+                        new_wall = (wall + 1) % 4
+                    elif op == "ccw":
+                        new_wall = (wall + 3) % 4
+                    elif op == "180":
+                        new_wall = (wall + 2) % 4
+                    elif op == "mirror":
+                        # For mirror: map 0->0, 1->3, 2->2, 3->1
+                        mapping = {0: 0, 1: 3, 2: 2, 3: 1}
+                        new_wall = mapping[wall]
+                        # Adjust from_m for mirror operation using old dimensions
+                        if "from_m" in opening and "width_m" in opening:
+                            # Get the OLD room dimensions (before any transformation)
+                            old_width = room["room"].get("width_m", 0.0)
+                            old_length = room["room"].get("length_m", 0.0)
+                            # Determine edge length based on wall index
+                            old_edge_length = old_length if wall in (1, 3) else old_width
+                            opening["from_m"] = old_edge_length - opening["from_m"] - opening["width_m"]
+
+                opening["wall"] = new_wall
+                new_openings.append(opening)
+            else:
+                # Keep openings without wall index unchanged
+                new_openings.append(opening)
+
+        rm["wall_openings"] = new_openings
 
     # Reverse outline point order for mirror operation
     if op == "mirror" and "outline" in rm and rm["outline"] is not None:
