@@ -51,7 +51,9 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
 - `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 8 parts, loaded in order as
   classic scripts sharing globals: core, tune, room-ai, receiver, measure, setup-home, liveeq, nav; plus
   `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
-  `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`
+  `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`.
+  Shared globals mean a top-level name declared in two parts makes the browser drop the later file entirely
+  (a per-file parse check can't see it): `tests/test_js_globals.py` catches that and duplicate ids.
 - `tests/test_*.py`: offline, no hardware, no sound; each file runs on its own
 - `deploy/`: `push-update.sh` (OTA to the Pi), `linux/` (install, updater), `pi-gen/` (SD image),
   `windows/` (PyInstaller spec + launcher + Inno Setup script; built by `.github/workflows/release.yml` on v* tags)
@@ -59,6 +61,11 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
 ## Commands
 - Tests (Windows): `& "$env:LOCALAPPDATA\subtune-venv\Scripts\python.exe" tests\test_X.py`.
   Always run `tests/test_compile.py` before deploying: the Pi refuses code that doesn't import.
+- Checks on GitHub (`.github/workflows/ci.yml`, every push to main and before every release, which only
+  builds when they pass): pyflakes, all offline tests on Linux/Python 3.13 and Windows/3.12, and
+  `tests/browser_check.py` (every page in headless Chromium with real reloads; locally needs
+  `pip install playwright` + `python -m playwright install chromium`). `tests/test_no_personal_info.py`
+  enforces the no-personal-info rule.
 - Deploy to the Pi: `bash deploy/push-update.sh` (sends tracked + new files, restarts, rolls back
   if it fails). The owner does the real testing on the Pi; local preview isn't needed unless a
   change can only be checked in a browser (e.g. the JS split).

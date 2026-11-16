@@ -186,6 +186,11 @@ def cmd_apply(a):
     else:                                                   # the current optimiser result
         r = json.loads((DATA / "result.json").read_text())
         name = None
+    from .subouts import check_apply
+    try:
+        check_apply(r, s)                                   # never drive a sub output the owner removed
+    except ValueError as e:
+        sys.exit(str(e))
     slot0 = (a.slot - 1) if a.slot else s["preset"]
     if not 0 <= slot0 <= 3:
         sys.exit("slot must be 1-4")

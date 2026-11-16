@@ -167,6 +167,34 @@ def test_save_writes_the_room_and_journals_it():
         raise AssertionError("a broken plan isn't saved")
 
 
+def test_floor_plan_upload_reaches_the_ai_with_its_rules():
+    assert "floor plan" in builder.LABELS
+    assert "Floor plans:" in builder.SYSTEM and "written on it" in builder.SYSTEM and "rotate the room" in builder.SYSTEM
+    old = ai.key_source, ai.vision
+    try:
+        ai.key_source, ai.vision = (lambda p=None: "saved"), fake_vision
+        r = builder.analyze({}, "", [{"data": PNG_DOT, "label": "floor plan", "note": "the den, bottom left"}])
+        assert r["proposal"]["outline_ft"] and "1: floor plan (the den, bottom left)" in CALLS[-1]["text"]
+        assert CALLS[-1]["images"][0][0] == "image/jpeg"
+    finally:
+        ai.key_source, ai.vision = old
+    page = (pathlib.Path(__file__).resolve().parents[1] / "subtune" / "web" / "build.html").read_text(encoding="utf-8")
+    assert 'id="plan"' in page and "Upload floor plan" in page and "'floor plan'" in page
+    js = (pathlib.Path(__file__).resolve().parents[1] / "subtune" / "web" / "js" / "room-ai.js").read_text(encoding="utf-8")
+    assert 'href="/build"' in js, "the dashboard can open the builder on the computer itself"
+
+
+def test_dashboard_reads_a_floor_plan_into_the_editor_unsaved():
+    root = pathlib.Path(__file__).resolve().parents[1] / "subtune" / "web"
+    assert 'id="planUpload"' in (root / "index.html").read_text(encoding="utf-8")
+    js = (root / "js" / "room-ai.js").read_text(encoding="utf-8")
+    i = js.index("function applyPlanReading")
+    body = js[i:js.index("\n}\n", i)]
+    assert "'/api/build/analyze'" in js and "label: 'floor plan'" in js
+    assert "/api/build/save" not in body and "/api/room" not in body, "the reading only fills the editor; Save stays the owner's"
+    assert "planUndo" in body and "Not saved yet" in body
+
+
 def test_touch_icon_is_a_png():
     b = builder.touch_icon(60)
     assert b[:8] == b"\x89PNG\r\n\x1a\n" and b"IHDR" in b and b"IEND" in b

@@ -18,7 +18,7 @@ from scipy.ndimage import uniform_filter1d
 from scipy.optimize import differential_evolution, least_squares
 
 from .audio import GRID, PPO, smooth_db
-from .biquad import peaking, response, to_minidsp, peq_chain_response
+from .biquad import peaking, to_minidsp, peq_chain_response
 from .config import DATA, DSP_FS, PEQ_BANDS, load_settings
 from .state import event, update_state
 
@@ -317,7 +317,6 @@ def optimise(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
     indiv_db = np.stack([20 * np.log10(np.abs(peq_chain_response(indiv[i], GRID[m]))) for i in range(S)])
     glob = fit_global_peq(GRID[m], avg[m], target_curve(GRID[m], s), nG, s["max_boost_db"],
                           None if seat_std is None else seat_std[m], sub_allow(GRID[m], s, nearfield), indiv_db)
-    G = peq_chain_response(glob, GRID)
     log("opt", f"stage 3: {len(glob)} shared PEQ bands")
 
     # ------------------------------------------------------------ finalise

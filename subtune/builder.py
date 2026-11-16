@@ -172,10 +172,12 @@ the ceiling, and estimate sizes in photos from known objects (doors about 6 ft 8
 outlets 1 ft up, ceilings usually 8 ft) only when nothing was measured. Never invent precision: round to 0.5 ft \
 for estimates and say what you estimated in assumptions. When something important is unclear (which wall the \
 screen is on, how deep an alcove is), make your best guess AND ask in questions (short, concrete, at most 4). \
-If a previous plan and the owner's corrections are given, apply the corrections and keep everything else."""
+If a previous plan and the owner's corrections are given, apply the corrections and keep everything else.
+
+Floor plans: an image labelled "floor plan" is a drawing, scan or screenshot of the room seen from above (an architect's or estate agent's plan, a sketch, an app export). Take the outline, the doors, openings and windows from it, and the sizes written on it (convert metres to feet); its scale comes from those written sizes, so measure the rest in proportion. It beats estimates from photos; only the owner's typed measurements and notes beat it. If the plan shows more than this room, use the room the notes name (or the one with the TV or screen) and ask if unsure. Plans often have north at the top, not the screen: rotate the room so the screen wall is the front (y 0) and say so in assumptions."""
 
 LABELS = ("front wall (screen)", "left wall", "right wall", "back wall", "corner", "ceiling", "opening / doorway",
-          "other")
+          "floor plan", "other")
 
 
 def _photos(photos) -> list[tuple[str, str]]:
@@ -253,7 +255,7 @@ def analyze(dims: dict, notes: str, photos: list, previous: dict | None = None, 
     if ai.key_source() is None:
         raise RuntimeError("the room builder needs the AI assistant: add an AI key on the dashboard (Tools → AI analysis)")
     if not photos and not (notes or "").strip() and not previous:
-        raise ValueError("add some photos or describe the room first")
+        raise ValueError("add some photos or a floor plan, or describe the room first")
     imgs = _photos(photos)
     assistant.spend_ai_call()
     r = ai.vision(SYSTEM, prompt(dims or {}, notes or "", photos or [], previous, correction), imgs, SCHEMA)

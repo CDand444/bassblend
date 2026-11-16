@@ -15,6 +15,7 @@ from . import audio
 from .config import AUDIO_FS as FS
 
 DECAY_BANDS = [20, 25, 31.5, 40, 50, 63, 80, 100, 125]
+TRAPS_WORK_HZ = 40              # below this, bass traps do little (same rule as limits.py and the treatment planner)
 THD_FREQS = [25, 31.5, 40, 50, 63, 80, 100]
 
 
@@ -152,7 +153,8 @@ def verdicts(r):
                         (f"Tight: bass notes stop within about {med:.1f} s." if s == "good" else
                          f"Mostly tight (about {med:.1f} s), but notes around {worst['f']:g} Hz hang on for {w:.1f} s." if s == "warn" else
                          f"Boomy around {worst['f']:g} Hz: notes ring for {w:.1f} s. That's a room resonance; "
-                         "sub placement or bass traps help most.") + extra)
+                         + ("sub placement or bass traps help most." if worst["f"] >= TRAPS_WORK_HZ else
+                            "sub placement helps most (bass traps would have to be enormous to work this low).")) + extra)
     snr = r["snr_db"]
     clip = r["peak_dbfs"] > -3
     out["quality"] = ("bad" if clip or snr < 20 else "warn" if snr < 30 else "good",

@@ -87,6 +87,9 @@ otherwise: read data, explain, plan, simulate offline, review settings, prepare 
 plan. Don't propose tools that play sound; mention what you'd measure next time instead.
 Night mode (set_night_mode) is different: it cuts all bass from the subs. Offer it when the owner wants no \
 bass at all (late films, sleeping neighbours); while it's on, sound tests are refused.
+A sub that is gone for good or unplugged (sold, moved to another room): set_sub_output remove takes its output \
+out of the sub list without touching the miniDSP; then optimise again from the other subs' measurements. Muting \
+that output on the miniDSP is a separate step (set_sub_output mute): ask before offering both.
 
 ## Automation (get_overview -> automation)
 htTamer can switch the miniDSP slot by itself when the receiver's input or listening mode changes, keep the \
@@ -285,6 +288,16 @@ TOOLS = [
     _t("set_night_mode", "Night mode: on = cut ALL bass from the subs (the miniDSP's master mute; no slot is written), "
        "off = the subs play again. Sound tests are refused while it's on. get_overview -> automation shows it.",
        {"on": {"type": "boolean"}}, ["on"], approval=True),
+    _t("set_sub_output", "Take a miniDSP output out of the sub list (sub unplugged, sold or moved), put one back, or mute "
+       "a removed one on the miniDSP. remove/add write nothing to the miniDSP; tunes made with a removed output go "
+       "stale (apply is refused) until it is back or a new tune is optimised from the remaining subs' measurements. "
+       "mute writes one output mute to htTamer's slot, only while that slot plays (never slot 1). Ask the owner "
+       "whether they only want to stop using it or also mute it.",
+       {"action": {"type": "string", "enum": ["remove", "add", "mute"]},
+        "output": {"type": "integer", "description": "1-based miniDSP output"},
+        "forget": {"type": "boolean", "description": "remove only: also delete its Room & subs details (sold); "
+                   "default keeps them (unplugged, may come back)"}},
+       ["action", "output"], approval=True),
     _t("run_checkup", "20-second health check at a mic spot: room noise, distortion, bass ringing per band, "
        "measurement quality. Plays one sweep through the subs.", {"pos": SPOT}, ["pos"], approval=True),
     _t("run_verify", "One sweep with all subs at a mic spot, compared with what the playing tune predicted.",
@@ -489,6 +502,11 @@ DESCRIBE = {
     "apply_tune": lambda i: f"Write tune {i.get('tune_name', i['tune_id'])} to miniDSP slot {i['slot']}"
                             + (" (your ORIGINAL setup!)" if i["slot"] == 1 else ""),
     "switch_slot": lambda i: f"Switch the miniDSP to slot {i['slot']}",
+    "set_sub_output": lambda i: {"remove": f"Stop using output {i['output']} as a sub (nothing written to the miniDSP"
+                                           + ("; its room details are deleted)" if i.get("forget") else ")"),
+                                 "add": f"Use output {i['output']} as a sub again (nothing written to the miniDSP)",
+                                 "mute": f"Mute output {i['output']} on the miniDSP (htTamer's slot only)"}.get(
+                                     i.get("action"), f"Change sub output {i['output']}"),
     "set_night_mode": lambda i: ("Night mode ON: mute the subs completely (no bass from them)" if i["on"]
                                  else "Night mode OFF: the subs play again"),
     "run_checkup": lambda i: f"Run a check-up at spot {i['pos']} (one sweep through the subs)",
@@ -752,7 +770,7 @@ def _brief(name, inp, out):
     label = {"get_overview": "Looked at the current state", "list_tunes": "Read the saved tunes",
              "simulate_tune": "Tried a tune offline", "save_simulation": "Saved the trial tune",
              "set_target_settings": "Changed the tuning target", "apply_tune": "Applied a tune",
-             "switch_slot": "Switched slot", "set_night_mode": "Changed night mode", "run_checkup": "Ran a check-up", "run_verify": "Verified",
+             "switch_slot": "Switched slot", "set_sub_output": "Changed the sub outputs", "set_night_mode": "Changed night mode", "run_checkup": "Ran a check-up", "run_verify": "Verified",
              "level_match": "Compared sub levels", "test_tone": "Played a test tone",
              "start_autotune": "Started auto-tune", "avr_status": "Checked the receiver",
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",

@@ -75,9 +75,10 @@ def test_token_is_validated_and_kept_private():
 
 
 def test_dev_copy_doesnt_self_update():
-    assert update.mode() == "dev"
     import subtune
-    real = subtune.version
+    real, real_updater = subtune.version, update.PI_UPDATER
+    update.PI_UPDATER = pathlib.Path(TMP) / "no-such-updater"   # a developer copy, even when run on a Pi
+    assert update.mode() == "dev"
     update.configure("someone/htTamer", None)
     update._req_saved = update._req
     try:
@@ -90,6 +91,7 @@ def test_dev_copy_doesnt_self_update():
     finally:
         update._req = update._req_saved
         subtune.version = real
+        update.PI_UPDATER = real_updater
 
 
 def test_check_gives_up_after_the_deadline():
@@ -122,6 +124,32 @@ def test_installed_update_isnt_offered_again():
         assert update.last_check(last)["newer"]
     finally:
         subtune.version = real
+
+
+def test_hardware_check_after_an_update():
+    import subtune
+    from subtune import server, smoke
+    from subtune.state import load_state
+    real = (update.mode, smoke.run, subtune.version, server._system_busy)
+    runs, waits, busy = [], [], [True, False]
+    try:
+        update.mode = lambda: "pi"
+        subtune.version = lambda: "v0.9.9"
+        smoke.run = lambda mic_busy=False: runs.append(1) or {"status": "warn", "checks": [
+            {"name": "miniDSP", "status": "ok", "detail": "answers"}, {"name": "Mic", "status": "warn", "detail": "quiet"}]}
+        server._system_busy = lambda: busy.pop(0) if busy else False
+        rec = server.post_update_check(wait=waits.append, now=lambda: 1000.0)
+        assert rec["version"] == "v0.9.9" and rec["status"] == "warn" and len(runs) == 1
+        assert waits[0] == server.POST_UPDATE_DELAY_S and 60 in waits, "waited for the job that was running"
+        assert load_state()["post_update"]["checks"][1]["name"] == "Mic"
+        assert server.post_update_check(wait=waits.append) is None and len(runs) == 1, "once per version"
+        subtune.version = lambda: "v1.0.0"
+        assert server.post_update_check(wait=lambda s: None)["version"] == "v1.0.0" and len(runs) == 2
+        update.mode = lambda: "dev"
+        subtune.version = lambda: "v1.0.1"
+        assert server.post_update_check(wait=lambda s: None) is None and len(runs) == 2, "not on a developer copy"
+    finally:
+        update.mode, smoke.run, subtune.version, server._system_busy = real
 
 
 if __name__ == "__main__":

@@ -451,6 +451,13 @@ async function loadUpdates() {
   else if (L && L.newer) h += `<div class="notice"><b>htTamer ${esc(L.latest)} is available</b> (you have ${esc(L.current)}).${L.notes ? `<div class="md small" style="margin-top:6px;max-height:180px;overflow:auto">${md(L.notes)}</div>` : ''}</div>`;
   else if (L && L.latest) h += `<p><span style="color:var(--good)">✓</span> Up to date: ${esc(L.current)} (latest release ${esc(L.latest)}).</p>`;
   if (UPD.mode !== 'dev') h += `<div class="row" style="margin-top:10px"><button class="btn" id="updCheck">Check now</button>${L && L.newer ? `<button class="btn primary" id="updInstall" ${busy ? 'disabled title="Wait for the current step to finish"' : ''}>Install ${esc(L.latest)}</button>` : ''}<span class="muted small">${L && L.t ? 'Checked ' + new Date(L.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}) : ''}</span></div>`;
+  const pu = UPD.post_update;
+  if (pu && pu.version === UPD.current) {
+    const ic = {ok: '✓', warn: '!', fail: '✕', skip: '–'};
+    h += `<div class="notice ${pu.status === 'ok' ? '' : pu.status === 'fail' ? 'bad' : 'warn'}" style="margin-top:10px"><b>${pu.status === 'ok' ? '✓ After the update, everything answers' : 'After the update, check this'}</b>
+      <span class="muted small">(silent hardware check, ${new Date(pu.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})})</span>
+      <div class="small">${(pu.checks || []).map(c => `${ic[c.status] || ''} ${esc(c.name)}: ${esc(c.detail)}`).join('<br>')}</div></div>`;
+  }
   if (UPD.mode === 'pi' && UPD.result) h += `<details style="margin-top:10px"><summary class="small">Last update on this Pi</summary><pre class="small" style="white-space:pre-wrap">${esc(UPD.result)}</pre></details>`;
   $('#updOut').innerHTML = h;
   $('#updSetup').hidden = UPD.mode === 'dev';

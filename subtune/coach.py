@@ -13,7 +13,6 @@ chat about it).
 """
 from __future__ import annotations
 
-import time
 
 AREAS = ("setup", "safety", "hardware", "tune", "blend", "receiver", "dirac", "verify", "listen")
 
@@ -26,6 +25,23 @@ def _mode():
         return "hdmi" if hdmi_port() and load_settings().get("avr_pi_input") in HDMI_INPUTS else "dlna"
     except Exception:
         return "dlna"
+
+
+def tuning_limits(st: dict, settings: dict, room: dict | None = None) -> dict | None:
+    """What limits the playing (or last optimized) tune; see limits.py."""
+    from . import limits
+    from .room import modal_report
+    res = st.get("result")
+    if not res:
+        return None
+    modes = None
+    try:
+        modes = modal_report(room, 200) if room else None
+    except Exception:                               # noqa: BLE001
+        pass
+    ck = (st.get("checkups") or [None])[-1]
+    measured = ((st.get("verify") or {}).get("after") or {}).get("1")   # cleared when another tune is applied
+    return limits.assess(res, settings, modes, ck, measured)
 
 
 def _step(rank, sid, area, title, why, who="bassblend", sound=False, open=None, tool=None, inp=None, ask=None):
@@ -56,6 +72,13 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
     if not sub_outs:
         out.append(_step(2, "subs", "setup", "Tell htTamer which outputs drive subs", "Nothing can be tuned until it knows.",
                          who="owner", open="setup"))
+    gone = sorted(int(x["output"]) + 1 for x in res.get("subs") or [] if sub_outs and int(x["output"]) not in sub_outs)
+    if gone:
+        outs = ", ".join(map(str, gone))
+        out.append(_step(2, "removed_sub", "tune", f"Re-tune without output {outs}",
+                         f"The playing tune was made with output {outs}, which you removed from the subs. Optimise again: "
+                         "the other subs' measurements still count. Until then the miniDSP still drives that output.",
+                         open="tune"))
     if live_dsp is not None and not live_dsp.get("master"):
         out.append(_step(3, "dsp", "setup", "Reconnect the miniDSP", "It isn't answering over USB.", who="owner", open="setup"))
 
@@ -214,6 +237,16 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
             out.append(_step(5, "limiters", "safety", "Set the protective limiters",
                              "The headroom test found where your subs start to strain. A limiter just below that protects them; "
                              "normal listening never reaches it. No sound.", open="headroom"))
+    except Exception:                               # noqa: BLE001 - advice must never break the plan
+        pass
+    try:
+        lim = tuning_limits(st, settings, room)
+        if lim and lim["grade"] != "good" and lim["tips"]:
+            t0 = lim["tips"][0]
+            out.append(_step(6 if lim["grade"] == "poor" else 12, "limits", "tune",
+                             "The room limits this tune: " + t0["title"].lower(),
+                             lim["summary"] + " " + t0["why"], who="owner", open=t0["page"], tool=t0.get("tool"),
+                             ask="The tune isn't as good as it could be. What's limiting it, and what should I change first?"))
     except Exception:                               # noqa: BLE001 - advice must never break the plan
         pass
     if not st.get("checkups"):

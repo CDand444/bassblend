@@ -35,7 +35,7 @@
   <li><b>Start low.</b> Begin with the receiver volume low. The automatic level setting never goes above its ceiling (70 at most) and always puts your volume back afterwards, but you are responsible for what your system can take.</li>
   <li><b>Stay safe during loud tests.</b> The sub headroom test plays loud bass on purpose. Keep people and pets out of the room, and press <b>Stop</b> at the first sign of strain: distortion, rattling, chuffing ports, or a smell of heat.</li>
   <li><b>Check results by ear.</b> Settings are calculated from measurements and can be wrong (a moved mic, a noisy room, a cable on the wrong input). Listen before you rely on a change.</li>
-  <li><b>Your original stays put.</b> htTamer never writes miniDSP slot 1, so your own setup is always one switch away.</li>
+  <li><b>Your original stays put.</b> Tuning, tests and the assistant never write miniDSP slot 1, so your own setup is always one switch away. Only you can overwrite it, on the Saved tunes page, after a warning you have to confirm.</li>
   <li><b>Not affiliated.</b> htTamer isn't made, endorsed or supported by Onkyo, Denon, Marantz, JBL, miniDSP, Dirac or any other company whose products it works with.</li>
 </ul>
 <p>The first time htTamer opens on a device it shows these terms and won't change anything until they're accepted. Pages that play sound or write the miniDSP carry a reminder at the top.</p>
@@ -61,7 +61,7 @@
 <p>Work down <b>Setup → Checklist</b>. Each line turns green when it's done.</p>
 <ol>
   <li><b>Mic calibration</b>: upload your UMIK-1's calibration file (the one for its serial number). Every measurement uses it.</li>
-  <li><b>miniDSP</b>: connected over USB to the Pi. htTamer owns one slot (slot 3 here). <b>Slot 1 keeps your original setup and htTamer never writes to it.</b></li>
+  <li><b>miniDSP</b>: connected over USB to the Pi. htTamer owns one slot (slot 3 here). <b>Slot 1 keeps your original setup: htTamer never writes it unless you choose to overwrite it on the Saved tunes page and confirm.</b></li>
   <li><b>Receiver</b>: its network address, so htTamer can switch inputs, set the test volume and read the sub level. The Receiver page also shows <b>what the receiver reports about itself</b>: whether it has a sub, each speaker's size (Small/Large), where the height speakers are, the crossover, the sub and center levels, the signal playing now and the model/firmware. htTamer checks that against your records (for example, the layout or a speaker set to Large) and can copy the sizes onto the Speakers page. The receiver can't report <b>speaker distances, per-speaker levels or per-speaker crossovers</b> over the network. Copy them from its Speaker Setup menu onto the Speakers page, and htTamer compares the distances with where the speakers actually are.</li>
   <li><b>Room and subs</b>: the room size (and its <a href="#m-shape">shape</a> if it isn't a rectangle), your seats, and each sub's model and knob settings (ports, EQ mode, Q). Some sub modes forbid EQ boost below a frequency. htTamer obeys that everywhere.</li>
   <li><b>Speakers</b>: the model and position of each speaker. This doesn't change tuning, but the assistant uses it for advice.</li>
@@ -77,10 +77,12 @@
 </ul>
 <p>What uses the real shape: the first-reflection points and treatment zones land on your actual walls (a wall in the way, such as an L's inside corner, blocks a reflection), the bass-trap corners are the room's real outside corners, the back wall is the one straight behind the seats, and the suggested Dolby speaker spots are on real walls inside the room. <b>Room modes</b> are only exact for a box. For any other shape htTamer calculates them for the room's main box (the biggest rectangle inside it), marks them <b>estimate</b>, and lists rough extra modes from the rest of the room (dashed, with ~). Openings and sloped ceilings get a note too. Your measurements (check-up, system report) show the real modes.</p>
 <h3 id="m-builder">Build it with your phone</h3>
-<p>Press <b>Build with your phone</b> above the room plan and scan the QR code with your phone's camera (the phone must be on the same Wi-Fi as htTamer). The code signs that phone in once and works for 10 minutes. On the phone:</p>
+<p><b>Floor plan on this computer?</b> Press <b>Upload floor plan</b> above the room plan, pick the image (for a PDF, a screenshot of the page), say which room it is if the plan shows more, and press <b>Read the plan</b>. The AI's reading fills in the shape, openings and sizes in the editor here, <b>not saved</b>: check it in the plan or 3D view, adjust, place the seats and press Save, or press Undo. Sizes you've typed win over the plan; one AI request.</p>
+<p>Press <b>Build with your phone</b> above the room plan and scan the QR code (or, to upload a floor plan file that's on your computer, use <b>Open the room builder on this computer</b> under the code) with your phone's camera (the phone must be on the same Wi-Fi as htTamer). The code signs that phone in once and works for 10 minutes. On the phone:</p>
 <ol>
   <li>Type the overall <b>length, width and height</b> (feet, the height at its highest) and <b>notes</b> on anything that isn't a box: an L, an alcove, an opening to the kitchen, a sloping ceiling.</li>
-  <li>Add <b>photos</b> (up to 8): stand in a corner and photograph the opposite wall, corner by corner, plus the openings and the ceiling if it slopes. Say which wall each photo shows; the screen wall is the front.</li>
+  <li>Have a <b>floor plan</b>? Press <b>Upload floor plan</b>: an architect's or estate agent's plan, a sketch with sizes, or a screenshot from a floor plan app (for a PDF, take a screenshot of the page). The AI takes the shape, the doors and openings and the sizes written on it, turns the plan so the screen wall is the front, and says so. If the plan shows the whole house, say in the notes which room it is. Your typed sizes still win.</li>
+  <li>Add <b>photos</b> (up to 8, together with the plan): stand in a corner and photograph the opposite wall, corner by corner, plus the openings and the ceiling if it slopes. Say which wall each photo shows; the screen wall is the front.</li>
   <li>Press <b>Build my room with AI</b>. Your AI assistant reads the photos, sizes and notes and draws the room: turn it around in <b>3D</b> (drag, pinch to zoom) or see the <b>2D plan</b> with wall numbers. It lists what it assumed and what you should check.</li>
   <li>If something is off, tell it ("the alcove is 4 ft deep") and press <b>Rebuild</b>. When it looks right, press <b>Save to htTamer</b>. Nothing is saved before that.</li>
 </ol>
@@ -96,6 +98,13 @@
   <li><b>Verify</b> plays one sweep with all subs on and compares the real result with what was expected. Within about 1 dB means the tune works as planned.</li>
 </ol>
 <p>The <b>Result</b> chart shows "how it was" (measured), "expected after" (dashed) and "actual after" (verified). The shaded band is the range being tuned.</p>
+
+<p><b>When the result isn't great.</b> Under the result, htTamer says what limits the tune when it is only fair or poor, and what would help most, with a link to the right page. EQ flattens peaks, but it can't fill a cancellation (a deep, narrow dip caused by the room), can't make seats in different spots sound alike, and can't shorten the room's ringing. So the advice is often physical: try a sub in another place, move the main seat a little, add bass traps (from about 40 Hz up; below that only placement and EQ help), give the tune more EQ bands, or trim what's left with Live EQ. The edges of the tuned range are where the subs roll off, so they aren't counted as faults. The assistant sees the same assessment.</p>
+
+<h3 id="m-removesub">Removing a sub</h3>
+<p>Unplugged a sub, sold it or moved it to another room? On <b>Room &amp; subs</b>, press <b>Remove this sub</b> on its output. htTamer stops using that output for a sub: auto-tune, the optimiser and the tests leave it out. You choose whether to keep its details (model, position, knobs) for when it comes back, or forget them. Removing it writes <b>nothing</b> to the miniDSP.</p>
+<p>Tunes made with that sub are marked <b>stale</b> in Tunes &amp; slots and can't be applied, because they would still drive it. Optimise again: each sub was measured on its own, so the other subs' measurements still count and no new sweeps are needed (re-measuring is better if you moved anything). Until a new tune is applied, the playing one still sends bass to that output. If that matters (a sub that is still plugged in, or an amplifier on that output), the sub's card offers <b>Mute it on the miniDSP</b>: one write to htTamer's slot, only while that slot is the one playing, never slot 1. Any new tune applied there keeps the output muted.</p>
+<p>Changed your mind? <b>Use for a sub</b> on the output's card puts it back; measure it before it gets a tune. The assistant can do all three too, after you approve.</p>
 
 <h2 id="m-blend">Blending subs and speakers</h2>
 <p>Even a perfect sub tune can fight the speakers around the crossover (typically 60-120 Hz). The <b>Blend test</b> plays sweeps through the receiver: the front speaker alone, then the subs together with it. It reports how much bass is lost where they cancel ("dB lost"); under 1 dB is great.</p>
@@ -233,7 +242,7 @@
 <p>Tools → Automation → <b>Home Assistant</b> connects htTamer to Home Assistant with its built-in RESTful integration, with no add-on to install. Press <b>Make a token</b>, add it to Home Assistant's <code>secrets.yaml</code> as shown, and paste the configuration under it into <code>configuration.yaml</code>. You get sensors for the playing slot, its tune, the receiver's sub level, night mode and the automatic slot, and actions to switch the slot, night mode and the automatic slot, ready for a "movie night" script or an automation. Every request needs the token, which only works for these few silent actions (it can't play tests or change tunes). Revoke it there at any time.</p>
 
 <h2 id="m-updates">Updates</h2>
-<p><b>Tools → Updates</b> keeps the Windows app and the Pi up to date from htTamer's public GitHub releases, with nothing to set up. htTamer checks once a day and pops up a note when a new version is out; <b>Install</b> does the rest. On Windows the app closes, updates and opens again; on the Pi the update is checked before it's used, and if the new version doesn't start the previous one comes back by itself. Settings, tunes and measurements are always kept. (Following a fork instead? Set its repository there; a private one also needs a read-only token.)</p>
+<p><b>Tools → Updates</b> keeps the Windows app and the Pi up to date from htTamer's public GitHub releases, with nothing to set up. htTamer checks once a day and pops up a note when a new version is out; <b>Install</b> does the rest. On Windows the app closes, updates and opens again; on the Pi the update is checked before it's used, and if the new version doesn't start the previous one comes back by itself. Settings, tunes and measurements are always kept. (Following a fork instead? Set its repository there; a private one also needs a read-only token.) A minute or two after an update (or the first start), htTamer runs its silent hardware check by itself, once per version, and shows under Updates whether the miniDSP, the receiver and the mic all answer, so a problem shows up straight away rather than at your next tuning session.</p>
 
 <h2 id="m-feedback">Bugs and feedback</h2>
 <p><b>Tools → Feedback</b> turns a bug report or an idea into a new issue on htTamer's GitHub page. Pick the kind, write what happened (or your idea) and press <b>Open on GitHub</b>: the issue opens already filled in, you check it, and you press <b>Submit new issue</b> there (a free GitHub account is needed). htTamer never sends anything by itself. <b>Include diagnostics</b> adds htTamer's version, Windows or Pi, the receiver model, the miniDSP slot and the latest errors from the activity log, with IP addresses, keys, e-mail addresses and names removed; open <b>See the diagnostics</b> to read exactly what's added, or copy them if they're too long for the link.</p>
@@ -241,7 +250,7 @@
 <h2 id="m-guards">Built-in safeguards</h2>
 <ul>
   <li>Nothing plays unless you start it (or approve it in the chat).</li>
-  <li>Slot 1 (your original setup) is never written.</li>
+  <li>Slot 1 (your original setup) is never written by tuning, tests or the assistant; only you can overwrite it, after confirming.</li>
   <li>The receiver volume is only raised by the guarded auto-level and is always put back.</li>
   <li>No EQ boost where a sub's port mode can be damaged, and the forbidden knob combinations are flagged on Home.</li>
   <li>Tests stop on overload (mic clipping or far above the test level).</li>

@@ -361,6 +361,7 @@ function renderTunes() {
         ${sl.map(n => `<span class="badge-slot">On slot ${n}${n === active ? ' · playing' : ''}</span>`).join('')}
         ${t.verified ? `<span class="badge-ok">✓ Verified (within ${t.verified.rms_db} dB)</span>` : ''}
         ${viewing ? '<span class="badge-view">On the graph</span>' : ''}
+        ${(t.removed_outputs || []).length ? `<span class="badge-view" title="Made with a sub output you removed: optimise again, or add it back on Room & subs">Stale: uses removed out ${t.removed_outputs.join(', ')}</span>` : ''}
         <span class="grow"></span><span class="when">${fmtWhen(t.t)}</span></div>
       ${t.notes ? `<p class="notes">${esc(t.notes)}</p>` : ''}
       <p class="muted small" style="margin:6px 0 0">${t.spots} mic spot${t.spots > 1 ? 's' : ''} · MLP weight ${t.mlp_weight}× ${nf.length ? '· nearfield: ' + nf.join(', ') : ''}</p>
@@ -369,7 +370,7 @@ function renderTunes() {
         <span class="grow"></span>
         <label class="row" style="gap:6px;font-size:13px">Apply to
           <select data-slot>${[1, 2, 3, 4].map(n => `<option value="${n}" ${n === (sl[0] || TUNES.owned_slot) ? 'selected' : ''}>Slot ${n}${n === TUNES.original_slot ? ' (original)' : ''}</option>`).join('')}</select></label>
-        <button class="btn primary" data-act="apply" ${busy ? 'disabled' : ''}>Apply</button>
+        <button class="btn primary" data-act="apply" ${busy || (t.removed_outputs || []).length ? 'disabled' : ''}>Apply</button>
         <button class="btn ghost" data-act="rename">Rename</button>
         <button class="btn ghost" data-act="delete" ${sl.length ? 'disabled title="On a DSP slot; apply another tune there first"' : ''}>Delete</button>
       </div></div>`;

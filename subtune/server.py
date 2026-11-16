@@ -173,9 +173,12 @@ class Runner:
             raise ValueError("choose a slot 1-4")
         args = [sys.executable, "-m", "subtune", "apply", "--slot", str(slot)]
         tid = body.get("tune")
+        from .subouts import check_apply
         if tid:
-            library.get(str(tid))                       # validates the id
+            check_apply(library.get(str(tid))["result"])   # validates the id; refuses a tune for a removed sub
             args += ["--tune", str(tid)]
+        else:
+            check_apply(_current_result())
         if slot - 1 == library.ORIGINAL_SLOT:
             if body.get("confirm_original") is not True:
                 raise ValueError("slot 1 holds your original setup; confirm to overwrite it")
@@ -185,8 +188,11 @@ class Runner:
         return self.cmd
 
     def switch_slot(self, n):
+        from . import abtest
         if self.running() or load_state().get("busy"):
             raise RuntimeError("wait for the current step to finish")
+        if abtest.active():
+            raise RuntimeError("a blind A/B test is running: it switches the slots itself (stop it first)")
         n = int(n)
         if not 1 <= n <= 4:
             raise ValueError("slot must be 1-4")
@@ -728,6 +734,11 @@ def build_executors(origin="assistant"):
                "receiver": avr_status()["status"], "measured_spots": len(st.get("measurements") or {}),
                "speaker_system": _system_brief(), "sub_hardware": sub_hardware(),
                "receiver_settings_slot": (s.get("preset") or 0) + 1}
+        from .coach import tuning_limits
+        try:
+            out["tuning_limits"] = tuning_limits(st, s, load_room())
+        except Exception as e:                           # noqa: BLE001
+            out["tuning_limits"] = {"error": str(e)[:120]}
         from . import abtest, automation
         a = automation.status(s)
         out["automation"] = {"night_mode": a["night"], "night_off_at": a["night_off_at"],
@@ -822,6 +833,9 @@ def build_executors(origin="assistant"):
     def switch_slot(slot):
         RUN.switch_slot(slot)
         return {"summary": f"slot {slot} playing"}
+
+    def sub_output(action, output, forget=False):
+        return sub_outputs({"action": action, "output": output, "forget": forget is True, "confirm": True})
 
     def night_mode(on):
         from . import automation
@@ -1145,7 +1159,7 @@ def build_executors(origin="assistant"):
 
     from . import guard
     return guard.wrap({"get_overview": overview, "list_tunes": tunes, "simulate_tune": simulate, "save_simulation": save_sim,
-            "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot, "set_night_mode": night_mode,
+            "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot, "set_sub_output": sub_output, "set_night_mode": night_mode,
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "keep_fixes": fixes_keep, "undo_fixes": fixes_undo,
@@ -1373,6 +1387,35 @@ def _live_levels():
         return {"paused": False, "error": _live["err"], "usb_hold_s": hold, **(_live["data"] or {})}
 
 
+def _current_result():
+    """The optimiser result `apply` writes when no saved tune is named (None if there is none yet)."""
+    from .config import DATA
+    f = DATA / "result.json"
+    try:
+        return json.loads(f.read_text()) if f.exists() else None
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def sub_outputs(body):
+    """Room & subs: remove a sub output (no DSP write), add one back, or mute a removed one on htTamer's slot."""
+    from . import subouts
+    act = body.get("action")
+    if act == "remove":
+        return subouts.remove(body.get("output"), forget=body.get("forget") is True)
+    if act == "add":
+        return subouts.add(body.get("output"))
+    if act == "mute":
+        if RUN.running() or load_state().get("busy"):
+            raise RuntimeError("wait for the current step to finish")
+        if body.get("confirm") is not True:
+            raise ValueError("muting writes to the miniDSP: confirm it first")
+        r = subouts.mute(body.get("output"))
+        _live["t"] = 0
+        return r
+    raise ValueError("action must be remove, add or mute")
+
+
 def _events(since: float, limit=300):
     if not EVENTS_FILE.exists():
         return []
@@ -1570,7 +1613,7 @@ class H(BaseHTTPRequestHandler):
         if not self._ha_ok():
             return
         try:
-            m = (_live.get("data") or {}).get("master")
+            m = _live_levels().get("master")             # refreshed here: no dashboard page may be open
         except Exception:                                # noqa: BLE001
             m = None
         return self._send(200, ha.state(m, avr_status()["status"], _system_busy()))
@@ -1737,6 +1780,8 @@ class H(BaseHTTPRequestHandler):
             room = load_room()
             st["room"] = room
             st["modes"] = modal_report(room, 200)
+            from .subouts import removed_in
+            st["result_removed"] = removed_in(st.get("result"), s)   # the playing tune still drives a removed sub
             from . import vendors
             st["sub_checks"] = {k: {"mode": (vendors.mode_of(d["catalog"], {**vendors.defaults(d["catalog"]), **(d.get("controls") or {})}) or {}).get("name"),
                                     "notes": vendors.check(d["catalog"], d.get("controls") or {}),
@@ -1792,6 +1837,10 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, liveeq_view())
         if u.path == "/api/avr":
             return self._send(200, avr_status(force="force" in q))
+        if u.path == "/api/tune/limits":                # what limits the tune, and what would help
+            from .coach import tuning_limits
+            from .room import load_room
+            return self._send(200, {"limits": tuning_limits(load_state(), load_settings(), load_room())})
         if u.path == "/api/automation":
             from . import abtest, automation, ha
             return self._send(200, {**automation.status(), "ab": abtest.view(), "ha": ha.token_info(),
@@ -1804,7 +1853,7 @@ class H(BaseHTTPRequestHandler):
                                     "repo": s.get("update_repo") or "", "default_repo": update.DEFAULT_REPO,
                                     "has_token": bool(update.token()),
                                     "auto": s.get("update_auto_check", True), "last": update.last_check(),
-                                    "result": update.result()})
+                                    "result": update.result(), "post_update": load_state().get("post_update")})
         if u.path == "/api/feedback":               # what a bug report would include (scrubbed)
             from . import feedback, update
             return self._send(200, {"repo": update.repo_name(), "diagnostics": feedback.diagnostics()})
@@ -2223,11 +2272,14 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"ok": True, "system": sy})
             if path == "/api/settings":
                 return self._send(200, {"changed": _apply_settings(body)})
+            if path == "/api/subs":
+                return self._send(200, sub_outputs(body))
             if path == "/api/build/pair":                # dashboard: a one-time QR code for the phone room builder
                 from . import builder
                 if not NET["lan"]:
                     raise ValueError("htTamer only listens to this computer right now, so a phone can't reach it. "
-                                     "The room builder works when htTamer runs on the Pi (or in network mode).")
+                                     "A phone can use the room builder when htTamer runs on the Pi (network mode); on this "
+                                     "computer it works as it is.")
                 return self._send(200, builder.pair_info(self.server.server_address[1], self.headers.get("Host")))
             if path == "/api/build/analyze":             # phone: photos + measurements + notes -> the AI's floor plan
                 from . import ai, builder
@@ -2344,6 +2396,40 @@ def input_guard_once(now=None):
 
 
 AUTOMATION = {"last": None}
+POST_UPDATE_DELAY_S = 90          # let the receiver and the miniDSP settle after a restart
+
+
+def post_update_check(wait=time.sleep, now=time.time):
+    """Once per new version (an update, or the first start): the silent hardware check, when nothing
+    else is running, so a version that can't reach the miniDSP, the receiver or the mic shows up under
+    Updates straight away instead of at the next tuning session. Plays nothing."""
+    from . import smoke, update, version
+    if update.mode() == "dev":
+        return None
+    v = version()
+    if (load_state().get("post_update") or {}).get("version") == v:
+        return None
+    wait(POST_UPDATE_DELAY_S)
+    for _ in range(60):                               # up to an hour for a running job to finish
+        if not _system_busy():
+            break
+        wait(60)
+    else:
+        return None
+    r = smoke.run(mic_busy=not mic_free() or METER.running)
+    rec = {"version": v, "t": now(), "status": r["status"], "checks": r["checks"]}
+    update_state(post_update=rec, smoke=r)
+    event("info" if r["status"] == "ok" else "warn",
+          f"after updating to {v}: hardware check {r['status']} ("
+          + ", ".join(f"{c['name']} {c['status']}" for c in r["checks"]) + ")")
+    return rec
+
+
+def _post_update_thread():
+    try:
+        post_update_check()
+    except Exception as e:                           # noqa: BLE001 - never stop the server over it
+        event("warn", f"after the update: the hardware check couldn't run ({e})"[:300])
 
 
 def _names(attr):
@@ -2469,6 +2555,7 @@ def serve(port=8765, lan=False):
     srv = ThreadingHTTPServer((os.environ.get("BASSBLEND_BIND") or ("0.0.0.0" if lan else "127.0.0.1"), port), H)
     threading.Thread(target=_input_guard_loop, daemon=True).start()
     threading.Thread(target=_automation_loop, daemon=True).start()
+    threading.Thread(target=_post_update_thread, daemon=True).start()
     from . import update
     threading.Thread(target=update.auto_loop, daemon=True).start()
     if lan:

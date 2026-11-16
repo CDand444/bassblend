@@ -870,6 +870,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="preview-banner" id="previewBanner" hidden><span id="previewText"></span><span class="grow"></span>
         <button class="btn" id="previewApply">Apply it…</button><button class="btn ghost" id="previewBack">Back to what's playing</button></div>
       <div id="tiles"></div>
+      <div id="limitsBox"></div>
       <div id="matchB"></div>
       <div class="legend" id="legB"></div>
       <div class="chart" id="chartB"></div>
@@ -1218,9 +1219,11 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="room-top">
         <div>
           <div class="row" style="margin-bottom:8px;gap:8px">
+            <span class="beta" title="New: room shapes and the 3D view">Beta</span>
             <div class="seg" id="planView" role="radiogroup" aria-label="Room view"><button type="button" data-pv="2d" class="on">Plan</button><button type="button" data-pv="3d">3D</button></div>
             <span class="grow"></span>
-            <button type="button" class="btn ghost" id="buildPhone" title="Photograph the room with your phone; the AI assistant turns it into this outline">Build with your phone</button>
+            <button type="button" class="btn ghost" id="buildPhone" title="Photograph the room with your phone; the AI assistant turns it into this outline">Build with your phone <span class="beta">Beta</span></button>
+            <label class="btn ghost" title="A floor plan image on this computer: the AI assistant reads its shape, doors and sizes into this outline">Upload floor plan<input type="file" id="planUpload" accept="image/*" hidden></label>
           </div>
           <div class="plan" id="plan"></div>
           <div class="plan plan3d" id="plan3dBox" hidden><canvas id="plan3d" aria-label="The room in 3D: drag to turn"></canvas></div>

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import time
 
-TERMS_VERSION = 1
+TERMS_VERSION = 2                 # 2: slot 1 can be overwritten by the owner after confirming
 
 TITLE = "Before you start: use at your own risk"
 POINTS = [
@@ -19,7 +19,8 @@ POINTS = [
     "the volume low, keep people and pets out of the room for loud tests, and press Stop at the first sign "
     "of strain (distortion, rattling, a smell of heat).",
     "Results are calculated from measurements and can be wrong. Check every change by ear before relying "
-    "on it. htTamer never writes miniDSP slot 1, so your original setup stays there.",
+    "on it. htTamer leaves miniDSP slot 1 (your original setup) alone: tuning, tests and the assistant never write it, "
+    "and it is only overwritten if you choose to on the Saved tunes page and confirm.",
     "htTamer is provided \"as is\", without warranty of any kind, under the PolyForm Noncommercial License "
     "1.0.0. You use it entirely at your own risk: the htTamer authors are not liable for damage to "
     "equipment, property or hearing, or for any other loss, however it is caused.",

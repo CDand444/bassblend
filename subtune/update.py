@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import re
 import subprocess
-import sys
 import tempfile
 import threading
 import time
@@ -176,7 +175,7 @@ def _download(url, dest: Path, accept):
 
 def install(log=print) -> dict:
     """Download and start installing the latest release for this kind of device."""
-    from .config import DATA, load_settings
+    from .config import DATA
     from .state import event
     info = check()
     if info.get("error"):

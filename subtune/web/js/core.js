@@ -132,6 +132,7 @@ function render() {
     const tile = (label, v, was, unit, dp = 2) => {
       const better = was != null && v < was;
       return `<div class="tile"><div class="label">${label}</div><div class="val">${(+v).toFixed(dp)}<small>${unit}</small></div><div class="delta ${better ? 'better' : ''}">${was != null ? `was ${(+was).toFixed(dp)} ${unit}` : '&nbsp;'}</div></div>`; };
+    loadLimits(res);
     $('#tiles').innerHTML = `<div class="tiles">${tile('Average unevenness', af.flat_rms_db, b.flat_rms_db, 'dB')}${tile('Difference between seats', af.seat_spread_db, b.seat_spread_db, 'dB')}${tile('Biggest swing', af.pk_pk_db, b.pk_pk_db, 'dB', 1)}${tile('Turned down for EQ', res.headroom_db, null, 'dB')}</div>`;
     $('#resSub').textContent = preview ? 'Saved tune, not playing'
       : res.applied ? `${res.tune_name ? res.tune_name + ' · ' : ''}${res.slot ? 'slot ' + res.slot + ' · ' : ''}applied ${new Date(res.applied * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}` : 'Predicted, not applied yet';
@@ -218,4 +219,19 @@ function render() {
 
   renderSteps();
   renderMatch();
+}
+
+// ---------- what limits the tune (shown under the result tiles when it's fair or poor)
+let tuneLimKey = null;
+const LIM_PAGE = {place: 'Speaker placement', room: 'Room and subs', treatment: 'Room treatment', wizard: 'Tuning settings', liveeq: 'Live EQ'};
+async function loadLimits(res) {
+  const k = JSON.stringify([res.tune_id, res.applied, res.metrics.after, (S.checkups || []).length, (S.verify_meta || {})['1']]);
+  if (k === tuneLimKey) return; tuneLimKey = k;
+  let L = null; try { L = (await fetch('/api/tune/limits').then(r => r.json())).limits; } catch (e) { return; }
+  const box = $('#limitsBox'); if (!box) return;
+  if (!L || L.grade === 'good' || !(L.tips || []).length) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="notice ${L.grade === 'poor' ? 'warn' : ''}" style="margin-top:10px"><b>What limits this tune.</b> ${esc(L.summary)}
+    ${(L.issues || []).length ? `<ul class="small" style="margin:6px 0">${L.issues.map(i => `<li>${esc(i)}</li>`).join('')}</ul>` : ''}
+    <div class="small"><b>What would help most:</b></div>
+    <ol class="small" style="margin:4px 0 0">${L.tips.map(t => `<li><b>${esc(t.title)}.</b> ${esc(t.why)}${LIM_PAGE[t.page] ? ` <a href="#/${esc(t.page)}">${esc(LIM_PAGE[t.page])} →</a>` : ''}</li>`).join('')}</ol></div>`;
 }

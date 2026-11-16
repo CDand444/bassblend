@@ -24,7 +24,7 @@ import time
 WATCH_EVERY_S = 60
 SUB_LEVEL_TOL_DB = 0.5
 SOUND_CMDS = {"level", "selftest", "measure", "verify", "baseline", "checkup", "levelmatch", "headroom", "tone",
-              "avrblend", "deepcheck", "allspeakers", "fixup", "liveeq", "gaincheck", "discover", "unmute"}
+              "avrblend", "deepcheck", "allspeakers", "fixup", "liveeq", "gaincheck", "discover"}
 
 _mem = {"seen": None, "watched": 0.0, "lock": threading.Lock()}
 
@@ -108,8 +108,12 @@ def keep_sub_level(s: dict):
         return float(s["watch_sub_level"])
     try:
         from . import fixlog
+        from .state import load_state
         lv = [e for e in (fixlog.get() or {}).get("entries", []) if e.get("kind") == "sub_level"]
-        return float(lv[-1]["to"]) if lv else None
+        if lv:
+            return float(lv[-1]["to"])
+        kept = load_state().get("kept_sub_level")      # set when the owner kept the fixes
+        return float(kept) if kept is not None else None
     except Exception:                                 # noqa: BLE001
         return None
 
@@ -133,6 +137,9 @@ def tick(busy, avr_status, receiver=None, dsp=None, now=None, refresh=lambda: No
             did.append("night off (time)")
             n = night()
 
+        if not (s.get("auto_slot_on") or s.get("watchdog_on") or n.get("on")):
+            _mem["seen"] = None                       # nothing to do: don't keep asking the receiver
+            return {"did": did + ["idle"]}
         if busy():
             return {"did": did + ["paused: in use"]}
         st = avr_status() or {}

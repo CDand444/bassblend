@@ -22,7 +22,7 @@ import time
 SOUND = {"run_checkup", "run_verify", "level_match", "test_tone", "start_autotune", "run_avr_blend",
          "run_system_report", "fix_from_report", "run_headroom", "run_all_speakers", "run_measurement",
          "start_live_analyzer"}
-CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_night_mode", "avr_control", "apply_avr_blend",
+CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_sub_output", "set_night_mode", "avr_control", "apply_avr_blend",
                    "keep_fixes", "undo_fixes", "update_speakers", "update_room", "update_system", "hw_save",
                    "set_live_eq", "fit_live_eq", "save_live_eq", "save_simulation", "set_treatment_constraints",
                    "record_treatment"}
@@ -83,6 +83,11 @@ def check(name: str, args: dict, s=None) -> None:
     elif name == "switch_slot":
         if _int(a.get("slot"), "slot") not in SLOTS:
             raise Refused("slot must be 1-4")
+    elif name == "set_sub_output":
+        if a.get("action") not in ("remove", "add", "mute"):
+            raise Refused("action must be remove, add or mute")
+        if _int(a.get("output"), "output") not in (1, 2, 3, 4):
+            raise Refused("output must be 1-4")
     elif name in ("test_tone", "run_headroom"):
         out = _int(a.get("output"), "output")
         subs = [o + 1 for o in (s.get("subs") or [])]

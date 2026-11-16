@@ -40,9 +40,13 @@ def _summary(t):
 def list_tunes():
     LIB.mkdir(parents=True, exist_ok=True)
     out = []
+    from .config import load_settings
+    from .subouts import removed_in
+    s = load_settings()
     for f in LIB.glob("*.json"):
         try:
-            out.append(_summary(json.loads(f.read_text(encoding="utf-8"))))
+            t = json.loads(f.read_text(encoding="utf-8"))
+            out.append({**_summary(t), "removed_outputs": removed_in(t["result"], s)})   # stale: drives a removed sub
         except (json.JSONDecodeError, KeyError):
             continue
     return sorted(out, key=lambda x: -x["t"])

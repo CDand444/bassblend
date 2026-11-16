@@ -181,7 +181,13 @@ def _blend_txt(e):
 
 
 def accept():
-    """The current state becomes the new baseline."""
+    """The current state becomes the new baseline. The receiver sub level htTamer set is remembered
+    (state kept_sub_level), so the watchdog keeps holding it after the fix log starts afresh."""
+    led = get()
+    lv = [e for e in (led or {}).get("entries", []) if e.get("kind") == "sub_level"]
+    if lv:
+        from .state import update_state
+        update_state(kept_sub_level=float(lv[-1]["to"]))
     _save(None)
     from . import journal
     journal.add("fix", "Kept the fixes: the current tune and sub level are the new starting point.")
@@ -189,7 +195,7 @@ def accept():
 
 def revert(log=print) -> dict:
     """Back to the baseline: its sub tune on the playing slot and the receiver sub level from before."""
-    led = get()
+    led = get()                    # kept_sub_level stays: undo goes back to the level kept before these fixes
     if not led or not led.get("entries"):
         raise RuntimeError("there are no fixes to undo")
     out = {}

@@ -2,7 +2,6 @@
 which outputs are audible, and measure each sub with a shared timing reference."""
 from __future__ import annotations
 
-import json
 
 import numpy as np
 
@@ -413,11 +412,18 @@ class Rig:
         update_state(measurements=meas, grid=np.round(GRID, 3).tolist())
 
 
-def load_measurements():
+def load_measurements(only=None):
+    """Every spot's per-sub responses. Subs no longer used (removed on Room & subs) are left out, so the
+    optimiser can re-tune the rest from the same measurements: each sub was measured on its own."""
     files = sorted(MEAS_DIR.glob("pos*.npz"))
     if not files:
         raise RuntimeError("no measurements yet - run `measure` first")
     data = [np.load(f) for f in files]
     subs = data[0]["subs"].tolist()
     Hs = np.stack([d["H"] for d in data])          # (positions, subs, freqs)
+    only = load_settings().get("subs") if only is None else only
+    keep = [o for o in subs if o in (only or subs)]
+    if keep and keep != subs:
+        Hs = Hs[:, [subs.index(o) for o in keep], :]
+        subs = keep
     return subs, Hs, [f.stem for f in files]

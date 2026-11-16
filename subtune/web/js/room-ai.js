@@ -10,9 +10,13 @@ function seatRow(s = {}) {
 function subCard(o, s = {}, used) {
   const v = k => esc(s[k] ?? '');
   const blank = !Object.values(s).some(x => x !== '' && x != null);
-  if (!used && blank) return `<div class="subcard off slim" data-o="${o}"><div class="hd" style="margin:0"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">not used for a sub</span></div></div>`;
+  const addBtn = `<button type="button" class="btn ghost subadd" data-o="${o}" style="height:26px;padding:0 8px">Use for a sub</button>`;
+  const stillDriven = !used && (S.result_removed || []).includes(o + 1);
+  const muteNote = stillDriven ? `<div class="notice warn" style="margin:6px 0">The playing tune still drives this output on the miniDSP. Optimise and apply again without it, or <button type="button" class="btn submute" data-o="${o}">Mute it on the miniDSP</button></div>` : '';
+  if (!used && blank) return `<div class="subcard off slim" data-o="${o}"><div class="hd" style="margin:0"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">not used for a sub</span>${addBtn}</div>${muteNote}</div>`;
   return `<div class="subcard ${used ? '' : 'off'}" data-o="${o}">
-    <div class="hd"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">${used ? '' : 'not a sub output'}</span></div>
+    <div class="hd"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">${used ? '' : 'not a sub output'}</span>${used
+      ? `<button type="button" class="btn ghost subrm" data-o="${o}" style="height:26px;padding:0 8px" title="Unplugged, sold or moved: stop using this output for a sub">Remove this sub</button>` : addBtn}</div>${muteNote}
     ${used ? `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency"><option value="30">30 Hz</option><option value="50" selected>50 Hz</option><option value="80">80 Hz</option></select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span></div>` : ''}
     <div class="grid g2">
       <label class="f">Model<input data-f="model" value="${v('model')}" placeholder="Make and model"></label>
@@ -126,7 +130,39 @@ function initRoom() {
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
 }
 $('#roomCard').addEventListener('input', () => renderPlan(readRoom()));
+async function subOutput(body, done) {
+  const r = await post('/api/subs', body);
+  if (r.error) { alert(r.error); return; }
+  toast(done, r.summary || '', 'good');
+  roomInit = false; await poll(); loadTunes();
+}
 $('#roomCard').addEventListener('click', async e => {
+  const rm = e.target.closest('.subrm'), ad = e.target.closest('.subadd'), mu = e.target.closest('.submute');
+  if (rm) {
+    const o = +rm.dataset.o + 1;
+    if (!confirm(`Remove the sub on output ${o}?
+
+htTamer stops using this output for a sub: it is left out of measuring and tuning, and tunes made with it are marked stale. Nothing is written to the miniDSP now.`)) return;
+    const forget = confirm(`Also forget output ${o}'s details (model, position, knob settings)?
+
+OK = forget them (sold or gone for good)
+Cancel = keep them (unplugged, may come back)`);
+    return subOutput({action: 'remove', output: o, forget}, `Output ${o} removed`);
+  }
+  if (ad) {
+    const o = +ad.dataset.o + 1;
+    if (!confirm(`Use output ${o} for a sub?
+
+Nothing is written to the miniDSP now; measure it with Auto-tune before it gets a tune.`)) return;
+    return subOutput({action: 'add', output: o}, `Output ${o} is a sub output`);
+  }
+  if (mu) {
+    const o = +mu.dataset.o + 1, slot = ((S.settings || {}).preset ?? 1) + 1;
+    if (!confirm(`Mute output ${o} on the miniDSP?
+
+One write to htTamer's slot ${slot}, and only if that slot is the one playing. Slot 1 is never touched. The next tune applied there keeps it muted.`)) return;
+    return subOutput({action: 'mute', output: o, confirm: true}, `Output ${o} muted`);
+  }
   const tb = e.target.closest('.tonebtn');
   if (tb) {
     const o = +tb.dataset.o, f = +tb.parentElement.querySelector('.tonef').value;
@@ -406,13 +442,70 @@ $('#buildPhone').addEventListener('click', async () => {
   if (!S.ai_api) { box.innerHTML = '<div class="hwnote warn" style="margin-top:10px">The room builder needs the AI assistant: add an API key under Tools → AI analysis first.</div>'; return; }
   box.innerHTML = '<p class="muted" style="margin:10px 0 0"><span class="spin"></span> Making a code…</p>';
   const r = await post('/api/build/pair', {});
-  if (r.error) { box.innerHTML = `<div class="hwnote warn" style="margin-top:10px">${esc(r.error)}</div>`; return; }
+  // a floor plan file usually lives on this computer: the same builder opens here too
+  const here = `<a href="/build" target="_blank" rel="noopener">Open the room builder on this computer</a> to upload a floor plan or photos from here.`;
+  if (r.error) { box.innerHTML = `<div class="hwnote warn" style="margin-top:10px">${esc(r.error)}</div><p class="small" style="margin:8px 0 0">${here}</p>${buildDone}`; return; }
   box.innerHTML = `<div class="buildqr">${r.svg}<div><b>Scan with your phone's camera</b>
-    <p class="muted small" style="margin:4px 0 8px">Opens the room builder on your phone (same Wi-Fi): take photos, add sizes and notes, and your AI assistant draws the room in 2D and 3D. Nothing is saved until you press Save there. The code works once, for ${Math.round(r.expires_s / 60)} minutes.</p>
+    <p class="muted small" style="margin:4px 0 8px">Opens the room builder on your phone (same Wi-Fi): take photos or upload a floor plan, add sizes and notes, and your AI assistant draws the room in 2D and 3D. Nothing is saved until you press Save there. The code works once, for ${Math.round(r.expires_s / 60)} minutes.</p>
     <p class="small" style="margin:0;word-break:break-all">${r.urls.map(u => `<code>${esc(u)}</code>`).join('<br>')}</p>
+    <p class="small" style="margin:8px 0 0">Floor plan on this computer? ${here}</p>
     <button type="button" class="btn ghost" style="margin-top:8px" id="buildClose">Done</button></div></div>`;
 });
+const buildDone = '<button type="button" class="btn ghost" style="margin-top:8px" id="buildClose">Done</button>';
 $('#buildBox').addEventListener('click', e => { if (e.target.closest('#buildClose')) { $('#buildBox').innerHTML = ''; roomInit = false; poll(); } });
+// ---- a floor plan file straight from this computer: the AI's reading goes into the editor above, unsaved
+let planFile = null, planUndo = null;
+function shrinkImg(file, max, q) {       // a JPEG at most `max` px (white behind transparent plans)
+  return new Promise((ok, bad) => { const url = URL.createObjectURL(file), img = new Image();
+    img.onload = () => { const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+      c.width = Math.round(img.naturalWidth * k); c.height = Math.round(img.naturalHeight * k);
+      const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url); ok(c.toDataURL('image/jpeg', q)); };
+    img.onerror = () => { URL.revokeObjectURL(url); bad(new Error('That file could not be read as an image. For a PDF, take a screenshot of the page.')); };
+    img.src = url; });
+}
+$('#planUpload').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const box = $('#buildBox');
+  if (!S.ai_api) { box.innerHTML = '<div class="hwnote warn" style="margin-top:10px">Reading a floor plan needs the AI assistant: add an API key under Tools → AI analysis first.</div>'; return; }
+  try { planFile = await shrinkImg(f, 2000, 0.85); } catch (err) { box.innerHTML = `<div class="hwnote warn" style="margin-top:10px">${esc(err.message)}</div>`; return; }
+  box.innerHTML = `<div class="buildqr"><img src="${planFile}" alt="Your floor plan" style="width:168px;max-height:168px;object-fit:contain;background:#fff;border-radius:6px">
+    <div><b>Read this floor plan with AI</b>
+    <p class="muted small" style="margin:4px 0 8px">The AI takes the shape, doors, openings and the sizes written on it, and turns it so the screen wall is the front. The sizes typed above win. One AI request; nothing is saved until you press Save below.</p>
+    <label class="f">Which room, and anything else?<input id="planNote" placeholder="The den, bottom left. The TV is on the long wall by the window."></label>
+    <div class="row" style="margin-top:8px"><button type="button" class="btn primary" id="planRead">Read the plan</button><button type="button" class="btn ghost" id="planCancel">Cancel</button></div></div></div>`;
+});
+$('#buildBox').addEventListener('click', async e => {
+  if (e.target.closest('#planCancel')) { $('#buildBox').innerHTML = ''; planFile = null; return; }
+  if (e.target.closest('#planUndo') && planUndo) {
+    roomShape = planUndo.shape; ['#rL', '#rW', '#rH'].forEach((id, k) => $(id).value = planUndo.dims[k]);
+    planUndo = null; $('#buildBox').innerHTML = ''; renderShapeEditor(); planKey = null; renderPlan(readRoom()); return;
+  }
+  if (!e.target.closest('#planRead') || !planFile) return;
+  const b = e.target.closest('#planRead'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Reading…';
+  const ft = id => +$(id).value || null;
+  const r = await post('/api/build/analyze', {dims: {length_ft: ft('#rL'), width_ft: ft('#rW'), height_ft: ft('#rH')},
+    notes: [$('#planNote').value, $('#rO').value].filter(Boolean).join('. '), photos: [{data: planFile, label: 'floor plan', note: $('#planNote').value}]});
+  if (r.error) { b.disabled = false; b.textContent = 'Read the plan'; $('#buildBox').insertAdjacentHTML('beforeend', `<div class="hwnote warn" style="margin-top:8px">${esc(r.error)}</div>`); return; }
+  applyPlanReading(r);
+});
+function applyPlanReading(r) {
+  const p = r.proposal || {}, rm = r.room || {}, list = v => Array.isArray(v) ? v : [];
+  if ((r.problems || []).length) {
+    $('#buildBox').innerHTML = `<div class="hwnote warn" style="margin-top:10px">The AI's reading can't be used as it is: ${esc(r.problems.join('; '))}. Try again with a note about what's wrong, or a clearer image.</div>${buildDone}`;
+    return;
+  }
+  planUndo = {shape: JSON.parse(JSON.stringify(roomShape)), dims: ['#rL', '#rW', '#rH'].map(id => $(id).value)};
+  roomShape = {outline: rm.outline ? JSON.parse(JSON.stringify(rm.outline)) : null, shape: rm.outline ? (rm.shape || 'custom') : 'rect',
+               wall_openings: JSON.parse(JSON.stringify(rm.wall_openings || [])), ceiling: rm.ceiling || null};
+  if (rm.length_m) $('#rL').value = toFt(rm.length_m); if (rm.width_m) $('#rW').value = toFt(rm.width_m); if (rm.height_m) $('#rH').value = toFt(rm.height_m);
+  renderShapeEditor(); planKey = null; renderPlan(readRoom()); planFile = null;
+  $('#buildBox').innerHTML = `<div class="hwnote" style="margin-top:10px"><b>From your floor plan</b> (${esc(['high', 'medium', 'low'].includes(p.confidence) ? p.confidence : 'low')} confidence): ${esc(String(p.summary || ''))}
+    ${list(p.assumptions).length ? `<br><b>Assumed:</b> ${list(p.assumptions).map(esc).join(' · ')}` : ''}
+    ${list(p.questions).length ? `<br><b>Please check:</b> ${list(p.questions).map(esc).join(' · ')}` : ''}
+    <br><b>Not saved yet.</b> Check the drawing (drag corners, fix openings), place the seats, then press Save below.</div>
+    <div class="row" style="margin-top:8px"><button type="button" class="btn ghost" id="planUndo">Undo</button></div>`;
+}
 // openings drawn on a wall: a gap for an opening, a door swing, a double line for a window
 function openingMarks(ops, es, X, Y, bg) {
   let g = '';

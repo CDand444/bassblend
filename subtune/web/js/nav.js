@@ -52,7 +52,7 @@ const MENU = [
   {grp: 'Survey', key: 'avr', icon: 'avr', title: 'Receiver', full: 'Receiver', el: $('#avrCard'),
    tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
   {grp: 'Survey', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
-   tag: () => { const n = Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
+   tag: () => { const n = ((S.settings || {}).subs || []).length || Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
   {grp: 'Survey', key: 'speakers', icon: 'speakers', title: 'Speakers', full: 'Your speakers', el: $('#spkCard'),
    tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
      const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
@@ -88,7 +88,7 @@ const MENU = [
   {grp: 'Tools', key: 'activity', icon: 'log', title: 'Activity', full: 'Activity log', el: card('#log'),
    tag: () => { const e = events.filter(x => x.kind === 'error' && x.t > seenErrors).length; return e ? [String(e), 'alert'] : null; }},
   {grp: 'Tools', key: 'config', icon: 'file', title: 'Settings file', full: 'Settings file: save and load', el: $('#cfgCard'), tag: () => null},
-  {grp: 'Tools', key: 'updates', beta: true, icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
+  {grp: 'Tools', key: 'updates', icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
    tag: () => (S.update || {}).newer ? ['new', 'alert'] : null},
   {grp: 'Tools', key: 'automation', beta: true, icon: 'gear', title: 'Automation', full: 'Automation: night mode, automatic slot, watchdog', el: $('#autoCard'),
    tag: () => (S.night || {}).on ? ['night', 'alert'] : null},
