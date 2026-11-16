@@ -764,7 +764,11 @@ def build_executors(origin="assistant"):
                                                      for x in pl["speakers"]]}
         a_all = max((st.get("allspk") or {}).values(), key=lambda r: r["t"], default=None)
         if a_all:
+            from . import channels, dirac, equip
+            sheet = channels.for_state(st, equip.speakers(), dirac.system(), load_settings().get("avr_make", "Onkyo"))
             out["all_speakers_check"] = {"t": a_all["t"], "spot": a_all.get("pos"), "advice": [x["text"] for x in a_all["advice"]],
+                                         "setup_sheet": [{k: s[k] for k in ("name", "action", "level_change_db", "distance_change_ft", "set_level_db", "set_distance_ft")}
+                                                         for s in (sheet or {}).get("sheet", [])], "setup_warnings": (sheet or {}).get("warnings", []),
                                          "speakers": {k: {x: v.get(x) for x in ("level_vs_fl_db", "arrival_vs_fl_ms", "heard")}
                                                       for k, v in a_all["speakers"].items()}}
         rep = max((st.get("deep_reports") or {}).values(), key=lambda r: r["t"], default=None)
@@ -1691,6 +1695,14 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, self._setup_status())
         if u.path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):
             return self._send(200, (WEB_DIR / "logo.svg").read_bytes(), "image/svg+xml")
+        if u.path in ("/api/channels", "/channels"):    # every-channel report and receiver setup sheet (nothing measured or changed)
+            from . import channels, dirac, equip
+            data = channels.for_state(load_state(), equip.speakers(), dirac.system(), load_settings().get("avr_make", "Onkyo"))
+            if u.path == "/api/channels":
+                return self._send(200, data or {"error": "no all-speakers check yet"})
+            if not data:
+                return self._send(404, b"Run the all-speakers check first.", "text/plain; charset=utf-8")
+            return self._send(200, channels.sheet_html(data, load_settings().get("avr_make", "Onkyo")).encode("utf-8"), "text/html; charset=utf-8")
         if u.path == "/report":                         # printable calibration report (nothing measured or changed)
             from . import coach, dirac, report
             from .room import load_room

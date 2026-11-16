@@ -46,12 +46,14 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     assistant grows (`hw_lookup`/`hw_save`, plus Claude web_search); used for driver choice and `protect_hz`.
   - `backup.py`: automatic backups (weekly, before an update, on demand) and restore; never holds keys/tokens/PIN
     (`secrets_check`). Card Tools -> Backups, `/api/backups`.
+  - `channels.py`: the every-channel report and receiver setup sheet from the newest all-speakers check (pure; `/api/channels`,
+    `/channels`); a result stores `rx_at_measure` (measured, not current).
   - `limiter.py`, `gaincheck.py`, `report.py` (/report), drift in `measure.py`, LFE check in `allspk.py`.
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
-- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 11 parts, loaded in order as
-  classic scripts sharing globals: core, tune, room-ai, furniture, soffit, backup, receiver, measure, setup-home, liveeq, nav; plus
+- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 12 parts, loaded in order as
+  classic scripts sharing globals: core, tune, room-ai, furniture, soffit, backup, receiver, measure, channels, setup-home, liveeq, nav; plus
   `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
   `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`.
   Shared globals mean a top-level name declared in two parts makes the browser drop the later file entirely

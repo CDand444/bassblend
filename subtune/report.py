@@ -62,6 +62,23 @@ def build(st: dict, settings: dict, room: dict, rx: dict | None = None) -> str:
     grid = st.get("grid") or []
     parts = []
 
+    # --- channel by channel (from the latest all-speakers check; stored results only)
+    try:
+        from . import channels, equip
+        ch = channels.for_state(st, room.get("speakers") or equip.speakers(), sy, settings.get("avr_make", "Onkyo"))
+    except Exception:                                  # noqa: BLE001 - the report never fails over this section
+        ch = None
+    if ch:
+        def _lv(s):
+            return "" if s["level_change_db"] is None else f"{s['level_change_db']:+.1f} dB"
+
+        def _ds(s):
+            return "" if s["distance_change_ft"] is None else f"{s['distance_change_ft']:+.1f} ft"
+        bits = "".join(f"<tr><td>{esc(s['name'])}</td><td>{esc(s['action'])}</td><td>{_lv(s)}</td><td>{_ds(s)}</td></tr>" for s in ch["sheet"])
+        parts.append(_section("Channel by channel", "<p class='muted'>From the all-speakers check, " + _when(ch.get("t")) + ". Changes are relative to the front left. The full sheet: /channels.</p>"
+                              + "".join(f"<p><b>{esc(w)}</b></p>" for w in ch["warnings"])
+                              + "<table><tr><th>Speaker</th><th>What</th><th>Level change</th><th>Distance change</th></tr>" + bits + "</table>"))
+
     # --- summary
     rm = room.get("room") or {}
     dims = " × ".join(f"{(rm.get(k) or 0) / 0.3048:.1f}" for k in ("length_m", "width_m", "height_m")) + " ft" if rm.get("length_m") else "not recorded"

@@ -133,7 +133,7 @@ of every bed speaker and the LFE against the front left (level and distance only
 plays the file out of its own HDMI port and htTamer switches the receiver to the input the Pi is plugged into \
 (chosen once on the All speakers page), in Direct mode, volume set automatically, all restored after. The \
 receiver's network player can't play 8 channels, so there is no network option. Mode "manual" = the owner plays \
-the file from another HDMI source or USB stick. Heights can't be tested this way.
+the file from another HDMI source or USB stick. Heights can't be tested this way. get_overview's all_speakers_check.setup_sheet is the owner's receiver setup sheet (level and distance changes per channel, final numbers when the receiver's values were recorded at the time; the page /channels prints it): read it out in the receiver's own words, and repeat its warning if the receiver settings changed since the measurement.
 - Equipment and data: get_equipment shows everything recorded (speakers per channel, subs, room, seats, \
 receiver, goals) and which speakers are still missing. Keep it current: whenever the owner mentions a speaker, \
 sub, knob setting, seat, measurement of the room or a receiver setting, record it straight away with \

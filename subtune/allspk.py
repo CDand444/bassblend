@@ -282,7 +282,9 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
                 log("avr", f"all-speakers check: receiver restored (input {snap.get('input_code')}, volume {snap.get('volume')})")
     status("Analyzing…")
     r = analyze(rec, t0, cal)
-    r.update({"pos": pos, "mode": mode, "level": level, "playback": playback or None})
+    from . import channels, equip
+    r.update({"pos": pos, "mode": mode, "level": level, "playback": playback or None,
+              "rx_at_measure": channels.snapshot(equip.speakers())})        # measured, not current: the sheet uses these
     if mode == "hdmi" and nothing_heard(r["speakers"]):
         r["advice"] = [{"ch": "", "status": "fix", "text": "Nothing came through from the Pi's HDMI. Check the receiver "
                         f"input picked ({HDMI_INPUTS.get(playback.get('input'), playback.get('input'))}) is the one the Pi "

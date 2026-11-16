@@ -89,6 +89,7 @@ function renderAllSpk() {
       <p class="muted small" style="margin:8px 0 0">${spotName(latest.pos || 1)} · ${new Date(latest.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})}. The LFE row is the subs’ arrival through the LFE channel.</p>`;
   } else if (!running) h += empty('Not checked yet', 'Follow the three steps above.');
   $('#allOut').innerHTML = h;
+  chLoad(latest && latest.t);
 }
 $('#allMode').onchange = () => { allKey = null; renderAllSpk(); };
 $('#allRun').onclick = async () => {
