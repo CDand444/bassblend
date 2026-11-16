@@ -195,3 +195,64 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
     return {"seat": {"x_m": mx, "y_m": my, "z_m": ez}, "room": {"L": L, "W": W, "H": H}, "speakers": spk, "notes": notes,
             "outline": pts, "openings": shape.openings(rm),
             "source": "Dolby Atmos home theater installation guidelines (speaker angles from the main seat)"}
+
+
+def compare(room: dict, plan: dict) -> dict:
+    """How the owner's recorded speaker positions sit against a plan: for each plan
+    speaker the recorded spot, the gap to the recommended spot, and whether the
+    angle seen from the seat is inside Dolby's range; plus channels that are
+    recorded but have no spot in this plan."""
+    seat = plan["seat"]
+    sx, sy, ez = seat["x_m"], seat["y_m"], seat["z_m"]
+    rec = room.get("speakers") or {}
+    ids = {s["id"] for s in plan["speakers"]}
+    out, n_in, recorded, best = {}, 0, 0, None
+    for s in plan["speakers"]:
+        r = rec.get(s["id"])
+        if not r or r.get("x_m") is None or r.get("y_m") is None:
+            out[s["id"]] = {"actual": None, "delta": None}
+            continue
+        ax, ay, rz = r["x_m"], r["y_m"], r.get("z_m")
+        if s["kind"] == "bed":
+            angle = math.degrees(math.atan2(ax - sx, sy - ay))
+        elif rz is None:
+            angle = None
+        else:
+            fy = sy - ay                                  # positive in front of the seat, like plan's elevation
+            if fy > 0:
+                angle = math.degrees(math.atan2(rz - ez, fy))
+            elif fy < 0:
+                angle = 180.0 - math.degrees(math.atan2(rz - ez, -fy))
+            else:
+                angle = 90.0 if rz >= ez else -90.0
+        lo, hi = s["range"]
+        if angle is None:
+            in_range, off = False, 0.0
+        elif angle < lo:
+            in_range, off = False, lo - angle
+        elif angle > hi:
+            in_range, off = False, angle - hi
+        else:
+            in_range, off = True, 0.0
+        recorded += 1
+        n_in += in_range
+        dx, dy = ax - s["x_m"], ay - s["y_m"]
+        dist = math.hypot(dx, dy)
+        if best is None or dist > best[0]:
+            best = (dist, s["id"])
+        status = "ok" if (dist <= 0.3 or in_range) else "close" if (dist <= 0.8 or off <= 8) else "off"
+        actual = {"x_m": round(ax, 3), "y_m": round(ay, 3), "z_m": None if rz is None else round(rz, 3)}
+        actual["azimuth" if s["kind"] == "bed" else "elevation"] = None if angle is None else round(angle, 1)
+        out[s["id"]] = {"actual": actual,
+                        "delta": {"dx_m": round(dx, 3), "dy_m": round(dy, 3),
+                                 "dz_m": None if rz is None else round(rz - s["z_m"], 3),
+                                 "dist_m": round(dist, 3), "angle_off_deg": round(off, 1),
+                                 "in_range": in_range, "status": status}}
+    if recorded == 0:
+        summary = "None of your speaker positions are recorded yet."
+    else:
+        summary = f"{n_in} of {recorded} speakers are within Dolby's range"
+        if best and best[0] > 0.05:
+            summary += f"; the biggest gap is {best[1]} ({round(best[0] / 0.3048, 1)} ft)"
+    extra = sorted(k for k, v in rec.items() if k not in ids and v.get("x_m") is not None and v.get("y_m") is not None)
+    return {"speakers": out, "extra": extra, "summary": summary}
