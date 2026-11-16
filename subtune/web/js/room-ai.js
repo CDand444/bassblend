@@ -112,7 +112,7 @@ function hwCheck(card) {
   if (st.power === 'off') notes.push(['danger', 'Power switch OFF: this sub won’t play.']);
   box.innerHTML = notes.map(([l, t]) => `<div class="hwnote ${l}">${l === 'danger' ? '⚠ ' : ''}${esc(t)}</div>`).join('');
 }
-$('#roomCard').addEventListener('change', e => {
+$('#subsCard').addEventListener('change', e => {
   const card = e.target.closest('.subcard'); if (!card) return;
   if (e.target.matches('[data-f="catalog"]')) card.querySelector('.hwctl').innerHTML = hwControls(e.target.value, {});
   if (e.target.matches('[data-f="catalog"], [data-c]')) hwCheck(card);
@@ -130,14 +130,14 @@ function initRoom() {
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
 }
-$('#roomCard').addEventListener('input', () => renderPlan(readRoom()));
+[$('#roomCard'), $('#subsCard')].forEach(c => c.addEventListener('input', () => renderPlan(readRoom())));
 async function subOutput(body, done) {
   const r = await post('/api/subs', body);
   if (r.error) { alert(r.error); return; }
   toast(done, r.summary || '', 'good');
   roomInit = false; await poll(); loadTunes();
 }
-$('#roomCard').addEventListener('click', async e => {
+$('#subsCard').addEventListener('click', async e => {
   const rm = e.target.closest('.subrm'), ad = e.target.closest('.subadd'), mu = e.target.closest('.submute');
   if (rm) {
     const o = +rm.dataset.o + 1;
@@ -200,13 +200,13 @@ function readRoom() {
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
           seats, subs, furniture: fuRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
-$('#roomSave').onclick = async () => {
-  $('#roomSave').disabled = true;
+[['#roomSave', '#roomMsg'], ['#subsSave', '#subsMsg']].forEach(([btn, msg]) => $(btn).onclick = async () => {    // one save for both pages
+  $(btn).disabled = true;
   const r = await post('/api/room', readRoom());
-  $('#roomSave').disabled = false;
-  $('#roomMsg').textContent = r.error ? r.error : 'Saved.';
+  $(btn).disabled = false;
+  $(msg).textContent = r.error ? r.error : 'Saved.';
   if (!r.error) { roomInit = false; await poll(); }
-};
+});
 $('#roTurn').onclick = e => { const b = e.target.closest('button[data-op]'); if (b && !b.disabled) roTurn(b.dataset.op); };
 async function roTurn(op) {
   if (op !== 'undo' && !confirm('Turn the room now? This saves the room. Edits you have not saved in the form below will be lost. You can undo it.')) return;

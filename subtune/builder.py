@@ -86,7 +86,7 @@ EXPIRED_PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><me
 <title>htTamer room builder</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;padding:16px;
 font:16px/1.5 -apple-system,system-ui,sans-serif;background:#f4f3ef;color:#1d1d1b}@media (prefers-color-scheme:dark){body{background:#141413;color:#ecebe6}}
 main{max-width:340px}</style></head><body><main><h1 style="font-size:20px">This code has expired</h1>
-<p>Each QR code works once, for 10 minutes. On the dashboard, open <b>Room and subs</b> and press <b>Build with your phone</b> again
+<p>Each QR code works once, for 10 minutes. On the dashboard, open <b>Room</b> and press <b>Build with your phone</b> again
 for a new one.</p></main></body></html>"""
 
 

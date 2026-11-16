@@ -223,7 +223,7 @@ function render() {
 
 // ---------- what limits the tune (shown under the result tiles when it's fair or poor)
 let tuneLimKey = null;
-const LIM_PAGE = {place: 'Speaker placement', room: 'Room and subs', treatment: 'Room treatment', wizard: 'Tuning settings', liveeq: 'Live EQ'};
+const LIM_PAGE = {place: 'Speaker placement', room: 'Room and subs', subs: 'Subs', treatment: 'Room treatment', wizard: 'Tuning settings', liveeq: 'Live EQ'};
 async function loadLimits(res) {
   const k = JSON.stringify([res.tune_id, res.applied, res.metrics.after, (S.checkups || []).length, (S.verify_meta || {})['1']]);
   if (k === tuneLimKey) return; tuneLimKey = k;

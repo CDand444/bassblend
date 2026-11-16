@@ -124,7 +124,7 @@ reason and trade-off grounded in that guidance and the room size (e.g. Hsu VTF-3
 headroom and flattest deep bass in small-to-medium rooms, 0.5 medium-to-large, 0.7 large; 4" port open + \
 EQ1 extends deepest; both ports + EQ2 = most output). NEVER suggest a forbidden combination (Hsu: both \
 ports open with EQ1 can damage the driver). You can't turn knobs: say exactly which knob on which \
-output, ask the owner to record the change in Room & subs, then re-measure. Ported modes get no EQ boost \
+output, ask the owner to record the change on the Subs page, then re-measure. Ported modes get no EQ boost \
 below their safe limit (no_boost_below_hz). Prefer the receiver doing the crossover (sub crossover Out / \
 LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies (Hsu: one port open, \
 EQ1, Q 0.7).
@@ -295,7 +295,7 @@ TOOLS = [
        "whether they only want to stop using it or also mute it.",
        {"action": {"type": "string", "enum": ["remove", "add", "mute"]},
         "output": {"type": "integer", "description": "1-based miniDSP output"},
-        "forget": {"type": "boolean", "description": "remove only: also delete its Room & subs details (sold); "
+        "forget": {"type": "boolean", "description": "remove only: also delete its Subs page details (sold); "
                    "default keeps them (unplugged, may come back)"}},
        ["action", "output"], approval=True),
     _t("run_checkup", "20-second health check at a mic spot: room noise, distortion, bass ringing per band, "

@@ -1235,7 +1235,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 
     <!-- ROOM -->
     <section class="card" id="roomCard">
-      <div class="card-h"><h2>Room and subs</h2><span class="sub">feet, measured from the left wall and the front (screen) wall</span></div>
+      <div class="card-h"><h2>Room</h2><span class="sub">feet, measured from the left wall and the front (screen) wall</span></div>
       <div class="room-top">
         <div>
           <div class="row" style="margin-bottom:8px;gap:8px">
@@ -1283,17 +1283,20 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="couchRows"></div>
       <div class="row" style="gap:8px;align-items:center"><select id="fuPreset" aria-label="Kind of couch" style="width:auto"><option value="three">3-seat couch</option><option value="loveseat">Loveseat</option><option value="sectional">Sectional</option><option value="recliner">Recliner</option><option value="custom">Custom size</option></select><button type="button" class="btn ghost" id="addCouch">Add couch</button></div>
 
+
+      <div id="modesBox"></div>
+      <div class="save-bar"><button class="btn primary" id="roomSave">Save room</button><span class="muted" id="roomMsg"></span></div>
+    </section>
+    <section class="card" id="subsCard">
+      <div class="card-h"><h2>Subs</h2><span class="sub">one card per miniDSP output; positions in feet like the room</span></div>
       <div class="suggest-head">
         <div><h3 style="margin:0 0 2px">Suggested setup</h3><p class="muted" style="margin:0">Claude recommends sub settings, placement and a target curve from “What you want”, the room and your subs. Re-run after measuring for a sharper answer.</p></div>
         <button class="btn primary" id="sugBtn">Suggest setup</button>
       </div>
       <div id="sugBox"></div>
 
-      <h3>Subs</h3>
       <div class="subs" id="subRows"></div>
-
-      <div id="modesBox"></div>
-      <div class="save-bar"><button class="btn primary" id="roomSave">Save room and subs</button><span class="muted" id="roomMsg"></span></div>
+      <div class="save-bar"><button class="btn primary" id="subsSave">Save subs</button><span class="muted" id="subsMsg"></span></div>
     </section>
   </div>
 

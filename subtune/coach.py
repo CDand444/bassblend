@@ -107,7 +107,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
         what = "; ".join(f"{m}: {', '.join(lbl)}" for m, lbl in kinds.items())
         out.append(_step(5, "hw_record", "hardware", f"Record how your subs are set ({outs})",
                          f"Their knobs and switches change how they play ({what}). Once htTamer knows them it can protect "
-                         "the drivers, spot conflicts and suggest better settings. Room & subs → Controls on the sub.",
+                         "the drivers, spot conflicts and suggest better settings. Subs → Controls on the sub.",
                          who="owner", open="room"))
     # ---- hardware suggestions grounded in the maker's guidance and the room
     rm = room.get("room") or {}

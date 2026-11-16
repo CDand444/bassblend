@@ -51,7 +51,8 @@ const MENU = [
    tag: () => { const n = setupItems().filter(i => !i.ok && !i.optional).length; return n ? [String(n), 'alert'] : ['✓', '']; }},
   {grp: 'Survey', key: 'avr', icon: 'avr', title: 'Receiver', full: 'Receiver', el: $('#avrCard'),
    tag: () => AVR.status ? [AVR.status.power ? 'on' : 'standby', AVR.status.power ? 'live' : ''] : null},
-  {grp: 'Survey', key: 'room', icon: 'room', title: 'Room & subs', full: 'Room and subs', el: $('#roomCard'),
+  {grp: 'Survey', key: 'room', icon: 'room', title: 'Room', full: 'Room', el: $('#roomCard'), tag: () => null},
+  {grp: 'Survey', key: 'subs', icon: 'meters', title: 'Subs', full: 'Your subs', el: $('#subsCard'),
    tag: () => { const n = ((S.settings || {}).subs || []).length || Object.keys((S.room || {}).subs || {}).length; return n ? [`${n} subs`, ''] : null; }},
   {grp: 'Survey', key: 'speakers', icon: 'speakers', title: 'Speakers', full: 'Your speakers', el: $('#spkCard'),
    tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;

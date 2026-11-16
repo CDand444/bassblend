@@ -1,4 +1,4 @@
-// htTamer page script: couches on Room and subs (spec 08). Loaded after room-ai.js; names here start with fu.
+// htTamer page script: couches on the Room page (spec 08). Loaded after room-ai.js; names here start with fu.
 // A couch is stored like furniture.py cleans it: {id, kind: 'couch', name, x_m, y_m, length_m, depth_m, seat_h_m, back_h_m,
 // fabric, rotation (0 = back toward the back wall, clockwise), against_wall}. Shown in feet.
 const FU_FABRICS = [['fabric', 'Fabric'], ['microfiber', 'Microfiber'], ['velvet', 'Velvet'], ['linen', 'Linen'], ['leather', 'Leather'], ['vinyl', 'Vinyl']];

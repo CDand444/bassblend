@@ -57,7 +57,7 @@ DEFS = {
     "eq switch": "On the Hsu, the EQ1/EQ2 switch works with the port plugs: 4\" port + EQ1 = deepest extension; 4\" port + "
                  "EQ2 = more headroom; both ports + EQ2 = most output. Never both ports with EQ1 (can damage the driver).",
     "ports": "Port plugs change how a ported sub plays: more ports open = more output, plugged = sealed-like (tighter, "
-             "rolls off higher but more gently). Record them in Room & subs so htTamer knows.",
+             "rolls off higher but more gently). Record them on the Subs page so htTamer knows.",
     "dirac": "Dirac Live corrects your speakers (and can see the subs as one). Run it after htTamer has tuned the subs, "
              "with htTamer's target curve (Tune my system → Dirac Live step), then re-run the blend test and a report.",
     "slot": "The miniDSP holds 4 slots (presets). Slot 1 is your original setup and htTamer never overwrites it. "
@@ -112,7 +112,7 @@ def answer(question: str, st: dict, settings: dict, room: dict, avr: dict | None
             if not cid:
                 continue
             ds = vendors.describe(cid, d.get("controls") or {})
-            rec = "" if d.get("controls") else " (settings not recorded yet: Room & subs → Controls on the sub)"
+            rec = "" if d.get("controls") else " (settings not recorded yet: Subs → Controls on the sub)"
             lines.append(f"- **Out {int(k) + 1}, {ds['make_model']}**: {ds['mode'] or 'mode unknown'}{rec}"
                          + ("".join(f"\n  - ⚠ {n}" for n in ds["notes"] if "never" in n.lower() or "stack" in n.lower())))
         if lines:
