@@ -18,7 +18,7 @@ C = 343.0
 EMPTY = {
     "room": {"length_m": None, "width_m": None, "height_m": None, "construction": "", "openings": "", "notes": "",
              # optional real shape (shape.py): floor outline, openings on its walls, sloped/vaulted ceiling
-             "outline": None, "shape": "rect", "wall_openings": [], "ceiling": None},
+             "outline": None, "shape": "rect", "wall_openings": [], "ceiling": None, "soffits": []},
     "seats": [{"name": "Main seat", "x_m": None, "y_m": None, "z_m": 1.0}],
     "subs": {},          # "0".."3" -> sub description (output index, 0-based)
     "avr": "",
@@ -124,6 +124,8 @@ def clean_shape(rm: dict, base: dict) -> dict:
         raise ValueError("enter the room size before adding openings")
     out["wall_openings"] = shape.clean_openings(ops, pts) if pts else []
     out["ceiling"] = shape.clean_ceiling(rm.get("ceiling"), base.get("height_m"))
+    from . import soffit
+    out["soffits"] = soffit.clean_soffits(rm.get("soffits"), pts, base.get("height_m"))
     return out
 
 

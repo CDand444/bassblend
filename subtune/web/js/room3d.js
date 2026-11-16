@@ -59,6 +59,15 @@
         });
         if (s < e.len) strip(s, e.len, 0, 'wall');
       });
+      // soffits: a box hanging under the ceiling along a wall (underside, two ends and the room-facing side)
+      (room.soffits || []).forEach(sf => {
+        const e = es[sf.wall]; if (!e || !(sf.length_m > 0)) return;
+        const ix = -e.n[0], iy = -e.n[1], a = [e.a[0] + e.d[0] * sf.from_m, e.a[1] + e.d[1] * sf.from_m], b = [a[0] + e.d[0] * sf.length_m, a[1] + e.d[1] * sf.length_m];
+        const c = [b[0] + ix * sf.depth_m, b[1] + iy * sf.depth_m], d = [a[0] + ix * sf.depth_m, a[1] + iy * sf.depth_m], lo = sf.bottom_m;
+        const hi = p => ceilZ(room, p[0], p[1]), side = (p, q, n) => out.push({kind: 'wall', poly: [[p[0], p[1], lo], [q[0], q[1], lo], [q[0], q[1], hi(q)], [p[0], p[1], hi(p)]], n});
+        out.push({kind: 'wall', poly: [[a[0], a[1], lo], [b[0], b[1], lo], [c[0], c[1], lo], [d[0], d[1], lo]]});
+        side(d, c, [ix, iy]); side(a, d, [-e.d[0], -e.d[1]]); side(c, b, [e.d[0], e.d[1]]);
+      });
       return out;
     }
     function draw() {

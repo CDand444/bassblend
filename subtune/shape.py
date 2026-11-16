@@ -392,7 +392,13 @@ def ceiling_z(rm: dict, x: float, y: float) -> float | None:
         (px, py, pz), (nx, ny, nz) = p["p0"], p["n"]
         z = pz - (nx * (x - px) + ny * (y - py)) / nz
         best = z if best is None else min(best, z)
-    return H if best is None else max(0.0, min(H, best))
+    z = H if best is None else max(0.0, min(H, best))
+    if rm.get("soffits"):
+        from . import soffit
+        b = soffit.bottom_at(rm, x, y)
+        if b is not None:
+            z = min(z, b)
+    return z
 
 
 def mean_height(rm: dict) -> float | None:

@@ -123,7 +123,7 @@ function initRoom() {
   $('#rL').value = toFt(rm.length_m); $('#rW').value = toFt(rm.width_m); $('#rH').value = toFt(rm.height_m);
   $('#rC').value = rm.construction || ''; $('#rO').value = rm.openings || ''; $('#rAvr').value = r.avr || ''; $('#rGoals').value = r.goals || '';
   const cp = v => v == null ? v : JSON.parse(JSON.stringify(v));
-  roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null};
+  roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null, soffits: cp(rm.soffits) || []};
   renderShapeEditor(); planKey = null;
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
   fuRender(r.furniture);
@@ -196,7 +196,7 @@ function readRoom() {
     if (Object.values(o).some(v => v !== '' && v != null)) subs[d.dataset.o] = o; });
   const sh = roomShape, [ow, ol] = sh.outline ? extentOf(sh.outline) : [toM($('#rW').value), toM($('#rL').value)];
   return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
-                 outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0),
+                 outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0), soffits: (sh.soffits || []).filter(s => s.length_m > 0),
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
           seats, subs, furniture: fuRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
@@ -221,7 +221,7 @@ async function roTurn(op) {
   $('#roMsg').textContent = 'Turned.';
 }
 // ---------- room shape: floor outline (corners in meters, in order around the room), openings, ceiling
-let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null}, planDrag = null, planKey = null;
+let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null, soffits: []}, planDrag = null, planKey = null;
 const SHAPES = [['rect', 'Rectangle'], ['l', 'L-shape'], ['alcove', 'Alcove'], ['cut', 'Cut corner'], ['custom', 'Custom']];
 const OPEN_KINDS = [['opening', 'Opening (no wall)'], ['door', 'Door'], ['window', 'Window']];
 const rectPts = (W, L) => [[0, 0], [W, 0], [W, L], [0, L]];
@@ -283,6 +283,7 @@ function renderShapeEditor() {
       <button type="button" class="btn icon ghost" data-odel="${j}" aria-label="Remove opening">✕</button>
       <label class="f">From corner${ftIn(`data-of="${j}"`, o.from_m)}</label><label class="f">Width${ftIn(`data-owd="${j}"`, o.width_m)}</label><label class="f">Height${ftIn(`data-oh="${j}"`, o.height_m, 'full')}</label></div>`).join('')}
     <button type="button" class="btn ghost" id="addOpening" ${es.length ? '' : 'disabled title="Enter the room size first"'}>Add opening</button></details>`;
+  h += soEditorHtml(sh, es, ftIn);
   h += `<div class="row"><span class="muted small">Ceiling</span><select id="ceilK" aria-label="Ceiling"><option value="flat">Flat</option><option value="slope" ${c.kind === 'slope' ? 'selected' : ''}>Sloped</option><option value="vault" ${c.kind === 'vault' ? 'selected' : ''}>Vaulted (peaked)</option></select>`;
   if (c.kind === 'slope' || c.kind === 'vault') {
     h += `<label class="f" style="flex:0 1 120px">Low side height${ftIn('id="ceilLow"', c.low_m)}</label>`;
@@ -295,11 +296,13 @@ function renderShapeEditor() {
   $('#shapeBox').className = 'shape'; $('#shapeBox').innerHTML = h;
 }
 function setPts(pts, rerender = true) { roomShape.outline = pts; syncExtent(); if (rerender) renderShapeEditor(); planKey = null; renderPlan(readRoom()); }
-function moveOpeningsOnInsert(i, half) {        // edge i was split at `half` meters: later edges shift by one
+function moveOpeningsOnInsert(i, half) {
+  soMoveOnInsert(i, half);        // edge i was split at `half` meters: later edges shift by one
   roomShape.wall_openings.forEach(o => { if (o.wall > i) o.wall++; else if (o.wall === i && o.from_m + o.width_m / 2 > half) { o.wall++; o.from_m = Math.max(0, r3(o.from_m - half)); } });
 }
 function moveOpeningsOnRemove(i, prevLen) {     // corner i removed: edges i-1 and i merge
   const n = roomShape.outline.length;
+  soMoveOnRemove(i, prevLen, n);
   roomShape.wall_openings.forEach(o => { if (o.wall === i) { o.wall = (i - 1 + n) % n; o.from_m = r3(o.from_m + prevLen); } else if (o.wall > i) o.wall--; });
 }
 $('#shapeBox').addEventListener('click', e => {
@@ -311,6 +314,7 @@ $('#shapeBox').addEventListener('click', e => {
     if (k === 'rect') { const [w, l] = roomShape.outline ? extentOf(roomShape.outline) : [W, L]; roomShape.outline = null; if (w) { $('#rW').value = toFt(w); $('#rL').value = toFt(l); } }
     else if (k !== 'custom' || !roomShape.outline) { roomShape.outline = k === 'custom' ? rectPts(W, L) : presetPts(k, W, L); }
     roomShape.wall_openings = roomShape.wall_openings.filter(o => o.wall < (roomShape.outline || [0, 0, 0, 0]).length);
+    roomShape.soffits = (roomShape.soffits || []).filter(s => s.wall < (roomShape.outline || [0, 0, 0, 0]).length);
     setPts(roomShape.outline); return;
   }
   const del = e.target.closest('[data-cdel]');
@@ -351,6 +355,7 @@ $('#shapeBox').addEventListener('change', e => {
   const cur = extentOf(pts)[k]; if (!cur) return;
   pts.forEach(p => p[k] = r3(p[k] * v / cur));
   roomShape.wall_openings.forEach(o => { const e = edgesOf(pts)[o.wall]; if (e) { o.from_m = Math.min(o.from_m, r3(e.len)); } });
+  soClamp(pts);
   renderShapeEditor();
 }));
 // dragging corners on the plan (snaps to 3 in. and to the neighbouring corners' lines, keeping walls square)
@@ -415,6 +420,7 @@ function renderPlan(r) {
     const mx = e.a[0] + (e.b[0] - e.a[0]) * .3, my = e.a[1] + (e.b[1] - e.a[1]) * .3, tx = X(mx) + e.n[0] * 15, ty = Y(my) + e.n[1] * 15 + 3.5;
     g += `<text x="${tx}" y="${ty}" text-anchor="middle" font-size="9.5" fill="var(--text-3)" stroke="var(--surface-2)" stroke-width="3" paint-order="stroke">${fmtFt(e.len)}</text>`; });
   g += openingMarks(r.room.wall_openings || [], es, X, Y, 'var(--surface-2)');
+  g += soPlanG(r.room.soffits, es, X, Y);
   g += fuPlanSvg(r.furniture, X, Y);
   spk.concat(sug).forEach(s => { const c = s.kind === 'height' ? 'var(--s4)' : 'var(--s1)';
     g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 4.5 : 5}" fill="${s.rec ? c : 'var(--surface)'}" stroke="${c}" stroke-width="1.5"${s.rec ? '' : ' stroke-dasharray="2 2"'}><title>${esc(s.id)}${s.rec ? '' : ' (suggested spot)'}</title></circle>
@@ -513,7 +519,7 @@ function applyPlanReading(r) {
   }
   planUndo = {shape: JSON.parse(JSON.stringify(roomShape)), dims: ['#rL', '#rW', '#rH'].map(id => $(id).value)};
   roomShape = {outline: rm.outline ? JSON.parse(JSON.stringify(rm.outline)) : null, shape: rm.outline ? (rm.shape || 'custom') : 'rect',
-               wall_openings: JSON.parse(JSON.stringify(rm.wall_openings || [])), ceiling: rm.ceiling || null};
+               wall_openings: JSON.parse(JSON.stringify(rm.wall_openings || [])), ceiling: rm.ceiling || null, soffits: []};
   if (rm.length_m) $('#rL').value = toFt(rm.length_m); if (rm.width_m) $('#rW').value = toFt(rm.width_m); if (rm.height_m) $('#rH').value = toFt(rm.height_m);
   renderShapeEditor(); planKey = null; renderPlan(readRoom()); planFile = null;
   $('#buildBox').innerHTML = `<div class="hwnote" style="margin-top:10px"><b>From your floor plan</b> (${esc(['high', 'medium', 'low'].includes(p.confidence) ? p.confidence : 'low')} confidence): ${esc(String(p.summary || ''))}

@@ -24,7 +24,7 @@ from __future__ import annotations
 import math
 import time
 
-from . import furniture
+from . import furniture, soffit
 
 FT = 0.3048
 IN = 0.0254
@@ -634,6 +634,9 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     rt = (room_metrics(state).get("report") or {}).get("rt60_mid_s")
     items, notes = [], []
     couch_notes(room, seats, rt, notes)
+    if soffit.front_wall(_rm(room)):
+        notes.append("A soffit along the front wall: in-ceiling or height speakers there are close to the wall; "
+                     "treat the soffit underside like a ceiling reflection point.")
 
     def add(iid, title, kind, wall, zone_, qty, size, thick, gap, effect, base, why, **kw):
         blocked = wall in banned

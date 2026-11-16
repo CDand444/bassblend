@@ -156,7 +156,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
 
     fl = next((s for s in spk if s["id"] == "FL"), None)
     lat = abs(mx - fl["x_m"]) if fl else W / 4
-    rise = (shape.ceiling_z(rm, mx, my) if poly or shape.ceiling(rm)["kind"] != "flat" else H) - ez
+    rise = (shape.ceiling_z(rm, mx, my) if poly or shape.ceiling(rm)["kind"] != "flat" or rm.get("soffits") else H) - ez
     if rise < 1.0:
         notes.append(f"The ceiling is only {_ft(rise)} ft above ear height: height speakers will sound close and "
                      "directional. Angled in-ceiling or upfiring modules help.")
@@ -181,7 +181,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
             notes.append(f"{NAMES[k]}: the ideal ceiling spot is outside your room's outline; put it on the nearest "
                          "ceiling inside the room.")
             continue
-        zc = shape.ceiling_z(rm, x, y) if (poly or shape.ceiling(rm)["kind"] != "flat") else H
+        zc = shape.ceiling_z(rm, x, y) if (poly or shape.ceiling(rm)["kind"] != "flat" or rm.get("soffits")) else H
         spk.append({"id": k, "name": NAMES[k], "x_m": round(x, 2), "y_m": round(y, 2), "z_m": round(zc, 2),
                     "x_ft": _ft(x), "y_ft": _ft(y), "z_ft": _ft(zc), "elevation": ideal_el, "range": [elo, ehi], "kind": "height"})
     if my < L * 0.35 or my > L * 0.85:

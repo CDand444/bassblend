@@ -19,6 +19,26 @@ _WALL_180 = {"front": "back", "back": "front", "left": "right", "right": "left"}
 _WALL_MIRROR = {"front": "front", "back": "back", "left": "right", "right": "left"}
 
 
+def _turn_soffits(rm: dict, old_rm: dict, op: str) -> None:
+    """Turn rm["soffits"] (already a copy) for `op`. `old_rm` is the room before the turn (for the wall lengths)."""
+    outline = rm.get("outline")
+    old_outline = old_rm.get("outline")
+    for s in rm["soffits"]:
+        w = s["wall"]
+        if outline is not None:
+            n = len(outline)
+            if op == "mirror":
+                ln = math.dist(old_outline[w], old_outline[(w + 1) % n])
+                s["from_m"] = round(ln - s["from_m"] - s["length_m"], 3)
+                s["wall"] = (n - 2 - w) % n
+        elif op == "mirror":
+            ln = old_rm.get("length_m", 0.0) if w in (1, 3) else old_rm.get("width_m", 0.0)
+            s["from_m"] = round(ln - s["from_m"] - s["length_m"], 3)
+            s["wall"] = {0: 0, 1: 3, 2: 2, 3: 1}[w]
+        else:
+            s["wall"] = (w + {"cw": 1, "ccw": 3, "180": 2}[op]) % 4
+
+
 def inverse(op: str) -> str:
     """Return the inverse of an operation."""
     if op == "cw":
@@ -193,6 +213,10 @@ def transform_room(room: dict, op: str) -> dict:
                 new_openings.append(opening)
 
         rm["wall_openings"] = new_openings
+
+    # Soffits sit on walls like openings do: renumber the wall, and a mirror flips where along it they start
+    if rm.get("soffits"):
+        _turn_soffits(rm, room["room"], op)
 
     # Couches turn with the room: footprint centre, which way the back faces, and the wall they stand against
     for item in new_room.get("furniture") or []:
