@@ -118,7 +118,14 @@
       path(floor.pp); ctx.fillStyle = C.floor; ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 1.2; ctx.stroke();
       // screen on the front wall's floor line, for orientation
       const fe = edges(pts).filter(e => e.n[1] < -0.9).sort((a, b) => a.a[1] - b.a[1] || b.len - a.len)[0];
-      if (fe) { const a = P([fe.a[0] + fe.d[0] * fe.len * .3, fe.a[1], 0.9]), b = P([fe.a[0] + fe.d[0] * fe.len * .7, fe.a[1], 0.9]);
+      if (fe && room.screen) {       // the real screen, to size: a rectangle on the front wall (dashed and blue when acoustically transparent)
+        const sc = room.screen, w = Math.min(sc.width_m, fe.len), mid = Math.min(fe.len - w / 2, Math.max(w / 2, sc.x_m != null ? sc.x_m - fe.a[0] : fe.len / 2));
+        const ix = -fe.n[0] * (sc.behind_m || 0), iy = -fe.n[1] * (sc.behind_m || 0), at = s => [fe.a[0] + fe.d[0] * s + ix, fe.a[1] + fe.d[1] * s + iy];
+        const z0 = sc.bottom_m || 0, z1 = z0 + sc.height_m, p0 = at(mid - w / 2), p1 = at(mid + w / 2);
+        path([P([p0[0], p0[1], z0]), P([p1[0], p1[1], z0]), P([p1[0], p1[1], z1]), P([p0[0], p0[1], z1])]);
+        ctx.globalAlpha = sc.at ? 0.25 : 0.8; ctx.fillStyle = sc.at ? C.accent : C.text; ctx.fill(); ctx.globalAlpha = 1;
+        ctx.strokeStyle = sc.at ? C.accent : C.text; ctx.lineWidth = 2; ctx.setLineDash(sc.at ? [5, 3] : []); ctx.stroke(); ctx.setLineDash([]);
+      } else if (fe) { const a = P([fe.a[0] + fe.d[0] * fe.len * .3, fe.a[1], 0.9]), b = P([fe.a[0] + fe.d[0] * fe.len * .7, fe.a[1], 0.9]);
         ctx.strokeStyle = C.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
       // markers sit on the floor (seats, subs) or where they are (speakers): drawn before the walls in front of them
       const mk = marks.filter(m => m.x_m != null && m.y_m != null).map(m => { const z = m.kind === 'height' ? ceilZ(room, m.x_m, m.y_m) : (m.z_m ?? (m.kind === 'sub' ? 0.3 : m.kind === 'seat' ? 0.5 : 1.1));

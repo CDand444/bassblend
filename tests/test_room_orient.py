@@ -26,6 +26,7 @@ ORIGINAL = {
     "treatment": {},
     "speakers": {},
     "furniture": [],
+    "screen": None,
 }
 
 

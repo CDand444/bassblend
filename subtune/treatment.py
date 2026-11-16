@@ -24,7 +24,7 @@ from __future__ import annotations
 import math
 import time
 
-from . import furniture, soffit
+from . import furniture, screen, soffit
 
 FT = 0.3048
 IN = 0.0254
@@ -633,6 +633,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
              ((room.get("room") or {}).get("notes") or "").lower()
     rt = (room_metrics(state).get("report") or {}).get("rt60_mid_s")
     items, notes = [], []
+    notes += screen.notes(room, seats)
     couch_notes(room, seats, rt, notes)
     notes += [n for n in (furniture.riser_note(room, s) for s in seats) if n]
     if soffit.front_wall(_rm(room)):

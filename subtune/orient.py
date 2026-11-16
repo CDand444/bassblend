@@ -218,6 +218,11 @@ def transform_room(room: dict, op: str) -> dict:
     if rm.get("soffits"):
         _turn_soffits(rm, room["room"], op)
 
+    # The screen stays on the front wall (that is how the front wall is chosen); a mirror flips where along it the middle is
+    sc = new_room.get("screen")
+    if op == "mirror" and sc and sc.get("x_m") is not None:
+        sc["x_m"] = round(rm["width_m"] - sc["x_m"], 4)
+
     # Couches turn with the room: footprint centre, which way the back faces, and the wall they stand against
     for item in new_room.get("furniture") or []:
         item["x_m"], item["y_m"] = transform_point(item.get("x_m"), item.get("y_m"))

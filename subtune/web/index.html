@@ -1281,6 +1281,26 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         </div>
       </div>
 
+      <h3>Screen</h3>
+      <div id="scBox">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">
+          <label class="f">Type<select id="scKind"><option value="">No screen entered</option><option value="tv">TV</option><option value="projector">Projector screen</option></select></label>
+        </div>
+        <div id="scFields" style="margin-top:8px" hidden>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end" id="scGrid">
+            <label class="f">Size, diagonal (in)<input id="scDiag" type="number" step="1" min="20" max="300" placeholder="65"></label>
+            <label class="f">Shape (aspect)<select id="scAspect"><option>16:9</option><option>16:10</option><option>4:3</option><option>1.85:1</option><option>2.35:1</option><option>2.40:1</option></select></label>
+            <label class="f">Bottom edge above floor<span class="unit" data-u="ft"><input id="scBottom" type="number" step="0.1" min="0" placeholder="2.6"></span></label>
+            <label class="f">Face in front of the wall<span class="unit" data-u="ft"><input id="scGap" type="number" step="0.1" min="0" placeholder="0.2"></span></label>
+            <label class="f">Middle from left (blank = centered)<span class="unit" data-u="ft"><input id="scX" type="number" step="0.1" min="0"></span></label>
+          </div>
+          <label class="cb" id="scAtRow" hidden><input type="checkbox" id="scAt"><span>Acoustically transparent (AT)<small>The fabric lets sound through, so speakers can stand behind it.</small></span></label>
+          <label class="cb" id="scBehindRow" hidden><input type="checkbox" id="scBehind"><span>Front left, center and right are behind it</span></label>
+          <label class="f" style="margin-top:6px">Notes<input id="scNotes" maxlength="300" placeholder="Fixed frame, masking, a sub behind it"></label>
+        </div>
+        <p class="muted small" id="scInfo" style="margin:6px 0 0"></p>
+      </div>
+
       <h3>Listening positions</h3>
       <div class="seatrow muted small" aria-hidden="true"><span>Name</span><span>From left</span><span>From front</span><span>Ear height</span><span></span></div>
       <div id="seatRows"></div>
@@ -1375,6 +1395,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/room-ai.js?v=__V__"></script>
 <script src="/js/furniture.js?v=__V__"></script>
 <script src="/js/soffit.js?v=__V__"></script>
+<script src="/js/screen.js?v=__V__"></script>
 <script src="/js/backup.js?v=__V__"></script>
 <script src="/js/receiver.js?v=__V__"></script>
 <script src="/js/measure.js?v=__V__"></script>

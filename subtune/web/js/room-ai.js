@@ -126,7 +126,7 @@ function initRoom() {
   roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null, soffits: cp(rm.soffits) || []};
   renderShapeEditor(); planKey = null;
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
-  fuRender(r.furniture);
+  fuRender(r.furniture); scFill(r.screen);
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
 }
@@ -198,7 +198,7 @@ function readRoom() {
   return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
                  outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0), soffits: (sh.soffits || []).filter(s => s.length_m > 0),
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
-          seats, subs, furniture: fuRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
+          seats, subs, furniture: fuRead(), screen: scRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
 [['#roomSave', '#roomMsg'], ['#subsSave', '#subsMsg']].forEach(([btn, msg]) => $(btn).onclick = async () => {    // one save for both pages
   $(btn).disabled = true;
@@ -414,7 +414,7 @@ function renderPlan(r) {
   const spk = Object.entries(r.speakers || (S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
   // suggested spots come from the saved room: while the outline is being edited, hide the ones now outside it
   const sug = spk.length || !pts ? [] : ((S.placement || {}).speakers || []).filter(s => insidePts(pts, s.x_m, s.y_m)).map(s => ({...s, rec: false}));
-  const key = JSON.stringify([swPick, r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
+  const key = JSON.stringify([swPick, r.screen, r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
   if (key === planKey && el.querySelector('svg')) return; planKey = key;
   plan3d(r, spk.concat(sug));
   if (!pts) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
@@ -424,7 +424,8 @@ function renderPlan(r) {
   const d = pts.map((p, k) => (k ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('') + 'Z';
   let g = `<path id="roomPoly" d="${d}" fill="var(--surface)" stroke="var(--border-strong)" stroke-width="1.5" stroke-linejoin="round"/>`;
   const front = es.filter(e => e.side === 'front' && !e.angled).sort((a, b) => a.a[1] - b.a[1] || b.len - a.len)[0];
-  if (front) { const x0 = Math.min(front.a[0], front.b[0]), x1 = Math.max(front.a[0], front.b[0]), y = front.a[1], w = x1 - x0;
+  if (front && r.screen) g += scPlanG(r.screen, front, X, Y);
+  else if (front) { const x0 = Math.min(front.a[0], front.b[0]), x1 = Math.max(front.a[0], front.b[0]), y = front.a[1], w = x1 - x0;
     g += `<line x1="${X(x0 + w * .3)}" x2="${X(x0 + w * .7)}" y1="${Y(y) + 4}" y2="${Y(y) + 4}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>`;
     g += `<text x="${X(x0 + w / 2)}" y="${Y(y) - 12}" text-anchor="middle" font-size="11" fill="var(--text-3)">Screen${rect ? ` · ${fmtFt(W)} wide` : ''}</text>`; }
   if (rect) {
@@ -466,7 +467,7 @@ function plan3d(r, spk) {
     .concat(Object.entries(r.subs || {}).map(([o, s]) => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'sub', label: `${+o + 1}`, color: css(SUBC[+o % 4])})))
     .concat(fuMarks3d(r.furniture))
     .concat((spk || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.kind === 'height' ? null : s.z_m, kind: s.kind === 'height' ? 'height' : 'speaker', label: s.id})));
-  plan3dView.set({...rm, outline: rm.outline || null, hl: soHl}, marks);
+  plan3dView.set({...rm, outline: rm.outline || null, hl: soHl, screen: r.screen || null}, marks);
 }
 function setPlanMode(m) {
   planMode = m; try { localStorage.setItem('htPlanView', m); } catch (e) { /* private mode */ }
