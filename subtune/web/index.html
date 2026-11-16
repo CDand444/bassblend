@@ -1266,6 +1266,11 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="seatRows"></div>
       <button class="btn ghost" id="addSeat">Add position</button>
 
+      <h3>Couches</h3>
+      <p class="muted small" style="margin:0 0 8px">Optional. A couch changes how long the room rings and where the seat sits against the wall, so htTamer counts it in the treatment plan.</p>
+      <div id="couchRows"></div>
+      <div class="row" style="gap:8px;align-items:center"><select id="fuPreset" aria-label="Kind of couch" style="width:auto"><option value="three">3-seat couch</option><option value="loveseat">Loveseat</option><option value="sectional">Sectional</option><option value="recliner">Recliner</option><option value="custom">Custom size</option></select><button type="button" class="btn ghost" id="addCouch">Add couch</button></div>
+
       <div class="suggest-head">
         <div><h3 style="margin:0 0 2px">Suggested setup</h3><p class="muted" style="margin:0">Claude recommends sub settings, placement and a target curve from “What you want”, the room and your subs. Re-run after measuring for a sharper answer.</p></div>
         <button class="btn primary" id="sugBtn">Suggest setup</button>
@@ -1345,6 +1350,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/core.js?v=__V__"></script>
 <script src="/js/tune.js?v=__V__"></script>
 <script src="/js/room-ai.js?v=__V__"></script>
+<script src="/js/furniture.js?v=__V__"></script>
 <script src="/js/receiver.js?v=__V__"></script>
 <script src="/js/measure.js?v=__V__"></script>
 <script src="/js/setup-home.js?v=__V__"></script>

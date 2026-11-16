@@ -91,6 +91,12 @@
       const items = sorted.filter(f => f.kind !== 'floor').concat(mk.map(m => ({kind: 'mark', m, depth: m.depth})));
       items.sort((a, b) => b.depth - a.depth);
       items.forEach(f => {
+        if (f.kind === 'mark' && f.m.kind === 'couch') {       // a seat box and a back box, drawn face by face
+          f.m.boxes.forEach(b => { const lo = b.pts.map(p => P([p[0], p[1], b.z0])), hi = b.pts.map(p => P([p[0], p[1], b.z1]));
+            const faces = [hi].concat([0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]));
+            faces.sort((p, q) => q.reduce((s, v) => s + v[2], 0) - p.reduce((s, v) => s + v[2], 0));
+            faces.forEach(pp => { path(pp); ctx.fillStyle = C.floor; ctx.globalAlpha = 0.95; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = C.text; ctx.lineWidth = 1; ctx.stroke(); }); });
+          return; }
         if (f.kind === 'mark') { const m = f.m, r = m.kind === 'sub' ? 6 : m.kind === 'seat' ? 6 : 4;
           ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(m.g[0], m.g[1]); ctx.lineTo(m.q[0], m.q[1]); ctx.stroke(); ctx.setLineDash([]);
           ctx.fillStyle = m.color || (m.kind === 'seat' ? C.text : m.kind === 'sub' ? C.accent : m.kind === 'height' ? color(canvas, '--s4', '#8a5cf5') : color(canvas, '--s1', '#2a78d6'));

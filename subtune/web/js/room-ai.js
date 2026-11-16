@@ -126,6 +126,7 @@ function initRoom() {
   roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null};
   renderShapeEditor(); planKey = null;
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
+  fuRender(r.furniture);
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
 }
@@ -197,7 +198,7 @@ function readRoom() {
   return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
                  outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0),
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
-          seats, subs, avr: $('#rAvr').value, goals: $('#rGoals').value};
+          seats, subs, furniture: fuRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
 $('#roomSave').onclick = async () => {
   $('#roomSave').disabled = true;
@@ -394,7 +395,7 @@ function renderPlan(r) {
   const spk = Object.entries(r.speakers || (S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
   // suggested spots come from the saved room: while the outline is being edited, hide the ones now outside it
   const sug = spk.length || !pts ? [] : ((S.placement || {}).speakers || []).filter(s => insidePts(pts, s.x_m, s.y_m)).map(s => ({...s, rec: false}));
-  const key = JSON.stringify([r.room, r.seats, r.subs, spk, sug, roomShape.outline ? 1 : 0]);
+  const key = JSON.stringify([r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
   if (key === planKey && el.querySelector('svg')) return; planKey = key;
   plan3d(r, spk.concat(sug));
   if (!pts) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
@@ -414,6 +415,7 @@ function renderPlan(r) {
     const mx = e.a[0] + (e.b[0] - e.a[0]) * .3, my = e.a[1] + (e.b[1] - e.a[1]) * .3, tx = X(mx) + e.n[0] * 15, ty = Y(my) + e.n[1] * 15 + 3.5;
     g += `<text x="${tx}" y="${ty}" text-anchor="middle" font-size="9.5" fill="var(--text-3)" stroke="var(--surface-2)" stroke-width="3" paint-order="stroke">${fmtFt(e.len)}</text>`; });
   g += openingMarks(r.room.wall_openings || [], es, X, Y, 'var(--surface-2)');
+  g += fuPlanSvg(r.furniture, X, Y);
   spk.concat(sug).forEach(s => { const c = s.kind === 'height' ? 'var(--s4)' : 'var(--s1)';
     g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 4.5 : 5}" fill="${s.rec ? c : 'var(--surface)'}" stroke="${c}" stroke-width="1.5"${s.rec ? '' : ' stroke-dasharray="2 2"'}><title>${esc(s.id)}${s.rec ? '' : ' (suggested spot)'}</title></circle>
       <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < L / 2 ? 15 : -8)}" text-anchor="middle" font-size="8.5" fill="var(--text-3)">${esc(s.id)}</text>`; });
@@ -439,6 +441,7 @@ function plan3d(r, spk) {
   if (!plan3dView) plan3dView = RoomView.view3d($('#plan3d'));
   const rm = r.room, marks = (r.seats || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'seat'}))
     .concat(Object.entries(r.subs || {}).map(([o, s]) => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'sub', label: `${+o + 1}`, color: css(SUBC[+o % 4])})))
+    .concat(fuMarks3d(r.furniture))
     .concat((spk || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.kind === 'height' ? null : s.z_m, kind: s.kind === 'height' ? 'height' : 'speaker', label: s.id})));
   plan3dView.set({...rm, outline: rm.outline || null}, marks);
 }
