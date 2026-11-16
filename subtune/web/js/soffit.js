@@ -9,9 +9,9 @@ function soEditorHtml(sh, es, ftIn) {
   const list = sh.soffits || [];
   return `<details ${list.length ? 'open' : ''}><summary>Soffits (${list.length})</summary>
     <p class="muted small" style="margin:6px 0">A soffit or bulkhead is a box along a wall that lowers the ceiling there (around the screen, ducts, side walls). Distance is along the wall from its first corner; the height is to its underside. It lowers the ceiling for height speakers and treatment; it does not change the bass numbers.</p>
-    ${list.map((s, j) => `<div class="orow">
-      <select data-sw="${j}" aria-label="Wall" style="grid-column:span 2">${es.map(e => `<option value="${e.i}" ${e.i === s.wall ? 'selected' : ''}>${esc(edgeLabel(e))}</option>`).join('')}</select>
-      <button type="button" class="btn icon ghost" data-sodel="${j}" aria-label="Remove soffit" style="grid-column:span 2">✕</button>
+    ${list.map((s, j) => `<div class="srow">
+      <select data-sw="${j}" aria-label="Wall">${es.map(e => `<option value="${e.i}" ${e.i === s.wall ? 'selected' : ''}>${esc(edgeLabel(e))}</option>`).join('')}</select>
+      <button type="button" class="btn icon ghost" data-sodel="${j}" aria-label="Remove soffit">✕</button>
       <label class="f">From corner${ftIn(`data-sf="${j}"`, s.from_m)}</label><label class="f">Length${ftIn(`data-sl="${j}"`, s.length_m)}</label>
       <label class="f">Sticks out${ftIn(`data-sd="${j}"`, s.depth_m)}</label><label class="f">Underside height${ftIn(`data-sb="${j}"`, s.bottom_m)}</label></div>`).join('')}
     <button type="button" class="btn ghost" id="addSoffit" ${es.length ? '' : 'disabled title="Enter the room size first"'}>Add soffit</button></details>`;
