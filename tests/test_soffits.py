@@ -38,7 +38,7 @@ def test_limits_clamp():
 
 
 def test_bad_input_rejected():
-    for bad, h in (([front(wall=7)], 2.6), ([front(from_m=2.0, length_m=3.0)], 2.6), ([front(length_m=0)], 2.6), ([front()], None), ([front()], 1.8)):
+    for bad, h in (([front(wall=7)], 2.6), ([front(from_m=3.95)], 2.6), ([front(length_m=0)], 2.6), ([front()], None), ([front()], 1.8)):
         try:
             soffit.clean_soffits(bad, PTS, h)
         except ValueError:
@@ -67,17 +67,31 @@ def test_rects_sit_on_their_wall():
     assert xs == [3.6, 4.0] and min(p[1] for p in r["poly"]) == 1.0 and max(p[1] for p in r["poly"]) == 3.0
 
 
+def test_soffit_blends_into_an_angled_wall():
+    # a room with the front-right corner cut at 45 degrees: corners (0,0) (3,0) (4,1) (4,6) (0,6)
+    pts = [[0, 0], [3, 0], [4, 1], [4, 6], [0, 6]]
+    base = {"outline": pts, "length_m": 6.0, "width_m": 4.0, "height_m": 2.6}
+    s = soffit.clean_soffits([{"wall": 0, "from_m": 0.0, "length_m": 3.0, "depth_m": 1.0, "bottom_m": 2.2}], pts, 2.6)
+    r = soffit.rects({**base, "soffits": s})[0]["poly"]
+    assert all(shape.point_in(pts, x, y) for x, y in r)                         # nothing pokes through the angled wall
+    assert max(p[0] for p in r) <= 3.0 + 1e-6 or max(p[1] for p in r) <= 1.0 + 1e-6
+    assert len(r) >= 4 and shape.ceiling_z({**base, "soffits": s}, 1.0, 0.5) == 2.2
+    assert shape.ceiling_z({**base, "soffits": s}, 3.8, 1.0) == 2.6            # in the cut-off corner there is no soffit
+
+
 def test_save_room_and_old_rooms():
     room.ROOM_FILE.write_text('{"room": {"length_m": 5, "width_m": 4, "height_m": 2.5}, "seats": []}')
     assert room.load_room()["room"].get("soffits", []) == []
     r = room.save_room({"room": {"length_m": 6, "width_m": 4, "height_m": 2.6, "soffits": [front()]}, "seats": []})
     assert r["room"]["soffits"][0]["bottom_m"] == 2.2
     try:
-        room.save_room({"room": {"length_m": 6, "width_m": 4, "height_m": 2.6, "soffits": [front(from_m=3.9)]}})
+        room.save_room({"room": {"length_m": 6, "width_m": 4, "height_m": 2.6, "soffits": [front(from_m=3.95)]}})
     except ValueError as e:
-        assert "hangs past" in str(e)
+        assert "starts past" in str(e)
     else:
-        raise AssertionError("overhang saved")
+        raise AssertionError("a soffit starting off the wall was saved")
+    long = room.save_room({"room": {"length_m": 6, "width_m": 4, "height_m": 2.6, "soffits": [front(from_m=0.5, length_m=9.0)]}})
+    assert long["room"]["soffits"][0]["length_m"] == 3.5                       # trimmed to the wall
 
 
 def base_room(*soffits):

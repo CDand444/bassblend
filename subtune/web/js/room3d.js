@@ -24,6 +24,24 @@
     return pts.map((a, i) => { const b = pts[(i + 1) % pts.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
       return {i, a, b, len, d: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], n: [(b[1] - a[1]) / len, -(b[0] - a[0]) / len]}; });
   }
+  // a soffit's floor footprint: along its wall, trimmed to the wall, then cut by the walls either side so that next to an
+  // angled wall it blends into it (the same rule as soffit.py)
+  function clipHalf(poly, nb) {
+    const ix = -nb.n[0], iy = -nb.n[1], side = p => (p[0] - nb.a[0]) * ix + (p[1] - nb.a[1]) * iy, out = [];
+    poly.forEach((p, i) => { const q = poly[(i + 1) % poly.length], sp = side(p), sq = side(q);
+      if (sp >= -1e-9) out.push(p);
+      if ((sp >= -1e-9) !== (sq >= -1e-9)) { const t = sp / (sp - sq); out.push([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t]); } });
+    return out;
+  }
+  function soffitPoly(pts, sf) {
+    const es = edges(pts), e = es[sf.wall]; if (!e || !(sf.length_m > 0)) return null;
+    const ix = -e.n[0], iy = -e.n[1], len = Math.min(sf.length_m, Math.max(0, e.len - sf.from_m)), d = sf.depth_m;
+    const a = [e.a[0] + e.d[0] * sf.from_m, e.a[1] + e.d[1] * sf.from_m], b = [a[0] + e.d[0] * len, a[1] + e.d[1] * len];
+    let poly = [a, b, [b[0] + ix * d, b[1] + iy * d], [a[0] + ix * d, a[1] + iy * d]];
+    const n = es.length;
+    if (n > 3) [es[(e.i + n - 1) % n], es[(e.i + 1) % n]].forEach(nb => { const c = clipHalf(poly, nb); if (c.length) poly = c; });
+    return poly;
+  }
   const color = (el, v, fb) => (getComputedStyle(el).getPropertyValue(v) || '').trim() || fb;
 
   // ---------------------------------------------------------------- 3D
@@ -61,12 +79,12 @@
       });
       // soffits: a box hanging under the ceiling along a wall (underside, two ends and the room-facing side)
       (room.soffits || []).forEach(sf => {
-        const e = es[sf.wall]; if (!e || !(sf.length_m > 0)) return;
-        const ix = -e.n[0], iy = -e.n[1], a = [e.a[0] + e.d[0] * sf.from_m, e.a[1] + e.d[1] * sf.from_m], b = [a[0] + e.d[0] * sf.length_m, a[1] + e.d[1] * sf.length_m];
-        const c = [b[0] + ix * sf.depth_m, b[1] + iy * sf.depth_m], d = [a[0] + ix * sf.depth_m, a[1] + iy * sf.depth_m], lo = sf.bottom_m;
-        const hi = p => ceilZ(room, p[0], p[1]), side = (p, q, n) => out.push({kind: 'wall', poly: [[p[0], p[1], lo], [q[0], q[1], lo], [q[0], q[1], hi(q)], [p[0], p[1], hi(p)]], n});
-        out.push({kind: 'wall', poly: [[a[0], a[1], lo], [b[0], b[1], lo], [c[0], c[1], lo], [d[0], d[1], lo]]});
-        side(d, c, [ix, iy]); side(a, d, [-e.d[0], -e.d[1]]); side(c, b, [e.d[0], e.d[1]]);
+        const poly = soffitPoly(pts, sf); if (!poly) return;
+        const lo = sf.bottom_m, hi = p => ceilZ(room, p[0], p[1]), cx = poly.reduce((t, p) => t + p[0], 0) / poly.length, cy = poly.reduce((t, p) => t + p[1], 0) / poly.length;
+        out.push({kind: 'wall', poly: poly.map(p => [p[0], p[1], lo])});
+        poly.forEach((p, i) => { const q = poly[(i + 1) % poly.length], len = Math.hypot(q[0] - p[0], q[1] - p[1]); if (len < 1e-6) return;
+          let n = [(q[1] - p[1]) / len, -(q[0] - p[0]) / len]; if ((p[0] - cx) * n[0] + (p[1] - cy) * n[1] < 0) n = [-n[0], -n[1]];      // pointing away from the middle
+          out.push({kind: 'wall', poly: [[p[0], p[1], lo], [q[0], q[1], lo], [q[0], q[1], hi(q)], [p[0], p[1], hi(p)]], n}); });
       });
       return out;
     }
@@ -161,5 +179,5 @@
     return `<svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" role="img" aria-label="Floor plan seen from above">${g}</svg>`;
   }
 
-  window.RoomView = {view3d, svg2d, ceilZ, outlineOf};
+  window.RoomView = {view3d, svg2d, ceilZ, outlineOf, soffitPoly};
 })();

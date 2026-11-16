@@ -36,8 +36,9 @@ def clean_soffits(items, pts, height_m) -> list[dict]:
         frm, length = max(0.0, float(s.get("from_m") or 0)), float(s.get("length_m") or 0)
         if length < 0.1:
             raise ValueError(f"soffit {k}: it must be at least 4 in. long")
-        if frm + length > ln + 0.005:
-            raise ValueError(f"soffit {k} hangs past the end of wall {w + 1} (the wall is {ln:.2f} m long): make it shorter or move it")
+        if frm > ln - 0.1:
+            raise ValueError(f"soffit {k} starts past the end of wall {w + 1} (the wall is {ln:.2f} m long): move it back onto the wall")
+        length = min(length, ln - frm)                       # a longer one ends where the wall does (rects() blends it into the next wall)
         depth = min(DEPTH[1], max(DEPTH[0], float(s.get("depth_m") or 0.3)))
         bottom = min(height_m - 0.05, max(MIN_BOTTOM, float(s.get("bottom_m") or 2.2)))
         out.append({"id": str(s.get("id") or f"soffit-{k}")[:40], "name": str(s.get("name") or f"Soffit {k}")[:40], "wall": w,
@@ -45,9 +46,29 @@ def clean_soffits(items, pts, height_m) -> list[dict]:
     return out
 
 
+def _clip(poly: list, edge: dict) -> list:
+    """Keep the part of the polygon on the room side of a wall's line (Sutherland-Hodgman, one half-plane)."""
+    ix, iy = -edge["n"][0], -edge["n"][1]
+    ax, ay = edge["a"]
+
+    def side(p):
+        return (p[0] - ax) * ix + (p[1] - ay) * iy
+    out = []
+    for p, q in zip(poly, poly[1:] + poly[:1]):
+        sp, sq = side(p), side(q)
+        if sp >= -1e-9:
+            out.append(p)
+        if (sp >= -1e-9) != (sq >= -1e-9):
+            t = sp / (sp - sq)
+            out.append([p[0] + (q[0] - p[0]) * t, p[1] + (q[1] - p[1]) * t])
+    return out
+
+
 def rects(rm: dict) -> list[dict]:
-    """Each soffit's floor footprint: {id, name, wall, bottom_m, poly (four [x, y] corners)}."""
-    es = {e["i"]: e for e in shape.edges(rm)}
+    """Each soffit's floor footprint: {id, name, wall, bottom_m, poly (corners)}. Its ends are cut by the walls on either
+    side, so next to an angled wall the soffit blends into it instead of poking through."""
+    elist = shape.edges(rm)
+    es = {e["i"]: e for e in elist}
     out = []
     for s in (rm or {}).get("soffits") or []:
         e = es.get(s.get("wall"))
@@ -59,6 +80,10 @@ def rects(rm: dict) -> list[dict]:
         b = (a[0] + dx * s["length_m"], a[1] + dy * s["length_m"])
         d = s["depth_m"]
         poly = [list(a), list(b), [b[0] + ix * d, b[1] + iy * d], [a[0] + ix * d, a[1] + iy * d]]
+        n = len(elist)
+        if n > 3:
+            for nb in (elist[(e["i"] - 1) % n], elist[(e["i"] + 1) % n]):
+                poly = _clip(poly, nb) or poly
         out.append({"id": s["id"], "name": s.get("name"), "wall": s["wall"], "bottom_m": s["bottom_m"], "poly": poly})
     return out
 

@@ -1,11 +1,9 @@
 // htTamer page script: soffits (bulkheads) in the room shape editor and on the plan (spec 10). Loaded after furniture.js;
 // names start with so. A soffit is {id, name, wall, from_m, length_m, depth_m, bottom_m} on wall `wall` (same numbering and
 // "from_m along the wall" as openings). The corner list in room-ai.js calls soMoveOnInsert / soMoveOnRemove to keep walls numbered.
-function soRect(s, es) {                      // the four floor corners of a soffit, or null when its wall isn't there
-  const e = es[s.wall]; if (!e || !(s.length_m > 0)) return null;
-  const a = [e.a[0] + e.d[0] * s.from_m, e.a[1] + e.d[1] * s.from_m], b = [a[0] + e.d[0] * s.length_m, a[1] + e.d[1] * s.length_m];
-  const ix = -e.n[0] * s.depth_m, iy = -e.n[1] * s.depth_m;
-  return [a, b, [b[0] + ix, b[1] + iy], [a[0] + ix, a[1] + iy]];
+function soRect(s, es) {                      // a soffit's floor corners (trimmed to its wall, blended into the walls beside it), or null
+  if (!es[s.wall] || !(s.length_m > 0)) return null;
+  return RoomView.soffitPoly(es.map(e => e.a), s);
 }
 function soEditorHtml(sh, es, ftIn) {
   const list = sh.soffits || [];
@@ -23,7 +21,7 @@ function soPlanG(list, es, X, Y) {            // hatched footprints with a label
   if (!items.length) return '';
   let g = `<defs><pattern id="soHatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--text-3)" stroke-width="1.2"/></pattern></defs>`;
   items.forEach(({s, r}) => {
-    const cx = r.reduce((t, p) => t + p[0], 0) / 4, cy = r.reduce((t, p) => t + p[1], 0) / 4;
+    const cx = r.reduce((t, p) => t + p[0], 0) / r.length, cy = r.reduce((t, p) => t + p[1], 0) / r.length;
     g += `<polygon points="${r.map(p => `${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ')}" fill="url(#soHatch)" stroke="var(--text-3)" stroke-width="1"><title>${esc(s.name || 'Soffit')}: underside ${fmtFt(s.bottom_m)} high</title></polygon>`;
     if (s.length_m > 0.8) g += `<text x="${X(cx)}" y="${Y(cy) + 3}" text-anchor="middle" font-size="8.5" fill="var(--text-2)" stroke="var(--surface)" stroke-width="3" paint-order="stroke">soffit, ${fmtFt(s.bottom_m)} high</text>`;
   });
