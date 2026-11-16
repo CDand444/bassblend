@@ -150,25 +150,55 @@ $('#hrRun').onclick = async () => {
 
 // ---------- speaker placement (Dolby guidelines from the room and the main seat)
 let placeKey = null;
+// placement "delta": the owner's recorded speakers vs the recommended spots
+const pdColor = {ok: 'var(--good)', close: 'var(--s2)', off: 'var(--bad)'};
+const pdWord = {ok: 'OK', close: 'Close', off: 'Off'};
+const pdFt = m => { const f = Math.round(m / 0.3048 * 10) / 10; return `${f % 1 === 0 ? f : f.toFixed(1)} ft`; };
+function pdMove(d) {                                     // what to do to move yours onto the recommended spot
+  const t = 0.1 * 0.3048, parts = [];                    // dx/dy/dz are actual minus recommended, so flip the sign
+  if (Math.abs(d.dy_m) >= t) parts.push(`${pdFt(Math.abs(d.dy_m))} ${d.dy_m > 0 ? 'toward the screen' : 'away from the screen'}`);
+  if (Math.abs(d.dx_m) >= t) parts.push(`${pdFt(Math.abs(d.dx_m))} ${d.dx_m > 0 ? 'left' : 'right'}`);
+  if (d.dz_m != null && Math.abs(d.dz_m) >= t) parts.push(`${pdFt(Math.abs(d.dz_m))} ${d.dz_m > 0 ? 'lower' : 'higher'}`);
+  return parts.length ? parts.join(', ') : 'none';
+}
 function renderPlacement() {
   const p = S.placement, key = JSON.stringify(p);
   if (key === placeKey) return; placeKey = key;
   if (!p) { $('#placeOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and the main seat position in Room & subs, and the speaker layout in Tune my system.'); return; }
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
+  const cmp = (p.compare && p.compare.speakers) ? p.compare : null;
+  const pair = s => { const c = cmp && cmp.speakers[s.id]; return (c && c.actual && c.delta) ? c : null; };
   let g = roomOutlineSvg(p.outline, p.openings, W, L, X, Y) + `
     <line x1="${X(W * .25)}" x2="${X(W * .75)}" y1="${Y(0) + 3}" y2="${Y(0) + 3}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   p.speakers.forEach(s => {
-    g += `<line x1="${X(p.seat.x_m)}" y1="${Y(p.seat.y_m)}" x2="${X(s.x_m)}" y2="${Y(s.y_m)}" stroke="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke-dasharray="2 4" opacity=".6"/>
-      <circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 6 : 7}" fill="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke="var(--surface)" stroke-width="2"><title>${esc(s.name)}</title></circle>
-      <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < p.seat.y_m ? 18 : -10)}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-2)">${s.id}</text>`; });
+    const c = pair(s);
+    g += `<line x1="${X(p.seat.x_m)}" y1="${Y(p.seat.y_m)}" x2="${X(s.x_m)}" y2="${Y(s.y_m)}" stroke="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke-dasharray="2 4" opacity=".6"/>`;
+    if (c) {
+      const col = pdColor[c.delta.status];
+      if ((c.delta.dist_m || 0) > 0.05)
+        g += `<line x1="${X(c.actual.x_m)}" y1="${Y(c.actual.y_m)}" x2="${X(s.x_m)}" y2="${Y(s.y_m)}" stroke="${col}" stroke-width="2" opacity=".8"/>`;
+      g += `<circle cx="${X(c.actual.x_m)}" cy="${Y(c.actual.y_m)}" r="7" fill="${col}" stroke="var(--surface)" stroke-width="2"><title>${esc(s.name)}: yours ${fmtFt(c.actual.x_m)} from left, ${fmtFt(c.actual.y_m)} from front${c.actual.z_m != null ? `, ${fmtFt(c.actual.z_m)} high` : ''} — ${pdWord[c.delta.status]} (${pdFt(c.delta.dist_m)} from the recommended spot)</title></circle>`;
+      g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 6 : 7}" fill="var(--surface)" stroke="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke-width="2"><title>${esc(s.name)} (recommended)</title></circle>`;
+    } else {
+      g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 6 : 7}" fill="${s.kind === 'height' ? 'var(--s4)' : 'var(--s1)'}" stroke="var(--surface)" stroke-width="2"><title>${esc(s.name)}</title></circle>`;
+    }
+    g += `<text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < p.seat.y_m ? 18 : -10)}" text-anchor="middle" font-size="10" font-weight="600" fill="var(--text-2)">${s.id}</text>`; });
+  if (cmp) (cmp.extra || []).forEach(id => {
+    const r = ((S.room || {}).speakers || {})[id];
+    if (!r || r.x_m == null || r.y_m == null) return;
+    g += `<circle cx="${X(r.x_m)}" cy="${Y(r.y_m)}" r="4" fill="var(--text-3)" opacity=".8"><title>${esc(id)} (recorded, not in this plan)</title></circle>`; });
   g += `<circle cx="${X(p.seat.x_m)}" cy="${Y(p.seat.y_m)}" r="8" fill="var(--text)"/><text x="${X(p.seat.x_m)}" y="${Y(p.seat.y_m) + 22}" text-anchor="middle" font-size="10.5" fill="var(--text)">MLP</text>`;
   const ang = s => s.kind === 'height' ? `${s.elevation}° up${s.elevation > 90 ? ' (behind)' : ''}` : `${Math.abs(s.azimuth)}° ${s.azimuth < 0 ? 'left' : s.azimuth > 0 ? 'right' : ''}`;
   const rng = s => s.kind === 'height' ? `${s.range[0]}–${s.range[1]}°` : s.azimuth === 0 ? 'straight ahead' : `${Math.min(...s.range.map(Math.abs))}–${Math.max(...s.range.map(Math.abs))}°`;
+  const rowCmp = s => {
+    const c = pair(s);
+    return c ? `<td>${fmtFt(c.actual.x_m)} left, ${fmtFt(c.actual.y_m)} front${c.actual.z_m != null ? `, ${fmtFt(c.actual.z_m)} high` : ''}</td><td>${pdMove(c.delta)}</td><td style="color:${pdColor[c.delta.status]}">${pdWord[c.delta.status]}</td>`
+             : `<td>not recorded</td><td></td><td></td>`; };
   $('#placeOut').innerHTML = `<div class="dc-grid" style="margin-top:0"><div><svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:440px" role="img" aria-label="Recommended speaker positions">${g}</svg>
-      <div class="legend"><span><i style="border-color:var(--s1)"></i>Ear-level speakers</span><span><i style="border-color:var(--s4)"></i>Height speakers (ceiling)</span></div></div>
-    <div><div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>From left</th><th>From front</th><th>Height</th><th>Angle</th><th>Dolby range</th></tr></thead><tbody>
-      ${p.speakers.map(s => `<tr><td>${esc(s.name)}</td><td>${s.x_ft} ft</td><td>${s.y_ft} ft</td><td>${s.kind === 'height' ? 'ceiling' : s.z_ft + ' ft'}</td><td>${ang(s)}</td><td>${rng(s)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="legend"><span><i style="border-color:var(--s1)"></i>Ear-level speakers</span><span><i style="border-color:var(--s4)"></i>Height speakers (ceiling)</span>${cmp ? `<span><i style="width:11px;height:11px;border-radius:50%;border:2px solid var(--text-2);background:var(--text-2);margin-right:6px"></i>Yours</span><span><i style="width:11px;height:11px;border-radius:50%;border:2px solid var(--s1);background:var(--surface);margin-right:6px"></i>Recommended</span>` : ''}</div></div>
+    <div>${cmp ? `<p class="muted small" style="margin:0 0 10px">${esc(cmp.summary)}</p>` : ''}<div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>From left</th><th>From front</th><th>Height</th><th>Angle</th><th>Dolby range</th>${cmp ? '<th>Yours</th><th>Move</th><th>Status</th>' : ''}</tr></thead><tbody>
+      ${p.speakers.map(s => `<tr><td>${esc(s.name)}</td><td>${s.x_ft} ft</td><td>${s.y_ft} ft</td><td>${s.kind === 'height' ? 'ceiling' : s.z_ft + ' ft'}</td><td>${ang(s)}</td><td>${rng(s)}</td>${cmp ? rowCmp(s) : ''}</tr>`).join('')}</tbody></table></div>
       ${p.notes.length ? `<ul class="wins" style="margin-top:12px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}
       <p class="muted small" style="margin:10px 0 0">Angles are seen from the main seat. Distances are to the front of each speaker. Source: ${esc(p.source)}.</p></div></div>`;
 }

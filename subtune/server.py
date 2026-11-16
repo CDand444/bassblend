@@ -1809,6 +1809,11 @@ class H(BaseHTTPRequestHandler):
             except Exception as e:                       # noqa: BLE001
                 st["placement"] = None
                 print(f"[placement] {e}", flush=True)
+            if st["placement"] is not None:
+                try:
+                    st["placement"]["compare"] = layout.compare(room, st["placement"])
+                except Exception as e:                   # noqa: BLE001 - the delta view must never break the plan
+                    print(f"[placement] compare: {e}", flush=True)
             try:
                 from . import treatment
                 st["treatment"] = treatment.plan(room, st, st["placement"], st["modes"])
