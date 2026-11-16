@@ -161,7 +161,7 @@ function renderSteps() {
     {k: 'set sweep level', t: 'Set sweep level', d: st.level ? `${st.level.sweep_dbfs} dBFS, SNR ${st.level.snr_db} dB` : 'Starts quiet, steps up', done: !!st.level, run: 'level', loud: true},
     {k: 'self-test', t: 'Test EQ writes', d: st.selftest ? `Wrote ${st.selftest.expected_db} dB, measured ${st.selftest.measured_db} dB` : 'Writes a known filter and measures it', done: st.selftest && st.selftest.ok, fail: st.selftest && !st.selftest.ok, run: 'selftest', loud: true},
     {k: 'measure', t: 'Measure one spot', d: `${nPos} measured`, done: nPos > 0, run: 'measure', pos: true, loud: true},
-    {k: 'optimise', t: 'Optimise', d: st.result ? `Deviation ${st.result.metrics.after.flat_rms_db} dB` : 'Needs measurements', done: !!st.result, run: 'optimize'},
+    {k: 'optimize', t: 'Optimize', d: st.result ? `Deviation ${st.result.metrics.after.flat_rms_db} dB` : 'Needs measurements', done: !!st.result, run: 'optimize'},
     {k: 'apply', t: 'Apply to DSP', d: st.result && st.result.applied ? 'Written' : 'Writes every sub output', done: st.result && st.result.applied, run: 'apply', confirm: `Write the computed filters to slot ${((S.settings || {}).preset ?? 3) + 1} of the miniDSP?`},
     {k: 'verify', t: 'Verify', d: st.verify && st.verify.after ? `${Object.keys(st.verify.after).length} spot(s) re-measured` : 'One sweep, all subs on', done: !!(st.verify && st.verify.after), run: 'verify', pos: true, loud: true},
     {k: 'restore', t: 'Back to AVR', d: 'Input back to analog', run: 'restore'},
@@ -182,7 +182,7 @@ function renderLog() {
   $('#log').innerHTML = events.slice(-250).map(e => {
     const t = new Date(e.t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'});
     const det = e.cmds ? `<details><summary>${e.cmds.length} USB command${e.cmds.length > 1 ? 's' : ''}</summary><pre>${esc(e.cmds.join('\n'))}</pre></details>` : '';
-    return `<div class="ev ${e.kind}"><time>${t}</time><div class="m"><span class="tag">${esc(({dsp: 'miniDSP', measure: 'measured', config: 'setting', opt: 'optimiser', step: 'step', error: 'problem', avr: 'receiver', ai: 'assistant'})[e.kind] || e.kind)}</span>${esc(e.msg)}${det}</div></div>`;
+    return `<div class="ev ${e.kind}"><time>${t}</time><div class="m"><span class="tag">${esc(({dsp: 'miniDSP', measure: 'measured', config: 'setting', opt: 'optimizer', step: 'step', error: 'problem', avr: 'receiver', ai: 'assistant'})[e.kind] || e.kind)}</span>${esc(e.msg)}${det}</div></div>`;
   }).reverse().join('');
 }
 

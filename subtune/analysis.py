@@ -62,7 +62,7 @@ POINTS = [15, 18, 20, 22, 25, 28, 31.5, 35, 40, 45, 50, 56, 63, 71, 80, 90, 100,
 
 SYSTEM = """You are an experienced room-acoustics and subwoofer-integration engineer reviewing data \
 from an automatic multi-sub tuning tool (miniDSP 2x4HD, UMIK-1 mic, sweeps measured per sub at \
-several seats, then an optimiser that picks per-sub gain/delay/polarity plus PEQ).
+several seats, then an optimizer that picks per-sub gain/delay/polarity plus PEQ).
 
 Write for the owner of the system: a technically keen hobbyist. Be concrete and practical. Ground every \
 claim in the supplied data (cite frequencies, seats, outputs, dB values) and say plainly when the data is \
@@ -77,16 +77,16 @@ odd timing).
 are given) and to where each sub and seat sits relative to those modes' pressure maxima/nulls.
 ## Per-sub notes - one short paragraph per output.
 ## Recommendations - ranked list. For placement moves give a specific direction/distance and the mode \
-it targets, and the expected effect. Include settings changes (target curve, optimisation band, boost \
+it targets, and the expected effect. Include settings changes (target curve, optimization band, boost \
 limit) only if the data supports them.
 ## Next measurements - what to measure or provide to firm up the conclusions.
 
 Keep it under about 900 words. Use plain language; explain a term the first time you use it.
-The owner works in feet: the JSON stores positions in metres, but give every distance in feet \
+The owner works in feet: the JSON stores positions in meters, but give every distance in feet \
 (and inches where useful). A sub described as nearfield sits close to the main listening position \
 (MLP) on purpose; treat its level and timing dominance at the MLP as expected, not as a fault.
 A sub with "fixed": true cannot be moved. Never recommend relocating it; work around its position \
-(its gain knob and controls, the other subs' placement, seating, target and optimiser settings).
+(its gain knob and controls, the other subs' placement, seating, target and optimizer settings).
 Measurement spots are numbered 1 = MLP, then the order the owner moved the mic; their exact positions \
 are not recorded, so don't map spots 2+ to named seats."""
 
@@ -129,7 +129,7 @@ def build_context() -> dict:
                    "sub_outputs": [o + 1 for o in s.get("subs", [])]},
         "user_goals": room.get("goals"),
         "room": room["room"], "seats": room["seats"], "subwoofers": subs_desc,
-        "coordinate_convention": "x from left wall, y from front wall, z from floor, metres, facing the screen",
+        "coordinate_convention": "x from left wall, y from front wall, z from floor, meters, facing the screen",
         "room_modes": modal_report(room),
         "tuning_settings": {k: s.get(k) for k in ("fmin", "fmax", "house_db", "house_fc", "max_boost_db",
                                                   "global_peq_bands", "sub_peq_bands")},
@@ -265,7 +265,7 @@ def _context_message(ctx, extra=""):
 def run_claude(question: str | None = None) -> dict:
     ctx = build_context()
     update_state(analysis_status={"running": True, "started": time.time()})
-    event("ai", f"asking {_who()} to analyse the room and placement")
+    event("ai", f"asking {_who()} to analyze the room and placement")
     from . import ai
     try:
         msg = ai.complete(SYSTEM, _context_message(ctx, f"The owner also asks: {question}" if question else ""))
@@ -296,12 +296,12 @@ SUGGEST_SYSTEM = """You are an experienced subwoofer-integration engineer. From 
 measurements, recommend how to set the system up.
 
 How the chain works: AVR sub/LFE out -> miniDSP 2x4HD analog input -> one output per sub. htTamer's \
-optimiser sets each output's delay, gain, polarity and PEQ automatically after measuring, so the \
+optimizer sets each output's delay, gain, polarity and PEQ automatically after measuring, so the \
 physical controls on each sub should normally be set to stay out of its way (phase at 0, the sub's own \
 low-pass bypassed or at maximum/LFE, any built-in room EQ or boost features off) unless you have a \
-specific reason tied to the goals. Physical choices the optimiser cannot make are where you add the \
+specific reason tied to the goals. Physical choices the optimizer cannot make are where you add the \
 most value: port configuration/tuning mode, placement moves, starting gain-knob positions so levels \
-are roughly matched before measuring, and the target curve the optimiser aims for.
+are roughly matched before measuring, and the target curve the optimizer aims for.
 
 Rules:
 - Base priorities on user_goals. If they are empty, say so in goal_summary and assume a balanced \
@@ -313,7 +313,7 @@ describe it generically and say "check the manual". Never invent specs.
 what can change instead.
 - If measurements exist, use each sub's measured level at the MLP ("level_dB_rel") to give gain-knob \
 changes in dB and approximate knob positions (e.g. "about 1-2 hours clockwise, aim for +6 dB").
-- Use feet and inches for distances (the JSON stores metres).
+- Use feet and inches for distances (the JSON stores meters).
 - Give the starting gain as a concrete instruction (e.g. "start at 11 o'clock; htTamer trims the rest").
 - dsp_target values must be within: fmin 10-40 Hz, fmax 60-200 Hz, house_db 0-10 dB, house_fc 20-100 Hz, \
 max_boost_db 0-6 dB.

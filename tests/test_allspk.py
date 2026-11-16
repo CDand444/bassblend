@@ -1,5 +1,5 @@
 """Offline tests for the experimental all-speakers check: a simulated 7.1 system
-with planted faults (a quiet centre, a late surround, a reversed back speaker, a
+with planted faults (a quiet center, a late surround, a reversed back speaker, a
 dead channel) must be reported correctly. Also checks the 7.1 WAV header.
 
 Run:  %LOCALAPPDATA%\\subtune-venv\\Scripts\\python.exe tests\\test_allspk.py
@@ -45,7 +45,7 @@ def record(system):
     return np.concatenate([np.zeros(FS), rec]), 1.0 + A.LEAD + 0.6
 
 
-R = A.analyse(*record(SYSTEM))
+R = A.analyze(*record(SYSTEM))
 S = R["speakers"]
 
 
@@ -65,7 +65,7 @@ def test_advice():
     txt = " ".join(t["text"] for t in R["advice"])
     assert "Surround right: not heard" in txt
     assert "wired backwards" not in txt and "Surround back left" not in txt, "a reversed speaker is not reported"
-    assert "Centre: 2.0 dB quieter" in txt and "+2.0 dB" in txt
+    assert "Center: 2.0 dB quieter" in txt and "+2.0 dB" in txt
     assert "Surround left: arrives 0.60 ms later" in txt
 
 
@@ -80,12 +80,12 @@ def test_wav_header_is_7_1_extensible():
 
 
 def test_stereo_only_detection():
-    stereo = A.analyse(*record({"FL": ir(6), "FR": ir(6), "LFE": ir(9)}))
+    stereo = A.analyze(*record({"FL": ir(6), "FR": ir(6), "LFE": ir(9)}))
     assert A.stereo_only(stereo) and not A.stereo_only(R)
 
 
 def test_nothing_heard_gives_one_clear_note():
-    silent = A.analyse(*record({}))
+    silent = A.analyze(*record({}))
     assert A.nothing_heard(silent["speakers"]) and len(silent["advice"]) == 1
     assert "Nothing came through" in silent["advice"][0]["text"]
     assert not A.nothing_heard(S)

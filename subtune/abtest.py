@@ -109,7 +109,7 @@ def p_value(k: int, n: int) -> float:
     return min(1.0, 2 * tail)
 
 
-def finish(dsp=None, cancelled=False) -> dict:
+def finish(dsp=None, canceled=False) -> dict:
     from .state import event, update_state
     with _lock:
         x, _s["session"] = _s["session"], None
@@ -120,8 +120,8 @@ def finish(dsp=None, cancelled=False) -> dict:
     ka, kb = x["votes"].count(x["a"]), x["votes"].count(x["b"])
     p = p_value(ka, n)
     win = x["a"] if ka > kb else x["b"] if kb > ka else None
-    if cancelled or n == 0:
-        res = {"t": time.time(), "a": x["a"], "b": x["b"], "rounds": n, "cancelled": True,
+    if canceled or n == 0:
+        res = {"t": time.time(), "a": x["a"], "b": x["b"], "rounds": n, "canceled": True,
                "a_votes": ka, "b_votes": kb, "verdict": "Stopped early." if n else "Stopped before any votes."}
     else:
         verdict = ("No preference: an even split." if not win else
@@ -130,7 +130,7 @@ def finish(dsp=None, cancelled=False) -> dict:
                       ": a leaning, but it could be chance; more rounds would tell." if p < 0.3 else
                       ": that's within what chance gives, so no real preference shows."))
         res = {"t": time.time(), "a": x["a"], "b": x["b"], "rounds": n, "a_votes": ka, "b_votes": kb,
-               "winner": win, "p": round(p, 3), "verdict": verdict, "cancelled": False}
+               "winner": win, "p": round(p, 3), "verdict": verdict, "canceled": False}
     update_state(ab_result=res)
     event("info", f"Blind A/B test: slot {x['a']} {ka} vs slot {x['b']} {kb}" + (f" (p={res.get('p')})" if res.get("p") is not None else "")
           + f"; slot {x['was']} playing again")

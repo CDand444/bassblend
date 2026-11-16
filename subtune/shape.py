@@ -1,7 +1,7 @@
 """Room shape: the floor outline as a polygon, openings on its walls, and the ceiling.
 
 A room that only has length/width/height is the rectangle [(0,0), (W,0), (W,L), (0,L)], so old
-rooms work unchanged. Coordinates as everywhere in htTamer: metres, x from the left wall, y from
+rooms work unchanged. Coordinates as everywhere in htTamer: meters, x from the left wall, y from
 the front (screen) wall, z from the floor; length_m/width_m are the outline's overall extent.
 
 Stored in room.json under "room":
@@ -356,7 +356,7 @@ def ceiling_planes(rm: dict) -> list[dict]:
     def plane(axis, x_lo, z_lo, x_hi, z_hi, part):
         # z rises linearly from z_lo at coordinate x_lo to z_hi at x_hi along axis (0 = x, 1 = y)
         span = x_hi - x_lo
-        g = (z_hi - z_lo) / span                 # dz per metre along the axis
+        g = (z_hi - z_lo) / span                 # dz per meter along the axis
         nv = [0.0, 0.0, 1.0]
         nv[axis] = -g
         m = math.sqrt(sum(v * v for v in nv))

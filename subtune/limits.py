@@ -21,7 +21,7 @@ TRAPS_WORK_HZ = 40                     # below this, bass traps do little: the s
 
 
 def _features(f, err, kind):
-    """Contiguous dips (kind=-1) or peaks (+1) past the threshold: [(centre Hz, depth dB, width octaves)]."""
+    """Contiguous dips (kind=-1) or peaks (+1) past the threshold: [(center Hz, depth dB, width octaves)]."""
     thr = NULL_DB if kind < 0 else PEAK_DB
     hit = err <= thr if kind < 0 else err >= thr
     out, i = [], 0
@@ -138,7 +138,7 @@ def assess(result: dict, settings: dict, modes: dict | None = None, checkup: dic
 
     if spread > SPREAD_FAIR:
         issues.append(f"The seats differ by {spread:.1f} dB on average, so one tune can't suit them all.")
-        tip("weight", "Favour the main seat",
+        tip("weight", "Favor the main seat",
             "If one seat matters most, give it more weight in the tuning settings (main seat weight) and optimize "
             "again.", "wizard")
         tip("subs", "Try another place for a sub",

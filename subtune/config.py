@@ -69,7 +69,7 @@ DEFAULTS = {
     "sweep_seconds": 4.0,
     "sweep_f1": 5.0,
     "sweep_f2": 1000.0,
-    "fmin": 18.0,                 # optimisation band
+    "fmin": 18.0,                 # optimization band
     "fmax": 120.0,
     "house_db": 4.0,              # low-frequency lift of the target curve
     "house_fc": 45.0,

@@ -86,7 +86,7 @@ def test_layouts():
 
 def test_left_only_recovers_speaker_and_subs():
     rec, lay = simulate("L")
-    Hm, Ht, Hs, HmR = am.analyse(rec, PRE + am.LEAD + 1.0, None, "L")       # detector fires ~1 s late
+    Hm, Ht, Hs, HmR = am.analyze(rec, PRE + am.LEAD + 1.0, None, "L")       # detector fires ~1 s late
     assert HmR is None
     _close(Hm, _truth("L"), "left speaker")
     _close(Hs, _truth("S"), "subs", lo=25, hi=120)
@@ -95,7 +95,7 @@ def test_left_only_recovers_speaker_and_subs():
 
 def test_left_right_recovers_all_three():
     rec, lay = simulate("LR")
-    Hm, Ht, Hs, HmR = am.analyse(rec, PRE + am.LEAD + 1.0, None, "LR")
+    Hm, Ht, Hs, HmR = am.analyze(rec, PRE + am.LEAD + 1.0, None, "LR")
     assert HmR is not None
     _close(Hm, _truth("L"), "left speaker")
     _close(HmR, _truth("R"), "right speaker")
@@ -106,7 +106,7 @@ def test_left_right_recovers_all_three():
 
 def test_right_speaker_changes_the_answer_sensibly():
     rec, _ = simulate("LR")
-    Hm, Ht, Hs, HmR = am.analyse(rec, PRE + am.LEAD + 1.0, None, "LR")
+    Hm, Ht, Hs, HmR = am.analyze(rec, PRE + am.LEAD + 1.0, None, "LR")
     one = am.optimise_blend(Hm, Hs)
     two = am.optimise_blend(Hm, Hs, HmR=HmR)
     assert two["loss_best_db"] <= two["loss_now_db"] + 1e-9
@@ -143,7 +143,7 @@ def test_seat_keeps_right_speaker_and_uses_it():
     import tempfile
     from subtune import blendmulti as bm
     rec, _ = simulate("LR")
-    Hm, Ht, Hs, HmR = am.analyse(rec, PRE + am.LEAD + 1.0, None, "LR")
+    Hm, Ht, Hs, HmR = am.analyze(rec, PRE + am.LEAD + 1.0, None, "LR")
     old = bm.SEAT_DIR
     with tempfile.TemporaryDirectory() as d:
         bm.SEAT_DIR = pathlib.Path(d)

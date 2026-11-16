@@ -34,7 +34,7 @@ FILE_DBFS = -20.0
 # WAVE_FORMAT_EXTENSIBLE 7.1 channel order (mask 0x63F): FL FR FC LFE BL BR SL SR
 WAV_CH = ["FL", "FR", "C", "LFE", "SBL", "SBR", "SL", "SR"]
 ORDER = ["FL", "FR", "C", "SL", "SR", "SBL", "SBR", "LFE"]
-NAMES = {"FL": "Front left", "FR": "Front right", "C": "Centre", "SL": "Surround left", "SR": "Surround right",
+NAMES = {"FL": "Front left", "FR": "Front right", "C": "Center", "SL": "Surround left", "SR": "Surround right",
          "SBL": "Surround back left", "SBR": "Surround back right", "LFE": "LFE (subs)"}
 OFFS = {ch: i * (SWEEP + GAP) for i, ch in enumerate(ORDER)}
 TOTAL = OFFS["LFE"] + SWEEP + TAIL
@@ -76,7 +76,7 @@ def build_file(path=None, order=None):
     return path
 
 
-def analyse(rec, t_start, cal=None):
+def analyze(rec, t_start, cal=None):
     """Per-speaker level, arrival and response from one recording."""
     off = spl_offset(cal)
     ir_full = audio.deconvolve(rec, sweep("FL"), F1, F2)
@@ -152,7 +152,7 @@ def advice(out):
            and (abs(r.get("arrival_vs_fl_ms") or 0) > 5 or abs(r.get("level_vs_fl_db") or 0) > 4)]
     if odd:
         tips.insert(0, {"ch": "", "status": "fix", "text": f"{', '.join(odd)}: far too early/loud to be a distance or level "
-                        "setting (that would mean metres out). Check which speaker is wired to which terminal and the receiver's "
+                        "setting (that would mean meters out). Check which speaker is wired to which terminal and the receiver's "
                         "speaker assignment (e.g. surround back vs. zone 2 / bi-amp) before changing any setting."})
     tips += lfe_check(out)
     if not [t for t in tips if t["status"] != "good"]:
@@ -280,8 +280,8 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
             finally:
                 o.restore(snap)
                 log("avr", f"all-speakers check: receiver restored (input {snap.get('input_code')}, volume {snap.get('volume')})")
-    status("Analysing…")
-    r = analyse(rec, t0, cal)
+    status("Analyzing…")
+    r = analyze(rec, t0, cal)
     r.update({"pos": pos, "mode": mode, "level": level, "playback": playback or None})
     if mode == "hdmi" and nothing_heard(r["speakers"]):
         r["advice"] = [{"ch": "", "status": "fix", "text": "Nothing came through from the Pi's HDMI. Check the receiver "

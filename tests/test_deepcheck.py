@@ -61,7 +61,7 @@ def report(**kw):
     irL = speaker_ir(5.0, **kw.get("L", {}))
     irR = speaker_ir(5.0 + kw.get("r_late_ms", 0.0), **kw.get("R", {}))
     rec, t0 = record(irL, irR, hum=kw.get("hum"))
-    return dc.analyse(rec, t0, None, SETTINGS, SYSTEM)
+    return dc.analyze(rec, t0, None, SETTINGS, SYSTEM)
 
 
 R_CLEAN = report()

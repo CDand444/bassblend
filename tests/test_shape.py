@@ -103,7 +103,7 @@ def test_rectangle_plan_keeps_its_zones_and_corners():
     assert [(c["x_m"], c["y_m"], c["name"]) for c in ct["corners"]] == [
         (0, 0, "front left"), (4.5, 0, "front right"), (0, 6, "back left"), (4.5, 6, "back right")]
     rw = it["rear_wall"]["zone"]
-    assert rw["a"] == [round(4.5 / 2 - 1.2, 2), round(4.5 / 2 + 1.2, 2)], "rear zone stays centred on the back wall"
+    assert rw["a"] == [round(4.5 / 2 - 1.2, 2), round(4.5 / 2 + 1.2, 2)], "rear zone stays centered on the back wall"
     assert it["rear_wall"]["rect"]["y0"] == it["rear_wall"]["rect"]["y1"] == 6
     left = it["side_panels"]
     assert left["rect"]["x0"] == left["rect"]["x1"] == 0

@@ -2,7 +2,7 @@
 
 One JSON file carries what you'd otherwise type in again on a new SD card or PC:
 
-* settings: subs, owned slot, target curve, optimiser limits, receiver address,
+* settings: subs, owned slot, target curve, optimizer limits, receiver address,
   speaker layout / Dirac choices;
 * the room description (size, seats, sub positions and models);
 * the mic calibration file itself (not just its path);

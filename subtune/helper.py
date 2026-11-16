@@ -40,7 +40,7 @@ DEFS = {
                 "itself so the subs add up; it doesn't judge your speakers' wiring.",
     "phase": "Phase is the timing of a sound wave at each pitch. Around the crossover, subs and speakers must be in step "
              "(in phase) to add up; out of step they cancel. The blend test finds the sub delay/polarity that keeps them in step.",
-    "rt60": "RT60 is how long a sound takes to fade by 60 dB. Home theatres sound best around 0.2-0.4 s above 250 Hz. "
+    "rt60": "RT60 is how long a sound takes to fade by 60 dB. Home theaters sound best around 0.2-0.4 s above 250 Hz. "
             "Longer is echoey (add rugs, curtains, panels); bass that rings much longer than the rest sounds boomy.",
     "reflection": "An early reflection is sound bouncing off a nearby surface (floor, table, side wall) and arriving a few "
                   "milliseconds after the direct sound. Strong ones blur the stereo image; a rug or panel at the bounce point helps.",
@@ -63,7 +63,7 @@ DEFS = {
     "slot": "The miniDSP holds 4 slots (presets). Slot 1 is your original setup and htTamer never overwrites it. "
             "Switching slots in Tunes & slots is the easiest way to compare tunes by ear.",
     "blend": "Blending lines up the subs with the front speakers around the crossover so they add up instead of "
-             "cancelling. Run the blend test at the MLP, then other seats; htTamer finds one setting for all of them.",
+             "canceling. Run the blend test at the MLP, then other seats; htTamer finds one setting for all of them.",
     "headroom": "Headroom is how much louder the system can play before it distorts or the mic overloads. EQ boosts use "
                 "headroom up; cutting peaks is safer than raising dips.",
     "sub level": "The receiver's subwoofer level sets how loud all the subs are against the speakers. The system report "
@@ -129,7 +129,7 @@ def answer(question: str, st: dict, settings: dict, room: dict, avr: dict | None
                 on.append(f"tone is bass {a.get('tone_bass'):+d} / treble {a.get('tone_treble'):+d} dB")
             if a.get("music_optimizer"):
                 on.append("Music Optimizer is on")
-            parts.append("**Receiver:** volume {:g}, sub level {}, centre {}. {}".format(
+            parts.append("**Receiver:** volume {:g}, sub level {}, center {}. {}".format(
                 a.get("volume") or 0, f"{a['sub_level']:+.1f} dB" if a.get("sub_level") is not None else "?",
                 f"{a['center_level']:+.1f} dB" if a.get("center_level") is not None else "?",
                 ("Processing that changes the sound: " + "; ".join(on) + ". You can change these in Receiver → Sound processing.")
@@ -152,7 +152,7 @@ def answer(question: str, st: dict, settings: dict, room: dict, avr: dict | None
             parts.append(f"**{term[0].upper() + term[1:]}:** {DEFS[term]}")
     if not parts:
         parts.append("I'm htTamer's built-in helper. Without an AI provider I can answer things like *what should I do "
-                     "next*, *explain my report*, *how are my subs set*, *is my receiver colouring the sound*, *what's "
+                     "next*, *explain my report*, *how are my subs set*, *is my receiver coloring the sound*, *what's "
                      "playing*, or terms like *room mode*, *null*, *polarity*, *RT60*, *crossover*, *Q*, *EQ1/EQ2*, *Dirac*.\n\n"
                      "**Right now I'd suggest:**\n" + _steps_md(steps, 2))
     parts.append("_Built-in helper (no AI key set). For a full conversation where the assistant can run tests for you, "

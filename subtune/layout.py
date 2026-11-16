@@ -2,12 +2,12 @@
 room and the main listening position, following Dolby's published home-theater
 guidelines (angles seen from the main seat):
 
-  front left/right   22-30 deg either side (30 for music)      centre: 0 deg
+  front left/right   22-30 deg either side (30 for music)      center: 0 deg
   side surrounds     90-110 deg                                  rear surrounds: 135-150 deg
   top front          30-55 deg elevation, in front, in line with the front L/R
   top middle         65-100 deg elevation (2 heights)            top rear: 125-150 deg
 
-Coordinates as everywhere in htTamer: metres, x from the left wall, y from the
+Coordinates as everywhere in htTamer: meters, x from the left wall, y from the
 front (screen) wall, z from the floor. The result gives each speaker an ideal
 spot, the acceptable range, and notes when the room can't reach the ideal (a
 seat against the back wall, a low ceiling).
@@ -30,7 +30,7 @@ BED = {
     7: ["FL", "FR", "C", "SL", "SR", "BL", "BR"], 9: ["FL", "FR", "C", "WL", "WR", "SL", "SR", "BL", "BR"],
 }
 HEIGHTS = {0: [], 2: ["TML", "TMR"], 4: ["TFL", "TFR", "TRL", "TRR"], 6: ["TFL", "TFR", "TML", "TMR", "TRL", "TRR"]}
-NAMES = {"FL": "Front left", "FR": "Front right", "C": "Centre", "WL": "Wide left", "WR": "Wide right",
+NAMES = {"FL": "Front left", "FR": "Front right", "C": "Center", "WL": "Wide left", "WR": "Wide right",
          "SL": "Surround left", "SR": "Surround right", "BL": "Rear surround left", "BR": "Rear surround right",
          "TFL": "Top front left", "TFR": "Top front right", "TML": "Top middle left", "TMR": "Top middle right",
          "TRL": "Top rear left", "TRR": "Top rear right"}

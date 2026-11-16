@@ -16,7 +16,7 @@ time), never today's state. What the owner has installed and their constraints a
 room.json under "treatment" and every change is journaled; each change keeps a snapshot of the
 measured numbers at that moment, so later reports can be compared before and after.
 
-Coordinates as everywhere in htTamer: metres, x from the left wall, y from the front (screen)
+Coordinates as everywhere in htTamer: meters, x from the left wall, y from the front (screen)
 wall, z from the floor. Walls: left (x=0), right (x=W), front (y=0), back (y=L), ceiling, floor.
 """
 from __future__ import annotations
@@ -58,7 +58,7 @@ _AXIS = {"left": (0, lambda d: 0.0), "right": (0, lambda d: d["W"]), "front": (1
 
 def reflection_point(src, lis, wall, dims):
     """First-order (mirror-image) reflection of src heard at lis off a wall.
-    src, lis: (x, y, z) in metres; dims: {"L", "W", "H"}. Returns {x, y, z, extra_m, ms, db} with
+    src, lis: (x, y, z) in meters; dims: {"L", "W", "H"}. Returns {x, y, z, extra_m, ms, db} with
     the point on the wall, the extra path vs the direct sound, its delay (ms) and the level of the
     reflection relative to the direct sound from distance alone (dB, a perfectly hard wall), or None
     when the point falls outside the wall."""
@@ -210,7 +210,7 @@ def _edge_extra(e, z):
 
 
 def _seg_rect(e, z):
-    """Drawing segment (top-down, metres) of a zone on wall edge e, with the wall's outward normal."""
+    """Drawing segment (top-down, meters) of a zone on wall edge e, with the wall's outward normal."""
     s0, s1 = z["s"]
     p = lambda s: (round(e["a"][0] + e["dir"][0] * s, 3), round(e["a"][1] + e["dir"][1] * s, 3))
     (x0, y0), (x1, y1) = p(s0), p(s1)
@@ -345,7 +345,7 @@ def problems(room: dict, state: dict, modal: dict | None = None, refl: dict | No
     if rm is not None:
         if rm > 0.4:
             out.append(_p("live_room", f"The room is lively (ring time {rm:.2f} s)", 30 + 140 * min(0.5, rm - 0.4),
-                          f"Above 250 Hz sound takes {rm:.2f} s to die away; home theatres sound best at 0.2-0.4 s.",
+                          f"Above 250 Hz sound takes {rm:.2f} s to die away; home theaters sound best at 0.2-0.4 s.",
                           "Dialogue gets less clear and the surround effects smear together.",
                           "EQ can't change how long a room rings; only absorption (panels, rug, curtains, soft furniture) does.",
                           True, ["side_panels", "ceiling_cloud", "rear_wall", "rug"], rt60=rm))
@@ -428,7 +428,7 @@ def _behind(room, seat, dy=1.0):
 
 
 def _rect(wall, z, dims):
-    """Drawing rectangle (top-down, metres) for a zone on a wall."""
+    """Drawing rectangle (top-down, meters) for a zone on a wall."""
     if not z:
         return None
     a, b = z["a"], z["b"]
@@ -636,7 +636,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             label = f"{w.title()} side wall" if e["name"] == f"{w} wall" else e["name"].capitalize()
             add(iid, f"{label}: first-reflection panels", "absorber", w, z,
                 _panels(z["area_m2"]), "2 x 4 ft", 4, 2,
-                "Clearer dialogue and a sharper, steadier centre image; takes out the comb ripples in the treble.",
+                "Clearer dialogue and a sharper, steadier center image; takes out the comb ripples in the treble.",
                 45, "The first reflections of the front speakers off the side walls arrive within a few milliseconds and blur the image.",
                 rect=_seg_rect(e, z), points=pts_)
             overlap_note(z)
@@ -769,7 +769,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
         notes.append("For a hidden look: fabric-wrapped panels with printed art, bass traps behind acoustically transparent "
                      "fabric or furniture, a bookshelf (filled unevenly) as the rear-wall diffuser, heavy curtains over the side walls.")
     elif looks == "tidy":
-        notes.append("Panels in the wall colour or with a fabric that matches the room look intentional; keep them symmetrical.")
+        notes.append("Panels in the wall color or with a fabric that matches the room look intentional; keep them symmetrical.")
     if not any(s["source"] == "recorded" for s in spk.values()):
         notes.append("Speaker positions are the suggested Dolby spots; record where yours really are (Speakers page) "
                      "for exact reflection points.")
@@ -786,7 +786,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
 
 
 def shape_view(rm: dict) -> dict:
-    """The outline, walls and openings for the drawing (metres)."""
+    """The outline, walls and openings for the drawing (meters)."""
     from . import shape
     es = shape.edges(rm)
     ops = []

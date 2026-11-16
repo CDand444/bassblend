@@ -174,7 +174,7 @@ for estimates and say what you estimated in assumptions. When something importan
 screen is on, how deep an alcove is), make your best guess AND ask in questions (short, concrete, at most 4). \
 If a previous plan and the owner's corrections are given, apply the corrections and keep everything else.
 
-Floor plans: an image labelled "floor plan" is a drawing, scan or screenshot of the room seen from above (an architect's or estate agent's plan, a sketch, an app export). Take the outline, the doors, openings and windows from it, and the sizes written on it (convert metres to feet); its scale comes from those written sizes, so measure the rest in proportion. It beats estimates from photos; only the owner's typed measurements and notes beat it. If the plan shows more than this room, use the room the notes name (or the one with the TV or screen) and ask if unsure. Plans often have north at the top, not the screen: rotate the room so the screen wall is the front (y 0) and say so in assumptions."""
+Floor plans: an image labeled "floor plan" is a drawing, scan or screenshot of the room seen from above (an architect's or estate agent's plan, a sketch, an app export). Take the outline, the doors, openings and windows from it, and the sizes written on it (convert meters to feet); its scale comes from those written sizes, so measure the rest in proportion. It beats estimates from photos; only the owner's typed measurements and notes beat it. If the plan shows more than this room, use the room the notes name (or the one with the TV or screen) and ask if unsure. Plans often have north at the top, not the screen: rotate the room so the screen wall is the front (y 0) and say so in assumptions."""
 
 LABELS = ("front wall (screen)", "left wall", "right wall", "back wall", "corner", "ceiling", "opening / doorway",
           "floor plan", "other")
@@ -213,7 +213,7 @@ def prompt(dims: dict, notes: str, photos: list, previous: dict | None = None, c
 
 
 def check(prop: dict) -> dict:
-    """Validate the AI's plan with the same rules as a saved room. Returns {room (metres), patch, describe,
+    """Validate the AI's plan with the same rules as a saved room. Returns {room (meters), patch, describe,
     problems}; problems is a list of plain-language issues (empty = it can be saved)."""
     from . import equip, room, shape
     problems = []

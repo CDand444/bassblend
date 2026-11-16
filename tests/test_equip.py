@@ -1,5 +1,5 @@
 """Offline tests for the equipment data the page and the assistant edit: speakers per
-channel, partial room/sub/seat updates in feet or metres, validation, and the
+channel, partial room/sub/seat updates in feet or meters, validation, and the
 journal line every change leaves. No hardware.
 
 Run:  %LOCALAPPDATA%\\subtune-venv\\Scripts\\python.exe tests\\test_equip.py

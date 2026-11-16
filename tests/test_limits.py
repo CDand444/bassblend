@@ -145,7 +145,7 @@ def test_no_slot_switch_during_a_blind_test():
         except RuntimeError as e:
             assert "blind" in str(e)
     finally:
-        abtest.finish(dsp=D(), cancelled=True)
+        abtest.finish(dsp=D(), canceled=True)
 
 
 def test_phone_page_escapes_the_ai_answer():

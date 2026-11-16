@@ -6,7 +6,7 @@ speakers and speaker layout. Each helper validates its input, merges it into
 what's stored (so a partial update never wipes other fields) and writes one
 journal line saying what changed, so edits by the assistant are always visible.
 
-Positions are stored in metres, like the rest of room.json; any field ending in
+Positions are stored in meters, like the rest of room.json; any field ending in
 _ft is accepted too and converted.
 """
 from __future__ import annotations
@@ -143,7 +143,7 @@ def sizes_from_receiver(details: dict) -> dict:
 
 
 def room_shape_m(rm: dict) -> dict:
-    """Room fields with the shape in metres: outline_ft [[x, y], ...] -> outline, openings' and the
+    """Room fields with the shape in meters: outline_ft [[x, y], ...] -> outline, openings' and the
     ceiling's *_ft -> *_m, plus the plain *_ft sizes. outline [] or null goes back to a rectangle."""
     rm = dict(rm)
     if "outline_ft" in rm:

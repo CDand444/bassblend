@@ -7,10 +7,10 @@ DLNA:  the receiver is a UPnP MediaRenderer; htTamer serves a WAV from this
 Safety rules (enforced here, not just in the UI):
   * volume is never raised above the level it had before htTamer touched it,
     and never above VOLUME_CAP; an explicit raise is limited to +RAISE_STEP;
-  * only power, input, listening mode, volume, mute, subwoofer/centre level and
+  * only power, input, listening mode, volume, mute, subwoofer/center level and
     the sound-processing switches (tone, Late Night, Cinema Filter, Music
     Optimizer, dialogue enhance, dimmer) are touched: no setup menus, no room
-    correction settings. During htTamer's tests the processing that colours the
+    correction settings. During htTamer's tests the processing that colors the
     sound is set flat/off, then put back exactly as it was.
 """
 from __future__ import annotations
@@ -292,7 +292,7 @@ class Onkyo:
         self.send("DIM", code)
 
     def neutral_for_test(self, snap: dict) -> list[str]:
-        """Switch off what colours a measurement (tone, Late Night, Cinema Filter, Music
+        """Switch off what colors a measurement (tone, Late Night, Cinema Filter, Music
         Optimizer, dialogue enhance). restore(snap) puts every one back. Returns what changed."""
         changed = []
         if snap.get("tone_bass") or snap.get("tone_treble"):
@@ -310,7 +310,7 @@ class Onkyo:
     def set_center_level(self, db: float):
         lo, hi = CENTER_LEVEL_RANGE
         if not lo <= db <= hi:
-            raise ValueError(f"centre level must be {lo:g} to {hi:+g} dB")
+            raise ValueError(f"center level must be {lo:g} to {hi:+g} dB")
         self.send("CTL", half_db_to_signed(db) if db else "00")
 
     # ---- snapshot / restore around a measurement

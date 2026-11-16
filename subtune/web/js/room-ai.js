@@ -47,12 +47,12 @@ function avrProcessing(st) {
   const db = v => v == null ? '–' : (v > 0 ? '+' : '') + v + ' dB';
   const tog = (key, on, label) => `<button class="btn ${on ? 'primary' : ''}" data-p="${key}" data-v="${on ? 0 : 1}">${on ? label + ': on' : label + ': off'}</button>`;
   const opt = (map, cur) => Object.entries(map).map(([k, v]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('');
-  const colouring = [];
-  if (st.tone_bass || st.tone_treble) colouring.push(`tone (bass ${db(st.tone_bass)}, treble ${db(st.tone_treble)})`);
-  if (st.cinema_filter) colouring.push('Cinema Filter (softens the treble)');
-  if (st.late_night && st.late_night !== '00') colouring.push(`Late Night ${LATE_NIGHT[st.late_night] || ''} (squeezes loud and soft together)`);
-  if (st.music_optimizer) colouring.push('Music Optimizer');
-  if (st.dialog) colouring.push(`dialogue enhance ${st.dialog}`);
+  const coloring = [];
+  if (st.tone_bass || st.tone_treble) coloring.push(`tone (bass ${db(st.tone_bass)}, treble ${db(st.tone_treble)})`);
+  if (st.cinema_filter) coloring.push('Cinema Filter (softens the treble)');
+  if (st.late_night && st.late_night !== '00') coloring.push(`Late Night ${LATE_NIGHT[st.late_night] || ''} (squeezes loud and soft together)`);
+  if (st.music_optimizer) coloring.push('Music Optimizer');
+  if (st.dialog) coloring.push(`dialogue enhance ${st.dialog}`);
   return `<h4 class="avr-h">Sound processing</h4>
     <div class="avrgrid">
       <div class="avrbox"><span class="k">Bass (tone)</span><span class="v">${db(st.tone_bass)}</span>
@@ -66,7 +66,7 @@ function avrProcessing(st) {
       <div class="avrbox"><span class="k">Display</span><select data-p="dimmer">${opt(DIMMER, st.dimmer)}</select>
         ${st.temp_c != null ? `<span class="muted small">Receiver at ${st.temp_c} °C${st.temp_c >= 60 ? ': running hot, check its ventilation' : ''}</span>` : ''}</div>
     </div>
-    ${colouring.length ? `<div class="notice warn" style="margin-top:8px">On now: ${esc(colouring.join(', '))}. These change the sound on top of your tuning. htTamer switches them off during its tests and puts them back afterwards.</div>` : '<p class="muted small" style="margin:8px 0 0">Tone flat and processing off: the receiver plays your tuning as measured.</p>'}
+    ${coloring.length ? `<div class="notice warn" style="margin-top:8px">On now: ${esc(coloring.join(', '))}. These change the sound on top of your tuning. htTamer switches them off during its tests and puts them back afterwards.</div>` : '<p class="muted small" style="margin:8px 0 0">Tone flat and processing off: the receiver plays your tuning as measured.</p>'}
     ${st.audio_in ? `<p class="muted small" style="margin:6px 0 0">Input signal: ${esc(st.audio_in)}</p>` : ''}`;
 }
 // ---- vendor-aware sub controls (knobs, switches, port plugs the owner sets by hand)

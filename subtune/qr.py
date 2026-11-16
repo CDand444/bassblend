@@ -81,7 +81,7 @@ def _mask_bit(m, x, y) -> bool:
 def _penalty(g) -> int:
     n, s = len(g), 0
     lines = [row for row in g] + [[g[y][x] for y in range(n)] for x in range(n)]
-    for line in lines:                                   # N1: runs of 5+ of one colour
+    for line in lines:                                   # N1: runs of 5+ of one color
         run, prev = 0, None
         for v in line:
             run = run + 1 if v == prev else 1

@@ -584,7 +584,7 @@ function renderAB() {
     $('#abV1').disabled = $('#abV2').disabled = !a.playing;
   }
   const L = a.last;
-  $('#abOut').innerHTML = !a.active && L ? `<div class="notice ${L.cancelled ? '' : L.p < 0.05 ? 'good' : ''}"><b>${esc(L.verdict)}</b><br>
+  $('#abOut').innerHTML = !a.active && L ? `<div class="notice ${L.canceled ? '' : L.p < 0.05 ? 'good' : ''}"><b>${esc(L.verdict)}</b><br>
     Slot ${L.a}: ${L.a_votes} · slot ${L.b}: ${L.b_votes}${L.p != null ? ` · chance of a split like this with no real preference: ${Math.round(L.p * 100)}%` : ''} · ${fmtWhen(L.t)}</div>` : '';
 }
 const abDo = async body => { const r = await post('/api/ab', body); if (r.error) { $('#abMsg').textContent = r.error; toast('Blind test', r.error, 'bad'); return; }

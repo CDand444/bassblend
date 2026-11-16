@@ -179,8 +179,8 @@ def test_blind_ab_stop_restores():
     d = FakeDSP(preset=1)
     abtest.start(3, 4, 5, dsp=d)
     abtest.play(2, dsp=d)
-    r = abtest.finish(dsp=d, cancelled=True)
-    assert r["last"]["cancelled"] and d.preset == 1 and not abtest.active()
+    r = abtest.finish(dsp=d, canceled=True)
+    assert r["last"]["canceled"] and d.preset == 1 and not abtest.active()
 
 
 def test_rules_are_checked():

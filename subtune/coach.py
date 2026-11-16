@@ -76,7 +76,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
     if gone:
         outs = ", ".join(map(str, gone))
         out.append(_step(2, "removed_sub", "tune", f"Re-tune without output {outs}",
-                         f"The playing tune was made with output {outs}, which you removed from the subs. Optimise again: "
+                         f"The playing tune was made with output {outs}, which you removed from the subs. Optimize again: "
                          "the other subs' measurements still count. Until then the miniDSP still drives that output.",
                          open="tune"))
     if live_dsp is not None and not live_dsp.get("master"):
@@ -152,7 +152,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
     if tuned and settings.get("avr_host"):
         if not b or b.get("tune_id") not in (tid, base):
             out.append(_step(9, "blend", "blend", "Blend the subs with the front speakers",
-                             "Checks that subs and speakers add up around the crossover instead of cancelling.",
+                             "Checks that subs and speakers add up around the crossover instead of canceling.",
                              sound=True, open="blend", tool="run_avr_blend", inp={"pos": 1, "mode": _mode(), "speakers": "both", "auto_volume": True}))
         elif b.get("tune_id") == base and base != tid:
             out.append(_step(9, "blend_confirm", "blend", "Re-measure the blend to confirm the fix",
@@ -194,7 +194,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
             if a["kind"] == "menu":
                 out.append(_step(13, f"menu_{a['what']}", "receiver", a["text"].split(" in the receiver")[0].split(" in Speaker")[0],
                                  a["text"], who="receiver_menu", open="report"))
-    # ---- receiver processing that colours listening
+    # ---- receiver processing that colors listening
     a = avr or {}
     if a.get("cinema_filter"):
         out.append(_step(15, "cinema_filter", "receiver", "Cinema Filter is on", "It softens the treble on everything. Turn it off unless "

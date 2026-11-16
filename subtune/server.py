@@ -371,7 +371,7 @@ class Runner:
         if checks:
             stages += [("discover", "Find subs"), ("level", "Set level"), ("selftest", "Test EQ writes")]
         stages += [(f"seat{k}", "Measure MLP" if k == 1 else f"Measure spot {k}") for k in range(1, seats + 1)]
-        stages += [("optimize", "Optimise"), ("apply", "Apply"), ("verify", "Verify"),
+        stages += [("optimize", "Optimize"), ("apply", "Apply"), ("verify", "Verify"),
                    ("restore", "Back to AVR")]
         self.auto = {"status": "running", "seats": seats, "started": time.time(), "prompt": None,
                      "stages": [{"id": i, "label": l, "status": "pending"} for i, l in stages], "error": None}
@@ -789,14 +789,14 @@ def build_executors(origin="assistant"):
 
     def simulate(**over):
         from .measure import load_measurements
-        from .optimize import optimise
+        from .optimize import optimize
         s = load_settings()
         for k, v in over.items():
             if k in SETTABLE:
                 typ, lo, hi = SETTABLE[k]
                 s[k] = typ(min(hi, max(lo, v)))
         subs, Hs, names = load_measurements()
-        r = optimise(Hs, subs, names, s=s, log=lambda *a, **k: None, save=False)
+        r = optimize(Hs, subs, names, s=s, log=lambda *a, **k: None, save=False)
         _sim["last"] = (r, {k: s.get(k) for k in SETTABLE})
         cur = load_state().get("result")
         a = r["metrics"]["after"]
@@ -914,7 +914,7 @@ def build_executors(origin="assistant"):
                      "avr_blend", timeout=360)
         out = {k: b[k] for k in ("delay_ms", "invert", "loss_now_db", "loss_best_db", "level_err_db", "advice")}
         m = load_state().get("avr_blend_multi")
-        if m:                                  # every seat measured with this tune, optimised together
+        if m:                                  # every seat measured with this tune, optimized together
             out["all_seats"] = {k: m[k] for k in ("seats", "now_db", "now_seats", "best", "dsp_only",
                                                    "level_err_db", "advice")}
         return out | {"summary": f"best sub delay {b['delay_ms']:+.1f} ms, level {b['level_err_db']:+.1f} dB vs target"
@@ -1346,7 +1346,7 @@ def avr_action(body):
         target = round(float(val) * 2) / 2
         if cur is not None and target > cur:
             if body.get("confirm") is not True:
-                raise ValueError("raising the centre level needs confirmation")
+                raise ValueError("raising the center level needs confirmation")
             target = min(target, cur + 3)
         o.set_center_level(target)
     else:
@@ -1388,7 +1388,7 @@ def _live_levels():
 
 
 def _current_result():
-    """The optimiser result `apply` writes when no saved tune is named (None if there is none yet)."""
+    """The optimizer result `apply` writes when no saved tune is named (None if there is none yet)."""
     from .config import DATA
     f = DATA / "result.json"
     try:
@@ -2517,7 +2517,7 @@ def _ab_action(body):
     if act == "vote":
         return abtest.vote(body.get("pick"))
     if act == "stop":
-        return abtest.finish(cancelled=True)
+        return abtest.finish(canceled=True)
     raise ValueError("start, play, vote or stop")
 
 

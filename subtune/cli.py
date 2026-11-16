@@ -143,10 +143,10 @@ def cmd_clear(a):
 
 def cmd_optimize(a):
     from .measure import load_measurements
-    from .optimize import optimise
+    from .optimize import optimize
     subs, Hs, names = load_measurements()
-    with busy(f"optimise {len(subs)} subs x {len(names)} positions"):
-        r = optimise(Hs, subs, names)
+    with busy(f"optimize {len(subs)} subs x {len(names)} positions"):
+        r = optimize(Hs, subs, names)
     print(json.dumps({k: r[k] for k in ("subs", "peq_global", "headroom_db", "metrics")}, indent=2,
                      default=lambda o: o if not isinstance(o, tuple) else list(o)))
 
@@ -183,7 +183,7 @@ def cmd_apply(a):
     if a.tune:
         tune = library.get(a.tune)
         r, name = tune["result"], tune["name"]
-    else:                                                   # the current optimiser result
+    else:                                                   # the current optimizer result
         r = json.loads((DATA / "result.json").read_text())
         name = None
     from .subouts import check_apply
@@ -237,7 +237,7 @@ def cmd_apply(a):
 
 
 def cmd_blendseats(a):
-    """Re-run the multi-seat blend optimiser on the saved seats (no sound)."""
+    """Re-run the multi-seat blend optimizer on the saved seats (no sound)."""
     from . import blendmulti
     m = blendmulti.refresh()
     print(json.dumps({k: m[k] for k in ("seats", "now_db", "best", "dsp_only", "level_err_db")} if m else None, indent=2))
@@ -475,7 +475,7 @@ def cmd_unmute(a):
 
 
 def cmd_simulate(a):
-    """Synthetic room for testing the optimiser + dashboard without hardware."""
+    """Synthetic room for testing the optimizer + dashboard without hardware."""
     from .audio import GRID
     from .measure import MEAS_DIR
     rng = np.random.default_rng(a.seed)

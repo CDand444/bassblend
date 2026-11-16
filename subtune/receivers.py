@@ -222,7 +222,7 @@ class JBLSynthesis(_Base):
                   0x0A: "DTS Neural:X", 0x0C: "DTS Virtual:X", 0x0D: "Dolby Virtual Height"}
     MODE_RC5 = {"Stereo": "stereo", "Dolby Surround": "dolby_surround", "DTS Neural:X": "neural_x", "5/7 Ch Stereo": "ch_stereo"}
     SUB_RANGE = (-10.0, 10.0)
-    ERRORS = {0x82: "zone invalid", 0x83: "command not recognised", 0x84: "parameter not recognised",
+    ERRORS = {0x82: "zone invalid", 0x83: "command not recognized", 0x84: "parameter not recognized",
               0x85: "command invalid at this time (setup menu open?)", 0x86: "invalid data length"}
     # speaker order in the distance and level replies -> htTamer's channel names
     SPK_ORDER = ["FL", "C", "FR", "SR", "BR", "BL", "SL", "TFL", "TFR", "TRL", "TRR", "SW"]

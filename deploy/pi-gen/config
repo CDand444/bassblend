@@ -3,7 +3,7 @@ IMG_NAME=bassblend
 PI_GEN_RELEASE="htTamer"
 RELEASE=trixie
 TARGET_HOSTNAME=bassblend
-# No password is baked in. Raspberry Pi Imager's "OS customisation" (cloud-init) can add a
+# No password is baked in. Raspberry Pi Imager's "OS customization" (cloud-init) can add a
 # user, SSH and Wi-Fi when writing the card; htTamer itself needs none of them.
 FIRST_USER_NAME=pi
 ENABLE_SSH=0

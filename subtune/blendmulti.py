@@ -1,7 +1,7 @@
 """Multi-seat sub/speaker blend.
 
 Each blend test saves the raw complex mains-only and subs-only responses for
-that seat, tagged with the sub tune that was playing. The optimiser then picks
+that seat, tagged with the sub tune that was playing. The optimizer then picks
 ONE setting for all seats (sub delay, polarity and an optional all-pass filter
 in the miniDSP) so mains and subs add up around the crossover at every seat,
 weighting the MLP more and never sacrificing one seat for the others.
@@ -83,7 +83,7 @@ def _ap_resp(fc, q):
     return response(*allpass(fc, q), GRID)
 
 
-# ---------------------------------------------------------------- optimiser
+# ---------------------------------------------------------------- optimizer
 def _losses(Hm, Hs, mult, band):
     """dB below perfect addition (40-200 Hz average) for many candidate sub
     multipliers at once. mult: (n, len(GRID)) complex."""
@@ -215,7 +215,7 @@ def advice(m):
 
 
 def refresh(update=True):
-    """Optimise over every saved seat measured with the tune that's playing now
+    """Optimize over every saved seat measured with the tune that's playing now
     (seats measured with an older tune are listed as stale and left out)."""
     from .state import load_state, update_state
     s = load_settings()

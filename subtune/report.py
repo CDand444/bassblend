@@ -20,7 +20,7 @@ def _when(t):
 
 
 def _chart(grid, series, band=None, w=720, h=260, f0=15.0, f1=250.0):
-    """Inline SVG line chart (log frequency). series: [(name, y, colour, dash)]."""
+    """Inline SVG line chart (log frequency). series: [(name, y, color, dash)]."""
     g = np.asarray(grid, float)
     m = (g >= f0) & (g <= f1)
     ys = np.concatenate([np.asarray(y, float)[m] for _, y, _, _ in series if y is not None]) if series else np.array([0.0])

@@ -7,8 +7,8 @@ main speaker alone; during the gap htTamer unmutes them, so sweep B is left
 main + subs through the AVR's bass management. Both sweeps are in one
 recording, so their timing relative to each other is exact:
     H_subs = H_B - H_A          (complex, same time base)
-The blend optimiser then picks a sub delay offset and polarity so mains and
-subs add up instead of cancelling around the crossover, and checks the
+The blend optimizer then picks a sub delay offset and polarity so mains and
+subs add up instead of canceling around the crossover, and checks the
 sub-to-mains level balance.
 
 Playback: DLNA from this PC when the receiver can reach it, otherwise
@@ -150,7 +150,7 @@ class SweepWatcher:
         return np.concatenate(self.chunks), self.t_start
 
 
-def analyse(rec, t_start, cal=None, speakers="L"):
+def analyze(rec, t_start, cal=None, speakers="L"):
     """Left-only, left+subs, subs-only and (for 'LR') right-only responses on
     GRID, all on one time base. Returns (Hm, Ht, Hs, HmR); HmR is None for 'L'."""
     lay = layout(speakers)
@@ -266,14 +266,14 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
         if not src.auto:
             watcher.max = 240.0                         # give time to press play by hand
         rec, t0 = watcher.run(started=start)
-        status("Analysing…")
+        status("Analyzing…")
     finally:
         src.stop()
         try:
             dsp.batch([dsp.c_source(dsp_before)] + mute(False), "AVR test done: subs on, input restored")
         finally:
             o.restore(snap)
-    Hm, Ht, Hs, HmR = analyse(rec, t0, cal, lay["speakers"])
+    Hm, Ht, Hs, HmR = analyze(rec, t0, cal, lay["speakers"])
     r = optimise_blend(Hm, Hs, s.get("house_db", 0), s.get("house_fc", 45), HmR=HmR)
     r.update({"t": time.time(), "pos": pos, "mode": mode, "speakers": lay["speakers"], "tune_id": (load_state().get("result") or {}).get("tune_id"), "grid": np.round(GRID, 3).tolist(),
               "curves": curves(Hm, Hs, r["delay_ms"], -1 if r["invert"] else 1, HmR),

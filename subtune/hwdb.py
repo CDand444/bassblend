@@ -6,7 +6,7 @@ when the owner turns on "Let the assistant build the hardware database" (setting
 records a model's specs. htTamer then uses them:
 
   receivers  protocol (onkyo | denon | jbl) -> which driver controls it
-  subs       protect_hz (no EQ boost below, for ported designs) -> the optimiser and live EQ obey it
+  subs       protect_hz (no EQ boost below, for ported designs) -> the optimizer and live EQ obey it
   speakers   specs the assistant uses for crossover and placement advice
 
 Every entry records where it came from (who, and a source URL when there is one) and every
@@ -56,7 +56,7 @@ def key(model: str) -> str:
 
 
 def find(kind: str, model: str) -> dict | None:
-    """Exact (normalised) match first, then one entry whose key contains the query or vice versa."""
+    """Exact (normalized) match first, then one entry whose key contains the query or vice versa."""
     d = load().get(kind) or {}
     k = key(model)
     if not k:

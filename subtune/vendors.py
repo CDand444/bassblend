@@ -9,7 +9,7 @@ then knows, for each sub:
     driver) or that fight the receiver (sub's own crossover left on while the
     receiver already crosses over);
   * how far down it is safe to boost with EQ in that mode (used by the
-    optimiser), and suggestions with reasons for the assistant.
+    optimizer), and suggestions with reasons for the assistant.
 
 htTamer can't turn these knobs: it says which one to change and why, then
 measures again. Facts are tagged with where they come from: the maker's manual
@@ -80,9 +80,9 @@ CATALOG = {
             "Hsu: when running an auto-EQ (Audyssey, Dirac), use one port open, EQ1, Q 0.7: it counters the auto-EQ's "
             "habit of over-boosting very low frequencies. Afterwards any mode can be chosen.",
             "Hsu: EQ should cut peaks, not raise dips, to avoid damaging the speaker.",
-            "Hsu: two subs side by side maximise headroom; separated they can smooth the in-room response.",
+            "Hsu: two subs side by side maximize headroom; separated they can smooth the in-room response.",
             "Hsu: set the level so the average of the tones below the crossover equals the average above it; "
-            "for home theatre most prefer the sub about 3 dB higher.",
+            "for home theater most prefer the sub about 3 dB higher.",
             "Hsu: if it drops into standby in quiet passages, raise the receiver's sub level and lower the sub's "
             "volume knob to match, or set the power switch to ON.",
         ],
@@ -157,7 +157,7 @@ CATALOG = {
             "Rythmik: try 20 Hz with all three damping settings; if you can't hear a difference, use 20 Hz / medium.",
             "Rythmik: 14 Hz / high damping for medium playback levels; 28 Hz / low damping with the rumble filter on for high SPL.",
             "Rythmik (F12/PEQ3 guide): 14 Hz / high damping for articulate sound, 14 Hz / low damping for full-bodied home "
-            "theatre. With room EQ (like htTamer or Dirac), start from rumble off, 14 Hz, low damping.",
+            "theater. With room EQ (like htTamer or Dirac), start from rumble off, 14 Hz, low damping.",
             "Rythmik: with a receiver, use the 12 dB / AVR low-pass setting and turn the crossover knob to maximum so the "
             "receiver does the crossover.",
             "Rythmik: the phase control is an all-pass filter (up to 180°), not a true delay; htTamer's miniDSP delay does that.",

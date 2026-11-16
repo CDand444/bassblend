@@ -414,7 +414,7 @@ class Rig:
 
 def load_measurements(only=None):
     """Every spot's per-sub responses. Subs no longer used (removed on Room & subs) are left out, so the
-    optimiser can re-tune the rest from the same measurements: each sub was measured on its own."""
+    optimizer can re-tune the rest from the same measurements: each sub was measured on its own."""
     files = sorted(MEAS_DIR.glob("pos*.npz"))
     if not files:
         raise RuntimeError("no measurements yet - run `measure` first")

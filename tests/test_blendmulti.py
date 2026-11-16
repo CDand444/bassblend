@@ -64,10 +64,10 @@ def test_allpass_minidsp_format():
     assert abs(c[2] - 1) < 1e-12 and abs(c[0] + c[4]) < 1e-12, "numerator is the reversed denominator"
 
 
-# ---------------------------------------------------------------- optimiser
+# ---------------------------------------------------------------- optimizer
 def test_improves_a_badly_timed_system():
     m = bm.optimise_multi(three_seats(-3.0), mlp_weight=2.0)
-    assert m["now_db"] > 3, "the simulated system starts out cancelling"
+    assert m["now_db"] > 3, "the simulated system starts out canceling"
     assert m["dsp_only"]["score_db"] < m["now_db"] - 3
     assert m["best"]["score_db"] <= m["dsp_only"]["score_db"] + 1e-9
     assert m["dsp_only"]["delay_ms"] >= 0, "the miniDSP can only add delay"

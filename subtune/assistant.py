@@ -37,7 +37,7 @@ setup (receiver, speaker layout, Dirac, sub hardware with each knob's setting an
 and its predictions, verifications, check-ups, blend results, the latest system report, the receiver's \
 levels and processing, next_steps (htTamer's coach: a ranked list of what to do next, each with why, \
 who does it, whether it plays sound, and the tool to use) and journal (the recent history of changes and \
-their measured effect). Use next_steps as your starting point, but apply judgement: reorder when the \
+their measured effect). Use next_steps as your starting point, but apply judgment: reorder when the \
 owner's goal or the data says so, and explain why.
 
 The miniDSP has 4 preset slots. Slot 1 is the owner's original setup: never write to it unless they \
@@ -68,7 +68,7 @@ Fix things in this order, because each layer depends on the ones before it:
 furnishings). These change what everything after them has to correct.
 3. The sub tune in the miniDSP (auto-tune; offline simulations for target tweaks).
 4. The blend of subs with the front speakers (blend test at the MLP, then other seats; apply the fix).
-5. The receiver: sub and centre level, speaker distances and levels (menu numbers from the system \
+5. The receiver: sub and center level, speaker distances and levels (menu numbers from the system \
 report), processing switches (tone, Late Night, Cinema Filter, Music Optimizer, dialogue enhance).
 6. Dirac Live for the speakers, with htTamer's target.
 7. Verify and listen: verify the tune, run the system report, compare with earlier reports, A/B slots.
@@ -88,7 +88,7 @@ plan. Don't propose tools that play sound; mention what you'd measure next time 
 Night mode (set_night_mode) is different: it cuts all bass from the subs. Offer it when the owner wants no \
 bass at all (late films, sleeping neighbours); while it's on, sound tests are refused.
 A sub that is gone for good or unplugged (sold, moved to another room): set_sub_output remove takes its output \
-out of the sub list without touching the miniDSP; then optimise again from the other subs' measurements. Muting \
+out of the sub list without touching the miniDSP; then optimize again from the other subs' measurements. Muting \
 that output on the miniDSP is a separate step (set_sub_output mute): ask before offering both.
 
 ## Automation (get_overview -> automation)
@@ -216,7 +216,7 @@ peaks and dips classified (room resonance, wall cancellation, reflection), left/
 (speaker polarity isn't judged: it read wrong on real systems), RT60, early reflections, distortion, noise and hum, bass extension, receiver_advice (exact \
 menu numbers, and the sub level htTamer can set). Separate what EQ/Dirac can fix (peaks) from what \
 needs placement (dips/cancellations) or hands (wiring, receiver menu, furnishings). Treble readings \
-depend on mic position: confirm at a second spot before acting on them. It doesn't cover the centre, \
+depend on mic position: confirm at a second spot before acting on them. It doesn't cover the center, \
 surrounds or heights yet. fix_from_report does the automatic part (sub level, blend fix, re-check).
 - Blend: run_avr_blend at the MLP, then spots 2 and 3; htTamer finds one setting for all measured \
 seats (avr_blend_all_seats; "dsp_only" = what the miniDSP can do; "best" may need the receiver's sub \
@@ -264,7 +264,7 @@ TOOLS = [
     _t("get_journal", "The tuning journal: recent changes (knobs, tunes, receiver levels, Dirac runs, target changes) and "
        "measurements (verifications, reports, fixes) with their key numbers, newest last. Use it to compare before and "
        "after. No sound.", {"n": {"type": "integer", "description": "how many recent entries (1-100)"}}, ["n"]),
-    _t("simulate_tune", "Re-run the optimiser OFFLINE on the existing measurements with changed settings "
+    _t("simulate_tune", "Re-run the optimizer OFFLINE on the existing measurements with changed settings "
        "and compare with the current tune. No sound, nothing written. Takes about 30-60 s.",
        {"mlp_weight": {"type": "number", "description": "1-4, how much the MLP counts vs other spots"},
         "house_db": {"type": "number", "description": "0-10 dB bass lift"},
@@ -276,7 +276,7 @@ TOOLS = [
         "nearfield_max_cut_db": {"type": "number", "description": "0-12, max gain cut on the nearfield sub"}}),
     _t("save_simulation", "Save the last simulate_tune result to the tune library (not applied).",
        {"name": {"type": "string"}, "notes": {"type": "string"}}, ["name"]),
-    _t("set_target_settings", "Change the tuning target used by the next optimisation/auto-tune.",
+    _t("set_target_settings", "Change the tuning target used by the next optimization/auto-tune.",
        {k: {"type": "number"} for k in ("fmin", "fmax", "house_db", "house_fc", "max_boost_db", "mlp_weight",
                                         "nearfield_max_cut_db", "nearfield_max_boost_db", "nearfield_max_eq_cut_db",
                                         "nearfield_min_q")}, approval=True),
@@ -290,7 +290,7 @@ TOOLS = [
        {"on": {"type": "boolean"}}, ["on"], approval=True),
     _t("set_sub_output", "Take a miniDSP output out of the sub list (sub unplugged, sold or moved), put one back, or mute "
        "a removed one on the miniDSP. remove/add write nothing to the miniDSP; tunes made with a removed output go "
-       "stale (apply is refused) until it is back or a new tune is optimised from the remaining subs' measurements. "
+       "stale (apply is refused) until it is back or a new tune is optimized from the remaining subs' measurements. "
        "mute writes one output mute to htTamer's slot, only while that slot plays (never slot 1). Ask the owner "
        "whether they only want to stop using it or also mute it.",
        {"action": {"type": "string", "enum": ["remove", "add", "mute"]},
@@ -313,7 +313,7 @@ TOOLS = [
        ["spots", "prechecks"], approval=True),
     _t("avr_status", "Receiver power, input, listening mode, volume, mute, sub and center level."),
     _t("avr_control", "Change the receiver: power on/off, mute, volume DOWN, input, listening mode, subwoofer "
-       "level or centre (dialogue) level. Volume can't be raised from here.",
+       "level or center (dialogue) level. Volume can't be raised from here.",
        {"action": {"type": "string", "enum": ["power", "mute", "volume_down", "input", "mode", "sub_level", "center_level",
                                                "bass", "treble", "late_night", "cinema_filter", "music_optimizer", "dialog", "dimmer"]},
         "value": {"type": "string", "description": "power/mute: '1' or '0'; volume_down: dB; input: code e.g. '10' "
@@ -369,11 +369,11 @@ TOOLS = [
        "the subs (model, placement, knob settings), the room, seats, receiver and goals. No sound."),
     _t("update_speakers", "Record or correct speakers. Merges the given fields into each channel's record; nothing "
        "else changes. Use it whenever the owner tells you about a speaker. No sound.",
-       {"speakers": {"type": "object", "description": "channel code -> fields to set, e.g. {\"FL\": {\"model\": \"Klipsch RP-8000F\", \"kind\": \"tower\", \"size\": \"small\", \"crossover_hz\": 80}}. Channels: FL FR C WL WR SL SR BL BR (rear surrounds) TFL TFR TML TMR TRL TRR. Fields: model, kind (tower, bookshelf, centre, on-wall, in-wall, in-ceiling, atmos module, satellite, other), size (the receiver's large/small setting), crossover_hz, x_ft/y_ft/z_ft (from the left wall, the front wall, the floor), aim, amp, notes. Only the fields given change."},
+       {"speakers": {"type": "object", "description": "channel code -> fields to set, e.g. {\"FL\": {\"model\": \"Klipsch RP-8000F\", \"kind\": \"tower\", \"size\": \"small\", \"crossover_hz\": 80}}. Channels: FL FR C WL WR SL SR BL BR (rear surrounds) TFL TFR TML TMR TRL TRR. Fields: model, kind (tower, bookshelf, center, on-wall, in-wall, in-ceiling, atmos module, satellite, other), size (the receiver's large/small setting), crossover_hz, x_ft/y_ft/z_ft (from the left wall, the front wall, the floor), aim, amp, notes. Only the fields given change."},
         "remove": {"type": "array", "items": {"type": "string"}, "description": "channel codes whose record to clear"}},
        []),
     _t("update_room", "Record or correct the room, seats, subs, receiver description or goals. Partial: only what's given "
-       "changes. Lengths may be given in feet (*_ft) or metres (*_m). No sound.",
+       "changes. Lengths may be given in feet (*_ft) or meters (*_m). No sound.",
        {"room": {"type": "object", "description": "length_ft, width_ft, height_ft (the highest point), construction, "
                  "openings (free-text notes), notes. Real shape (optional): outline_ft = floor corners in order "
                  "[[x_ft, y_ft], ...] (x from the left wall, y from the front/screen wall, e.g. an L: "

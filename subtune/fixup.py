@@ -8,7 +8,7 @@ htTamer always uses):
      or polarity change helps by 0.5 dB or more, it is saved as a new tune on the
      playing slot (never slot 1). Late subs need the receiver's sub distance, which
      is reported, not changed.
-  3. A fresh system report at the same spot, labelled "after fixes", so the page
+  3. A fresh system report at the same spot, labeled "after fixes", so the page
      can show before and after.
 Speaker distances and levels (receiver menu), Dirac Live and anything physical are
 listed for the owner; htTamer can't change those.

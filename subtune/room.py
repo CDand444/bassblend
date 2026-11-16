@@ -1,6 +1,6 @@
 """Room + subwoofer description and simple modal acoustics.
 
-Coordinates (metres): x from the LEFT wall, y from the FRONT wall (the wall
+Coordinates (meters): x from the LEFT wall, y from the FRONT wall (the wall
 the screen/mains are on), z from the floor - all as seen from the main seat.
 """
 from __future__ import annotations
@@ -151,7 +151,7 @@ def mode_pressure(mode, x, y, z, W, L, H):
 
 def modal_report(room: dict, fmax=150.0) -> dict | None:
     """Room modes. A rectangle gets the classic rectangular-room calculation. An irregular room gets the
-    same calculation for its main box (the biggest rectangle inside the outline), labelled as an
+    same calculation for its main box (the biggest rectangle inside the outline), labeled as an
     estimate, plus the rough extra modes its other parts add; measurements stay the authority."""
     from . import shape
     rm = room["room"]

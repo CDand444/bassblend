@@ -39,7 +39,7 @@ def check_apply(result, settings=None) -> None:
     gone = removed_in(result, settings)
     if gone:
         outs = ", ".join(str(o) for o in gone)
-        raise ValueError(f"this tune was made with output {outs}, which is no longer a sub output. Optimise again "
+        raise ValueError(f"this tune was made with output {outs}, which is no longer a sub output. Optimize again "
                          f"(the measurements of the other subs still count), or add output {outs} back on Room & subs.")
 
 
@@ -78,7 +78,7 @@ def remove(output, forget: bool = False) -> dict:
     return {"output": o + 1, "subs": [x + 1 for x in subs], "forgot_details": forgot, "result_stale": stale,
             "dsp_written": False,
             "summary": f"output {o + 1} removed from the sub list ({len(subs)} left); nothing written to the miniDSP"
-                       + ("; the playing tune still drives it: optimise and apply again, or mute it on the miniDSP" if stale else "")}
+                       + ("; the playing tune still drives it: optimize and apply again, or mute it on the miniDSP" if stale else "")}
 
 
 def add(output) -> dict:

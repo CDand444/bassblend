@@ -12,7 +12,7 @@ exact, so they share one time base) htTamer works out:
     split into deep bass / bass / low mids / mids / upper mids / highs;
   * the biggest peaks and dips, and what kind of problem each probably is
     (room resonance, wall cancellation, reflection, speaker);
-  * left/right match: level, tone and timing (is the seat centred?). Speaker polarity isn't judged:
+  * left/right match: level, tone and timing (is the seat centered?). Speaker polarity isn't judged:
     it read wrong on real systems
     (is a speaker wired backwards?);
   * how long the room rings per octave (RT60) and the strongest early reflections;
@@ -93,14 +93,14 @@ def _cal_db(cal, f):
     return np.interp(np.log(f), np.log(fr), db)
 
 
-def frac_smooth(f_bins, p_bins, centres, frac=6):
-    """Power average over a 1/frac-octave window around each centre (dB)."""
+def frac_smooth(f_bins, p_bins, centers, frac=6):
+    """Power average over a 1/frac-octave window around each center (dB)."""
     cs = np.concatenate([[0.0], np.cumsum(p_bins)])
-    lo = np.searchsorted(f_bins, centres * 2 ** (-0.5 / frac))
-    hi = np.searchsorted(f_bins, centres * 2 ** (0.5 / frac))
-    out = np.empty(len(centres))
+    lo = np.searchsorted(f_bins, centers * 2 ** (-0.5 / frac))
+    hi = np.searchsorted(f_bins, centers * 2 ** (0.5 / frac))
+    out = np.empty(len(centers))
     for i, (a, b) in enumerate(zip(lo, hi)):
-        out[i] = (cs[b] - cs[a]) / (b - a) if b - a >= 1 else np.interp(centres[i], f_bins, p_bins)
+        out[i] = (cs[b] - cs[a]) / (b - a) if b - a >= 1 else np.interp(centers[i], f_bins, p_bins)
     return 10 * np.log10(np.maximum(out, 1e-20))
 
 
@@ -284,7 +284,7 @@ def bass_extension(f, norm):
 
 
 # ---------------------------------------------------------------- analysis
-def analyse(rec, t_start, cal=None, settings=None, system=None):
+def analyze(rec, t_start, cal=None, settings=None, system=None):
     s = settings or load_settings()
     if system is None:
         from .dirac import system as _sy
@@ -364,7 +364,7 @@ def analyse(rec, t_start, cal=None, settings=None, system=None):
 
 
 def combine(reports: list[dict]) -> dict | None:
-    """Average several spots' reports (power average of the normalised curves): the tonal balance
+    """Average several spots' reports (power average of the normalized curves): the tonal balance
     over the listening area, which treble readings at one spot can't give. Also says how much each
     pitch varies from spot to spot, and which peaks/dips only showed at one spot."""
     reps = [r for r in reports if r.get("curves") and r.get("target")]
@@ -376,7 +376,7 @@ def combine(reports: list[dict]) -> dict | None:
     avg_lr = [10 * np.log10((10 ** (np.array(r["curves"]["left"]) / 10) + 10 ** (np.array(r["curves"]["right"]) / 10)) / 2) for r in reps]
     norm = {k: 10 * np.log10(pw(k).mean(0)) for k in ("left", "right", "both")}
     norm["avg"] = 10 * np.log10(np.mean([10 ** (a / 10) for a in avg_lr], 0))
-    for k in norm:                                   # re-centre the mids at 0 dB
+    for k in norm:                                   # re-center the mids at 0 dB
         norm[k] = norm[k] - band_mean(grid, norm[k], 500, 2000)
     dev = {k: norm[k] - tgt for k in norm}
     spread = np.std(np.array(avg_lr), 0)
@@ -438,7 +438,7 @@ def receiver_advice(r, sub_level=None, dirac_on=False):
     out = []
     lr = r["lr"]
     if dirac_on:
-        note = " Dirac Live sets distances and levels itself: re-run Dirac with the mic centred instead of changing these by hand."
+        note = " Dirac Live sets distances and levels itself: re-run Dirac with the mic centered instead of changing these by hand."
     else:
         note = ""
     if abs(lr["timing_ms"]) >= 0.15:
@@ -446,7 +446,7 @@ def receiver_advice(r, sub_level=None, dirac_on=False):
         cm = abs(lr["timing_cm"])
         out.append({"kind": "menu", "what": "distance",
                     "text": f"Increase the {side} speaker's distance by {cm / 30.48:.1f} ft ({cm:.0f} cm) in the receiver's Speaker Setup → "
-                            f"Distance, or check the mic was centred.{note}"})
+                            f"Distance, or check the mic was centered.{note}"})
     if abs(lr["level_db"]) >= 0.5:
         side = "Left" if lr["level_db"] > 0 else "Right"
         db = round(abs(lr["level_db"]) * 2) / 2
@@ -510,7 +510,7 @@ def peaks_dips(dev, norm):
                 dist = C / (4 * f)
                 title = f"Hole at {_hz(f)} ({v:.0f} dB): probably the wall behind the speakers"
                 found = (f"Both speakers lose {mag:.0f} dB around {_hz(f)}. A dip at this pitch in both speakers is usually a "
-                         f"wall bounce cancelling the direct sound: a surface about {dist * 100:.0f} cm ({dist / 0.3048:.1f} ft) "
+                         f"wall bounce canceling the direct sound: a surface about {dist * 100:.0f} cm ({dist / 0.3048:.1f} ft) "
                          "from the speakers' woofers (most often the wall behind them).")
                 why = "Instruments and voices lose body in that range; it can sound thin or hollow."
                 todo = (f"EQ can't fill a cancellation (boosting just wastes power). Moving the speakers closer to the wall "
@@ -613,15 +613,15 @@ def _more_findings(out, r, dev, norm):
     out.append(_f("stereo", "good" if abs(lv) < 1 else "watch" if abs(lv) < 2 else "fix",
                   "Left and right are equally loud" if abs(lv) < 1 else f"The {'left' if lv > 0 else 'right'} speaker is {abs(lv):.1f} dB louder",
                   f"Level difference in the mids: {lv:+.1f} dB (left minus right).",
-                  "A louder side pulls the centre image (voices) towards it.",
-                  "" if abs(lv) < 1 else "Set the speaker levels in the receiver (or let Dirac do it), and check the mic is centred."))
+                  "A louder side pulls the center image (voices) towards it.",
+                  "" if abs(lv) < 1 else "Set the speaker levels in the receiver (or let Dirac do it), and check the mic is centered."))
     tm = lr["timing_ms"]
     out.append(_f("stereo", "good" if abs(tm) < 0.15 else "watch",
-                  "The seat is centred between the speakers" if abs(tm) < 0.15 else
+                  "The seat is centered between the speakers" if abs(tm) < 0.15 else
                   f"The {'right' if tm > 0 else 'left'} speaker's sound arrives {abs(tm):.2f} ms later",
                   f"Arrival difference {tm:+.2f} ms, about {abs(lr['timing_cm']):.0f} cm of extra distance.",
-                  "Even a few centimetres off-centre shifts the image; at 0.3 ms+ voices drift to the nearer speaker.",
-                  "" if abs(tm) < 0.15 else "If the mic was centred, set the speaker distances in the receiver (or let Dirac do it). "
+                  "Even a few centimetres off-center shifts the image; at 0.3 ms+ voices drift to the nearer speaker.",
+                  "" if abs(tm) < 0.15 else "If the mic was centered, set the speaker distances in the receiver (or let Dirac do it). "
                   "If it wasn't, this is just the mic position."))
     ts = lr["tone_spread_db"]
     if ts > 2.5:
@@ -644,7 +644,7 @@ def _more_findings(out, r, dev, norm):
         else:
             out.append(_f("room", st, f"Room ring time {mid:.2f} s" + ("" if st == "good" else (" (lively)" if mid > 0.5 else " (very dead)")),
                       f"Above 250 Hz, sound dies away by 60 dB in about {mid:.2f} s.",
-                      "Home theatres sound best around 0.2-0.4 s: lively enough to feel natural, dead enough for clear dialogue.",
+                      "Home theaters sound best around 0.2-0.4 s: lively enough to feel natural, dead enough for clear dialogue.",
                       "" if st == "good" else ("Add soft furnishings: a rug, curtains, panels at the side walls' first reflection points." if mid > 0.5
                                                else "A very dead room can feel closed-in; a few reflective surfaces (bookshelf, wood) liven it up.")))
     if good_rt:
@@ -662,7 +662,7 @@ def _more_findings(out, r, dev, norm):
         out.append(_f("room", "watch", f"Strong early reflection {x['ms']:.1f} ms after the direct sound",
                       f"A reflection only {abs(x['db']):.0f} dB quieter than the speaker itself arrives {x['ms']:.1f} ms later: "
                       f"its path is about {x['extra_cm']} cm longer. Typically the floor, a coffee table, a desk or the nearest side wall.",
-                      "Early, strong reflections blur the image and colour the sound (they cause the comb-like ripples in the treble).",
+                      "Early, strong reflections blur the image and color the sound (they cause the comb-like ripples in the treble).",
                       "A rug, moving a table out of the path, or an absorption panel at the mirror point on the side wall."))
     elif refl:
         out.append(_f("room", "good", "No strong early reflections", "The earliest reflections are well below the direct sound.", "", ""))
@@ -769,7 +769,7 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label="", a
                 status(f"Press play on the receiver now ({MEDIA_NAME} on your USB stick). Listening…")
         watcher = SweepWatcher(rec_dev, lambda: None, max_seconds=90.0 if src.auto else 240.0, lay=lay)
         rec, t0 = watcher.run(started=start)
-        status("Analysing…")
+        status("Analyzing…")
     finally:
         src.stop()
         try:
@@ -778,7 +778,7 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label="", a
         finally:
             o.restore(snap)
             log("avr", f"system report: receiver restored (input {snap.get('input_code')}, volume {snap.get('volume')})")
-    r = analyse(rec, t0, cal, s)
+    r = analyze(rec, t0, cal, s)
     r.update({"pos": pos, "mode": mode, "level": level, "neutralised": flat,
               "avr": {k: snap.get(k) for k in ("volume", "sub_level", "input_code", "mode_code")},
               "tune_id": (load_state().get("result") or {}).get("tune_id")})

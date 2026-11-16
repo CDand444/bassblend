@@ -1,4 +1,4 @@
-"""Multi-sub optimisation.
+"""Multi-sub optimization.
 
 Model at mic position p:
     Y_p(f) = G(f) * sum_i  a_i * s_i * exp(-j 2 pi f d_i) * P_i(f) * H_{p,i}(f)
@@ -224,7 +224,7 @@ def sub_roles(subs):
     return [((room["subs"].get(str(o)) or {}).get("role") or "main") for o in subs]
 
 
-def optimise(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
+def optimize(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
     s = s or load_settings()
     S = len(subs)
     k = int(s["sub_peq_bands"])
@@ -319,7 +319,7 @@ def optimise(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
                           None if seat_std is None else seat_std[m], sub_allow(GRID[m], s, nearfield), indiv_db)
     log("opt", f"stage 3: {len(glob)} shared PEQ bands")
 
-    # ------------------------------------------------------------ finalise
+    # ------------------------------------------------------------ finalize
     d = d - d.min()
     boost = max(float(np.max(20 * np.log10(np.abs(peq_chain_response(indiv[i] + glob, GRID[m]))))) + g[i]
                 for i in range(S))

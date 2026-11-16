@@ -48,7 +48,7 @@ def test_subs_with_danger():
 
 
 def test_receiver_colouring():
-    a = ask("Is my receiver colouring the sound?")
+    a = ask("Is my receiver coloring the sound?")
     assert "Cinema Filter is on" in a and "-11.0 dB" in a
 
 
