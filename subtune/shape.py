@@ -124,10 +124,51 @@ def clean_outline(o, max_m: float = 50.0) -> list[list[float]] | None:
     a = signed_area(pts)
     if abs(a) < 1.0:
         raise ValueError("outline encloses less than 1 m²")
+    problem = shape_problem(pts)
+    if problem:
+        raise ValueError(f"outline: {problem}")
     if a < 0:
         pts.reverse()
     k = min(range(len(pts)), key=lambda i: (pts[i][1], pts[i][0]))
     return pts[k:] + pts[:k]
+
+
+MIN_WALL = 0.3            # m: about 1 ft; shorter walls are drawing slips
+MIN_GAP = 0.3             # m: a corner closer than this to a wall it isn't on makes a sliver
+MIN_ANGLE = 20.0          # degrees inside a corner
+
+
+def _seg_dist(p, a, b) -> float:
+    ax, ay = a
+    dx, dy = b[0] - ax, b[1] - ay
+    L2 = dx * dx + dy * dy
+    t = 0.0 if L2 == 0 else max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / L2))
+    return math.dist(p, (ax + t * dx, ay + t * dy))
+
+
+def shape_problem(pts) -> str | None:
+    """Why an outline can't be a room (None = fine): too few corners, a very short wall, a needle-sharp
+    corner, or a corner pressed against a wall it isn't part of (a sliver). Mirrored in the page's editor."""
+    n = len(pts)
+    if n < 4:
+        return "a room needs at least 4 corners"
+    for i in range(n):
+        a, b = pts[i], pts[(i + 1) % n]
+        if math.dist(a, b) < MIN_WALL:
+            return f"wall {i + 1} is shorter than 1 ft"
+    for i in range(n):
+        p, q, r = pts[i - 1], pts[i], pts[(i + 1) % n]
+        v1, v2 = (p[0] - q[0], p[1] - q[1]), (r[0] - q[0], r[1] - q[1])
+        cos = (v1[0] * v2[0] + v1[1] * v2[1]) / (math.hypot(*v1) * math.hypot(*v2))
+        if math.degrees(math.acos(max(-1.0, min(1.0, cos)))) < MIN_ANGLE:
+            return f"corner {i + 1} is too sharp (under {MIN_ANGLE:.0f}°)"
+    for i in range(n):
+        for j in range(n):
+            if j in (i, (i - 1) % n):
+                continue
+            if _seg_dist(pts[i], pts[j], pts[(j + 1) % n]) < MIN_GAP:
+                return f"corner {i + 1} is within 1 ft of wall {j + 1}: the room would be a sliver"
+    return None
 
 
 def extent(pts) -> tuple[float, float]:
