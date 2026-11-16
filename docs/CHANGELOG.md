@@ -1,5 +1,24 @@
 # htTamer changelog
 
+## Nov 16, 2026 - room details, backups, receiver setup sheet
+
+Built and tested offline (the offline tests and a headless browser); the receiver setup sheet, a real backup restore and the
+new room details are still to be tried on the real system.
+
+- **Room page**: a **Screen** section (TV or projector screen, size and shape, acoustically transparent or not, front speakers
+  behind it), **Furniture** (couches with fabric and size, risers), **Soffits** along walls (trimmed to their wall and blended
+  into angled walls), a jump bar, and "Pick screen wall". Plan and 3D draw everything; pointing at a soffit, opening or corner
+  row lights it up on the plan and in 3D. Room and Subs are now two pages.
+- **Treatment and layout**: couches, risers, soffits and the screen add notes (ring-time estimate, couch back at the ears, a
+  front-wall soffit, viewing angle, what an AT screen does); front speakers sit close behind an AT screen.
+- **Backups** (Tools, Beta): weekly, before an update and on demand; the newest five are kept; restore with a safety copy first;
+  never holds keys, PIN or tokens; optional second copy to a USB stick or share.
+- **Receiver setup sheet** (after the all-speakers check): level and distance changes per channel in the receiver's words,
+  final numbers from the values recorded at measurement time, tonal match and bass extension per channel; printable at `/channels`.
+- **Assistant and MCP**: update_room records the screen, furniture and soffits; list_backups, make_backup and restore_backup
+  (the last needs your approval). The phone room builder can also propose the screen, couches, risers and soffits.
+- **Layout**: pages scale to wide screens; Speaker placement and Room treatment use a plan-and-table layout.
+
 ## Nov 14, 2026 (overnight) - pro views, placement, headroom, all speakers, offline helper
 
 Built and tested offline (simulations and the browser); nothing played on the real system.

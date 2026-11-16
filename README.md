@@ -27,6 +27,32 @@ Get the latest build from **[Releases](https://github.com/danand444/bassblend/re
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed (the Windows
 installer); the Pi image is built with `deploy/pi-gen/build-image.sh` and uploaded to the same release.
 
+## Getting started
+
+1. **Open the dashboard** (`http://bassblend.local:8765` on the Pi, or the window the Windows installer opens) and accept the
+   safety notice. Choose a PIN if it asks.
+2. **Receiver**: enter its address (htTamer can search the network) so it can be put back exactly as it was after every test.
+3. **Room**: describe the room (size, shape, doors and windows), the **Screen** (a TV or a projector screen, acoustically
+   transparent or not), your seats, any couch or riser, and soffits. The plan and the 3D view draw it as you type; **Pick screen
+   wall** turns the room so the screen is at the front.
+
+   ![The Room page: plan with the screen, soffit, couch and riser, and the shape editor](docs/img/room.png)
+
+4. **Subs** and **Speakers**: record each sub and speaker (model, where it stands, the receiver's own level and distance if you can
+   read them off its menu). The more it knows, the sharper its advice.
+5. **Speaker placement**: Dolby-guideline positions for your layout, next to where yours really are, with plain "move it this far"
+   words.
+
+   ![Speaker placement: recommended and recorded positions, with how far off each is](docs/img/placement.png)
+
+6. **Tune my system** guides the rest: a silent hardware check, then measurements with the UMIK-1 (the only steps that play sound,
+   and only when you start them), writing the tune to the miniDSP, and **Verify**. After the all-speakers check, the
+   **receiver setup sheet** lists what to change in the receiver, channel by channel.
+7. **Tools → Backups** keeps your room, tunes and settings safe: weekly, before each update and on demand, with one-click restore.
+
+The built-in assistant (the chat button) can read all of this and, with your approval for anything that plays sound or changes
+your hardware, help with each step. Everything is also in the [user manual](subtune/web/manual.html).
+
 ## Documentation
 
 - User manual: `subtune/web/manual.html` (in the app under System → Manual, or at `/manual`)

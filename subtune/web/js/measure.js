@@ -250,7 +250,7 @@ function trtDrawing(p) {
     <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < L / 2 ? 16 : -9)}" text-anchor="middle" font-size="9" fill="var(--text-3)">${esc(s.id)}</text>`);
   (p.subs || []).forEach(s => g += `<rect x="${X(s.x_m) - 6}" y="${Y(s.y_m) - 6}" width="12" height="12" rx="2" fill="var(--text-2)"><title>Sub out ${s.out}</title></rect>`);
   (p.seats || []).forEach((s, k) => g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${k ? 5.5 : 7}" fill="var(--text)"><title>${esc(s.name)}</title></circle>`);
-  return `<svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:440px" role="img" aria-label="Suggested room treatment positions">${g}</svg>
+  return `<svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:480px" role="img" aria-label="Suggested room treatment positions">${g}</svg>
     <div class="legend"><span><i style="border-color:var(--s2)"></i>Do first</span><span><i style="border-color:var(--s1)"></i>Next</span><span><i style="border-color:var(--s4)"></i>Nice to have</span><span><i style="border-color:var(--good)"></i>Installed</span><span><i class="dash" style="border-color:var(--text-2)"></i>Ceiling cloud</span><span><i class="dot" style="color:var(--text)"></i>Reflection points</span></div>`;
 }
 function renderTreatment() {
@@ -286,7 +286,7 @@ function renderTreatment() {
         if (cmp.waiting.length) cmpH += `<p class="small muted">Run a new ${cmp.waiting.join(' and a new ')} to see the change.</p>`;
       }
       $('#trtOut').innerHTML = `<div class="notice" style="margin-bottom:12px">${esc(p.honesty)}</div>
-        <div class="dc-grid" style="margin-top:0"><div>${trtDrawing(p)}</div><div><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
+        <div class="pl-grid"><div>${trtDrawing(p)}</div><div><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
         ${trtCostHtml(p, usd)}${list}${cmpH}
         ${p.notes.length ? `<ul class="wins" style="margin-top:14px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}`;
       $('#trtOut').querySelectorAll('[data-trt-build]').forEach(b => b.onclick = async () => {

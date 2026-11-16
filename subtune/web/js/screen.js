@@ -38,5 +38,6 @@ function scPlanG(sc, front, X, Y) {             // the screen drawn on the front
   return `<line x1="${X(cx - w / 2)}" x2="${X(cx + w / 2)}" y1="${Y(y)}" y2="${Y(y)}" stroke="${sc.at ? 'var(--accent)' : 'var(--text-2)'}" stroke-width="${sc.kind === 'tv' ? 6 : 4}" stroke-linecap="round"${sc.at ? ' stroke-dasharray="6 3" opacity=".8"' : ''}><title>${esc(label)}</title></line>
     <text x="${X(cx)}" y="${Y(front.a[1]) - 10}" text-anchor="middle" font-size="11" fill="var(--text-3)">${esc(label)}</text>`;
 }
+document.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { const t = document.querySelector(b.dataset.jump); if (t) t.scrollIntoView({behavior: 'smooth', block: 'start'}); });
 $('#scBox').addEventListener('input', () => { scSync(); renderPlan(readRoom()); });
 $('#scBox').addEventListener('change', () => { scSync(); renderPlan(readRoom()); });
