@@ -27,7 +27,7 @@ yet**. Expect a first session of small fixes, ideally with Claude connected to t
 
 ## Your settings in one file (no typing on a new card)
 The dashboard menu has **Settings file**. **Download** saves one `.json` with:
-- settings: subs, owned slot, target curve, optimiser limits, receiver, speaker layout and Dirac choices;
+- settings: subs, owned slot, target curve, optimizer limits, receiver, speaker layout and Dirac choices;
 - the room (size, seats, where each sub is and what it is);
 - the mic calibration file itself;
 - ticked by default: saved tunes, slot contents, the current result and its measurements;

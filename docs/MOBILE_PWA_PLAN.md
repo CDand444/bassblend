@@ -30,7 +30,7 @@ automatic gain, so its readings would be wrong.
 
 ## Phase 2: installable app (PWA)
 
-1. **Web app manifest:** name, icons (192/512 px plus maskable), theme colours matching
+1. **Web app manifest:** name, icons (192/512 px plus maskable), theme colors matching
    the dashboard, `display: standalone`, so it opens full-screen from the home screen.
 2. **Service worker:** caches the app shell so it opens instantly, and shows a friendly
    "Can't reach your htTamer PC" page when the PC is off. Measurements and DSP writes always

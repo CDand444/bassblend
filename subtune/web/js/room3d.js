@@ -1,6 +1,6 @@
 // htTamer room viewer: a 3D "dollhouse" view and a simple 2D plan of a room's real shape.
 // Shared by the dashboard (Room and subs) and the phone room builder (/build); no libraries, so it
-// works on a home network without internet. Units: metres, x from the left wall, y from the front
+// works on a home network without internet. Units: meters, x from the left wall, y from the front
 // (screen) wall, z up; outline corners in order, openings on walls (wall i = corner i -> i+1).
 // Usage: RoomView.view3d(canvas) -> {set(room, markers)}; RoomView.svg2d(room, markers) -> '<svg…>'.
 // markers: [{x_m, y_m, z_m, kind: 'seat'|'sub'|'speaker'|'height', label}]

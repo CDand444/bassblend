@@ -243,7 +243,7 @@ function wizSteps() {
   const vt = (S.verify_meta || {})['1'];
   const steps = [
     {k: 'setup', t: 'Check setup', s: 'everything connected', done: its.filter(i => !i.optional).every(i => i.ok)},
-    {k: 'tune', t: 'Tune the subs', s: 'measure + optimise', done: applied && Object.keys(S.measurements || {}).length > 0},
+    {k: 'tune', t: 'Tune the subs', s: 'measure + optimize', done: applied && Object.keys(S.measurements || {}).length > 0},
   ];
   if (sy.dirac) steps.push({k: 'dirac', t: 'Dirac Live', s: sy.dirac_current ? 'run with this tune' : 'for your speakers', done: !!sy.dirac_current});
   steps.push({k: 'blend', t: 'Blend with speakers', s: nSeats ? `${nSeats} of 3 seats measured` : 'timing + level',

@@ -215,7 +215,7 @@ function render() {
     if (res.subs.some(s => (s.allpass || []).length)) h += `<p class="muted small" style="margin:10px 0 0">“Phase only” is an all-pass filter from the blend test: it shifts the subs’ timing near the crossover so they add up with your speakers, without changing their level.</p>`;
     $('#filtersSub').textContent = res.slot ? `per output, slot ${res.slot}` : 'per output';
     $('#filters').innerHTML = h;
-  } else $('#filters').innerHTML = empty('No filters yet', 'Gain, delay, polarity and EQ for each output are listed here after optimising.');
+  } else $('#filters').innerHTML = empty('No filters yet', 'Gain, delay, polarity and EQ for each output are listed here after optimizing.');
 
   renderSteps();
   renderMatch();

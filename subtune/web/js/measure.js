@@ -441,7 +441,7 @@ function renderDeep() {
   h += `<div class="dc-grid">
     <div><h3>By range, vs your target (dB)</h3><p class="hint muted small" style="margin:0 0 6px">Positive = louder than the target. The last column is how bumpy that range is.</p>
       <div class="tw"><table class="dc-tbl"><thead><tr><th>Range (Hz)</th><th>Left</th><th>Right</th><th>Both</th><th>Bumpiness</th></tr></thead><tbody>${r.bands.map(bandRow).join('')}</tbody></table></div></div>
-    <div><h3>How long the room rings (RT60)</h3><p class="hint muted small" style="margin:0 0 6px">Time for sound to fade by 60 dB. Home theatres sound best around 0.2–0.4 s; the small line marks the upper limit.</p><div class="bars">${rt}</div></div>
+    <div><h3>How long the room rings (RT60)</h3><p class="hint muted small" style="margin:0 0 6px">Time for sound to fade by 60 dB. Home theaters sound best around 0.2–0.4 s; the small line marks the upper limit.</p><div class="bars">${rt}</div></div>
     <div><h3>Left vs right</h3><table class="dc-tbl"><tbody>
       <tr><td>Level difference (left − right)</td><td>${lr.level_db > 0 ? '+' : ''}${lr.level_db.toFixed(1)} dB</td></tr>
       <tr><td>Arrival difference</td><td>${lr.timing_ms > 0 ? '+' : ''}${lr.timing_ms.toFixed(2)} ms (${Math.abs(lr.timing_cm).toFixed(0)} cm)</td></tr>
@@ -459,7 +459,7 @@ function renderDeep() {
   h += `<p class="muted small" style="margin:16px 0 0">${spotName(r.pos)} · ${new Date(r.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} · ` +
     (lv ? `volume set automatically: ${lv.start} → ${lv.volume} (${lv.spl.toFixed(0)} dB at the mic${lv.reached ? '' : `, target ${lv.target} not reached under the max of ${lv.ceiling}`}), back to ${lv.start} afterwards` :
       `receiver volume ${r.avr && r.avr.volume != null ? r.avr.volume : '?'}`) +
-    `. Covers the front left and right speakers and the subs; centre, surrounds and heights aren't in this test yet.</p>
+    `. Covers the front left and right speakers and the subs; center, surrounds and heights aren't in this test yet.</p>
   <details style="margin-top:12px" class="dc-gloss"><summary class="muted small" style="cursor:pointer">What these words mean</summary><dl>
     <dt>Room resonance (mode)</dt><dd>A pitch where sound bouncing between walls reinforces itself: those bass notes are louder and ring longer. EQ fixes peaks well.</dd>
     <dt>Cancellation (null, dip)</dt><dd>Sound arriving by two paths cancels at your seat. EQ can't fill it; moving the seat, subs or speakers can.</dd>

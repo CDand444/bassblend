@@ -139,7 +139,7 @@ function renderTargetPresets() {
   $('#tgtPresets').innerHTML = TARGETS.map(([k, n, d, f]) => `<button type="button" data-k="${k}" class="${hd === d && hf === f ? 'on' : ''}" title="+${d} dB below ${f} Hz">${n}</button>`).join('');
   $('#tgtPresets').querySelectorAll('button').forEach(b => b.onclick = () => {
     const t = TARGETS.find(x => x[0] === b.dataset.k); setVal('house_db', t[2]); setVal('house_fc', t[3]); renderTargetPresets();
-    $('#setMsg').textContent = `${t[1]} selected: press Save to use it from the next optimisation.`; });
+    $('#setMsg').textContent = `${t[1]} selected: press Save to use it from the next optimization.`; });
   const xo = (S.system || {}).crossover_hz, top = xo ? Math.round(xo * 1.25 / 5) * 5 : null, fmax = getVal('fmax');
   $('#tgtXo').innerHTML = top ? (Math.abs(fmax - top) <= 5 ? `Tuned range ends at ${fmax} Hz, matched to your ${xo} Hz crossover ✓`
     : `Your crossover is ${xo} Hz: tuning above about ${top} Hz fights its slope. <button type="button" class="btn ghost" id="tgtMatch" style="height:24px;padding:0 6px">Use ${top} Hz</button>`) : '';
@@ -148,7 +148,7 @@ function renderTargetPresets() {
 document.querySelectorAll('#setForm input').forEach(i => i.addEventListener('input', renderTargetPresets));
 $('#setSave').onclick = async () => {
   const b = {}; document.querySelectorAll('#setForm input').forEach(i => b[i.dataset.k] = +i.value);
-  const r = await post('/api/settings', b); $('#setMsg').textContent = r.error || 'Saved. Used from the next optimisation.';
+  const r = await post('/api/settings', b); $('#setMsg').textContent = r.error || 'Saved. Used from the next optimization.';
 };
 
 // ---------- manual steps

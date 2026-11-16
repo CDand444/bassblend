@@ -121,7 +121,7 @@ function renderAvr() {
         <div class="avrbox"><span class="k">Listening mode</span>${sel(MODE_OPTS, st.mode_code, 'mode')}</div>
         <div class="avrbox"><span class="k">Subwoofer level</span><span class="v">${st.sub_level != null ? (st.sub_level > 0 ? '+' : '') + st.sub_level.toFixed(1) + ' dB' : '–'}</span>
           <div class="row"><button class="btn" data-a="sub_level" data-d="-1">−1</button><button class="btn" data-a="sub_level" data-d="-0.5">−½</button><button class="btn" data-a="sub_level" data-d="0.5">+½</button><button class="btn" data-a="sub_level" data-d="1">+1</button></div></div>
-        <div class="avrbox"><span class="k">Centre (dialogue) level</span><span class="v">${st.center_level != null ? (st.center_level > 0 ? '+' : '') + st.center_level.toFixed(1) + ' dB' : '–'}</span>
+        <div class="avrbox"><span class="k">Center (dialogue) level</span><span class="v">${st.center_level != null ? (st.center_level > 0 ? '+' : '') + st.center_level.toFixed(1) + ' dB' : '–'}</span>
           <div class="row"><button class="btn" data-a="center_level" data-d="-1">−1</button><button class="btn" data-a="center_level" data-d="-0.5">−½</button><button class="btn" data-a="center_level" data-d="0.5">+½</button><button class="btn" data-a="center_level" data-d="1">+1</button></div></div>
       </div>
       ${avrProcessing(st)}
@@ -143,7 +143,7 @@ function renderAvr() {
     $('#avrCtl').querySelectorAll('[data-a]').forEach(b => b.onclick = async () => {
       const a = b.dataset.a;
       if (a === 'sub_level' || a === 'center_level') {
-        const target = (st[a] || 0) + +b.dataset.d, what = a === 'sub_level' ? 'subwoofer' : 'centre';
+        const target = (st[a] || 0) + +b.dataset.d, what = a === 'sub_level' ? 'subwoofer' : 'center';
         if (+b.dataset.d > 0 && !confirm(`Raise the ${what} level to ${target > 0 ? '+' : ''}${target.toFixed(1)} dB?`)) return;
         return avrDo({action: a, value: target, confirm: +b.dataset.d > 0});
       }
@@ -351,7 +351,7 @@ function renderTunes() {
   const best = Object.fromEntries(cols.map(([k]) => [k, Math.min(...T.map(t => t.metrics[k] ?? Infinity))]));
   $('#tuneCmp').innerHTML = T.length > 1 ? `<div class="tw" style="margin-top:10px"><table class="cmp"><thead><tr><th>Tune</th>${cols.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead><tbody>${
     T.map(t => `<tr><td>${esc(t.name)}</td>${cols.map(([k]) => { const v = t.metrics[k]; return `<td class="num ${v != null && v === best[k] ? 'best' : ''}">${v == null ? '–' : v.toFixed(2) + ' dB'}</td>`; }).join('')}</tr>`).join('')
-  }</tbody></table></div><p class="muted" style="margin:6px 0 0">All are “expected” figures from the optimiser; lower is better; green is the best in each column.</p>` : '';
+  }</tbody></table></div><p class="muted" style="margin:6px 0 0">All are “expected” figures from the optimizer; lower is better; green is the best in each column.</p>` : '';
   const onSlots = id => Object.entries(TUNES.slots).filter(([, v]) => v.tune === id).map(([n]) => +n);
   $('#tuneList').innerHTML = T.map(t => {
     const sl = onSlots(t.id), playing = active && sl.includes(active), viewing = (S.preview || {}).tune_id === t.id;
@@ -361,7 +361,7 @@ function renderTunes() {
         ${sl.map(n => `<span class="badge-slot">On slot ${n}${n === active ? ' · playing' : ''}</span>`).join('')}
         ${t.verified ? `<span class="badge-ok">✓ Verified (within ${t.verified.rms_db} dB)</span>` : ''}
         ${viewing ? '<span class="badge-view">On the graph</span>' : ''}
-        ${(t.removed_outputs || []).length ? `<span class="badge-view" title="Made with a sub output you removed: optimise again, or add it back on Room & subs">Stale: uses removed out ${t.removed_outputs.join(', ')}</span>` : ''}
+        ${(t.removed_outputs || []).length ? `<span class="badge-view" title="Made with a sub output you removed: optimize again, or add it back on Room & subs">Stale: uses removed out ${t.removed_outputs.join(', ')}</span>` : ''}
         <span class="grow"></span><span class="when">${fmtWhen(t.t)}</span></div>
       ${t.notes ? `<p class="notes">${esc(t.notes)}</p>` : ''}
       <p class="muted small" style="margin:6px 0 0">${t.spots} mic spot${t.spots > 1 ? 's' : ''} · MLP weight ${t.mlp_weight}× ${nf.length ? '· nearfield: ' + nf.join(', ') : ''}</p>

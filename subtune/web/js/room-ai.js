@@ -1,6 +1,6 @@
 // htTamer page script, part 3 of 8 (room-ai). Loaded in order as classic scripts:
 // top-level names are shared between the parts.
-// ---------- room & subs (stored in metres, shown in feet)
+// ---------- room & subs (stored in meters, shown in feet)
 let roomInit = false, roomBuild = 0;
 const ENCL = ['', 'sealed', 'ported', 'passive radiator', 'other'];
 const ftInput = (f, v, ph = '') => `<span class="unit" data-u="ft"><input data-f="${f}" type="number" step="0.1" min="0" value="${toFt(v)}" placeholder="${ph}"></span>`;
@@ -12,7 +12,7 @@ function subCard(o, s = {}, used) {
   const blank = !Object.values(s).some(x => x !== '' && x != null);
   const addBtn = `<button type="button" class="btn ghost subadd" data-o="${o}" style="height:26px;padding:0 8px">Use for a sub</button>`;
   const stillDriven = !used && (S.result_removed || []).includes(o + 1);
-  const muteNote = stillDriven ? `<div class="notice warn" style="margin:6px 0">The playing tune still drives this output on the miniDSP. Optimise and apply again without it, or <button type="button" class="btn submute" data-o="${o}">Mute it on the miniDSP</button></div>` : '';
+  const muteNote = stillDriven ? `<div class="notice warn" style="margin:6px 0">The playing tune still drives this output on the miniDSP. Optimize and apply again without it, or <button type="button" class="btn submute" data-o="${o}">Mute it on the miniDSP</button></div>` : '';
   if (!used && blank) return `<div class="subcard off slim" data-o="${o}"><div class="hd" style="margin:0"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">not used for a sub</span>${addBtn}</div>${muteNote}</div>`;
   return `<div class="subcard ${used ? '' : 'off'}" data-o="${o}">
     <div class="hd"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">${used ? '' : 'not a sub output'}</span>${used
@@ -20,7 +20,7 @@ function subCard(o, s = {}, used) {
     ${used ? `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency"><option value="30">30 Hz</option><option value="50" selected>50 Hz</option><option value="80">80 Hz</option></select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span></div>` : ''}
     <div class="grid g2">
       <label class="f">Model<input data-f="model" value="${v('model')}" placeholder="Make and model"></label>
-      <label class="f">Role<select data-f="role" title="Nearfield: sits by the seats; the optimiser keeps it near full level and never boosts it">
+      <label class="f">Role<select data-f="role" title="Nearfield: sits by the seats; the optimizer keeps it near full level and never boosts it">
         <option value="main" ${s.role !== 'nearfield' ? 'selected' : ''}>Main</option>
         <option value="nearfield" ${s.role === 'nearfield' ? 'selected' : ''}>Nearfield</option></select></label>
       <label class="f">Driver<input data-f="driver" value="${v('driver')}" placeholder='15"'></label>
@@ -206,7 +206,7 @@ $('#roomSave').onclick = async () => {
   $('#roomMsg').textContent = r.error ? r.error : 'Saved.';
   if (!r.error) { roomInit = false; await poll(); }
 };
-// ---------- room shape: floor outline (corners in metres, in order around the room), openings, ceiling
+// ---------- room shape: floor outline (corners in meters, in order around the room), openings, ceiling
 let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null}, planDrag = null, planKey = null;
 const SHAPES = [['rect', 'Rectangle'], ['l', 'L-shape'], ['alcove', 'Alcove'], ['cut', 'Cut corner'], ['custom', 'Custom']];
 const OPEN_KINDS = [['opening', 'Opening (no wall)'], ['door', 'Door'], ['window', 'Window']];
@@ -281,7 +281,7 @@ function renderShapeEditor() {
   $('#shapeBox').className = 'shape'; $('#shapeBox').innerHTML = h;
 }
 function setPts(pts, rerender = true) { roomShape.outline = pts; syncExtent(); if (rerender) renderShapeEditor(); planKey = null; renderPlan(readRoom()); }
-function moveOpeningsOnInsert(i, half) {        // edge i was split at `half` metres: later edges shift by one
+function moveOpeningsOnInsert(i, half) {        // edge i was split at `half` meters: later edges shift by one
   roomShape.wall_openings.forEach(o => { if (o.wall > i) o.wall++; else if (o.wall === i && o.from_m + o.width_m / 2 > half) { o.wall++; o.from_m = Math.max(0, r3(o.from_m - half)); } });
 }
 function moveOpeningsOnRemove(i, prevLen) {     // corner i removed: edges i-1 and i merge
@@ -684,7 +684,7 @@ $('#aiBtn').onclick = async () => { const r = await post('/api/analyze', {questi
 // ---------- assistant chat
 let CHAT = {display: []}, chatKey = null, chatTimer = null;
 const SUGGEST = ['What should I do next?', 'Explain my latest system report', 'How are my subs set?',
-                 'Is my receiver colouring the sound?', 'What does a room mode mean?'];
+                 'Is my receiver coloring the sound?', 'What does a room mode mean?'];
 async function chatLoad() { try { CHAT = await fetch('/api/chat').then(r => r.json()); } catch (e) {} renderChat(); chatSchedule(); }
 function chatSchedule() {
   const busy = CHAT.running || CHAT.pending;
