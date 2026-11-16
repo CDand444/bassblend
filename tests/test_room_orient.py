@@ -24,7 +24,8 @@ ORIGINAL = {
     "avr": "",
     "goals": "",
     "treatment": {},
-    "speakers": {}
+    "speakers": {},
+    "furniture": [],
 }
 
 

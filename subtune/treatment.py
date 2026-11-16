@@ -24,6 +24,8 @@ from __future__ import annotations
 import math
 import time
 
+from . import furniture
+
 FT = 0.3048
 IN = 0.0254
 C = 343.0
@@ -421,6 +423,21 @@ def problems(room: dict, state: dict, modal: dict | None = None, refl: dict | No
 
 
 # ------------------------------------------------------------------ the plan
+def couch_notes(room, seats, measured_rt, notes):
+    """What the couches change: an estimated ring time (only when nothing is measured) and back-at-the-ears reflections."""
+    if not furniture.couches(room):
+        return
+    est = furniture.room_rt60(room)
+    if est and measured_rt is None:
+        notes.append(f"Estimated ring time with your couches: about {est['mid_s']:.2f} s above 250 Hz "
+                     "(an estimate before you measure; a system report replaces it).")
+    for s in seats:
+        g = furniture.couch_back_gap(room, s)
+        if g and g["reflects_at_ears"]:
+            notes.append(f"{s['name']}: {g['note']} It is {_ft(g['to_back_m'])} ft behind the head; a lower back or "
+                         "absorption on the wall behind helps.")
+
+
 def _behind(room, seat, dy=1.0):
     """The wall straight behind (dy=1) or in front of (dy=-1) a seat: shape.ray_to_wall's hit."""
     from . import shape
@@ -616,6 +633,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
              ((room.get("room") or {}).get("notes") or "").lower()
     rt = (room_metrics(state).get("report") or {}).get("rt60_mid_s")
     items, notes = [], []
+    couch_notes(room, seats, rt, notes)
 
     def add(iid, title, kind, wall, zone_, qty, size, thick, gap, effect, base, why, **kw):
         blocked = wall in banned
@@ -801,6 +819,12 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             if it["kind"] in ("absorber", "cloud") and it["id"] != "rear_wall":
                 it["score"] = min(it["score"], 10)
         notes.append("Your room is already dead above 250 Hz: skip more thin panels; bass traps and diffusion still help.")
+    cover = furniture.rear_wall_cover(room)
+    if cover:
+        for it in items:
+            if it["id"] == "rear_wall" and not it["measured"]:
+                it["score"] = max(10, int(it["score"] * 0.6))
+                notes.append(cover["note"])
     # tiers
     for it in items:
         s = it["score"] if not it["installed"] else 0

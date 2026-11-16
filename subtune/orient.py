@@ -13,6 +13,12 @@ from subtune import shape
 OPS = ("cw", "ccw", "180", "mirror")
 
 
+_WALL_CW = {"front": "right", "right": "back", "back": "left", "left": "front"}
+_WALL_CCW = {v: k for k, v in _WALL_CW.items()}
+_WALL_180 = {"front": "back", "back": "front", "left": "right", "right": "left"}
+_WALL_MIRROR = {"front": "front", "back": "back", "left": "right", "right": "left"}
+
+
 def inverse(op: str) -> str:
     """Return the inverse of an operation."""
     if op == "cw":
@@ -187,6 +193,20 @@ def transform_room(room: dict, op: str) -> dict:
                 new_openings.append(opening)
 
         rm["wall_openings"] = new_openings
+
+    # Couches turn with the room: footprint centre, which way the back faces, and the wall they stand against
+    for item in new_room.get("furniture") or []:
+        item["x_m"], item["y_m"] = transform_point(item.get("x_m"), item.get("y_m"))
+        rot, wall = int(item.get("rotation") or 0), item.get("against_wall")
+        if op == "cw":
+            rot, wall = (rot + 90) % 360, _WALL_CW.get(wall)
+        elif op == "ccw":
+            rot, wall = (rot + 270) % 360, _WALL_CCW.get(wall)
+        elif op == "180":
+            rot, wall = (rot + 180) % 360, _WALL_180.get(wall)
+        else:
+            rot, wall = {0: 0, 90: 270, 180: 180, 270: 90}[rot], _WALL_MIRROR.get(wall)
+        item["rotation"], item["against_wall"] = rot, wall
 
     # Reverse outline point order for mirror operation
     if op == "mirror" and "outline" in rm and rm["outline"] is not None:
