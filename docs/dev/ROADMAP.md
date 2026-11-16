@@ -7,7 +7,7 @@ Written at v0.9.10. Read `CLAUDE.md` first (layout, rules), then `docs/dev/LOCAL
 ## Where things stand
 
 - **Proven on real hardware** (Raspberry Pi 4, miniDSP 2x4HD, an Onkyo receiver): auto-tune, measure, apply, verify, check-up, level match, headroom and limiters, the blend test and fix log, the system report, receiver control, updates (Windows and the Pi), the assistant on Claude.
-- **Tested offline only, so labelled or treated as Beta:** Live EQ, the all-speakers check, room treatment, the hardware database, MCP, the Denon/Marantz and JBL drivers, room shapes and the phone room builder, night mode, automatic slot, the watchdog, the blind A/B test, Home Assistant, receiver auto-off, "what limits this tune", and the assistant on a local model.
+- **Tested offline only, so labeled or treated as Beta:** Live EQ, the all-speakers check, room treatment, the hardware database, MCP, the Denon/Marantz and JBL drivers, room shapes and the phone room builder, night mode, automatic slot, the watchdog, the blind A/B test, Home Assistant, receiver auto-off, "what limits this tune", and the assistant on a local model.
 - **GitHub checks** run on every push (`.github/workflows/ci.yml`): pyflakes, all offline tests on Linux (Python 3.13) and Windows (3.12), and a browser check of every page. A release builds only if they pass.
 
 ## What to improve, in order
@@ -28,6 +28,7 @@ Other files over 450 lines: `index.html` (1,346: markup and CSS), `treatment.py`
 |---|------|------|
 | 4 | Automatic backups and one-click restore (a bad SD card or update must never cost the owner their tunes) | `02-backups.md` |
 | 5 | Room drawing by dragging walls and corners, with validation and undo | `03-room-drag.md` |
+| 5b | Rotate the room's orientation (choose the screen wall, quarter turns, mirror) with everything in it turning too | `06-room-orientation.md` |
 
 ### C. Needs the owner at the hardware
 The manager schedules these; local models only fix what they uncover.
@@ -40,6 +41,22 @@ The manager schedules these; local models only fix what they uncover.
 10. **Dirac slot selection.** The receiver has three Dirac Live slots but no documented network command. Plan: listen to what the receiver announces on the network while the owner changes slot with the remote, then confirm the command by sending it. Needs the owner and the receiver.
 11. HTTPS on the Pi (so the phone builder can use the live camera).
 12. Long-term trends: how the room measures over months.
+
+### E. Scope: what an all-around tuner still needs (proposed, awaiting the owner's decision)
+htTamer is strong on subs and the miniDSP. To be an all-around home theater audio tuner it should grow in these directions, in this order. Nothing here is approved until the owner says so.
+1. **Every channel, not just the subs** (chosen first by the owner; spec `07-every-channel-report.md`). Measure and report each speaker (center, surrounds, heights, not just front left/right) with one "what to set in your receiver" sheet: crossover, level trim, distance and size per channel, in the receiver's own menu wording. Builds on the all-speakers check (which is still experimental).
+2. **A crossover and bass-management recommender.** Pick the crossover frequency and slope from the measured extension of the main speakers and the subs' bandwidth, and check the blend at that frequency.
+3. **Work without a miniDSP.** A measure-and-advise mode for receiver-only systems (the audience is much larger), and support for more of the miniDSP family that `minidsp-rs` already drives (Flex, HTx and others), not only the 2x4HD.
+4. **More receivers.** Yamaha first (a documented HTTP interface), then Anthem, NAD and Arcam; keep the manual playback path polished for everything else. Only Onkyo is verified on real hardware today.
+5. **Room-correction coordination.** Target-curve exports for Dirac, Audyssey, YPAO and MCACC, and the Dirac slot selection (spec idea 10 above).
+6. **Low-volume loudness.** A profile that adds bass at low listening levels (the opposite of night mode), switched by volume or listening mode.
+
+**Simplify and remove (also proposed):**
+- Fold the separate "AI analysis" page into the assistant: one AI place, not two.
+- The setup checklist, the "Tune my system" wizard, the coach and the check-up overlap: make one guided flow.
+- 29 menu pages is too many for a newcomer: a Basic view (guided flow plus the essentials) and an Advanced view; put the Beta features (Live EQ, treatment planner, MCP, Home Assistant, hardware database, phone builder) behind a "Labs" switch.
+- Group MCP, Home Assistant, the hardware database and the local AI settings under one "Integrations" page.
+- Don't build our own full-range room correction for the main speakers: Dirac and its peers own that; stay in the lane of subs, system setup and verification.
 
 ### Housekeeping
 - `drag-and-drop-implementation.md` at the repo root is a stray notes file: delete it or move it to `docs/dev/`.

@@ -23,14 +23,14 @@
    disallow_untyped_defs = True
    ```
    Add one `[mypy-subtune.<module>]` block with `disallow_untyped_defs = True` per module as you finish it, in the order above (one module per step).
-2. For each module: annotate every function (arguments and return), fix what mypy finds, and **don't change behaviour**. If mypy points at a real bug, fix it with a test and say so in your report. Don't silence errors with `# type: ignore` unless unavoidable, and explain each one in a comment.
+2. For each module: annotate every function (arguments and return), fix what mypy finds, and **don't change behavior**. If mypy points at a real bug, fix it with a test and say so in your report. Don't silence errors with `# type: ignore` unless unavoidable, and explain each one in a comment.
 3. Install mypy in the dev environment (`pip install mypy`; pin the version in the CI step, not in `requirements.txt`, which is only for runtime).
 4. When all modules pass, the manager adds `python -m mypy` to the Linux job in `.github/workflows/ci.yml`.
 
 ## Tests and checks
 
 - `python -m mypy` prints "Success" with no errors.
-- Every existing test file still passes (annotation-only changes must not alter behaviour); `pyflakes` stays clean.
+- Every existing test file still passes (annotation-only changes must not alter behavior); `pyflakes` stays clean.
 - A tiny test, `tests/test_typecheck.py`: runs `python -m mypy` through `subprocess` when mypy is installed, asserts exit code 0, and otherwise prints a skip note and passes.
 
 ## Out of scope

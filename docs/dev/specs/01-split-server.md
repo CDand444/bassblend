@@ -1,12 +1,12 @@
 # Spec 01: split `server.py` into small modules
 
-**Goal:** `subtune/server.py` (about 2,600 lines) ends under 1,200 lines. No behaviour change: same endpoints, same replies, same checks in the same order.
+**Goal:** `subtune/server.py` (about 2,600 lines) ends under 1,200 lines. No behavior change: same endpoints, same replies, same checks in the same order.
 
 **Why:** it holds every endpoint and the assistant's tool executors; it is too big to read, review or safely edit. See `docs/dev/ROADMAP.md`, item 1.
 
 ## Rules for this refactor
 
-- **Behaviour must not change.** No renamed endpoints, no new ones, none removed, no changed replies.
+- **Behavior must not change.** No renamed endpoints, no new ones, none removed, no changed replies.
 - **Order matters for safety.** Keep these exactly as they are in `server.py`:
   - routes answered *before* the sign-in gate: `/build.webmanifest`, `/apple-touch-icon.png`, `/build?pair=...`, `/api/ha/*`, `/mcp`;
   - the use-at-your-own-risk gate in `do_POST` (`if path not in legal.OPEN_PATHS and not legal.accepted():`). `tests/test_legal.py` checks that this line is in `server.py`: leave it there. Every action route must come after it.
@@ -50,4 +50,4 @@ Module-level helpers used by only one group move with it; shared ones go in `sub
 
 ## Out of scope
 
-Changing any endpoint's behaviour or name, switching web frameworks, async code, touching the page scripts.
+Changing any endpoint's behavior or name, switching web frameworks, async code, touching the page scripts.

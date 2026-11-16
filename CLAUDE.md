@@ -31,7 +31,7 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
   - `liveeq.py`: live EQ layer (free top PEQ bands), analyzer (`run_rta`), `autofit`
   - Room shape: `shape.py` (outline polygon, openings on walls, sloped/vaulted ceiling; reflections off real
     walls, corners, main box). No outline = the plain L×W rectangle, so old rooms are unchanged. Room modes for
-    irregular rooms are an estimate from the main box (labelled so).
+    irregular rooms are an estimate from the main box (labeled so).
   - `builder.py` + `web/build.html`: phone room builder. The dashboard shows a one-time QR (`qr.py`, own encoder)
     that signs a phone in (`/build?pair=`), photos + sizes + notes -> `ai.vision` -> a checked plan the owner saves.
     Needs an AI key; counts against `assistant.spend_ai_call` (the daily budget). Only in network mode (the Pi).

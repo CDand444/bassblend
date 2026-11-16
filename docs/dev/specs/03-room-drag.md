@@ -6,9 +6,9 @@
 
 ## What exists (read these before changing anything)
 
-In `subtune/web/js/room-ai.js`: `roomShape` (`{outline, shape, wall_openings, ceiling}`; outline = `[x, y]` points in metres, x from the left wall, y from the front wall), `renderPlan()` (draws the SVG into `#plan`; corner handles `.vh`, add-a-corner handles `.eh`, polygon `#roomPoly`), `renderShapeEditor()`, `setPts()`, `syncExtent()`, and the pointer handlers under the comment "dragging corners on the plan" (corner drag with 3 in. snap and square-wall snapping). In `subtune/shape.py`: `shape_problem(pts)` (why an outline can't be a room), `clean_outline`, `clean_openings`. The server also validates when saving (`room.clean_shape`).
+In `subtune/web/js/room-ai.js`: `roomShape` (`{outline, shape, wall_openings, ceiling}`; outline = `[x, y]` points in meters, x from the left wall, y from the front wall), `renderPlan()` (draws the SVG into `#plan`; corner handles `.vh`, add-a-corner handles `.eh`, polygon `#roomPoly`), `renderShapeEditor()`, `setPts()`, `syncExtent()`, and the pointer handlers under the comment "dragging corners on the plan" (corner drag with 3 in. snap and square-wall snapping). In `subtune/shape.py`: `shape_problem(pts)` (why an outline can't be a room), `clean_outline`, `clean_openings`. The server also validates when saving (`room.clean_shape`).
 
-## Behaviour
+## Behavior
 
 1. **Editing is on the 2D plan.** Starting to edit (picking a shape, dragging, adding a corner) switches to the 2D view automatically; 2D is the default view. The 3D view stays read-only.
 2. **Bigger, easier handles:** corner handles at least 12 px (24 px hit area on touch); a wall highlights when the pointer is near it.

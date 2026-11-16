@@ -16,7 +16,7 @@ You write the code. The manager (a separate Claude session) checks it, commits, 
 - One spec, one step at a time. Finish and check a step before the next. A step should change at most a few files.
 - Your window is 128k tokens, but quality and speed drop as it fills. **Don't open big files whole.** `server.py` is thousands of lines (about 35k tokens): search first (`grep -n "def name"`), then read about 150 lines around the match. Never print whole logs or test output; use `tail -20`. Start a fresh session for each spec step instead of carrying one long conversation.
 - Keep new modules under 400 lines and functions under 60 (D6 in the roadmap). Leave a file smaller than you found it when you can.
-- Match the surrounding code: names, error messages in plain English for non-experts, feet for lengths shown to the owner, metres inside.
+- Match the surrounding code: names, error messages in plain English for non-experts, feet for lengths shown to the owner, meters inside.
 - Comment only the reason the code can't show.
 
 ## How to check your work
@@ -32,7 +32,7 @@ On Windows (PowerShell), from the repo folder:
 
 Each test file runs on its own. Run the tests for what you touched, plus the three checks above. The manager runs the whole suite and the browser check (`tests/browser_check.py`) before pushing.
 
-**Write the test first** for new behaviour (a small `tests/test_<area>.py`, same style as the existing ones: `test_` functions, an `if __name__` runner printing `N/N passed`, temp data via `BASSBLEND_DATA` / `BASSBLEND_CONFIG`). A step isn't done until its test fails without your change and passes with it.
+**Write the test first** for new behavior (a small `tests/test_<area>.py`, same style as the existing ones: `test_` functions, an `if __name__` runner printing `N/N passed`, temp data via `BASSBLEND_DATA` / `BASSBLEND_CONFIG`). A step isn't done until its test fails without your change and passes with it.
 
 ## Be honest
 

@@ -4,7 +4,7 @@
 
 **Why:** there's no backup today. Earlier a display bug made the owner think their data was wiped. See `docs/dev/ROADMAP.md`, item 4.
 
-## Behaviour
+## Behavior
 
 - **What's in a backup:** the data folder's state (measurements, results, saved tunes and slots, room, equipment, reports, the fix log, journal, hardware database, chat history) and the settings file. **Never** in a backup: API keys, the GitHub, MCP or Home Assistant tokens or their hashes, the sign-in PIN or its hash, the local MCP key. A backup file must be safe to copy anywhere.
 - **When:** automatically once a week; before every in-app update installs (`subtune/update.py`, just before the download is handed over); and on demand from the page.
