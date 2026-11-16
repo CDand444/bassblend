@@ -575,6 +575,20 @@ def cost_summary(items: list, build: str = "buy", budget: float | None = None) -
     return out
 
 
+def buried_speakers(room):
+    """Return list of speaker channels whose kind is 'in-wall' or 'in-ceiling'."""
+    # Read directly from room speakers to preserve original kinds
+    speakers = room.get("speakers") or {}
+    buried = [ch for ch, d in speakers.items()
+              if str(d.get("kind") or "").lower() in ("in-wall", "in-ceiling")]
+    # Ensure FL, FR, C are in order if present
+    ordered = []
+    for ch in ["FL", "FR", "C"]:
+        if ch in buried:
+            ordered.append(ch)
+    return ordered + [ch for ch in buried if ch not in ["FL", "FR", "C"]]
+
+
 def plan(room: dict, state: dict | None = None, placement: dict | None = None, modal: dict | None = None) -> dict | None:
     """The full plan: ranked problems, treatment items by tier, geometry for the drawing."""
     dims = _dims(room)
@@ -724,18 +738,51 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             "Softens the floor bounce and some slap echo; easy and cheap.", 22,
             "A hard floor reflects the speakers' sound to your ears like a mirror.", rect=_rect("floor", zf, dims), points=refl.get("floor"))
     # front wall behind the speakers
-    if any(p["id"] == "boundary_dip" for p in probs) or any(s["y_m"] < 0.9 for k, s in spk.items() if k in ("FL", "FR")):
-        fh = _behind(room, seats[0], -1.0) if seats else None
-        fe = fh["edge"] if fh and not fh["opening"] else walls.get(0)
-        key, lo, hi = _edge_axis(fe)
-        top = _edge_top(room, fe)
+    buried = buried_speakers(room)
+    # If any speaker is buried, add a note about it
+    if buried:
+        names = ", ".join(buried)
+        notes.append(f"Your {names} speakers are in the wall or ceiling, so there is no space behind or above them. "
+                     "htTamer skips panels behind them and suggests wall-cavity fill, sealing and front-corner bass traps instead.")
+
+    # Determine if we should use inwall cavity logic (all front speakers buried)
+    front_speakers = ["FL", "FR", "C"]
+    front = [ch for ch in front_speakers if ch in spk]
+    all_buried = bool(front) and all(ch in buried for ch in front)
+
+    # Build the geometry once for both cases
+    fh = _behind(room, seats[0], -1.0) if seats else None
+    fe = fh["edge"] if fh and not fh["opening"] else walls.get(0)
+    key, lo, hi = _edge_axis(fe)
+    top = _edge_top(room, fe)
+
+    # If all front speakers are buried, use cavity treatment
+    if all_buried:
+        # Add inwall cavity treatment instead of front wall
         zfw = {"axis": [key, "z_m"], "a": [round(lo, 2), round(hi, 2)], "b": [0.3, min(top, 1.5)], "area_m2": None}
         zfw["area_m2"] = round((hi - lo) * (zfw["b"][1] - zfw["b"][0]), 2)
         zfw.update(_edge_extra(fe, zfw))
-        add("front_wall", "Front wall behind the speakers", "absorber", "front", zfw, 2 if fe["len"] < 4.5 else 3, "2 x 4 ft",
-            6, 4, "A little more body where the wall-bounce dip is, and a cleaner image depth. Moving the speakers helps more.",
-            15, "The wall behind the speakers bounces bass back that cancels the direct sound at one pitch.",
+        add("inwall_cavity", "Wall cavity behind your in-wall speakers", "other", "front", zfw, 1, "stud bays",
+            0, 0, "There is no space behind in-wall speakers, so skip panels behind them. Fill the stud bays around the speaker with mineral wool or fiberglass batts, use a back box if the speaker has none, and seal the cutout so sound does not leak into the next room. Front-corner bass traps and a rug between screen and seats do the rest.",
+            20, "The speakers sit flush in the wall, so the wall behind them cannot bounce sound back; the cavity can ring instead.",
             rect=_seg_rect(fe, zfw))
+    else:
+        # If any front speakers are buried but not all, modify the existing condition to check for buried speakers
+        if any(p["id"] == "boundary_dip" for p in probs) or any(s["y_m"] < 0.9 for k, s in spk.items() if k in ("FL", "FR")):
+            # If some speakers are buried, update the reason text
+            why_suffix = ""
+            if buried and any(ch in buried for ch in ["FL", "FR", "C"]):
+                buried_in_wall = [ch for ch in ["FL", "FR", "C"] if ch in buried]
+                why_suffix = f" ({', '.join(buried_in_wall)} is in the wall, so nothing can go behind it)"
+
+            # Reuse the geometry from above
+            zfw = {"axis": [key, "z_m"], "a": [round(lo, 2), round(hi, 2)], "b": [0.3, min(top, 1.5)], "area_m2": None}
+            zfw["area_m2"] = round((hi - lo) * (zfw["b"][1] - zfw["b"][0]), 2)
+            zfw.update(_edge_extra(fe, zfw))
+            add("front_wall", "Front wall behind the speakers", "absorber", "front", zfw, 2 if fe["len"] < 4.5 else 3, "2 x 4 ft",
+                6, 4, "A little more body where the wall-bounce dip is, and a cleaner image depth. Moving the speakers helps more.",
+                15, "The wall behind the speakers bounces bass back that cancels the direct sound at one pitch." + why_suffix,
+                rect=_seg_rect(fe, zfw))
     # merge the right-side panels into the left item for ranking (one row each, same score)
     for it in items:
         if it["id"] == "side_panels_r":
