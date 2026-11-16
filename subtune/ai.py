@@ -41,6 +41,7 @@ PROVIDERS = {
               "key_hint": "usually not needed", "key_where": "your local server's settings, if it uses one"},
 }
 TIMEOUT = 180
+LOCAL_TIMEOUT = 600        # a local server may first load or swap a model, or read photos on its CPU
 
 
 class AIError(Exception):
@@ -53,7 +54,7 @@ def _cfg_file():
 
 
 def config() -> dict:
-    d = {"provider": "anthropic", "models": {}, "local_base": ""}
+    d = {"provider": "anthropic", "models": {}, "local_base": "", "local_vision_model": ""}
     try:
         d.update(json.loads(_cfg_file().read_text(encoding="utf-8")))
     except (OSError, ValueError):
@@ -63,7 +64,7 @@ def config() -> dict:
     return d
 
 
-def save_config(provider=None, model=None, local_base=None) -> dict:
+def save_config(provider=None, model=None, local_base=None, local_vision_model=None) -> dict:
     d = config()
     if provider is not None:
         if provider not in PROVIDERS:
@@ -79,6 +80,11 @@ def save_config(provider=None, model=None, local_base=None) -> dict:
         if b and not re.match(r"^https?://[^\s/]+", b):
             raise ValueError("the local server address should look like http://192.168.1.20:11434/v1")
         d["local_base"] = b
+    if local_vision_model is not None:
+        v = str(local_vision_model).strip()
+        if v and not re.fullmatch(r"[A-Za-z0-9._:/@+-]{1,120}", v):
+            raise ValueError("that photo model name has unexpected characters")
+        d["local_vision_model"] = v
     f = _cfg_file()
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(json.dumps(d, indent=1), encoding="utf-8")
@@ -165,7 +171,7 @@ def status() -> dict:
     """For the dashboard (never includes a key)."""
     c = config()
     return {"active": c["provider"], "label": PROVIDERS[c["provider"]]["label"], "model": model_for(),
-            "local_base": c["local_base"], "ready": key_source() is not None,
+            "local_base": c["local_base"], "local_vision_model": c.get("local_vision_model", ""), "ready": key_source() is not None,
             "providers": [{"id": p, "label": v["label"], "needs_key": v["needs_key"], "key": key_source(p) if p != "local" else
                            ("saved" if saved_key("local") else None), "model": model_for(p), "key_hint": v["key_hint"],
                            "key_where": v["key_where"]} for p, v in PROVIDERS.items()]}
@@ -176,8 +182,10 @@ def _http(url, body=None, headers=None, method=None):
     data = None if body is None else json.dumps(body).encode()
     req = urllib.request.Request(url, data=data, method=method or ("POST" if body is not None else "GET"),
                                  headers={"Content-Type": "application/json", **(headers or {})})
+    base = config().get("local_base") or ""
+    limit = LOCAL_TIMEOUT if base and url.startswith(base) else TIMEOUT
     try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        with urllib.request.urlopen(req, timeout=limit) as r:
             return json.loads(r.read().decode() or "{}")
     except urllib.error.HTTPError as e:
         try:
@@ -347,12 +355,43 @@ def openai_tools(tools):
                                               "parameters": t["input_schema"]}} for t in tools]
 
 
+_XML_CALL = re.compile(r"<function=([\w.-]+)>(.*?)</function>", re.S)
+_XML_PARAM = re.compile(r"<parameter=([\w.-]+)>(.*?)</parameter>", re.S)
+
+
+def text_tool_calls(text: str):
+    """Tool calls a local model wrote as text instead of a real tool call: Qwen3-Coder's
+    <function=NAME><parameter=KEY>VALUE</parameter></function> (optionally inside <tool_call>).
+    Returns (the text without them, [(name, input)]). Values are JSON where they parse, else strings.
+    The calls then go through the same checks as any other: unknown names and bad inputs are refused."""
+    calls = []
+    for name, body in _XML_CALL.findall(text or ""):
+        inp = {}
+        for key, val in _XML_PARAM.findall(body):
+            v = val.strip()
+            try:
+                inp[key] = json.loads(v)
+            except ValueError:
+                inp[key] = v
+        calls.append((name, inp))
+    if not calls:
+        return text, []
+    rest = re.sub(r"</?tool_call>", "", _XML_CALL.sub("", text)).strip()
+    return rest, calls
+
+
 def from_openai(r):
     ch = (r.get("choices") or [{}])[0]
     msg = ch.get("message") or {}
     blocks = []
-    if msg.get("content"):
-        blocks.append({"type": "text", "text": msg["content"]})
+    content = msg.get("content") or ""
+    if content and not msg.get("tool_calls"):
+        content, found = text_tool_calls(content)
+        for name, inp in found:
+            msg.setdefault("tool_calls", []).append(
+                {"id": "call_" + uuid.uuid4().hex[:12], "function": {"name": name, "arguments": json.dumps(inp)}})
+    if content:
+        blocks.append({"type": "text", "text": content})
     for tc in msg.get("tool_calls") or []:
         fn = tc.get("function") or {}
         try:
@@ -536,8 +575,9 @@ def vision(system: str, text: str, images: list[tuple[str, str]], json_schema: d
     if p in ("openai", "local"):
         content = [{"type": "image_url", "image_url": {"url": f"data:{mt};base64,{b64}"}} for mt, b64 in images]
         content.append({"type": "text", "text": text})
-        body = {"model": _need_model(p), "messages": [{"role": "system", "content": system},
-                                                       {"role": "user", "content": content}]}
+        vm = config().get("local_vision_model") if p == "local" else ""
+        body = {"model": vm or _need_model(p), "messages": [{"role": "system", "content": system},
+                                                             {"role": "user", "content": content}]}
         body["max_completion_tokens" if p == "openai" else "max_tokens"] = 16000
         if json_schema:
             body["response_format"] = {"type": "json_object"}

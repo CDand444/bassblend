@@ -745,7 +745,7 @@ def build_executors(origin="assistant"):
                              "auto_slot": {"on": a["auto_slot_on"], "rules": a["auto_slot_map"], "last": a["auto_slot_last"]},
                              "watchdog": {"on": a["watchdog_on"], "fix": a["watchdog_fix"], "keep_sub_level": a["keep_sub_level"],
                                           "last": a["watchdog"]},
-                             "blind_ab": abtest.view()}
+                             "blind_ab": abtest.view(), "receiver_auto_off": a["avr_idle"]}
         from . import coach, journal
         try:
             out["next_steps"] = [{k: x[k] for k in ("title", "why", "who", "sound", "tool", "input", "area")}
@@ -1957,8 +1957,12 @@ class H(BaseHTTPRequestHandler):
         except json.JSONDecodeError:
             return self._send(400, {"error": "bad json"})
         if path == "/mcp":                             # MCP (streamable HTTP, JSON answers) for outside AI clients
+            from . import automation
+            automation.note_activity(path)
             return self._mcp(body)
         if path.startswith("/api/ha/"):                 # Home Assistant: its token, even from this computer
+            from . import automation
+            automation.note_activity(path)
             return self._ha_action(path, body)
         if not self._gate(path):
             return
@@ -2001,7 +2005,9 @@ class H(BaseHTTPRequestHandler):
         if path == "/api/logout":
             auth.end_session(auth.cookie_from(self.headers.get("Cookie")))
             return self._send(200, {"ok": True}, headers=[("Set-Cookie", auth.clear_cookie())])
-        from . import legal
+        from . import automation, legal
+        if path not in ("/api/client-error", "/api/terms"):
+            automation.note_activity(path)
         if path == "/api/terms":                       # the use-at-your-own-risk terms, accepted once per device
             if body.get("accept") is not True or body.get("version") != legal.TERMS_VERSION:
                 return self._send(400, {"error": "tick the box to accept the current terms"})
@@ -2316,7 +2322,8 @@ class H(BaseHTTPRequestHandler):
                 if act == "save":
                     if body.get("key"):
                         ai.save_key(p, str(body["key"]))
-                    ai.save_config(provider=p, model=body.get("model"), local_base=body.get("local_base"))
+                    ai.save_config(provider=p, model=body.get("model"), local_base=body.get("local_base"),
+                                   local_vision_model=body.get("local_vision_model"))
                     if ai.key_source(p):
                         ai.ensure_model(p)                    # beginners don't have to pick a model
                     event("config", f"AI provider: {ai.PROVIDERS[p]['label']}" + (f", model {ai.model_for(p)}" if ai.model_for(p) else ""))
@@ -2478,6 +2485,11 @@ def _automation_action(body):
                 if not -15 <= v <= 12:
                     raise ValueError("sub level is -15 to +12 dB")
                 s["watch_sub_level"] = v
+        if "avr_idle_off_min" in body:
+            v = int(body["avr_idle_off_min"] or 0)
+            if v and not 10 <= v <= 240:
+                raise ValueError("the receiver's auto-off is 10-240 minutes (0 = off)")
+            s["avr_idle_off_min"] = v
         if "night_off_at" in body:
             v = str(body["night_off_at"] or "").strip()
             if v and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v):

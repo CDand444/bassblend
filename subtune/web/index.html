@@ -945,6 +945,12 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <label class="f" style="width:200px">Switch off by itself at<input id="nightOff" type="time" title="Empty = stays on until you turn it off"></label>
         <span class="muted small" id="nightMsg"></span>
       </div>
+      <h3 style="margin:18px 0 6px">Receiver auto-off</h3>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="idleOn"><span>Switch the receiver off when nothing has played for a while<small>Counts as playing: any signal on the miniDSP's inputs, anyone changing the receiver's volume, input or mode, and anything htTamer does (tests, tuning, the assistant, a button in the app). A paused film counts as nothing playing; a quiet scene doesn't. If htTamer can't read the miniDSP it never switches off. You get a notice 5 minutes before.</small></span></label>
+      <div class="row" style="align-items:end;margin-top:6px">
+        <label class="f" style="width:170px">After (minutes)<input id="idleMin" type="number" min="10" max="240" step="5" placeholder="30"></label>
+        <span class="muted small" id="idleMsg"></span>
+      </div>
       <h3 style="margin:18px 0 6px">Automatic slot</h3>
       <label class="cb" style="max-width:none"><input type="checkbox" id="asOn"><span>Switch the miniDSP slot when the receiver's input or listening mode changes<small>For example movies on the streaming box play slot 3 and music from the CD player slot 2. It acts only when the input or mode changes, so a slot you pick by hand stays until the next change. A listening-mode rule wins over an input rule. Paused during tests.</small></span></label>
       <div id="asRules" style="margin-top:8px"></div>
@@ -1181,6 +1187,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <label class="f">Model<span class="row" style="flex-wrap:nowrap;width:100%"><select id="aiModel" style="flex:1;min-width:0"></select><button type="button" class="btn ghost" id="aiModels" title="Fetch the models this provider offers">Load list</button></span></label>
           <label class="f span2" id="aiBaseRow" hidden>Local server address<input id="aiBase" placeholder="http://192.168.1.20:11434/v1" spellcheck="false">
             <span class="hint">Any OpenAI-compatible server on your network: Ollama (port 11434, add /v1), LM Studio (port 1234, add /v1).</span></label>
+          <label class="f span2" id="aiVisionRow" hidden>Photo model (optional)<input id="aiVision" placeholder="Same as the model above" spellcheck="false">
+            <span class="hint">Used only to read photos (Build with your phone). Set it when the model above can't read images, e.g. a coding model for the assistant and a vision model for photos.</span></label>
           <label class="f span2" id="aiKeyRow"><span id="aiKeyLabel">API key</span>
             <input id="keyIn" type="password" autocomplete="off" spellcheck="false">
             <span class="hint" id="aiKeyHint"></span></label>

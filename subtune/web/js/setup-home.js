@@ -528,6 +528,12 @@ function renderAutomation() {
   if (!AUTO) return;
   const k = JSON.stringify(AUTO); if (k === autoKey) return; autoKey = k;
   if (document.activeElement !== $('#nightOff')) $('#nightOff').value = AUTO.night_off_at || '';
+  const ai = AUTO.avr_idle || {};
+  $('#idleOn').checked = !!ai.minutes;
+  if (document.activeElement !== $('#idleMin')) $('#idleMin').value = ai.minutes || 30;
+  $('#idleMsg').textContent = !ai.minutes ? 'Off.' : ai.off_in_s == null ? 'Waiting for the receiver to be on.'
+    : ai.idle_s < 60 ? 'Something is playing (or just did).'
+    : `Nothing has played for ${Math.round(ai.idle_s / 60)} min: off in ${Math.max(1, Math.round(ai.off_in_s / 60))} min unless something plays.`;
   $('#asOn').checked = !!AUTO.auto_slot_on; $('#wdOn').checked = !!AUTO.watchdog_on; $('#wdFix').checked = AUTO.watchdog_fix !== false;
   if (document.activeElement !== $('#wdSub')) { $('#wdSub').value = AUTO.watch_sub_level ?? ''; $('#wdSub').placeholder = AUTO.keep_sub_level != null ? `${AUTO.keep_sub_level} (last set by htTamer)` : 'not set'; }
   const sel = (key) => { const v = (AUTO.auto_slot_map || {})[key] || 0;
@@ -547,6 +553,9 @@ function renderAutomation() {
 }
 const autoSave = async (body, msg) => { const r = await post('/api/automation', {action: 'settings', ...body}); if (r.error) { alert(r.error); return; }
   toast(msg, '', 'good'); loadAutomation(); };
+$('#idleOn').onchange = () => autoSave({avr_idle_off_min: $('#idleOn').checked ? (+$('#idleMin').value || 30) : 0},
+  $('#idleOn').checked ? `The receiver switches off after ${+$('#idleMin').value || 30} min with nothing playing` : 'Receiver auto-off is off');
+$('#idleMin').onchange = () => { if ($('#idleOn').checked) autoSave({avr_idle_off_min: +$('#idleMin').value || 30}, `Receiver auto-off: ${+$('#idleMin').value || 30} min`); };
 $('#asOn').onchange = () => autoSave({auto_slot_on: $('#asOn').checked}, $('#asOn').checked ? 'Automatic slot on' : 'Automatic slot off');
 $('#asSave').onclick = () => { const m = {}; document.querySelectorAll('#asRules [data-as]').forEach(s => { if (+s.value) m[s.dataset.as] = +s.value; });
   autoSave({auto_slot_map: m}, `Saved ${Object.keys(m).length} rule${Object.keys(m).length === 1 ? '' : 's'}`); };

@@ -18,6 +18,7 @@
   <a href="#m-dirac">Dirac Live</a>
   <a href="#m-night">Night mode</a>
   <a href="#m-auto">Automatic slot and watchdog</a>
+  <a href="#m-idleoff">Receiver auto-off</a>
   <a href="#m-ab">Blind A/B test</a>
   <a href="#m-ha">Home Assistant</a>
   <a href="#m-updates">Updates</a>
@@ -234,6 +235,9 @@
 <h2 id="m-auto">Automatic slot and watchdog</h2>
 <p><b>Automatic slot</b> (Tools → Automation): choose a slot for any receiver input or listening mode, for example slot 3 for the streaming box and slot 2 for the CD player, or a slot just for Pure Audio. When the receiver's input or mode changes, htTamer switches the miniDSP to that slot within a few seconds. A listening-mode rule wins over an input rule. It acts only when something changes, so a slot you pick by hand stays until the next change, and it pauses while tests run (tests switch the receiver's input themselves).</p>
 <p><b>Watchdog</b>: every minute, and right after the receiver's input changes, htTamer checks that the receiver's sub level is still the one to keep. An Onkyo resets a sub level set over the network whenever you change inputs, which quietly undoes a blend fix. With <b>Put the sub level back by itself</b> it sets it again; otherwise it just tells you. It also tells you if the miniDSP isn't on htTamer's slot or isn't listening to the receiver. The level to keep is the last one htTamer set, unless you type your own. Everything it puts back appears as a notice and in the activity log. Nothing plays.</p>
+
+<h2 id="m-idleoff">Receiver auto-off</h2>
+<p>Tools → Automation → <b>Receiver auto-off</b> puts the receiver in standby after a set time (30 minutes by default) with nothing playing. Playing means any signal on the miniDSP's inputs, anyone changing the receiver's volume, input or mode, or anything htTamer does (tests, tuning, the assistant, a button in the app); each of those starts the time again. A paused film counts as nothing playing; a quiet scene doesn't, so it won't cut off a movie. A notice appears 5 minutes before it switches off. If htTamer can't read the miniDSP it never switches the receiver off, and after the Pi restarts the time starts fresh. Your receiver may also have its own Auto Standby in its setup menu; that one can't see what htTamer is doing.</p>
 
 <h2 id="m-ab">Blind A/B test</h2>
 <p><b>Verify → Blind A/B</b> tells you which of two slots you really prefer, without knowing which is which. Pick the two slots and the number of rounds, then play your own music or a film scene at your usual volume. In each round the slots hide behind buttons 1 and 2 in a new random order: switch between them as often as you like and pick the one you prefer. At the end htTamer reveals which slot won how often and how likely that split is by pure chance (under 5% is a real preference), and puts the slot you were on back. Louder usually sounds better, so compare tunes at the same level; 8 or more rounds give a clearer answer. Comparing with slot 1 (your original setup) is a good way to check htTamer's tune is an improvement.</p>

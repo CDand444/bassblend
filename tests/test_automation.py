@@ -208,6 +208,98 @@ def test_home_assistant_token_and_config():
     assert st["slot"] == 3 and st["night"] in (True, False) and st["input"] == "TV"
 
 
+# ---- receiver auto-off after N minutes with nothing playing
+class LevelDSP(FakeDSP):
+    def __init__(self, levels=(-105.0, -106.0), broken=False):
+        super().__init__()
+        self.levels, self.broken = list(levels), broken
+
+    def status(self):
+        if self.broken:
+            raise RuntimeError("no miniDSP")
+        return {**super().status(), "input_levels": self.levels}
+
+
+class PowerRX(FakeRX):
+    def __init__(self):
+        super().__init__()
+        self.st.update(volume=40.0, mute=False)
+
+    def power(self, on):
+        self.st["power"] = bool(on)
+
+
+def idle_run(d, rx, minutes, start, busy=False, step=30):
+    """Tick every `step` seconds for `minutes`; returns everything done."""
+    did = []
+    for i in range(int(minutes * 60 / step) + 1):
+        did += automation.tick(lambda: busy, lambda: rx.st if rx.st.get("power") else {"power": False},
+                               receiver=rx, dsp=d, now=start + i * step)["did"]
+    return did
+
+
+def idle_fresh(minutes=30):
+    setting(avr_idle_off_min=minutes, auto_slot_on=False, watchdog_on=False)
+    update_state(night={"on": False}, avr_idle=None)
+    automation._idle.update(act=None, rx=None, lvl_t=0.0, lvl_ok=False, warned=False)
+    automation._mem.update(seen=None, watched=time.time())
+
+
+def test_receiver_switches_off_after_30_quiet_minutes_with_a_warning():
+    idle_fresh(30)
+    d, rx, t0 = LevelDSP(), PowerRX(), time.time()
+    did = idle_run(d, rx, 24, t0)
+    assert rx.st["power"] and not any("off" in x for x in did), did
+    did = idle_run(d, rx, 3, t0 + 24 * 60 + 30)
+    from subtune.state import load_state
+    assert any("off in" in x for x in did) and load_state()["avr_idle"]["warn"], did
+    did = idle_run(d, rx, 4, t0 + 27 * 60 + 30)
+    assert not rx.st["power"] and any("receiver off after 30 min" in x for x in did), did
+    assert load_state()["avr_idle"]["off"]
+
+
+def test_anything_playing_or_touched_restarts_the_clock():
+    idle_fresh(30)
+    d, rx, t0 = LevelDSP(), PowerRX(), time.time()
+    idle_run(d, rx, 20, t0)
+    d.levels = [-60.0, -70.0]                       # a film starts (even quietly)
+    idle_run(d, rx, 1, t0 + 20 * 60 + 30)
+    d.levels = [-105.0, -105.0]                     # paused
+    idle_run(d, rx, 25, t0 + 22 * 60)
+    assert rx.st["power"], "25 quiet minutes after the film paused: still on"
+    rx.st["volume"] = 42.0                          # someone turns it up
+    idle_run(d, rx, 20, t0 + 48 * 60)
+    assert rx.st["power"], "the volume change restarted the clock"
+
+
+def test_app_activity_and_jobs_keep_it_on():
+    idle_fresh(30)
+    d, rx, t0 = LevelDSP(), PowerRX(), time.time()
+    idle_run(d, rx, 29, t0)
+    automation.note_activity("/api/chat")           # a button in the app / the assistant
+    automation._idle["act"] = t0 + 29 * 60          # (what note_activity does, on the simulated clock)
+    idle_run(d, rx, 10, t0 + 29 * 60 + 30)
+    assert rx.st["power"]
+    idle_fresh(30)
+    idle_run(d, rx, 60, t0, busy=True)              # a long tuning run
+    assert rx.st["power"], "never while htTamer is busy"
+
+
+def test_never_switches_off_blind_or_when_off():
+    idle_fresh(30)
+    rx, t0 = PowerRX(), time.time()
+    idle_run(LevelDSP(broken=True), rx, 90, t0)
+    assert rx.st["power"], "can't read the miniDSP: never switches off"
+    idle_fresh(30)
+    rx.st["power"] = False
+    assert not any("off" in x for x in idle_run(LevelDSP(), rx, 60, t0)), "already off: nothing to do"
+    idle_fresh(0)
+    rx.st["power"] = True
+    idle_run(LevelDSP(), rx, 90, t0)
+    assert rx.st["power"], "the setting is off"
+    setting(avr_idle_off_min=0)
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

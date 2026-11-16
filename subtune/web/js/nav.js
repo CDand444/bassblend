@@ -241,6 +241,12 @@ function notifyChanges() {
     const wd = S.watchdog || {};
     if (wd.fixed_t && wd.fixed_t !== NOTE.wdSeen && NOTE.wdSeen !== undefined && (wd.fixed || []).length) toast('Watchdog put something back', wd.fixed.join(' · '), 'warn', {tag: 'watchdog'});
     NOTE.wdSeen = wd.fixed_t;
+    const idl = S.avr_idle || {};
+    if (idl.t && idl.t !== NOTE.idleSeen && NOTE.idleSeen !== undefined) {
+      if (idl.warn) toast('The receiver switches off soon', `Nothing has played for a while: standby in about ${Math.max(1, Math.round((idl.off_at - Date.now() / 1000) / 60))} min. Play something or press anything in htTamer to keep it on.`, 'warn', {tag: 'idle', sticky: true});
+      else if (idl.off) toast('Receiver switched to standby', `Nothing played for ${idl.minutes} minutes.`, '', {tag: 'idle'});
+    }
+    NOTE.idleSeen = idl.t;
     const as = S.auto_slot || {};
     if (as.t && as.t !== NOTE.asSeen && NOTE.asSeen !== undefined) toast(`Slot ${as.slot}`, `Switched automatically: ${as.because}`, '', {tag: 'autoslot'});
     NOTE.asSeen = as.t;

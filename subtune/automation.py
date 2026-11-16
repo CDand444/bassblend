@@ -118,6 +118,92 @@ def keep_sub_level(s: dict):
         return None
 
 
+# ------------------------------------------------------------------ receiver auto-off
+# Setting avr_idle_off_min (0 = off). The receiver goes to standby after that many minutes with nothing
+# playing: no signal on the miniDSP's inputs (they stay near the noise floor), nobody touching the receiver
+# (volume, input, mode, mute unchanged) and no htTamer activity (jobs, tests, the A/B test, the assistant,
+# any action in the app). Anything resets the clock. If the miniDSP can't be read it never switches off,
+# and after a restart the clock starts fresh (it lives in memory only).
+SIGNAL_DBFS = -85.0                 # the inputs' floor is about -105 dBFS; program material passes this often
+LEVEL_EVERY_S = 30
+WARN_BEFORE_S = 5 * 60
+_idle = {"act": None, "rx": None, "lvl_t": 0.0, "lvl_ok": False, "warned": False}
+
+
+def note_activity(why: str = "") -> None:
+    """Something happened (an app action, a job): the receiver's idle clock starts again."""
+    _idle["act"] = time.time()
+    if _idle["warned"]:
+        _idle["warned"] = False
+        _idle_state(None)
+
+
+def _idle_state(rec):
+    from .state import update_state
+    update_state(avr_idle=rec)
+
+
+def idle_status(s=None) -> dict:
+    from .config import load_settings
+    s = s or load_settings()
+    mins = int(s.get("avr_idle_off_min") or 0)
+    if not mins or _idle["act"] is None:
+        return {"minutes": mins, "idle_s": None, "off_in_s": None}
+    idle = max(0.0, time.time() - _idle["act"])
+    return {"minutes": mins, "idle_s": round(idle), "off_in_s": round(max(0.0, mins * 60 - idle)),
+            "signal_known": _idle["lvl_ok"]}
+
+
+def _idle_off(s, avr_status, receiver, dsp, now, busy) -> list:
+    from .dsp import MiniDSP
+    from .state import event
+    mins = int(s.get("avr_idle_off_min") or 0)
+    if _idle["act"] is None:
+        _idle["act"] = now                            # first look (or after a restart): start fresh
+    if busy():
+        _idle["act"] = now
+        return []
+    st = avr_status() or {}
+    if not st.get("power"):                           # off or unreachable: nothing to do, start fresh next time
+        _idle.update(act=now, rx=None, warned=False)
+        return []
+    rx = (st.get("volume"), st.get("input_code"), st.get("mode_code"), st.get("mute"))
+    if rx != _idle["rx"]:
+        if _idle["rx"] is not None:
+            _idle["act"] = now                        # someone used the receiver
+        _idle["rx"] = rx
+    if now - _idle["lvl_t"] >= LEVEL_EVERY_S:
+        _idle["lvl_t"] = now
+        try:
+            lv = (dsp or MiniDSP(s)).status().get("input_levels") or []
+            _idle["lvl_ok"] = bool(lv)
+            if lv and max(float(x) for x in lv) > SIGNAL_DBFS:
+                _idle["act"] = now                    # something is playing
+        except Exception:                             # noqa: BLE001 - can't tell: never switch off blind
+            _idle["lvl_ok"] = False
+    if not _idle["lvl_ok"]:
+        _idle["act"] = now
+        return []
+    idle = now - _idle["act"]
+    left = mins * 60 - idle
+    if left <= 0:
+        if busy():
+            return []
+        if receiver is None:
+            from .avr import receiver as make_receiver
+            receiver = make_receiver()
+        receiver.power(False)
+        event("info", f"Receiver switched to standby: nothing played for {mins} minutes")
+        _idle.update(act=now, rx=None, warned=False)
+        _idle_state({"t": now, "off": True, "minutes": mins})
+        return [f"receiver off after {mins} min idle"]
+    if left <= WARN_BEFORE_S and not _idle["warned"]:
+        _idle["warned"] = True
+        _idle_state({"t": now, "warn": True, "off_at": now + left, "minutes": mins})
+        return [f"receiver off in {left / 60:.0f} min"]
+    return []
+
+
 # ------------------------------------------------------------------ one pass
 def tick(busy, avr_status, receiver=None, dsp=None, now=None, refresh=lambda: None) -> dict:
     """One pass of everything above. busy(): a job or the A/B test is using the system.
@@ -137,6 +223,10 @@ def tick(busy, avr_status, receiver=None, dsp=None, now=None, refresh=lambda: No
             did.append("night off (time)")
             n = night()
 
+        if s.get("avr_idle_off_min"):
+            did += _idle_off(s, avr_status, receiver, dsp, now, busy)
+        else:
+            _idle.update(act=None, rx=None, warned=False)
         if not (s.get("auto_slot_on") or s.get("watchdog_on") or n.get("on")):
             _mem["seen"] = None                       # nothing to do: don't keep asking the receiver
             return {"did": did + ["idle"]}
@@ -230,4 +320,4 @@ def status(s=None) -> dict:
             "auto_slot_last": st.get("auto_slot"),
             "watchdog_on": bool(s.get("watchdog_on")), "watchdog_fix": bool(s.get("watchdog_fix", 1)),
             "watch_sub_level": s.get("watch_sub_level"), "keep_sub_level": keep_sub_level(s),
-            "watchdog": st.get("watchdog")}
+            "watchdog": st.get("watchdog"), "avr_idle": idle_status(s)}

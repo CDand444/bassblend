@@ -633,14 +633,15 @@ let keyEditing = false, aiFilled = null;
 const aiProv = () => ((S.ai_provider || {}).providers || []).find(p => p.id === $('#aiProv').value) || {};
 function aiFormFill(force) {
   const ap = S.ai_provider; if (!ap) return;
-  const k = JSON.stringify([ap.active, ap.model, ap.local_base]); if (!force && aiFilled === k) return; aiFilled = k;
+  const k = JSON.stringify([ap.active, ap.model, ap.local_base, ap.local_vision_model]); if (!force && aiFilled === k) return; aiFilled = k;
   $('#aiProv').innerHTML = ap.providers.map(p => `<option value="${p.id}" ${p.id === ap.active ? 'selected' : ''}>${esc(p.label)}</option>`).join('');
   $('#aiBase').value = ap.local_base || '';
+  $('#aiVision').value = ap.local_vision_model || '';
   aiProvChanged();
 }
 function aiProvChanged() {
   const p = aiProv(), local = p.id === 'local';
-  $('#aiBaseRow').hidden = !local;
+  $('#aiBaseRow').hidden = !local; $('#aiVisionRow').hidden = !local;
   $('#aiKeyLabel').textContent = local ? 'API key (only if your server asks for one)' : `${p.label || ''} API key`;
   $('#keyIn').placeholder = p.key ? '•••••• saved (leave empty to keep it)' : p.key_hint || '';
   $('#aiKeyHint').textContent = (local ? '' : `Get one at ${p.key_where}. `) + 'Stored only on this device and sent only to this provider.';
@@ -648,7 +649,7 @@ function aiProvChanged() {
   $('#aiModel').innerHTML = cur ? `<option value="${esc(cur)}">${esc(cur)}</option>` : '<option value="">Press “Load list” to choose</option>';
 }
 $('#aiProv').onchange = () => { keyEditing = true; aiProvChanged(); };
-['#keyIn', '#aiBase', '#aiModel'].forEach(s => $(s).addEventListener('focus', () => keyEditing = true));
+['#keyIn', '#aiBase', '#aiModel', '#aiVision'].forEach(s => $(s).addEventListener('focus', () => keyEditing = true));
 $('#aiModels').onclick = async () => {
   keyEditing = true; const p = aiProv(); $('#keyMsg').textContent = 'Loading models…';
   if ($('#keyIn').value.trim() && p.id !== 'local') {                       // save a new key first so the list can load
@@ -671,7 +672,8 @@ $('#keyForm').onsubmit = async e => {
   e.preventDefault();
   const p = aiProv();
   const r = await post('/api/ai', {action: 'save', provider: p.id, model: $('#aiModel').value, key: $('#keyIn').value.trim() || undefined,
-                                   local_base: p.id === 'local' ? $('#aiBase').value.trim() : undefined});
+                                   local_base: p.id === 'local' ? $('#aiBase').value.trim() : undefined,
+                                   local_vision_model: p.id === 'local' ? $('#aiVision').value.trim() : undefined});
   $('#keyIn').value = '';
   $('#keyMsg').textContent = r.error || 'Saved.';
   if (!r.error) { keyEditing = false; aiFilled = null; $('#keyIn').blur(); }
