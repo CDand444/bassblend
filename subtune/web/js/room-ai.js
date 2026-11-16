@@ -206,6 +206,19 @@ $('#roomSave').onclick = async () => {
   $('#roomMsg').textContent = r.error ? r.error : 'Saved.';
   if (!r.error) { roomInit = false; await poll(); }
 };
+$('#roTurn').onclick = e => { const b = e.target.closest('button[data-op]'); if (b && !b.disabled) roTurn(b.dataset.op); };
+async function roTurn(op) {
+  if (op !== 'undo' && !confirm('Turn the room now? This saves the room. Edits you have not saved in the form below will be lost. You can undo it.')) return;
+  const r = await post('/api/room/orient', {op});
+  if (r.error) { $('#roMsg').textContent = r.error; return; }
+  S.room = r.room;
+  roomInit = false; planKey = null;
+  initRoom();
+  renderPlan(readRoom());
+  const u = $('#roUndo');
+  u.disabled = !r.undo; u.textContent = r.undo ? `Undo turn (${r.undo})` : 'Undo turn';
+  $('#roMsg').textContent = 'Turned.';
+}
 // ---------- room shape: floor outline (corners in meters, in order around the room), openings, ceiling
 let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null}, planDrag = null, planKey = null;
 const SHAPES = [['rect', 'Rectangle'], ['l', 'L-shape'], ['alcove', 'Alcove'], ['cut', 'Cut corner'], ['custom', 'Custom']];

@@ -1233,6 +1233,14 @@ details.card[open] > summary::after { transform: rotate(45deg); }
             <button type="button" class="btn ghost" id="buildPhone" title="Photograph the room with your phone; the AI assistant turns it into this outline">Build with your phone <span class="beta">Beta</span></button>
             <label class="btn ghost" title="A floor plan image on this computer: the AI assistant reads its shape, doors and sizes into this outline">Upload floor plan<input type="file" id="planUpload" accept="image/*" hidden></label>
           </div>
+          <div class="row" id="roTurn" style="margin:0 0 8px;gap:6px">
+            <button type="button" class="btn ghost" data-op="ccw" title="Turn the whole room a quarter turn counterclockwise; seats, subs and speakers turn with it">Turn left</button>
+            <button type="button" class="btn ghost" data-op="cw" title="Turn the whole room a quarter turn clockwise; seats, subs and speakers turn with it">Turn right</button>
+            <button type="button" class="btn ghost" data-op="180" title="Turn the whole room half a turn; seats, subs and speakers turn with it">Turn 180</button>
+            <button type="button" class="btn ghost" data-op="mirror" title="Flip left and right">Mirror</button>
+            <button type="button" class="btn ghost" id="roUndo" data-op="undo" title="Step back one turn" disabled>Undo turn</button>
+            <span class="muted small" id="roMsg"></span>
+          </div>
           <div class="plan" id="plan"></div>
           <div class="plan plan3d" id="plan3dBox" hidden><canvas id="plan3d" aria-label="The room in 3D: drag to turn"></canvas></div>
           <div id="buildBox"></div>
