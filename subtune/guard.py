@@ -23,7 +23,7 @@ SOUND = {"run_checkup", "run_verify", "level_match", "test_tone", "start_autotun
          "run_system_report", "fix_from_report", "run_headroom", "run_all_speakers", "run_measurement",
          "start_live_analyzer"}
 CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_sub_output", "set_night_mode", "set_quiet_hours", "avr_control", "apply_avr_blend",
-                   "keep_fixes", "undo_fixes", "update_speakers", "update_room", "update_system", "hw_save",
+                   "keep_fixes", "undo_fixes", "update_speakers", "move_speakers", "update_room", "update_system", "hw_save",
                    "set_live_eq", "fit_live_eq", "save_live_eq", "save_simulation", "set_treatment_constraints",
                    "record_treatment", "make_backup", "restore_backup"}
 ALWAYS_OK = {"stop_live_analyzer"}           # stopping sound is never blocked

@@ -234,6 +234,30 @@ def test_the_assistant_can_set_speaker_dimensions_in_any_common_form():
         raise AssertionError("an unknown field was silently ignored")
 
 
+def test_the_assistant_cannot_move_a_recorded_speaker_by_mistaking_its_size_for_a_position():
+    from subtune import equip
+    equip.update_speakers({"FL": {"x_ft": 2.0, "y_ft": 0.0, "z_ft": 3.0}}, who="page")           # the owner records where it is
+    before = equip.speakers()["FL"]
+    # the mistake that happened: a size given as x/y/z
+    try:
+        equip.update_speakers({"FL": {"x_ft": 0.6, "y_ft": 4.5, "z_ft": 1.4}}, who="assistant")
+    except ValueError as e:
+        assert "move_speakers" in str(e) and "width_in" in str(e)
+    else:
+        raise AssertionError("the assistant moved a recorded speaker")
+    assert equip.speakers()["FL"] == before
+    # sizes are fine, a first-time position is fine, the owner can always edit, and an approved move works
+    equip.update_speakers({"FL": {"width_in": 9, "height_in": 40, "depth_in": 12}}, who="assistant")
+    assert equip.speakers()["FL"]["width_in"] == 9 and equip.speakers()["FL"]["x_m"] == before["x_m"]
+    equip.update_speakers({"FR": {"x_ft": 9.0, "y_ft": 0.0}}, who="assistant")
+    assert equip.speakers()["FR"]["x_m"] > 2
+    equip.update_speakers({"FL": {"x_ft": 2.5}}, who="page")
+    got = equip.update_speakers({"FL": {"x_ft": 3.0}}, who="assistant", allow_move=True)
+    assert abs(equip.speakers()["FL"]["x_m"] - 3.0 * 0.3048) < 0.01 and got["changed"]
+    from subtune import assistant, guard
+    assert any(t["name"] == "move_speakers" and t.get("approval") for t in assistant.TOOLS) and "move_speakers" in guard.CHANGES
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

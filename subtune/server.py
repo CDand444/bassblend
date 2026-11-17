@@ -1032,6 +1032,11 @@ def build_executors(origin="assistant"):
         r = equip.update_speakers(speakers or {}, remove or [], who="assistant")
         return {"changed": r["changed"], "summary": ("; ".join(r["changed"]) or "nothing changed")[:300]}
 
+    def speakers_move(speakers=None):
+        from . import equip
+        r = equip.update_speakers(speakers or {}, [], who="assistant", allow_move=True)
+        return {"changed": r["changed"], "summary": ("; ".join(r["changed"]) or "nothing changed")[:300]}
+
     def room_set(**patch):
         from . import equip
         r = equip.update_room(patch, who="assistant")
@@ -1220,7 +1225,7 @@ def build_executors(origin="assistant"):
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "keep_fixes": fixes_keep, "undo_fixes": fixes_undo,
-            "get_equipment": equipment, "update_speakers": speakers_set, "update_room": room_set,
+            "get_equipment": equipment, "update_speakers": speakers_set, "move_speakers": speakers_move, "update_room": room_set,
             "update_system": system_set, "list_backups": backups_list, "make_backup": backup_make, "restore_backup": backup_restore, "run_measurement": measure_spot, "get_system_report": report_get, "run_system_report": report_run,
             "fix_from_report": fix_run, "run_headroom": headroom_run, "run_all_speakers": allspk_run, "get_tuning_plan": plan_get, "get_journal": journal_get,
             "hw_lookup": hw_lookup, "hw_save": hw_save,

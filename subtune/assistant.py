@@ -184,6 +184,9 @@ every one and a retest: active tuning of a sub's own controls (for a Hsu VTF-3: 
 choice measured, the best kept, a final verification) and a sub crawl (the sub at the seat, the mic at places a sub could go; the smoothest spot wins, \
 then verify at the seat). Scores are lower-is-better (distance from the target curve with levels aligned, ripple, reach). Explain the numbers in plain \
 words, say what to do next, and remember that a measurement through a playing tune includes that tune. You can't start a measurement yourself.
+- Positions are not sizes. x_ft, y_ft and z_ft say where a speaker IS in the room; they are never its dimensions, and you can't change a recorded position with \
+update_speakers (that needs move_speakers and the owner's OK). Never put numbers you were not given or did not read from a source into any field: if a \
+size is unknown, say so (or look it up with web_search and cite it with hw_save) instead of filling a placeholder such as 10 x 10 x 10.
 - When the owner gives a speaker's or sub's dimensions, set them with update_speakers (width_in, height_in, depth_in; or the update_room sub fields), then \
 read the result: if it says nothing changed or refuses, fix the fields and try again instead of telling the owner it is done. When the hardware database is on, \
 also save the model's dimensions with hw_save so every room with that model uses them. The Speakers page offers the database's models in a drop-down.
@@ -409,6 +412,10 @@ TOOLS = [
        {"speakers": {"type": "object", "description": "channel code -> fields to set, e.g. {\"FL\": {\"model\": \"Klipsch RP-8000F\", \"kind\": \"tower\", \"size\": \"small\", \"crossover_hz\": 80, \"width_in\": 9, \"height_in\": 40, \"depth_in\": 12, \"aim_deg\": 180}} (the cabinet's physical size is width_in/height_in/depth_in in inches, or give dimensions as \"9 x 40 x 12 in\" or {w, h, d, unit}; size is only the receiver's large or small setting) (aim_deg = which way it faces on the plan: 0 back wall, 90 left, 180 the screen, 270 right; omit = at the main seat). Channels: FL FR C WL WR SL SR BL BR (rear surrounds) TFL TFR TML TMR TRL TRR. Fields: model, kind (tower, bookshelf, center, on-wall, in-wall, in-ceiling, atmos module, satellite, other), size (the receiver's large/small setting), crossover_hz, x_ft/y_ft/z_ft (from the left wall, the front wall, the floor), aim, amp, notes. Only the fields given change."},
         "remove": {"type": "array", "items": {"type": "string"}, "description": "channel codes whose record to clear"}},
        []),
+    _t("move_speakers", "Change where a speaker that is ALREADY recorded stands in the room (the owner approves it first). x_ft/y_ft/z_ft are positions: "
+       "feet from the left wall, from the front wall and up from the floor. NEVER use them for a speaker's size (that is width_in/height_in/depth_in in update_speakers). "
+       "Only use this when the owner has said the speaker moved or the recorded spot is wrong.",
+       {"speakers": {"type": "object", "description": "channel code -> {x_ft, y_ft, z_ft} (any of them)"}}, ["speakers"], approval=True),
     _t("update_room", "Record or correct the room, seats, subs, receiver description or goals. Partial: only what's given "
        "changes. Lengths may be given in feet (*_ft) or meters (*_m). No sound.",
        {"room": {"type": "object", "description": "length_ft, width_ft, height_ft (the highest point), construction, "
@@ -574,6 +581,8 @@ DESCRIBE = {
     "restore_backup": lambda i: f"Restore the backup {i['name']}: your room, tunes, measurements and settings go back to that moment (a safety copy is made first)",
     "set_quiet_hours": lambda i: (f"Quiet hours: night mode on by itself at {i['start']}" + (f" and off at {i['end']}" if i.get("end") else " (stays on until you turn it off)")
                                   if i.get("start") else "Quiet hours off: night mode only comes on when you turn it on"),
+    "move_speakers": lambda i: "Move speakers in the room (they are recorded where they are now): " + "; ".join(
+        f"{ch} to {', '.join(f'{k[0]} {v} ft' for k, v in d.items() if k in ('x_ft', 'y_ft', 'z_ft'))}" for ch, d in (i.get("speakers") or {}).items()),
     "set_night_mode": lambda i: ("Night mode ON: mute the subs completely (no bass from them)" if i["on"]
                                  else "Night mode OFF: the subs play again"),
     "run_checkup": lambda i: f"Run a check-up at spot {i['pos']} (one sweep through the subs)",
@@ -837,7 +846,7 @@ def _brief(name, inp, out):
     label = {"get_overview": "Looked at the current state", "list_tunes": "Read the saved tunes",
              "simulate_tune": "Tried a tune offline", "save_simulation": "Saved the trial tune",
              "set_target_settings": "Changed the tuning target", "apply_tune": "Applied a tune",
-             "switch_slot": "Switched slot", "set_sub_output": "Changed the sub outputs", "set_night_mode": "Changed night mode", "get_sub_workshop": "Read the sub workshop", "set_quiet_hours": "Changed quiet hours", "run_checkup": "Ran a check-up", "run_verify": "Verified",
+             "switch_slot": "Switched slot", "set_sub_output": "Changed the sub outputs", "set_night_mode": "Changed night mode", "move_speakers": "Moved speakers", "get_sub_workshop": "Read the sub workshop", "set_quiet_hours": "Changed quiet hours", "run_checkup": "Ran a check-up", "run_verify": "Verified",
              "level_match": "Compared sub levels", "test_tone": "Played a test tone",
              "start_autotune": "Started auto-tune", "avr_status": "Checked the receiver",
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",

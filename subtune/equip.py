@@ -134,8 +134,9 @@ def speakers() -> dict:
     return load_room().get("speakers") or {}
 
 
-def update_speakers(updates: dict | None = None, remove: list | None = None, who="page") -> dict:
-    """Merge per-channel changes ({"FL": {"model": ...}, ...}); remove clears a channel's record."""
+def update_speakers(updates: dict | None = None, remove: list | None = None, who="page", allow_move=False) -> dict:
+    """Merge per-channel changes ({"FL": {"model": ...}, ...}); remove clears a channel's record.
+    The assistant may record a speaker's position the first time, but moving one that is already recorded needs the owner's OK (move_speakers)."""
     from .room import load_room, write_room
     r = load_room()
     spk = dict(r.get("speakers") or {})
@@ -148,6 +149,12 @@ def update_speakers(updates: dict | None = None, remove: list | None = None, who
         if not isinstance(d, dict):
             raise ValueError(f"{ch}: expected an object of fields")
         new = clean_speaker(ch, d, spk.get(ch))
+        old = spk.get(ch) or {}
+        if who == "assistant" and not allow_move:
+            for f in ("x_m", "y_m", "z_m"):
+                if old.get(f) is not None and new.get(f) is not None and abs(new[f] - old[f]) > 0.01:
+                    raise ValueError(f"{ch}: its position is already recorded (x, y and z are where the speaker IS in the room, never its size); "
+                                     "moving it needs the owner's OK: use move_speakers. A cabinet's size is width_in, height_in and depth_in.")
         diff = [f"{k} {spk.get(ch, {}).get(k)!r} → {v!r}" for k, v in new.items() if (spk.get(ch) or {}).get(k) != v]
         if diff:
             changed.append(f"{ch}: " + ", ".join(diff))
