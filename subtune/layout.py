@@ -50,7 +50,7 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
     seat = next((s for s in room.get("seats") or [] if s.get("x_m") is not None and s.get("y_m") is not None), None)
     if not (L and W and H and seat and beds in BED):
         return None
-    from . import shape
+    from . import shape, soffit
     mx, my = seat["x_m"], seat["y_m"]
     ez = seat.get("z_m") or EAR
     spk, notes = [], []
@@ -188,6 +188,11 @@ def plan(room: dict, beds: int | None, heights: int | None) -> dict | None:
                          "ceiling inside the room.")
             continue
         zc = shape.ceiling_z(rm, x, y) if (poly or shape.ceiling(rm)["kind"] != "flat" or rm.get("soffits")) else H
+        under = next((r_ for r_ in soffit.rects(rm) if shape.point_in(r_["poly"], x, y)), None)
+        if under:
+            notes.append(f"{NAMES[k]} falls under {under.get('name') or 'a soffit'}: it goes on the soffit's underside, {_ft(under['bottom_m'])} ft "
+                         "above the floor, which is lower than the rest of the ceiling. Aim it at the seat, or move it out from under the soffit "
+                         "if it ends up too close to the wall.")
         spk.append({"id": k, "name": NAMES[k], "x_m": round(x, 2), "y_m": round(y, 2), "z_m": round(zc, 2),
                     "x_ft": _ft(x), "y_ft": _ft(y), "z_ft": _ft(zc), "elevation": ideal_el, "range": [elo, ehi], "kind": "height"})
     if my < L * 0.35 or my > L * 0.85:

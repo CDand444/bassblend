@@ -140,6 +140,11 @@ def make(reason: str = "manual") -> Path:
         _note_copy_error(str(e))
     else:
         _note_copy_error(None)
+    try:
+        from . import dropbox
+        dropbox.push(final)
+    except Exception as e:                                      # noqa: BLE001 - the same: reported on the card, never fatal
+        event("error", f"Dropbox copy failed: {e}")
     return final
 
 

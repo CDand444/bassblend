@@ -131,6 +131,19 @@ def test_double_door_is_a_door_that_takes_no_panel():
     raise AssertionError("an unknown kind was accepted")
 
 
+def test_height_speaker_under_a_soffit_hangs_from_its_underside_and_says_so():
+    from subtune import layout
+    r = copy.deepcopy(ROOM)
+    r["seats"] = [{"name": "MLP", "x_m": 2.0, "y_m": 2.6, "z_m": 1.05}]
+    r["room"]["soffits"] = soffit.clean_soffits([{"wall": 0, "from_m": 0.0, "length_m": 4.0, "depth_m": 2.0, "bottom_m": 2.1}], [[0, 0], [4, 0], [4, 6], [0, 6]], 2.4)
+    p = layout.plan(r, 7, 4)
+    tfl = next(s for s in p["speakers"] if s["id"] == "TFL")
+    assert tfl["z_m"] <= 2.1 + 1e-6, tfl                                   # on the soffit's underside, not the higher ceiling
+    assert any("falls under" in n for n in p["notes"])
+    plain = layout.plan(ROOM, 7, 4)
+    assert not any("falls under" in n for n in plain["notes"])
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

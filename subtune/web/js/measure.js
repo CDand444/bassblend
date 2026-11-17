@@ -150,7 +150,20 @@ $('#hrRun').onclick = async () => {
 };
 
 // ---------- speaker placement (Dolby guidelines from the room and the main seat)
-let placeKey = null;
+let placeKey = null, placeMode = '2d';
+try { placeMode = localStorage.getItem('htPlaceView') === '3d' ? '3d' : '2d'; } catch (e) { placeMode = '2d'; }
+const PLACE3D_CAM = {yaw: 0.35, pitch: 0.62, zoom: 1};
+function place3dDraw() {                    // the recommended speakers, and yours where you have recorded them, in the room as saved
+  const p = S.placement, cv = $('#place3d'); if (!cv || !p || !S.room || !S.room.room || placeMode !== '3d') return;
+  const pl = v3Placement(p, S.room), sc = v3Scene(S.room, pl.spk, null, pl.lines), view = cv._v3 || (cv._v3 = RoomView.view3d(cv, {camera: PLACE3D_CAM}));
+  view.set(sc.room, sc.marks);
+}
+function setPlaceMode(m) {
+  placeMode = m; try { localStorage.setItem('htPlaceView', m); } catch (e) { /* private mode */ }
+  document.querySelectorAll('#placeView button').forEach(b => b.classList.toggle('on', b.dataset.pv === m));
+  $('#place3dBox').hidden = m !== '3d'; $('#place3dHint').hidden = m !== '3d'; $('#place2d').hidden = m === '3d';
+  if (m === '3d') place3dDraw();
+}
 // placement "delta": the owner's recorded speakers vs the recommended spots
 const pdColor = {ok: 'var(--good)', close: 'var(--s2)', off: 'var(--bad)'};
 const pdWord = {ok: 'OK', close: 'Close', off: 'Off'};
@@ -163,13 +176,13 @@ function pdMove(d) {                                     // what to do to move y
   return parts.length ? parts.join(', ') : 'none';
 }
 function renderPlacement() {
-  const p = S.placement, key = JSON.stringify(p);
+  const p = S.placement, key = JSON.stringify([p, (S.room || {}).room, (S.room || {}).speakers, (S.room || {}).subs, (S.room || {}).furniture, (S.room || {}).screen]);
   if (key === placeKey) return; placeKey = key;
   if (!p) { $('#placeOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and the main seat position in Room, and the speaker layout in Tune my system.'); return; }
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
   const cmp = (p.compare && p.compare.speakers) ? p.compare : null;
   const pair = s => { const c = cmp && cmp.speakers[s.id]; return (c && c.actual && c.delta) ? c : null; };
-  let g = roomOutlineSvg(p.outline, p.openings, W, L, X, Y) + `
+  let g = roomOutlineSvg(p.outline, p.openings, W, L, X, Y) + v3SoffitSvg((S.room || {}).room, p.outline, W, L, X, Y) + `
     <line x1="${X(W * .25)}" x2="${X(W * .75)}" y1="${Y(0) + 3}" y2="${Y(0) + 3}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   p.speakers.forEach(s => {
@@ -196,12 +209,17 @@ function renderPlacement() {
     const c = pair(s);
     return c ? `<td>${fmtFt(c.actual.x_m)} left, ${fmtFt(c.actual.y_m)} front${c.actual.z_m != null ? `, ${fmtFt(c.actual.z_m)} high` : ''}</td><td>${pdMove(c.delta)}</td><td style="color:${pdColor[c.delta.status]}">${pdWord[c.delta.status]}</td>`
              : `<td>not recorded</td><td></td><td></td>`; };
-  $('#placeOut').innerHTML = `<div class="pl-grid"><div><svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:480px" role="img" aria-label="Recommended speaker positions">${g}</svg>
+  $('#placeOut').innerHTML = `<div class="row" style="margin:0 0 8px;gap:8px"><div class="seg" id="placeView" role="radiogroup" aria-label="Placement view"><button type="button" data-pv="2d" class="${placeMode === '2d' ? 'on' : ''}">Plan</button><button type="button" data-pv="3d" class="${placeMode === '3d' ? 'on' : ''}">3D</button></div>
+      <span class="muted small" id="place3dHint" ${placeMode === '3d' ? '' : 'hidden'}>Pale speakers are the recommended spots; dark ones are yours. A colored line runs from a recommended spot to where yours is (green is close, red is off). Drag to turn, scroll to zoom.</span></div>
+    <div class="plan plan3d trt3d" id="place3dBox" ${placeMode === '3d' ? '' : 'hidden'}><canvas id="place3d" aria-label="The recommended speaker positions in your room in 3D: drag to turn"></canvas></div>
+    <div class="pl-grid"><div id="place2d" ${placeMode === '3d' ? 'hidden' : ''}><svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:480px" role="img" aria-label="Recommended speaker positions">${g}</svg>
       <div class="legend"><span><i style="border-color:var(--s1)"></i>Ear-level speakers</span><span><i style="border-color:var(--s4)"></i>Height speakers (ceiling)</span>${cmp ? `<span><i style="width:11px;height:11px;border-radius:50%;border:2px solid var(--text-2);background:var(--text-2);margin-right:6px"></i>Yours</span><span><i style="width:11px;height:11px;border-radius:50%;border:2px solid var(--s1);background:var(--surface);margin-right:6px"></i>Recommended</span>` : ''}</div></div>
     <div>${cmp ? `<p class="muted small" style="margin:0 0 10px">${esc(cmp.summary)}</p>` : ''}<div class="tw"><table class="dc-tbl"><thead><tr><th>Speaker</th><th>From left</th><th>From front</th><th>Height</th><th>Angle</th><th>Dolby range</th>${cmp ? '<th>Yours</th><th>Move</th><th>Status</th>' : ''}</tr></thead><tbody>
       ${p.speakers.map(s => `<tr><td>${esc(s.name)}</td><td>${s.x_ft} ft</td><td>${s.y_ft} ft</td><td>${s.kind === 'height' ? 'ceiling' : s.z_ft + ' ft'}</td><td>${ang(s)}</td><td>${rng(s)}</td>${cmp ? rowCmp(s) : ''}</tr>`).join('')}</tbody></table></div>
       ${p.notes.length ? `<ul class="wins" style="margin-top:12px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}
       <p class="muted small" style="margin:10px 0 0">Angles are seen from the main seat. Distances are to the front of each speaker. Source: ${esc(p.source)}.</p></div></div>`;
+  place3dDraw();
+  $('#placeOut').querySelectorAll('#placeView [data-pv]').forEach(b => b.onclick = () => setPlaceMode(b.dataset.pv));
 }
 
 // ---------- room treatment planner (offline: geometry + measurements, ranked)
@@ -227,7 +245,7 @@ function roomOutlineSvg(outline, openings, W, L, X, Y) {
 function trtDrawing(p) {
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
   const sh = p.shape || {};
-  let g = roomOutlineSvg(sh.outline, sh.openings, W, L, X, Y) + `
+  let g = roomOutlineSvg(sh.outline, sh.openings, W, L, X, Y) + v3SoffitSvg((S.room || {}).room, sh.outline, W, L, X, Y) + `
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   const items = p.items;
   // floor and ceiling zones first (underneath)

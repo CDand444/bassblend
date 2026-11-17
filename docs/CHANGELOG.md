@@ -1,5 +1,14 @@
 # htTamer changelog
 
+## Nov 18, 2026 - Dropbox backups
+
+- **Dropbox as a backup copy**: Tools → Backups → Keep a copy in Dropbox. You make a small free Dropbox app once (App folder, files.content read and write), paste its App key, allow access on dropbox.com and paste the code. Every new backup is then also sent to /htTamer-backups (the newest five stay, plus the one made before an update); a failed copy is shown on the card and never stops the backup. Send the newest now, see what is in Dropbox, bring one back (then Restore as usual), or disconnect. Only a refresh token is kept, in the config folder like an AI key: never in settings and never in a backup.
+
+## Nov 18, 2026 - speaker placement in 3D, soffits everywhere
+
+- **Speaker placement has a 3D view**: the recommended spots as pale speaker cabinets, yours (where recorded) as dark ones, dashed lines from the seat, and a green, orange or red line from each recommended spot to where yours is.
+- **Soffits are acknowledged**: ceiling speakers hang from a soffit's underside where one is overhead (in 3D and in the plan, with a note saying so), and the placement and treatment plan drawings show soffit footprints.
+
 ## Nov 18, 2026 - cabinet sizes, sub aim, screen frame, soffit-aware treatment
 
 - **Double door** in the openings catalog (Room → shape → Openings, doors and windows): an Add double door button (5 ft, two leaves on the plan and in 3D), the same panel advice as a door, and the phone builder and assistant know it.

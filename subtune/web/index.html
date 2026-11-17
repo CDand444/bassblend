@@ -1003,6 +1003,9 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <div class="row" style="align-items:end"><label class="f" style="width:300px">Copy folder<input id="bkCopy" placeholder="/mnt/usb/htTamer-backups" spellcheck="false"></label>
           <label class="cb" style="max-width:200px"><input type="checkbox" id="bkWeekly" checked><span>Weekly backup</span></label><button class="btn" id="bkSave">Save</button></div>
       </details>
+      <details style="margin-top:10px" id="bkDbx"><summary class="small">Keep a copy in Dropbox <span class="conf" id="bkDbxTag"></span></summary>
+        <div id="bkDbxOut" style="margin-top:8px"></div>
+      </details>
     </section>
     <section class="card" id="updCard">
       <div class="card-h"><h2>Updates</h2><span class="sub" id="updSub"></span></div>

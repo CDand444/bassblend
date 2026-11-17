@@ -1982,7 +1982,8 @@ class H(BaseHTTPRequestHandler):
             from . import backup
             s = load_settings()
             return self._send(200, {"backups": backup.list_backups(), "copy_dir": s.get("backup_copy_dir"),
-                                    "weekly": s.get("backup_weekly", True), "copy_error": load_state().get("backup_copy_error")})
+                                    "weekly": s.get("backup_weekly", True), "copy_error": load_state().get("backup_copy_error"),
+                                    "dropbox": __import__("subtune.dropbox", fromlist=["x"]).status()})
         if u.path == "/api/backups/download":          # one backup file (the name must be in the list)
             from . import backup
             try:
@@ -2035,9 +2036,31 @@ class H(BaseHTTPRequestHandler):
                 if RUN.running() or load_state().get("busy"):
                     raise RuntimeError("wait for the current job to finish, then restore")
                 return self._send(200, backup.restore(str(body.get("name"))))
+            if act and act.startswith("dropbox_"):
+                from . import dropbox
+                if act == "dropbox_start":
+                    return self._send(200, dropbox.start(str(body.get("app_key") or "")))
+                if act == "dropbox_connect":
+                    return self._send(200, {"dropbox": dropbox.connect(str(body.get("code") or ""))})
+                if act == "dropbox_disconnect":
+                    return self._send(200, {"dropbox": dropbox.disconnect()})
+                if act == "dropbox_option":
+                    s = load_settings()
+                    s["dropbox_on"] = bool(body.get("on"))
+                    save_settings(s)
+                    return self._send(200, {"dropbox": dropbox.status()})
+                if act == "dropbox_list":
+                    return self._send(200, {"remote": dropbox.remote(), "dropbox": dropbox.status()})
+                if act == "dropbox_send":                       # send the newest backup now (made first when there is none)
+                    newest = max(backup.folder().glob("htTamer-backup-*.zip"), key=lambda p: p.stat().st_mtime, default=None) or backup.make("manual")
+                    dropbox.upload(newest)
+                    return self._send(200, {"sent": newest.name, "remote": dropbox.remote(), "dropbox": dropbox.status()})
+                if act == "dropbox_fetch":                      # bring one back into the list; Restore is the usual separate, confirmed step
+                    p = dropbox.download(str(body.get("name") or ""), backup.folder())
+                    return self._send(200, {"fetched": p.name, "backups": backup.list_backups()})
         except (ValueError, RuntimeError, OSError) as e:
             return self._send(400, {"error": str(e)})
-        return self._send(400, {"error": "action must be make, delete, upload, options or restore"})
+        return self._send(400, {"error": "action must be make, delete, upload, options, restore or a dropbox_ action"})
 
     def do_POST(self):
         path = urlparse(self.path).path

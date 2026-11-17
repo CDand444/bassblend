@@ -22,6 +22,15 @@
     const t = c.ridge === 'width' ? 1 - Math.abs(y - L / 2) / (L / 2) : 1 - Math.abs(x - W / 2) / (W / 2);
     return low + d * Math.max(0, Math.min(1, t));
   }
+  function inPoly(pl, x, y) {
+    let n = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) { if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) n = !n; }
+    return n;
+  }
+  function ceilAt(r, x, y) {                        // what is overhead at a floor point: the ceiling, or a soffit's underside where one hangs
+    let z = ceilZ(r, x, y); const pts = outlineOf(r);
+    if (pts) (r.soffits || []).forEach(sf => { const pl = soffitPoly(pts, sf); if (pl && sf.bottom_m < z && inPoly(pl, x, y)) z = sf.bottom_m; });
+    return z;
+  }
   function edges(pts) {
     return pts.map((a, i) => { const b = pts[(i + 1) % pts.length], len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1e-9;
       return {i, a, b, len, d: [(b[0] - a[0]) / len, (b[1] - a[1]) / len], n: [(b[1] - a[1]) / len, -(b[0] - a[0]) / len]}; });
@@ -136,7 +145,8 @@
         ctx.strokeStyle = C.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
       // objects (furniture, speakers, subs, treatment) are drawn after the walls, far to near; the soffits are part of that sort
       const isShell = f => f.wall !== undefined || f.kind === 'hl' || f.kind === 'door' || f.kind === 'window';
-      const mk = marks.filter(m => (m.x_m != null && m.y_m != null) || m.boxes).map(m => {
+      const mk = marks.filter(m => (m.x_m != null && m.y_m != null) || m.boxes || m.line).map(m => {
+        if (m.line) { const a = P(m.line[0]), b = P(m.line[1]); return {...m, a, b, depth: Math.min(a[2], b[2]) - 0.05}; }
         if (m.boxes) { const q = m.boxes.flatMap(bx => bx.pts), cx = q.reduce((t, v) => t + v[0], 0) / q.length, cy = q.reduce((t, v) => t + v[1], 0) / q.length;
           return {...m, cx, cy, depth: P([cx, cy, 0])[2]}; }
         const z = m.kind === 'height' ? ceilZ(room, m.x_m, m.y_m) : (m.z_m ?? (m.kind === 'sub' ? 0.3 : m.kind === 'seat' ? 0.5 : 1.1));
@@ -168,6 +178,8 @@
           bs.forEach(bx => drawBox(fade < 1 ? {...bx, alpha: (bx.alpha ?? 1) * fade} : bx, m.shadow));
           if (m.label) { const zt = Math.max(...m.boxes.map(bx => bx.z1)), q = P([m.cx, m.cy, (m.labelZ ?? zt) + 0.06]); txt(m.label, q[0], q[1] - 3); }
           return; }
+        if (f.kind === 'mark' && f.m.line) { const m = f.m; ctx.strokeStyle = m.color || C.text; ctx.lineWidth = m.width || 1.2; ctx.setLineDash(m.dash || []); ctx.globalAlpha = m.alpha ?? 0.8;
+          ctx.beginPath(); ctx.moveTo(m.a[0], m.a[1]); ctx.lineTo(m.b[0], m.b[1]); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1; return; }
         if (f.kind === 'mark') { const m = f.m, r = m.kind === 'sub' ? 6 : m.kind === 'seat' ? 6 : 4;
           ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(m.g[0], m.g[1]); ctx.lineTo(m.q[0], m.q[1]); ctx.stroke(); ctx.setLineDash([]);
           ctx.fillStyle = m.color || (m.kind === 'seat' ? C.text : m.kind === 'sub' ? C.accent : m.kind === 'height' ? color(canvas, '--s4', '#8a5cf5') : color(canvas, '--s1', '#2a78d6'));
@@ -230,5 +242,5 @@
     const l = Math.hypot(dir[0], dir[1]) || 1, fx = dir[0] / l, fy = dir[1] / l, rx = -fy, ry = fx;
     return [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([u, v]) => [x + u * rx + v * fx, y + u * ry + v * fy]);
   }
-  window.RoomView = {view3d, svg2d, ceilZ, outlineOf, soffitPoly, cuboid};
+  window.RoomView = {view3d, svg2d, ceilZ, ceilAt, outlineOf, soffitPoly, cuboid};
 })();

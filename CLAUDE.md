@@ -44,6 +44,7 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     `avr.hdmi_inputs()` per make. Only Onkyo is hardware-tested.
   - `hwdb.py`: hardware database (receivers/subs/speakers) the owner or, with setting `ai_hwdb`, the
     assistant grows (`hw_lookup`/`hw_save`, plus Claude web_search); used for driver choice and `protect_hz`.
+  - `dropbox.py`: optional Dropbox copy of every backup (owner's own scoped app, PKCE sign-in, refresh token in the config folder like an AI key); `_open` is the only network call, tests replace it.
   - `backup.py`: automatic backups (weekly, before an update, on demand) and restore; never holds keys/tokens/PIN
     (`secrets_check`). Card Tools -> Backups, `/api/backups`.
   - `channels.py`: the every-channel report and receiver setup sheet from the newest all-speakers check (pure; `/api/channels`,

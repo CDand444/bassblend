@@ -121,6 +121,21 @@ def main():
                   const m = v3Subs(r)[0].boxes[0]; const xs = m.pts.map(p => p[0]), ys = m.pts.map(p => p[1]); return Math.abs((Math.max(...xs) - Math.min(...xs)) - 0.508) < 0.001 || Math.abs((Math.max(...ys) - Math.min(...ys)) - 0.508) < 0.001; })()"""))
             page.wait_for_timeout(300)
 
+            check("Treatment 3D: no panel tile over a door", page.evaluate("""(() => { const rm = {length_m: 6, width_m: 4, height_m: 2.5};
+              const p = {room: {W: 4, L: 6, H: 2.5}, shape: {openings: [{wall: 0, from_m: 1, width_m: 1, height_m: 2.03, kind: 'door'}]}, items: [
+                {id: 'front', wall: 'front', kind: 'absorber', tier: 1, qty: 8, thickness_in: 4, rect: {x0: 0, x1: 4, y0: 0, y1: 0, n: [0, -1]}, zone: {edge: 0, s: [0, 4], b: [0.3, 1.5]}}]};
+              const tiles = v3Treatment(p, rm)[0].boxes; if (!tiles.length) return false;
+              return tiles.every(b => { const xs = b.pts.map(q => q[0]); return Math.max(...xs) <= 1.0 + 1e-6 || Math.min(...xs) >= 2.0 - 1e-6; }) && tiles.length < 8; })()"""))
+
+            # ---- Speaker placement in 3D: recommended spots, recorded ones, lines between them; ceiling speakers hang from a soffit
+            check("Placement 3D: speakers, lines and the soffit-aware ceiling", page.evaluate("""(() => {
+              const rm = {length_m: 6, width_m: 4, height_m: 2.4, soffits: [{wall: 0, from_m: 0, length_m: 4, depth_m: 2, bottom_m: 2.0}]};
+              if (Math.abs(RoomView.ceilAt(rm, 2, 1) - 2.0) > 1e-6 || Math.abs(RoomView.ceilAt(rm, 2, 4) - 2.4) > 1e-6) return false;
+              const p = {seat: {x_m: 2, y_m: 4, z_m: 1.05}, speakers: [{id: 'FL', x_m: 0.8, y_m: 0.4, z_m: 1.05, kind: 'bed'}, {id: 'TFL', x_m: 0.8, y_m: 1.2, z_m: 2.0, kind: 'height'}],
+                compare: {speakers: {FL: {actual: {x_m: 1.0, y_m: 0.6, z_m: 1.0}, delta: {status: 'close', dist_m: 0.3}}}}};
+              const pl = v3Placement(p, {speakers: {}}), sc = v3Scene({room: rm, seats: [{x_m: 2, y_m: 4}], subs: {}, furniture: []}, pl.spk, null, pl.lines);
+              const tfl = sc.marks.find(m => m.label === 'TFL'); return pl.lines.length === 3 && pl.spk.length === 3 && !!tfl && Math.abs(tfl.boxes[0].z1 - 2.0) < 1e-6; })()"""))
+
             # ---- Turning the room: Mirror and Undo change the stored room and the form
             before = page.evaluate("S.room.furniture[1].x_m")
             page.click("#roTurn [data-op='cw']")
@@ -145,7 +160,7 @@ def main():
             page.locator("#bkOut [data-bkdel]").first.click()
             check("Backups: Delete removes the row", until(page, "document.querySelectorAll('#bkOut tbody tr').length === 1"))
             check("Backups: the list says what the room holds", "screen" in page.inner_text("#bkOut"))
-            page.locator("#bkCard details summary").click()                  # the options are inside a closed section
+            page.locator("#bkCard details summary").first.click()                  # the options are inside a closed section
             page.uncheck("#bkWeekly"); page.click("#bkSave")
             check("Backups: Save options answers", until(page, "document.querySelector('#bkMsg').textContent === 'Saved.'"))
 
