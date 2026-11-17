@@ -6,7 +6,7 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 root = Path(SPECPATH).parents[1]
-datas = [(str(root / "subtune" / "web"), "subtune/web"),
+datas = [(str(root / "subtune" / "web"), "subtune/web"), (str(root / "subtune" / "hwdb_seed.json"), "subtune"),
          (str(root / "tools" / "minidsp" / "minidsp.exe"), "tools/minidsp"),
          (str(root / "LICENSE.md"), "."), (str(root / "README.md"), "."), (str(root / "VERSION"), ".")]
 datas += collect_data_files("_sounddevice_data")

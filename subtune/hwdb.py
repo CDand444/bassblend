@@ -18,20 +18,24 @@ from __future__ import annotations
 import json
 import re
 import time
+from pathlib import Path
 
 KINDS = ("receivers", "subs", "speakers")
 PROTOCOLS = ("onkyo", "denon", "jbl", "unknown")
 FIELDS = {
     "receivers": {"brand": str, "model": str, "protocol": str, "control_port": int, "channels": str,
                   "sub_outputs": int, "room_correction": str, "notes": str, "source_url": str},
-    "subs": {"brand": str, "model": str, "driver_in": float, "amp_w": float, "f3_hz": float, "design": str,
-             "protect_hz": float, "width_in": float, "height_in": float, "depth_in": float, "controls": str, "notes": str, "source_url": str},
-    "speakers": {"brand": str, "model": str, "kind": str, "sensitivity_db": float, "impedance_ohm": float,
-                 "low_hz": float, "crossover_hz": float, "width_in": float, "height_in": float, "depth_in": float, "notes": str, "source_url": str},
+    "subs": {"brand": str, "model": str, "year": int, "driver_in": float, "amp_w": float, "f3_hz": float, "design": str, "ports": str, "freq_response": str,
+             "protect_hz": float, "width_in": float, "height_in": float, "depth_in": float, "weight_lb": float,
+             "controls": str, "tuning": str, "notes": str, "source_url": str, "manual_url": str},
+    "speakers": {"brand": str, "model": str, "year": int, "kind": str, "sensitivity_db": float, "impedance_ohm": float, "power_w": float,
+                 "low_hz": float, "crossover_hz": float, "freq_response": str, "drivers": str, "width_in": float, "height_in": float, "depth_in": float,
+                 "weight_lb": float, "notes": str, "source_url": str, "manual_url": str},
 }
 RANGES = {"control_port": (1, 65535), "sub_outputs": (0, 4), "driver_in": (4, 24), "amp_w": (0, 10000), "f3_hz": (5, 200),
           "protect_hz": (5, 60), "sensitivity_db": (70, 110), "impedance_ohm": (2, 16), "low_hz": (10, 300),
-          "crossover_hz": (40, 250), "width_in": (1, 120), "height_in": (1, 120), "depth_in": (0, 120)}
+          "crossover_hz": (40, 250), "width_in": (1, 120), "height_in": (1, 120), "depth_in": (0, 120), "year": (2000, 2035),
+          "weight_lb": (0.5, 600), "power_w": (1, 5000)}
 
 
 def _file():
@@ -39,7 +43,27 @@ def _file():
     return DATA / "hwdb.json"
 
 
+def _seed() -> dict:
+    """The starter database that ships with htTamer (hwdb_seed.json: specs read from the makers' own pages, each with its source). Read only."""
+    try:
+        d = json.loads((Path(__file__).with_name("hwdb_seed.json")).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    return {k: {kk: {**v, "who": "seed"} for kk, v in (d.get(k) or {}).items()} for k in KINDS}
+
+
 def load() -> dict:
+    """Everything the database knows: the shipped starter entries, with the owner's and the assistant's own entries winning over them."""
+    try:
+        d = json.loads(_file().read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        d = {}
+    seed = _seed()
+    return {k: {**seed[k], **(d.get(k) or {})} for k in KINDS}
+
+
+def _owner() -> dict:
+    """Only the owner's file (what save and remove write back; the starter entries are never copied into it)."""
     try:
         d = json.loads(_file().read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -105,11 +129,11 @@ def save(kind: str, model: str, data: dict, who="page") -> dict:
         raise ValueError(f"kind must be one of {', '.join(KINDS)}")
     if not key(model):
         raise ValueError("a model name is needed")
-    d = load()
     k = key(model)
-    cur = dict(d[kind].get(k) or {})
+    cur = dict(load()[kind].get(k) or {})                        # a starter entry's fields carry over when the owner edits it
     new = {**cur, **clean(kind, data), "model": cur.get("model") or str(model)[:80], "who": who, "t": time.time()}
     changed = [f for f in FIELDS[kind] if cur.get(f) != new.get(f) and new.get(f) is not None]
+    d = _owner()
     d[kind][k] = new
     _save(d)
     if changed:
@@ -121,7 +145,8 @@ def save(kind: str, model: str, data: dict, who="page") -> dict:
 
 
 def remove(kind: str, model: str) -> bool:
-    d = load()
+    """Remove the owner's own entry (a starter entry can't be removed, only overridden)."""
+    d = _owner()
     if d.get(kind, {}).pop(key(model), None) is None:
         return False
     _save(d)
