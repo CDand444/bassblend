@@ -1714,7 +1714,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, (WEB_DIR / "logo.svg").read_bytes(), "image/svg+xml")
         if u.path == "/api/readiness":                 # what is connected, verified and untested, and whether it is safe to proceed
             from . import readiness
-            return self._send(200, readiness.build(load_state(), load_settings()))
+            s = load_settings()
+            s["cal_ok"] = bool(s.get("cal_file")) and os.path.isfile(str(s["cal_file"]))
+            return self._send(200, readiness.build(load_state(), s))
         if u.path == "/api/results":                   # did the calibration help: before and after, in plain words (reads stored results only)
             from . import results
             return self._send(200, results.build(load_state()))

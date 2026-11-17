@@ -1,6 +1,6 @@
 // htTamer page script: the system readiness panel (Home) and its one-line version on Calibrate.
 // Loaded after results.js; names start with rd. Data from GET /api/readiness (readiness.py). The silent check plays nothing.
-let rdData = null, rdKey = null, rdBusy = false, rdLast = 0, rdOpen = false;
+let rdData = null, rdKey = null, rdBusy = false, rdLast = 0, rdOpen = null;      // rdOpen: whether the owner opened the details (null = the mode's default)
 const RD_WORD = {ok: 'Ready', warn: 'Check', bad: 'Fix', unknown: 'Unknown', todo: 'Not done'};
 const RD_CLS = {ok: 'good', warn: 'meh', bad: 'bad', unknown: 'muted', todo: 'muted'};
 const RD_VERDICT = {ready: ['good', 'Ready'], caution: ['meh', 'Ready, with warnings'], blocked: ['bad', 'Not ready']};
@@ -25,9 +25,11 @@ function rdDraw() {
   box.innerHTML = `<div class="rd-banner ${vc}"><div><b>${esc(vw)}</b> <span>${esc(d.summary)}</span>
       ${d.warnings.length ? `<ul class="rd-warns">${d.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}</div>
       <div class="rd-act"><button type="button" class="btn" id="rdCheck">Run the silent check</button><span class="muted small">Hardware last checked: ${esc(when)}. Plays nothing.</span></div></div>
+    <details class="rd-more" ${(rdOpen === null ? uiMode !== 'basic' : rdOpen) ? 'open' : ''}><summary>Details: what is connected, set up, verified and not yet tested</summary>
     <div class="rd-groups">${d.groups.map(g => `<div class="rd-group"><h3>${esc(g.title)}</h3>${g.items.length ? g.items.map(i => `<div class="rd-item">
         <div class="rd-row">${rdChip(i.status)}<span class="rd-label">${esc(i.label)}</span>${i.when ? `<span class="muted small">${esc(i.when)}</span>` : ''}</div>
-        <div class="muted small">${esc(i.detail)}${i.page ? ` <a href="#/${esc(i.page)}" data-rdpage="${esc(i.page)}">Open</a>` : ''}</div></div>`).join('') : '<p class="muted small">Everything has been run.</p>'}</div>`).join('')}</div>`;
+        <div class="muted small">${esc(i.detail)}${i.page ? ` <a href="#/${esc(i.page)}" data-rdpage="${esc(i.page)}">Open</a>` : ''}</div></div>`).join('') : '<p class="muted small">Everything has been run.</p>'}</div>`).join('')}</div></details>`;
+  const more = box.querySelector('.rd-more'); if (more) more.ontoggle = () => { rdOpen = more.open; };
   const b = $('#rdCheck'); if (b) b.onclick = async () => {
     b.disabled = true; b.textContent = 'Checking…';
     const r = await post('/api/smoke', {}); if (r.error) alert(r.error);

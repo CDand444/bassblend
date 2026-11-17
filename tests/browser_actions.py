@@ -99,6 +99,29 @@ def main():
             page.uncheck("#bkWeekly"); page.click("#bkSave")
             check("Backups: Save options answers", until(page, "document.querySelector('#bkMsg').textContent === 'Saved.'"))
 
+            # ---- Basic and Advanced: the short menu, Show all pages, remembered, and the one-button first calibration
+            page.evaluate("setMode('basic')")
+            page.goto(base + "/#/home")
+            page.wait_for_timeout(600)
+            keys = lambda: page.evaluate("[...document.querySelectorAll('#sideNav button[data-k]')].map(b => b.dataset.k)")
+            check("Basic: the menu is Home, Setup, Calibrate, Results, Compare", keys() == ["home", "setup", "wizard", "results", "ab"], str(keys()))
+            check("Basic: advanced header items are hidden", page.is_hidden("#nightPill") and page.is_hidden("#mapCard"))
+            page.click("#showAll")
+            check("Show all pages switches to Advanced at once", until(page, "document.querySelectorAll('#sideNav button[data-k]').length > 20"))
+            page.click("#uiModeSeg [data-uimode='basic']")
+            page.reload()
+            page.wait_for_timeout(1200)
+            check("The chosen view is remembered after a reload", page.evaluate("uiMode") == "basic")
+            check("Quick start card shows when nothing is calibrated", page.is_visible("#qsCard"))
+            sent = []
+            page.route("**/api/auto/start", lambda r: (sent.append(r.request.post_data), r.fulfill(status=200, content_type="application/json", body="{}")))
+            if page.is_enabled("#qsGo"):
+                page.click("#qsGo")
+                check("Calibrate my subs starts a one-seat auto-tune", until(page, "true") and bool(sent) and '"seats":1' in sent[0], str(sent))
+            else:
+                check("Calibrate my subs is held back until the system is ready", "Not ready" in page.inner_text("#rdOut") or page.is_disabled("#qsGo"))
+            page.click("#uiModeSeg [data-uimode='advanced']")
+
             # ---- Data that changes behind the page's back reaches the page by itself (the page polls)
             page.goto(base + "/#/allspk")
             page.wait_for_timeout(600)

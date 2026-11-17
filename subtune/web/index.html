@@ -120,6 +120,12 @@ main { min-width: 0; padding: 22px 32px 64px; }
 .rd-chip.meh { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 .rd-mini { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid var(--border); border-left-width: 5px; border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; font-size: 13.5px; }
 .rd-mini.good { border-left-color: var(--good); } .rd-mini.meh { border-left-color: var(--warn); } .rd-mini.bad { border-left-color: var(--bad); } .rd-mini span { flex: 1; color: var(--text-2); }
+body[data-mode="basic"] .adv-only { display: none !important; }
+.nav .more { margin: 12px 10px 4px; font-size: 12.5px; color: var(--text-3); } .nav .more button { color: var(--accent); padding: 4px 0; }
+.qs-head { font-size: 15px; margin: 4px 0 8px; } .qs-steps { margin: 0 0 10px; padding-left: 20px; color: var(--text-2); font-size: 14px; }
+.qs-need { display: flex; gap: 16px; flex-wrap: wrap; margin: 0 0 12px; font-size: 13.5px; } .qs-need span { display: inline-flex; gap: 6px; align-items: center; }
+.qs-stages { list-style: none; padding: 0; margin: 8px 0; display: grid; gap: 4px; font-size: 14px; } .qs-stages .running { font-weight: 700; } .qs-stages .done { color: var(--good); }
+.rd-more > summary { cursor: pointer; font-weight: 650; font-size: 13.5px; margin: 14px 0 6px; }
 .rs-head h2 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
 .rs-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; margin-top: 16px; align-items: start; }
 @media (max-width: 900px) { .rs-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -754,12 +760,13 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   <div class="hbar">
     <a class="brand" href="#/home" aria-label="htTamer home"><img src="/logo.svg" alt=""><b><i>ht</i>Tamer</b><span>home theater tuning</span></a>
     <span class="pill"><span class="dot" id="busyDot"></span><span id="busyTxt">Connecting…</span></span>
-    <span class="pill" id="dspPill">DSP: waiting</span>
-    <div class="seg" id="inputSeg" role="radiogroup" aria-label="DSP input" title="What feeds the subs: your AVR (analog) or this PC (USB, used for test sweeps)">
+    <span class="pill adv-only" id="dspPill">DSP: waiting</span>
+    <div class="seg" id="uiModeSeg" role="radiogroup" aria-label="Basic or advanced view" title="Basic shows only setup, calibrate, results and compare. Advanced shows every page."><button type="button" data-uimode="basic">Basic</button><button type="button" data-uimode="advanced">Advanced</button></div>
+    <div class="seg adv-only" id="inputSeg" role="radiogroup" aria-label="DSP input" title="What feeds the subs: your AVR (analog) or this PC (USB, used for test sweeps)">
       <button type="button" data-in="avr">AVR</button><button type="button" data-in="usb">USB</button></div>
     <span class="pill" id="micPill" title="">Mic: …</span>
-    <button type="button" class="pill night-pill" id="nightPill" title="Night mode: cut all bass from the subs" aria-pressed="false">☾ Night</button>
-    <button type="button" class="pill spl-pill" id="splPill" aria-label="Sound level meter">
+    <button type="button" class="pill night-pill adv-only" id="nightPill" title="Night mode: cut all bass from the subs" aria-pressed="false">☾ Night</button>
+    <button type="button" class="pill spl-pill adv-only" id="splPill" aria-label="Sound level meter">
       <span class="dot" aria-hidden="true"></span><span id="splPillTxt">SPL –</span>
       <span class="spl-mini" aria-hidden="true"><i id="splPillBar"></i></span></button>
     <span class="grow"></span>
@@ -778,12 +785,14 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   <nav class="subnav" id="subNav" aria-label="Pages in this section"></nav>
   <div class="view-body" id="viewBody"></div>
   <div class="col" id="homeView">
+    <section class="card" id="qsCard" hidden></section>
+    <section class="card" id="qsDone" hidden></section>
     <section class="card" id="rdCard">
       <div class="card-h"><h2>Is it ready?</h2><span class="sub">what is connected, verified and untested</span></div>
       <div id="rdOut"><p class="muted">Checking…</p></div>
     </section>
     <!-- SYSTEM MAP + HEALTH -->
-    <section class="card" id="mapCard">
+    <section class="card adv-only" id="mapCard">
       <div class="card-h"><h2>Your system</h2><span class="sub" id="mapSub"></span><span class="grow"></span>
         <a class="btn ghost" href="/report" target="_blank" rel="noopener" title="A printable record of the calibration: tune, blend, gain structure, receiver and what's left">Calibration report</a>
         <button class="btn ghost ask" data-ask="Give me a quick health check of my whole system in plain words.">Ask about this</button></div>
@@ -792,7 +801,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     </section>
 
     <!-- FIX LOG: the net effect of every fix since the baseline -->
-    <section class="card" id="fixCard" hidden>
+    <section class="card adv-only" id="fixCard" hidden>
       <div class="card-h"><h2>What htTamer changed</h2><span class="sub" id="fixSub"></span><span class="grow"></span>
         <button class="btn ghost ask" data-ask="Explain what htTamer's fixes changed compared with where I started, and whether I should keep them or undo them.">Ask about this</button></div>
       <div id="fixOut"></div>
@@ -1443,6 +1452,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/channels.js?v=__V__"></script>
 <script src="/js/results.js?v=__V__"></script>
 <script src="/js/readiness.js?v=__V__"></script>
+<script src="/js/quickstart.js?v=__V__"></script>
 <script src="/js/setup-home.js?v=__V__"></script>
 <script src="/js/liveeq.js?v=__V__"></script>
 <script src="/js/nav.js?v=__V__"></script>

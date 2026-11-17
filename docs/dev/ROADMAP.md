@@ -58,6 +58,13 @@ htTamer is strong on subs and the miniDSP. To be an all-around home theater audi
 - Group MCP, Home Assistant, the hardware database and the local AI settings under one "Integrations" page.
 - Don't build our own full-range room correction for the main speakers: Dirac and its peers own that; stay in the lane of subs, system setup and verification.
 
+### F. Owner feedback of Nov 16 (done offline; hardware part open)
+1. Basic / Advanced view: **done** (Basic = Home, Setup, Calibrate, Results, Compare).
+2. One results screen with an honest before and after: **done** (`results.py`).
+3. Validate the whole real-hardware workflow, repeated: **protocol and tools ready** (`HARDWARE_VALIDATION.md`); needs the owner at the room.
+4. System readiness indicator: **done** (`readiness.py`).
+5. First calibration without entering every detail: **done** (Your first calibration, one mic spot).
+
 ### Housekeeping
 - `drag-and-drop-implementation.md` at the repo root is a stray notes file: delete it or move it to `docs/dev/`.
 - Owner infrastructure (not code): reserve a fixed address for the AI desktop in the router; keep its firewall on; create the CPU-only copy of the vision model for photos.

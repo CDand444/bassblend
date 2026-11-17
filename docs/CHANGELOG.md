@@ -1,5 +1,18 @@
 # htTamer changelog
 
+## Nov 16, 2026 (night) - a beginner view, one results screen, readiness
+
+Built and tested offline and in a browser against copies of real results; the real-hardware protocol is in `docs/dev/HARDWARE_VALIDATION.md`.
+
+- **Basic / Advanced**: Basic shows Home, Setup, Calibrate, Results and Compare; everything else is behind "Show all pages". New
+  systems start in Basic, calibrated ones keep Advanced.
+- **Results** (Verify): the response before and after, seat consistency, crossover integration and the listening comparison on one page,
+  with what improved, what did not and what is not measured. Expected numbers are labelled as expected until a verify measures them.
+- **Is it ready?** (Home): connected, set up, verified (with when) and never tested, and a ready / caution / blocked verdict; a hardware
+  check that is old is shown as unknown.
+- **Your first calibration**: one button, one mic spot, no room, speaker or furniture details needed first.
+- `scripts/validation_snapshot.py` snapshots and compares repeated hardware runs against limits.
+
 ## Nov 16, 2026 - room details, backups, receiver setup sheet
 
 Built and tested offline (the offline tests and a headless browser); the receiver setup sheet, a real backup restore and the

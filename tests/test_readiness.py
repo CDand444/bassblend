@@ -51,6 +51,12 @@ def test_blockers():
     assert readiness.build({"smoke": smoke(Mic="fail")}, SETTINGS, NOW)["can_run"]          # a mic that can't be seen isn't proven fatal: caution, not blocked
 
 
+def test_a_calibration_file_that_is_not_there_blocks():
+    r = readiness.build({"smoke": smoke()}, dict(SETTINGS, cal_ok=False), NOW)
+    assert r["verdict"] == "blocked" and item(r, "cal")["status"] == "bad"
+    assert readiness.build({"smoke": smoke()}, dict(SETTINGS, cal_ok=True), NOW)["verdict"] == "ready"
+
+
 def test_standby_receiver_is_fine_but_a_missing_hdmi_is_a_warning():
     r = readiness.build({"smoke": smoke(**{"Pi HDMI": "warn"})}, SETTINGS, NOW)
     st = smoke()

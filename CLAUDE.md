@@ -48,13 +48,17 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     (`secrets_check`). Card Tools -> Backups, `/api/backups`.
   - `channels.py`: the every-channel report and receiver setup sheet from the newest all-speakers check (pure; `/api/channels`,
     `/channels`); a result stores `rx_at_measure` (measured, not current).
+  - `results.py` (Verify > Results: before/after, what improved and what did not, from stored results only), `readiness.py` (Home > Is it
+    ready?: connected/set up/verified/untested + verdict, from the stored silent-check result), `js/results.js`, `js/readiness.js`,
+    `js/quickstart.js` (first calibration in one button). Basic/Advanced lives in `js/nav.js` (`uiMode`, `BASIC_KEYS`; `.adv-only` hides things in Basic).
+    Hardware validation protocol: `docs/dev/HARDWARE_VALIDATION.md` + `scripts/validation_snapshot.py`.
   - `screen.py`: the TV or projector screen on the front wall (size, AT or not, speakers behind it); drawn on the plan and in 3D,
     adds viewing-angle and AT notes to the treatment plan. `furniture.py`, `soffit.py`: couches/risers and soffits on the Room page.
   - `limiter.py`, `gaincheck.py`, `report.py` (/report), drift in `measure.py`, LFE check in `allspk.py`.
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
-- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 13 parts, loaded in order as
+- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 16 parts, loaded in order as
   classic scripts sharing globals: core, tune, room-ai, furniture, soffit, screen, backup, receiver, measure, channels, setup-home, liveeq, nav; plus
   `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
   `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`.

@@ -116,23 +116,47 @@ MENU.forEach(m => { const r = RISKY[m.key]; if (!r || !m.el || m.el.querySelecto
 MENU.filter(m => m.beta).forEach(m => { const h = m.el.querySelector('h2'); if (h && !h.querySelector('.beta')) h.insertAdjacentHTML('beforeend', ' <span class="beta" title="New, or not yet proven on every system">Beta</span>'); });
 MENU.forEach(m => { if (m.key !== 'home') homeOf(m).appendChild(m.el); });   // pages wait off-screen until opened
 $('#wizTune').appendChild($('#tuneCard'));                    // auto-tune lives in wizard step 2
+// ---------- Basic and Advanced: Basic shows only setup, calibrate, results and compare; every page is still one click away
+const BASIC_KEYS = ['home', 'setup', 'wizard', 'results', 'ab'];
+const BASIC_LABEL = {home: 'Home', setup: 'Setup', wizard: 'Calibrate', results: 'Results', ab: 'Compare'};
+let uiMode = null;
+try { uiMode = localStorage.getItem('httamer-mode'); } catch (e) { /* private window */ }
+if (uiMode !== 'basic' && uiMode !== 'advanced') uiMode = null;
+if (uiMode) document.body.dataset.mode = uiMode;                           // decided once the first state arrives: new systems start Basic, calibrated ones keep Advanced
+function setMode(m, remember = true) {
+  uiMode = m; document.body.dataset.mode = m;
+  if (remember) { try { localStorage.setItem('httamer-mode', m); } catch (e) { /* ignore */ } }
+  const ae = document.activeElement; if (ae && $('#sideNav').contains(ae)) ae.blur();           // the menu is rebuilt, so it must not be held by the focus
+  document.querySelectorAll('#uiModeSeg button').forEach(b => { b.classList.toggle('on', b.dataset.uimode === m); b.setAttribute('aria-checked', String(b.dataset.uimode === m)); });
+  renderMenu();
+}
+const menuVisible = m => uiMode !== 'basic' || BASIC_KEYS.includes(m.key) || m.key === sheetKey;
+const menuTitle = m => uiMode === 'basic' && BASIC_LABEL[m.key] ? BASIC_LABEL[m.key] : m.title;
 let sheetKey = 'home', lastInSection = {};
 try { lastInSection = JSON.parse(localStorage.getItem('httamer-last') || '{}') || {}; } catch (e) {}
 const safeTag = m => { try { return m.tag(); } catch (e) { return null; } };
 const navBtn = (m, cls = '') => { const t = safeTag(m);
-  return `<button type="button" data-k="${m.key}" class="${cls}${m.key === sheetKey ? ' on' : ''}" ${m.key === sheetKey ? 'aria-current="page"' : ''} title="${esc(m.full)}">${icon(m.icon)}<span class="lbl">${esc(m.title)}</span>${m.beta ? '<span class="beta" title="New, or not yet proven on every system">Beta</span>' : ''}${t ? `<span class="tag ${t[1]}">${esc(t[0])}</span>` : ''}</button>`; };
+  return `<button type="button" data-k="${m.key}" class="${cls}${m.key === sheetKey ? ' on' : ''}" ${m.key === sheetKey ? 'aria-current="page"' : ''} title="${esc(m.full)}">${icon(m.icon)}<span class="lbl">${esc(menuTitle(m))}</span>${m.beta && uiMode !== 'basic' ? '<span class="beta" title="New, or not yet proven on every system">Beta</span>' : ''}${t ? `<span class="tag ${t[1]}">${esc(t[0])}</span>` : ''}</button>`; };
 function renderMenu() {
   const cur = MENU.find(x => x.key === sheetKey) || MENU[0];
   // side bar: every page, grouped by section
   let h = '', grp = '';
-  MENU.forEach(m => {
+  MENU.filter(menuVisible).forEach(m => {
     if (m.key === 'home') { h += navBtn(m, 'home'); return; }
-    if (m.grp !== grp) { grp = m.grp; h += `<div class="grp">${grp}</div>`; }
+    if (uiMode !== 'basic' && m.grp !== grp) { grp = m.grp; h += `<div class="grp">${grp}</div>`; }
     h += navBtn(m);
   });
+  if (uiMode === 'basic') h += `<div class="more"><button type="button" id="showAll" class="linkbtn">Show all pages</button></div>`;
   if ((S.net || {}).signed_in) h += `<div class="grp">Account</div><button type="button" id="signOut" title="Sign out of htTamer on this device">${icon('chat').replace(/<path[^>]*>/, '<path d="M6 3H3v10h3M10 5l3 3-3 3M13 8H6"/>')}<span class="lbl">Sign out</span></button>`;
   if (!$('#sideNav').contains(document.activeElement)) $('#sideNav').innerHTML = h;
   // phone: the five sections along the bottom, this section's pages as pills
+  if (uiMode === 'basic') {                                   // Basic: one tab per step
+    $('#tabBar').innerHTML = BASIC_KEYS.map(k => { const m = MENU.find(x => x.key === k);
+      return `<button type="button" data-k="${k}" class="${sheetKey === k ? 'on' : ''}" ${sheetKey === k ? 'aria-current="true"' : ''}>${icon(m.icon)}<span>${esc(menuTitle(m))}</span></button>`; }).join('');
+    $('#subNav').hidden = true; $('#subNav').dataset.k = '';
+    const so = $('#signOut'); if (so) so.onclick = async () => { await post('/api/logout'); location.href = '/login'; };
+    return;
+  }
   $('#tabBar').innerHTML = SECTIONS.map(sec => {
     const alert = MENU.some(m => m.grp === sec.grp && (safeTag(m) || [])[1] === 'alert');
     return `<button type="button" data-sec="${sec.grp}" class="${cur.grp === sec.grp ? 'on' : ''}" ${cur.grp === sec.grp ? 'aria-current="true"' : ''}>${icon(sec.icon)}<span>${sec.grp}</span>${alert ? '<i class="bdg" aria-label="needs attention"></i>' : ''}</button>`; }).join('');
@@ -147,7 +171,9 @@ function renderMenu() {
   const so = $('#signOut'); if (so) so.onclick = async () => { await post('/api/logout'); location.href = '/login'; };
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest('#sideNav button[data-k], #subNav button[data-k]'); if (b) { openSheet(b.dataset.k); return; }
+  const b = e.target.closest('#sideNav button[data-k], #subNav button[data-k], #tabBar button[data-k]'); if (b) { openSheet(b.dataset.k); return; }
+  if (e.target.closest('#showAll')) { setMode('advanced'); return; }
+  const mb = e.target.closest('#uiModeSeg button[data-uimode]'); if (mb) { setMode(mb.dataset.uimode); return; }
   const t = e.target.closest('#tabBar button[data-sec]'); if (t) {
     const sec = SECTIONS.find(x => x.grp === t.dataset.sec), cur = MENU.find(x => x.key === sheetKey) || MENU[0];
     openSheet(cur.grp === sec.grp ? sec.first : (lastInSection[sec.grp] || sec.first));
@@ -164,7 +190,7 @@ function openSheet(key, fromHash = false) {
   $('#homeView').hidden = m.key !== 'home';
   if (m.key !== 'home' && !$('#viewBody').contains(m.el)) { $('#viewBody').innerHTML = ''; $('#viewBody').appendChild(m.el); }
   if (m.key === 'home') $('#viewBody').innerHTML = '';
-  $('#viewTitle').innerHTML = esc(m.key === 'home' ? 'Home' : (m.full || m.title)) + (m.beta ? ' <span class="beta" title="New, or not yet proven on every system">Beta</span>' : '');
+  $('#viewTitle').innerHTML = esc(m.key === 'home' ? 'Home' : (uiMode === 'basic' && BASIC_LABEL[m.key] ? BASIC_LABEL[m.key] : (m.full || m.title))) + (m.beta ? ' <span class="beta" title="New, or not yet proven on every system">Beta</span>' : '');
   $('#viewCrumb').textContent = m.key === 'home' ? '' : m.grp;
   document.title = m.key === 'home' ? 'htTamer' : `${m.title} · htTamer`;
   if (m.key === 'activity') { seenErrors = Date.now() / 1000; try { localStorage.setItem('subtune-seen-errors', String(seenErrors)); } catch (e) {} }
@@ -212,7 +238,7 @@ function safe(name, fn) {
 let polling = false;
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
-  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'receiver.js': 'renderBlend',
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
                 'measure.js': 'renderDeep', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {
@@ -273,13 +299,14 @@ async function poll() {
   }
   try {
     S = st;
+    if (uiMode === null) setMode((S.result || {}).tune_id ? 'advanced' : 'basic', false);       // a system that has been calibrated keeps the full view
     safe('terms', () => renderTerms());
     safe('night', () => renderNight());
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; safe('activity', renderLog); }
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
-      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness};
+      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness, renderQuickStart};
     for (const [n, f] of Object.entries(parts)) safe(n, () => f());
     safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }

@@ -57,8 +57,9 @@ def build(st: dict, settings: dict, now: float | None = None) -> dict:
         connected.append(_item("Storage", "Storage", SMOKE_STATUS.get(st_c["status"], "warn"), st_c["detail"], smoke.get("t"), now))
 
     # ---- set up: what a first calibration needs (and what it does not)
-    setup.append(_item("cal", "Mic calibration file", "ok" if s.get("cal_file") else "bad",
-                       "loaded" if s.get("cal_file") else "add your UMIK-1's calibration file: without it the measurements are wrong", page="wizard", blocks=True))
+    cal = bool(s.get("cal_file")) and s.get("cal_ok") is not False          # cal_ok: the file is really there (the server checks)
+    setup.append(_item("cal", "Mic calibration file", "ok" if cal else "bad",
+                       "loaded" if cal else "add your UMIK-1's calibration file: without it the measurements are wrong", page="wizard", blocks=True))
     subs = s.get("subs") or []
     setup.append(_item("subs", "Subwoofer outputs", "ok" if subs else "bad",
                        f"{len(subs)} sub output{'s' if len(subs) != 1 else ''} chosen" if subs else "choose which miniDSP outputs drive subs", page="subs", blocks=True))
@@ -120,7 +121,7 @@ def build(st: dict, settings: dict, now: float | None = None) -> dict:
     elif warns:
         verdict, summary = "caution", "Ready to go, with things to know. Nothing plays until you press the button."
     else:
-        verdict, summary = "ready", "Ready. The calibration plays sweeps through your subs only after you press the button, and puts the receiver back afterwards."
+        verdict, summary = "ready", "Nothing is in the way. The calibration plays sweeps through your subs only after you press the button, and puts the receiver back afterwards."
     return {"t": now, "verdict": verdict, "summary": summary, "warnings": warns, "can_run": not blockers, "checked": smoke.get("t"), "fresh": fresh,
             "groups": [{"id": "connected", "title": "Connected", "items": connected}, {"id": "setup", "title": "Set up", "items": setup},
                        {"id": "verified", "title": "Verified on this system", "items": verified}, {"id": "untested", "title": "Not tested yet", "items": untested}]}
