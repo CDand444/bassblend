@@ -13,6 +13,7 @@
   <a href="#m-measure">Other tests</a>
   <a href="#m-views">Basic and Advanced</a>
   <a href="#m-results">Results and readiness</a>
+  <a href="#m-open">Rooms that aren't enclosed</a>
   <a href="#m-screen">Screen</a>
   <a href="#m-furniture">Furniture</a>
   <a href="#m-channels">Receiver setup sheet</a>
@@ -196,6 +197,14 @@
 <h2 id="m-results">Results and readiness</h2>
 <p><b>Verify → Results</b> puts the answer to "did it help?" on one page: the bass at the main seat before and after (measured when you have verified the tune, otherwise labelled as what the tune expects), how alike the seats sound, how well the subs blend with the speakers at the crossover, and whether you compared by ear. It lists <b>what improved</b>, <b>what did not improve</b> and <b>what has not been measured yet</b>: nothing is hidden when it did not improve. A blend result only counts when it was measured for the tune that is playing now.</p>
 <p><b>Home → Is it ready?</b> shows what is connected (from the silent hardware check, with how long ago, and as <i>Unknown</i> when that check is old), what is set up, what has been verified on this system and when, and what has never been run. The verdict is <b>Ready</b>, <b>Ready, with warnings</b> or <b>Not ready</b> (a missing mic calibration file, no sub outputs, or a miniDSP that does not answer). <b>Run the silent check</b> plays nothing.</p>
+
+<h2 id="m-open">Rooms that aren't enclosed</h2>
+<p>A living room, or a room with a large opening, isn't a closed box, and that changes what htTamer can predict. In <b>Room</b>, the shape block has an <b>Enclosure</b> setting: <b>Closed</b> (walls all around), <b>A large opening</b> (the walls mostly stand), or <b>Open plan</b> (a whole side is open to another space). For the last two, <b>Whole side open</b> ticks the sides that have no wall, and <b>Openings</b> below sets the width of a smaller opening. It uses the same openings as a doorway or arch, so the plan, the 3D view and the treatment plan all follow.</p>
+<ul>
+  <li><b>Room modes</b> are then a rough guide: bass escapes into the open space, so the room reinforces it less (your subs may need more output than in a closed room) and the real peaks and dips are usually smaller and in different places. The measurements are the answer.</li>
+  <li><b>Treatment</b>: there is no wall to treat on an open side, bass traps help less, and the plan says to put absorption where walls exist (the side walls' first reflections, behind the screen).</li>
+  <li>The assistant and the phone room builder know about it too: tell them the room opens into the kitchen and they record it as an opening.</li>
+</ul>
 
 <h2 id="m-screen">Screen</h2>
 <p>In <b>Room</b>, under <b>Screen</b>, describe what is on the front wall: a <b>TV</b> or a <b>projector screen</b>. Give its diagonal size in inches and its shape (16:9, 2.35:1 and so on); htTamer works out the width and height. Then set where its lower edge is above the floor, how far its face stands in front of the wall, and where its middle is along the wall (leave it blank to center it). The plan and the 3D view draw it to scale.</p>

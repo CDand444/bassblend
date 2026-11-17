@@ -224,6 +224,12 @@ def update_system(patch: dict, who="page") -> dict:
     return {"system": sy, "changed": changed}
 
 
+def _enclosure(r: dict) -> dict:
+    from . import shape
+    o = shape.openness(r.get("room") or {})
+    return {"level": o["level"], "open_sides": o["open_sides"], "open_ft": round(o["open_m"] / FT, 1)}
+
+
 def summary() -> dict:
     """All equipment, for the assistant: layout, every channel's speaker (or what's missing), subs, room."""
     from . import dirac
@@ -240,7 +246,7 @@ def summary() -> dict:
             "speakers": [{"channel": c, "name": nm.get(c, c), **(spk.get(c) or {})} for c in chans],
             "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
             "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},
-            "room": r.get("room"), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"),
+            "room": r.get("room"), "enclosure": _enclosure(r), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"),
             "receiver": r.get("avr"), "goals": r.get("goals")}
 
 

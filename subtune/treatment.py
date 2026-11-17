@@ -717,6 +717,9 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     if shape.open_width(rm):
         notes.append("Corners where the room opens to another space aren't real corners, so they get no trap; the "
                      "opening already lets some bass out.")
+    if shape.openness(rm)["level"] == "open":
+        notes.append("Open plan: bass traps help less here because much of the bass leaves through the open side. Put absorption "
+                     "where there is a wall (the side walls' first reflections, behind the screen); the open side can't be treated.")
     # rear wall: the wall straight behind the seats (none when the room opens up behind them)
     hits = [(s, _behind(room, s)) for s in seats]
     hits = [(s, h) for s, h in hits if h]

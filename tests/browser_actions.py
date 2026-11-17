@@ -71,6 +71,15 @@ def main():
             check("3D view opens with the room", page.locator("#plan3dBox").is_visible())
             page.click("#planView [data-pv='2d']")
 
+            # ---- Enclosure: open plan opens a whole side, and the page and the saved room agree
+            page.select_option("#enLevel", "open")
+            check("Enclosure: Open plan opens a whole side", until(page, "roomShape.wall_openings.some(o => o.kind === 'opening') && document.querySelectorAll('[data-enwall]:checked').length === 1"))
+            page.click("#roomSave")
+            check("Enclosure: it is saved with the room", until(page, "S.room.room.wall_openings.some(o => o.kind === 'opening')"))
+            page.select_option("#enLevel", "closed")
+            check("Enclosure: Closed removes the openings", until(page, "roomShape.wall_openings.filter(o => o.kind === 'opening').length === 0"))
+            page.click("#roomSave")
+
             # ---- Turning the room: Mirror and Undo change the stored room and the form
             before = page.evaluate("S.room.furniture[1].x_m")
             page.click("#roTurn [data-op='cw']")

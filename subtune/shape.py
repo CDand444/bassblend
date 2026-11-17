@@ -303,6 +303,30 @@ def open_width(rm: dict) -> float:
     return sum(o["width_m"] for o in openings(rm) if o["kind"] == "opening")
 
 
+OPEN_WALL_FRAC = 0.9          # an opening this much of a wall's length counts as that wall being open
+OPEN_PLAN_FRAC = 0.25         # or openings this much of the whole perimeter
+
+
+def openness(rm: dict) -> dict:
+    """How enclosed the room is, from its openings to other spaces (kind "opening"; doors and windows are walls):
+    level "closed" (none), "partial" (a large opening, but the walls mostly stand) or "open" (open plan: a whole wall is open,
+    or the openings add up to a quarter of the perimeter). Also which walls are open and how much of the perimeter is."""
+    es = edges(rm)
+    if not es:
+        return {"level": "closed", "open_m": 0.0, "perimeter_m": None, "fraction": 0.0, "open_walls": [], "open_sides": []}
+    per = sum(e["len"] for e in es)
+    open_m, walls = 0.0, []
+    for e in es:
+        w = sum(o["width_m"] for o in e["openings"] if o["kind"] == "opening")
+        open_m += w
+        if w >= OPEN_WALL_FRAC * e["len"]:
+            walls.append(e["i"])
+    frac = open_m / per if per else 0.0
+    level = "closed" if open_m <= 0 else "open" if (walls or frac >= OPEN_PLAN_FRAC) else "partial"
+    sides = sorted({es[i]["side"] for i in walls})
+    return {"level": level, "open_m": round(open_m, 2), "perimeter_m": round(per, 2), "fraction": round(frac, 2), "open_walls": walls, "open_sides": sides}
+
+
 # ------------------------------------------------------------------ ceiling
 def ceiling(rm: dict) -> dict:
     c = dict((rm or {}).get("ceiling") or {})

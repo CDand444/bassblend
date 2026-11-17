@@ -174,6 +174,7 @@ network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 the room and the main seat (feet from the left and front walls, height; azimuth for bed speakers, elevation for \
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
+- Open rooms: a room that isn't enclosed (an open-plan living room, a large opening) is recorded as wall_openings of kind "opening": a whole wall open is an opening as wide as that wall (from_ft 0, width_ft = the wall's length). get_equipment shows enclosure (closed, partial or open, and which sides). In an open plan room treat the calculated room modes as a rough guide, expect the subs to need more output, and rely on measurements.
 - Screen, furniture and soffits: update_room also records the screen on the front wall (TV or projector screen: size, aspect, \
 acoustically transparent or not, speakers behind it), the couches and risers, and soffits (bulkheads) along the walls. They \
 add viewing-angle, ring-time and ceiling notes to the treatment plan; a TV cannot be acoustically transparent. get_equipment \

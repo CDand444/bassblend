@@ -289,6 +289,7 @@ function renderShapeEditor() {
     <div class="crow muted small" aria-hidden="true"><span>#</span><span>From left</span><span>From front</span><span></span></div>
     ${pts.map((p, i) => `<div class="crow"><b>${i + 1}</b>${ftIn(`data-cx="${i}" aria-label="Corner ${i + 1} from left"`, p[0])}${ftIn(`data-cy="${i}" aria-label="Corner ${i + 1} from front"`, p[1])}
       <button type="button" class="btn icon ghost" data-cdel="${i}" aria-label="Remove corner ${i + 1}" ${pts.length <= 3 ? 'disabled' : ''}>${icon('x')}</button></div>`).join('')}</details>`;
+  h += enEditorHtml(sh, es);
   h += `<details ${ops.length ? 'open' : ''}><summary>Openings, doors and windows (${ops.length})</summary>
     <p class="muted small" style="margin:6px 0">An opening to another room or an open-plan space has no wall: no reflection, no panel, no corner trap there. Distance is along the wall from its first corner (the corner with the same number). Leave the height empty for floor to ceiling.</p>
     ${ops.map((o, j) => `<div class="orow">

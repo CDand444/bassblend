@@ -240,7 +240,7 @@ function safe(name, fn) {
 let polling = false;
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
-  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'enclosure.js': 'enEditorHtml', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
                 'measure.js': 'renderDeep', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {

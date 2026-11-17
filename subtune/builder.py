@@ -198,6 +198,8 @@ length_ft across the room, depth_ft, height_ft (a riser's height; 0 for couches)
 0 the back wall, 90 the left wall, 180 the screen, 270 the right wall); [] when none are visible. Do not guess at \
 furniture you cannot see.
 
+An open-plan room (a living room that runs into a kitchen or hall, a side with no wall): record each open side as an opening of kind "opening" as wide as that wall (from_ft 0, width_ft = its length, height_ft 0), not as a shorter room, and say so in the summary. A doorway or large archway is an opening of its real width.
+
 Rules: the owner's typed measurements and notes are authoritative; use the photos for the shape, the openings and \
 the ceiling, and estimate sizes in photos from known objects (doors about 6 ft 8 in high and 2.5-3 ft wide, \
 outlets 1 ft up, ceilings usually 8 ft) only when nothing was measured. Never invent precision: round to 0.5 ft \

@@ -308,5 +308,9 @@ def _irregular_notes(rm, box, axial, irregular, sloped, fmax) -> dict:
     if ow:
         notes.append(f"Openings to other spaces ({ow / FT:.1f} ft in all) let bass leak out: modes along that direction are "
                      "usually weaker and a little lower than calculated, and the space next door joins in.")
+    if shape.openness(rm)["level"] == "open":
+        notes.append("Your room is open plan: treat the calculated modes as a rough guide only. Bass escapes into the open space, so the "
+                     "room reinforces it less (the subs may need more output than in a closed room) and the real peaks and dips are "
+                     "usually smaller and in different places. Measure it; the measurements are the answer.")
     out["notes"] = notes
     return out
