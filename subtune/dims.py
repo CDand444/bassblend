@@ -119,3 +119,51 @@ def aim_notes(room: dict) -> list[str]:
         else:
             out.append(f"Sub {int(k) + 1} points at the {h['wall']}, {ft:.1f} ft away.")
     return out
+
+
+# ---------------------------------------------------------------- where a speaker points, in 3D
+def speaker_aim(ch: str, rec: dict | None, pos: tuple, seat: tuple | None, height: float) -> dict:
+    """Which way a speaker points: {mode, vector (unit x, y, z), az_deg (aim convention: 0 = back wall, 90 = left, 180 = the screen, 270 = right), tilt_deg (+ up),
+    off_seat_deg (how far the aim is from the direction to the seat)}. A blank mode is chosen by kind: in-ceiling points straight down, atmos modules fire up at the
+    ceiling spot whose bounce reaches the seat, everything else points at the seat. The same rules as v3Aim3 in view3d.js."""
+    rec = rec or {}
+    x, y, z = pos
+    to = (seat[0] - x, seat[1] - y, seat[2] - z) if seat else (0.0, 1.0, 0.0)
+    mode = rec.get("aim_mode") or ("custom" if rec.get("aim_deg") not in (None, "") else
+                                   "down" if rec.get("kind") == "in-ceiling" else "up_bounce" if rec.get("kind") == "atmos module" else "seat")
+    if mode == "down":
+        v = (0.0, 0.0, -1.0)
+    elif mode == "up_bounce" and seat:
+        v = (seat[0] - x, seat[1] - y, (2 * height - seat[2]) - z)               # the seat's mirror image in the ceiling
+    elif mode == "custom":
+        flat = math.hypot(to[0], to[1]) or 1.0
+        if rec.get("aim_deg") not in (None, ""):
+            a = math.radians(float(rec["aim_deg"]))
+            hx, hy = -math.sin(a), math.cos(a)
+        else:
+            hx, hy = to[0] / flat, to[1] / flat
+        t = math.radians(float(rec["tilt_deg"])) if rec.get("tilt_deg") not in (None, "") else math.atan2(to[2], flat)
+        v = (hx * math.cos(t), hy * math.cos(t), math.sin(t))
+    else:
+        v = to
+    n = math.sqrt(sum(c * c for c in v)) or 1.0
+    v = tuple(round(c / n, 4) for c in v)
+    tn = math.sqrt(sum(c * c for c in to)) or 1.0
+    off = math.degrees(math.acos(max(-1.0, min(1.0, sum(a * b for a, b in zip(v, to)) / tn))))
+    az = math.degrees(math.atan2(-v[0], v[1])) % 360
+    return {"mode": mode, "vector": list(v), "az_deg": round(az, 1), "tilt_deg": round(math.degrees(math.asin(max(-1.0, min(1.0, v[2])))), 1), "off_seat_deg": round(off, 1)}
+
+
+def aims(room: dict) -> dict:
+    """Every recorded speaker's aim, for the assistant: {channel: speaker_aim(...)}; needs the speaker's position, a seat helps."""
+    seat0 = next((s for s in room.get("seats") or [] if s.get("x_m") is not None and s.get("y_m") is not None), None)
+    seat = (seat0["x_m"], seat0["y_m"], seat0.get("z_m") or 1.05) if seat0 else None
+    h = (room.get("room") or {}).get("height_m") or 2.4
+    out = {}
+    for ch, d in (room.get("speakers") or {}).items():
+        if d.get("x_m") is None or d.get("y_m") is None:
+            continue
+        z = d.get("z_m")
+        z = z if z is not None else (h - 0.1 if str(ch).startswith("T") else 1.1)
+        out[ch] = speaker_aim(ch, d, (d["x_m"], d["y_m"], z), seat, h)
+    return out

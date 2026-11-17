@@ -141,15 +141,24 @@ async function spkDbLoad() {                          // the hardware database's
 const SPK_KINDS = ['', 'tower', 'bookshelf', 'centre', 'on-wall', 'in-wall', 'in-ceiling', 'atmos module', 'satellite', 'other'];
 const ftOf = m => m == null ? '' : (m / 0.3048).toFixed(1);
 // where a speaker is as seen from the main seat: distance, left or right of straight ahead, up from ear height; against Dolby's range for that channel; and how far off the seat it faces
+const SPK_AIMS = [['', 'Auto'], ['seat', 'At the main seat'], ['down', 'Straight down'], ['up_bounce', 'Up, bouncing off the ceiling to the seat'], ['custom', 'Custom angles']];
+function spkAimOptions(r) { const cur = r.aim_mode || (r.aim_deg != null ? 'custom' : ''); return SPK_AIMS.map(([v, n]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${n}</option>`).join(''); }
+document.addEventListener('change', e => {            // choosing Custom opens Faces and Tilt filled in with the aim it has now; any other choice clears them
+  const sel = e.target.closest('select[data-f="aim_mode"]'); if (!sel) return; const row = sel.closest('.spkrow'), box = row.querySelector('.spk-custom'), g = spkGeom(row);
+  const f = n => row.querySelector(`[data-f="${n}"]`);
+  if (sel.value === 'custom') { box.hidden = false; if (g && g.aim) { f('aim_deg').value = Math.round(g.aim.az / 5) * 5 % 360; f('tilt_deg').value = Math.round(g.aim.tilt / 5) * 5; } }
+  else { box.hidden = true; f('aim_deg').value = ''; f('tilt_deg').value = ''; }
+  spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; spkAngles(row);
+});
 function spkSeat() { const st = ((S.room || {}).seats || []).find(x => x.x_m != null && x.y_m != null); return st ? {x: st.x_m, y: st.y_m, z: st.z_m || 1.05, name: st.name || 'the main seat'} : null; }
 function spkGeom(row) {                                  // the numbers for one speaker row, from what is typed in it (null until it has a position)
   const seat = spkSeat(), v = f => { const i = row.querySelector(`[data-f="${f}"]`); return i && i.value !== '' ? +i.value : null; }, x = v('x_ft'), y = v('y_ft'), z = v('z_ft');
   if (!seat || x == null || y == null) return null;
   const dx = x * 0.3048 - seat.x, dy = y * 0.3048 - seat.y, dz = z == null ? null : z * 0.3048 - seat.z, flat = Math.hypot(dx, dy);
   const az = Math.round(Math.atan2(dx, -dy) * 180 / Math.PI), el = dz == null ? null : Math.round(Math.atan2(dz, flat) * 180 / Math.PI), dist = Math.hypot(flat, dz || 0);
-  const aim = v('aim_deg');
-  let off = null; if (aim != null) { const a = aim * Math.PI / 180, fx = -Math.sin(a), fy = Math.cos(a), sx = -dx / (flat || 1), sy = -dy / (flat || 1); off = Math.round(Math.acos(Math.max(-1, Math.min(1, fx * sx + fy * sy))) * 180 / Math.PI); }
-  return {az, el, dist, off, seat};
+  const sv = f => { const i = row.querySelector(`[data-f="${f}"]`); return i ? i.value : ''; }, H = ((S.room || {}).room || {}).height_m || 2.4, ch = row.dataset.ch || '';
+  const pos = {x: x * 0.3048, y: y * 0.3048, z: z == null ? (ch.startsWith('T') ? H - 0.1 : 1.1) : z * 0.3048}, a3 = v3Aim3(ch, {kind: sv('kind'), aim_mode: sv('aim_mode'), aim_deg: v('aim_deg'), tilt_deg: v('tilt_deg')}, pos, {x: seat.x, y: seat.y, z: seat.z}, H);
+  return {az, el, dist, off: Math.round(a3.off), aim: a3, seat};
 }
 function spkAngles(row) {
   const el = row.querySelector('.spk-ang'); if (!el) return; const g = spkGeom(row), ch = row.dataset.ch;
@@ -161,7 +170,7 @@ function spkAngles(row) {
     if (val != null) { const d = val < lo ? lo - val : val > hi ? val - hi : 0; verdict = d === 0 ? 'inside Dolby’s range' : d <= 5 ? `${d}° outside Dolby’s range` : `${d}° outside Dolby’s range`; cls = d === 0 ? 'ok' : d <= 5 ? 'close' : 'off'; verdict += ` (${lo}–${hi}°)`; }
   }
   const side = g.az === 0 ? 'straight ahead' : `${Math.abs(g.az)}° ${g.az < 0 ? 'left' : 'right'}`;
-  el.innerHTML = `<span class="chip">${side}</span><span class="chip">${g.el == null ? 'height not set' : g.el === 0 ? 'at ear height' : `${Math.abs(g.el)}° ${g.el > 0 ? 'above' : 'below'} ear height`}</span><span class="chip">${fmtFt(g.dist)} away</span>${g.off != null ? `<span class="chip">faces ${g.off}° off the seat</span>` : ''}${verdict ? `<span class="chip spk-${cls}">${esc(verdict)}</span>` : ''}`;
+  el.innerHTML = `<span class="chip">${side}</span><span class="chip">${g.el == null ? 'height not set' : g.el === 0 ? 'at ear height' : `${Math.abs(g.el)}° ${g.el > 0 ? 'above' : 'below'} ear height`}</span><span class="chip">${fmtFt(g.dist)} away</span>${g.aim ? `<span class="chip" title="Where it points: ${esc(g.aim.mode.replace('_', ' '))}">${g.off < 2 ? 'aimed at the seat' : `aimed ${g.off}° off the seat`}${Math.abs(g.aim.tilt) >= 3 ? `, ${Math.abs(Math.round(g.aim.tilt))}° ${g.aim.tilt < 0 ? 'down' : 'up'}` : ''}</span>` : ''}${verdict ? `<span class="chip spk-${cls}">${esc(verdict)}</span>` : ''}`;
 }
 const spkInDb = m => !!m && (SPK_DB || []).some(e => e.model.toLowerCase() === String(m).toLowerCase());
 function spkModelOptions(cur) {
@@ -200,7 +209,10 @@ function renderSpeakers() {
         <label class="f">Receiver size<select data-f="size">${opt(['', 'small', 'large'], r.size)}</select></label>
         ${unit('crossover_hz', 'Crossover', r.crossover_hz ?? '', 'Hz', '10')}
         ${unit('x_ft', 'From left', ftOf(r.x_m), 'ft')}${unit('y_ft', 'From front', ftOf(r.y_m), 'ft')}${unit('z_ft', 'Height', ftOf(r.z_m), 'ft')}
-        <label class="f">Faces<span class="unit" data-u="°"><input data-f="aim_deg" type="number" step="5" min="0" max="359" value="${r.aim_deg ?? ''}" placeholder="the seat" title="Degrees clockwise on the plan: 0 = the back wall, 90 = the left wall, 180 = the screen, 270 = the right wall. Blank = aimed at the main seat."></span></label>
+        <label class="f">Aimed<select data-f="aim_mode" title="Where the speaker points. Auto: in-ceiling speakers point straight down, atmos modules fire up at the ceiling spot whose bounce reaches the seat, everything else points at the seat.">${spkAimOptions(r)}</select></label>
+        <span class="spk-custom" ${r.aim_mode === 'custom' || (!r.aim_mode && r.aim_deg != null) ? '' : 'hidden'} style="display:contents">
+          <label class="f">Faces<span class="unit" data-u="°"><input data-f="aim_deg" type="number" step="5" min="0" max="359" value="${r.aim_deg ?? ''}" placeholder="the seat" title="Compass on the plan: 0 = the back wall, 90 = the left wall, 180 = the screen, 270 = the right wall. Blank = toward the main seat."></span></label>
+          <label class="f">Tilt<span class="unit" data-u="°"><input data-f="tilt_deg" type="number" step="5" min="-90" max="90" value="${r.tilt_deg ?? ''}" placeholder="to the seat" title="0 = level, + up, - down. Blank = toward the main seat."></span></label></span>
         ${unit('rx_distance_ft', 'Receiver distance', ftOf(r.rx_distance_m), 'ft')}${unit('rx_level_db', 'Receiver level', r.rx_level_db ?? '', 'dB', '0.5')}
         <label class="f spk-size">Size (in) W × H × D<span class="row" style="gap:4px;flex-wrap:nowrap"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${r.width_in ?? ''}" placeholder="W" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${r.height_in ?? ''}" placeholder="H" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${r.depth_in ?? ''}" placeholder="D" aria-label="Depth in inches"><button type="button" class="btn ghost hwsize" data-kind="speakers" style="height:32px;padding:0 8px;white-space:nowrap" title="Remember this size for this model">Remember</button></span>${(((S.hw_sizes || {}).speakers || {})[c.ch] || {}).source && !r.width_in ? `<small class="muted">Using a ${esc(S.hw_sizes.speakers[c.ch].source)} size.</small>` : ''}</label>
         <label class="f spk-notes">Notes<input data-f="notes" value="${esc(r.notes || '')}" placeholder="Mounting, amp…"></label>

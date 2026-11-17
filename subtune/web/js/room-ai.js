@@ -125,7 +125,7 @@ function initRoom() {
   if (roomInit || !S.room) return; roomInit = true; roomBuild++;
   const r = S.room, rm = r.room, subs = (S.settings || {}).subs || [];
   $('#rL').value = toFt(rm.length_m); $('#rW').value = toFt(rm.width_m); $('#rH').value = toFt(rm.height_m);
-  $('#rC').value = rm.construction || ''; $('#rO').value = rm.openings || ''; $('#rAvr').value = r.avr || ''; $('#rGoals').value = r.goals || '';
+  $('#rC').value = rm.construction || ''; $('#rFloor').value = rm.floor || ''; $('#rRug').checked = !!rm.rug; $('#rO').value = rm.openings || ''; $('#rAvr').value = r.avr || ''; $('#rGoals').value = r.goals || '';
   const cp = v => v == null ? v : JSON.parse(JSON.stringify(v));
   roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null, soffits: cp(rm.soffits) || []};
   renderShapeEditor(); planKey = null;
@@ -200,7 +200,7 @@ function readRoom() {
     if (d.querySelector('[data-c]')) o.controls = hwRead(d);
     if (Object.values(o).some(v => v !== '' && v != null)) subs[d.dataset.o] = o; });
   const sh = roomShape, [ow, ol] = sh.outline ? extentOf(sh.outline) : [toM($('#rW').value), toM($('#rL').value)];
-  return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
+  return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, floor: $('#rFloor').value, rug: $('#rRug').checked, openings: $('#rO').value, notes: '',
                  outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0), soffits: (sh.soffits || []).filter(s => s.length_m > 0),
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
           seats, subs, furniture: fuRead(), fixtures: fxRead(), screen: scRead(), dwelling: dwRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};

@@ -208,21 +208,50 @@ def main():
               spkAngles(row); const txt = row.querySelector('.spk-ang').textContent; spkSeat = old;
               return g.az === -18 && g.el === 0 && Math.abs(g.dist - Math.hypot(1.2, 3.6)) < 0.01 && g.off <= 1 && Math.abs(g2.off - 162) <= 1 && txt.includes('18° left') && txt.includes('at ear height'); })()""") is True)
 
-            # ---- Sound field: the standing-wave model puts the loud and quiet spots where the physics says
+            # ---- Sound field: the standing-wave model puts the loud and quiet spots where the physics says; the ray engine follows the image-source geometry and the materials
             page.goto(base + "/#/soundfield"); page.wait_for_timeout(400)
-            check("Sound field: a mode builds a loud end and a quiet middle, and the seat response peaks at the mode", page.evaluate("""(() => {
-              const R = {W: 4, L: 6, H: 2.5, subs: [{o: 0, x: 0.1, y: 0.1, z: 0.3}], seat: {x: 1, y: 1.5, z: 1}, irregular: false};
-              SF.room = R; SF.modes = sfModes(R); SF.f = 343 / 12; SF.z = 1; SF.t60 = 0.5; sfCompute();
-              const F = SF.field, col = Math.floor(F.nx / 2), row = y => Math.min(F.ny - 1, Math.floor(y / R.L * F.ny)), at = y => F.amp[row(y) * F.nx + col];
-              const farEnd = at(5.8), middle = at(3.0); if (!(farEnd > 4 * middle)) return 'end ' + farEnd + ' middle ' + middle;
+            check("Sound field bass: a mode builds a loud end and a quiet middle, and the seat response peaks at the mode", page.evaluate("""(() => {
+              const R = {W: 4, L: 6, H: 2.5, subs: [{o: 0, x: 0.1, y: 0.1, z: 0.3}], speakers: [], seat: {x: 1, y: 1.5, z: 1}, construction: 'drywall', structure: 'unknown'};
+              SF.room = R; SF.modes = sfModes(R); SF.damp = 'normal';
+              const F = sfPlane('z', 1, 343 / 12, 0.5), col = Math.floor(F.nu / 2), row = y => Math.min(F.nv - 1, Math.floor(y / R.L * F.nv)), at = y => F.amp[row(y) * F.nu + col];
+              if (!(at(5.8) > 4 * at(3.0))) return 'end ' + at(5.8) + ' middle ' + at(3.0);
               const db = sfSeatDb(R, SF.modes, 0.5, [24, 343 / 12, 40]); if (!(db[1] > db[0] + 6)) return 'seat ' + db;
-              const lenModes = SF.modes.filter(m => m.nx === 0 && m.ny === 1 && m.nz === 0); return lenModes.length === 1 && Math.abs(lenModes[0].f - 28.58) < 0.05; })()""") is True)
+              const sd = sfPlane('x', 2, 343 / 12, 0.5), en = sfPlane('y', 3, 343 / 12, 0.5); if (sd.nu !== 96 || en.nv < 24) return 'planes';
+              const len = SF.modes.filter(m => m.nx === 0 && m.ny === 1 && m.nz === 0); return len.length === 1 && Math.abs(len[0].f - 28.58) < 0.05; })()""") is True)
+            check("Sound field treble: image-source paths, absorption by frequency, panels, walls and leakage", page.evaluate("""(() => {
+              const R = {W: 4, L: 6, H: 2.5, construction: 'drywall'}, S = {x: 1, y: 1, z: 1.1}, Rx = {x: 2, y: 4, z: 1.05};
+              const paths = srPaths(S, Rx, R, 1, 2000, []), d0 = Math.hypot(1, 3, 0.05);
+              if (Math.abs(paths[0].len - d0) > 1e-6 || paths[0].order !== 0) return 'direct';
+              const left = paths.find(p => p.order === 1 && p.surf[0] === 'x0'); const img = Math.hypot(-1 - 2, 1 - 4, 1.1 - 1.05);          // the mirror image of the speaker across the left wall
+              if (!left || Math.abs(left.len - img) > 1e-6 || Math.abs(left.pts[1][0]) > 1e-6) return 'first order ' + JSON.stringify(left && left.pts);
+              if (paths.length !== 7) return 'count ' + paths.length;                                                      // direct + 6 walls at order 1
+              const lev = f => srPaths(S, Rx, R, 1, f, []).find(p => p.order === 1 && p.surf[0] === 'x0').level_db;
+              const panel = [{plane: 'x0', u: [0, 6], v: [0, 2.5], a: f => srPanelAlpha(0.1, 0.05, f)}];
+              const a250 = srPanelAlpha(0.1, 0.05, 250), a2k = srPanelAlpha(0.1, 0.05, 2000); if (!(a2k > 0.6 && a250 < 0.25)) return 'panel ' + [a250, a2k];
+              const bare = srPaths(S, Rx, R, 1, 2000, []).find(p => p.surf[0] === 'x0').level_db, covered = srPaths(S, Rx, R, 1, 2000, panel).find(p => p.surf[0] === 'x0').level_db;
+              if (!(covered < bare - 6)) return 'covered ' + [bare, covered];
+              const lowBare = srPaths(S, Rx, R, 1, 125, []).find(p => p.surf[0] === 'x0').level_db, lowPanel = srPaths(S, Rx, R, 1, 125, panel).find(p => p.surf[0] === 'x0').level_db;
+              if (Math.abs(lowBare - lowPanel) > 1.5 * Math.abs(bare - covered)) return 'bass should not care';
+              if (!(srTL('drywall', 1000) > srTL('drywall', 100) + 15 && srTL('concrete', 100) > srTL('drywall', 100) + 10)) return 'mass law';
+              if (!(srLeak(R, 100, 'concrete').share < srLeak(R, 100, 'wood').share)) return 'leak';
+              if (!(srT60(R, 60, []) >= 0.3 && srT60(R, 1000, panel) < srT60(R, 1000, []))) return 't60';
+              return srImageEnergy(R, 0, 0, 0, 1000, []) === 1 && srImageEnergy(R, 1, 0, 0, 1000, []) < 1; })()""") is True)
+            check("Sound field 3D: the page renders it (or says it needs WebGL) without errors", page.evaluate("""(() => {
+              SF.room = {W: 4, L: 6, H: 2.5, subs: [{o: 0, x: 0.2, y: 0.2, z: 0.3}], speakers: [{ch: 'FL', x: 1, y: 0.4, z: 1.1, dir: null}], seat: {x: 2, y: 4, z: 1.05}, construction: 'drywall', structure: 'unknown', irregular: false};
+              SF.modes = sfModes(SF.room); SF.view = '3d'; SF.bass = true; SF.treble = true; SF.spk = 'FL'; SF.key = null; sfRefresh();
+              const cv = document.querySelector('#sf3dCanvas'); const ok = !!SF.s3 || !document.querySelector('#sf3dNote').hidden;
+              SF.view = 'plan'; SF.treble = false; sfRefresh(); return ok && SF.paths.length === 0 && !!SF.fields.plan; })()""") is True)
 
-            check("Speakers: the 3D view turns a speaker to the direction it is set to face (also from the Room page, which has no speaker form)", page.evaluate("""(() => {
-              const old = S.room.speakers; S.room.speakers = {FL: {x_m: 1, y_m: 0.5, aim_deg: 90, width_in: 9, height_in: 40, depth_in: 12}};
-              const r = {room: {length_m: 6, width_m: 4, height_m: 2.4}, seats: [{x_m: 2, y_m: 4}], subs: {}, furniture: [], fixtures: []};
-              const m = v3Speakers([{id: 'FL', x_m: 1, y_m: 0.5, z_m: 1.05, kind: 'bed', rec: true}], r, () => 2.4)[0], b = m.boxes[0], f = [(b.pts[2][0] + b.pts[3][0]) / 2, (b.pts[2][1] + b.pts[3][1]) / 2], c = [(b.pts[0][0] + b.pts[1][0]) / 2, (b.pts[0][1] + b.pts[1][1]) / 2];
-              S.room.speakers = old; return f[0] < c[0] - 0.05 && Math.abs(f[1] - c[1]) < 0.01; })()""") is True)
+            check("Height and atmos speakers: sensible default aims, a custom 3D aim is honored, beams are drawn, and the page matches the Python rules", page.evaluate("""(() => {
+              const seat = {x: 2, y: 4, z: 1.05}, H = 2.4, pos = {x: 0.8, y: 1.2, z: 2.4};
+              const down = v3Aim3('TFL', {kind: 'in-ceiling'}, pos, seat, H); if (down.mode !== 'down' || down.v[2] !== -1 || down.off < 60 || down.off > 72) return 'down ' + JSON.stringify(down);
+              const up = v3Aim3('TFL', {kind: 'atmos module'}, {x: 0.8, y: 1.2, z: 1.0}, seat, H), mir = [1.2, 2.8, 2 * H - 1.05 - 1.0], n = Math.hypot(...mir);
+              if (up.mode !== 'up_bounce' || up.v.some((c, i) => Math.abs(c - mir[i] / n) > 1e-3) || up.tilt < 30) return 'up ' + JSON.stringify(up);
+              const at = v3Aim3('FL', {}, {x: 0.8, y: 0.4, z: 1.05}, seat, H); if (at.mode !== 'seat' || at.off > 0.01) return 'seat';
+              const cu = v3Aim3('TFL', {aim_mode: 'custom', aim_deg: 180, tilt_deg: -45}, pos, seat, H); if (Math.abs(cu.tilt + 45) > 0.2 || Math.abs(cu.az - 180) > 0.2) return 'custom ' + JSON.stringify(cu);
+              const r = {room: {length_m: 6, width_m: 4, height_m: 2.4}, seats: [{x_m: 2, y_m: 4, z_m: 1.05}], subs: {}, furniture: [], fixtures: [], speakers: {TFL: {kind: 'in-ceiling', x_m: 0.8, y_m: 1.2}}};
+              const marks = v3Speakers([{id: 'TFL', x_m: 0.8, y_m: 1.2, kind: 'height', rec: true}], r, () => 2.4), beams = marks.filter(m => m.line);
+              return beams.length === 5 && beams[0].line[1][2] < beams[0].line[0][2] - 1; })()""") is True)
 
             # ---- Setup: the home-type question saves by itself and shows on the Room page too
             page.goto(base + "/#/setup"); page.wait_for_timeout(500)
@@ -354,6 +383,31 @@ def main():
             page.wait_for_timeout(600)
             check("The AI analysis is folded by default", page.evaluate("(() => { const d = document.querySelector('#aiOut details.aifold'); return !!d && !d.open; })()"))
             check("The assistant settings are folded too", page.evaluate("[...document.querySelectorAll('#aiQ ~ details.fold, details.fold')].some(d => !d.open)"))
+            page.evaluate("openSheet('home')")
+
+            # ---- Room card: flooring and the modeler
+            page.evaluate("openSheet('room')")
+            page.wait_for_timeout(500)
+            [page.fill(i, v) for i, v in (("#rL", "18"), ("#rW", "13"), ("#rH", "8.5"))]
+            page.select_option("#rFloor", "tile")
+            page.check("#rRug")
+            page.evaluate("document.querySelector('#mdBox').open = true")
+            page.fill("#mdRows", "3")
+            page.fill("#mdFirst", "6")
+            page.fill("#mdStep", "6")
+            page.once("dialog", lambda d: d.accept())                        # "replace the list?" -> OK
+            before = page.evaluate("fuRead().length")
+            page.click("#mdBuild")
+            check("The tier builder puts risers and couches into the Room form",
+                  until(page, "fuRead().filter(i => i.kind === 'riser').length === 2 && fuRead().filter(i => i.kind === 'couch').length === 3", 8000) is True,
+                  f"form has {page.evaluate('fuRead().length')} items (was {before})")
+            check("Undo is offered, and it puts the list back", page.evaluate("!document.querySelector('#mdUndo').hidden") is True)
+            page.click("#mdUndo")
+            check("Undo restores the list", until(page, f"fuRead().length === {before}") is True)
+            page.click("#roomSave")
+            page.wait_for_timeout(1200)
+            saved = page.evaluate("fetch('/api/state').then(r => r.json()).then(r => [r.room.room.floor, r.room.room.rug])")
+            check("Floor and rug are saved with the room", saved == ["tile", True], str(saved))
             page.evaluate("openSheet('home')")
 
             check("No script errors while clicking around", not errs, "; ".join(errs[:3]))

@@ -677,8 +677,8 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             if p["measured"]:
                 measured.add(t)
     seats, spk = seats_of(room), speakers_of(room, placement)
-    carpet = "carpet" in ((room.get("room") or {}).get("construction") or "").lower() + \
-             ((room.get("room") or {}).get("notes") or "").lower()
+    fk, has_rug = furniture.floor_kind(room), bool((room.get("room") or {}).get("rug"))
+    carpet = fk == "carpet" or has_rug                      # a carpeted floor, or an area rug already there, needs no rug item
     rt = (room_metrics(state).get("report") or {}).get("rt60_mid_s")
     items, notes = [], []
     notes += screen.notes(room, seats)
@@ -833,7 +833,11 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
         add("rug", "Thick rug between the screen and the seats", "rug", "floor", zf, 1,
             f"about {_ft(zf['a'][1] - zf['a'][0]):.0f} x {_ft(zf['b'][1] - zf['b'][0]):.0f} ft", 1, 0,
             "Softens the floor bounce and some slap echo; easy and cheap.", 22,
-            "A hard floor reflects the speakers' sound to your ears like a mirror.", rect=_rect("floor", zf, dims), points=refl.get("floor"))
+            f"{'A ' + fk + ' floor' if fk and fk != 'other' else 'A hard floor'} reflects the speakers' sound to your ears like a mirror"
+            + (" (and it is the least forgiving of floors: tile and concrete absorb almost nothing)." if fk in ("tile", "concrete") else "."),
+            rect=_rect("floor", zf, dims), points=refl.get("floor"))
+    elif zf and carpet:
+        notes.append(f"Your {'carpeted floor' if fk == 'carpet' else 'area rug'} already softens the floor bounce, so no rug is suggested.")
     # front wall behind the speakers
     buried = buried_speakers(room)
     # If any speaker is buried, add a note about it

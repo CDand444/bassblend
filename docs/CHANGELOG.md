@@ -1,8 +1,14 @@
 # htTamer changelog
 
+## Nov 19, 2026 - flooring, room modeler, speaker aim in 3D
+
+- **Flooring** on the Room card (carpet, hardwood, laminate, vinyl, tile, bare concrete) and an **area rug** box. The ring-time estimate, treatment plan (no rug suggested over carpet or a rug; tile and concrete called out), sound field, 3D floor color, apartment tips and the assistant all use it.
+- **Room modeler** (Room card, under Furniture): build a stepped riser with a couch on each tier from measurements (rows, width, depth, first riser height, step; no AI) or from a plain-text description (the AI assistant, one request). The proposal appears in the form, plan and 3D view, is not saved until Save room, and has an Undo. Up to 24 furniture items now.
+- **Speaker aim in 3D**: each speaker has an Aimed pick (Auto, at the main seat, straight down, up and bouncing off the ceiling to the seat, custom Faces plus Tilt). Auto aims atmos modules up at the ceiling bounce point and in-ceiling speakers down. The Speakers page, Treatment/3D views (with an aim beam) and the sound field follow it.
+
 ## Nov 18, 2026 - Sound field viewer, speaker facing in 3D
 
-- **Sound field** (Survey → Sound field): a map of the room's bass seen from above. Drag the frequency slider and the loud spots (red) and quiet spots (blue) move; pick the height of the slice; switch between a level map and a moving wave; click a room mode to jump to it; set the room's damping. The line chart shows what the same model says at your seat with your measured response laid over it. It is the standard standing-wave (modal) model for the room's box (the main rectangle for an irregular room), driven by your subs. Treble (reflections off walls and panels) is not in this version.
+- **Sound field** (Survey → Sound field): views from above, from the side, from the end and in 3D (WebGL, three slices you can turn), with **Bass** and **Treble** as separate layers. Bass is the room's standing waves driven by your subs (ring time worked out from the room's surfaces and your treatment); Treble follows a chosen speaker's direct sound and reflections to your seat (image-source method, exact for a box) as paths, pulses and wavefronts, losing what each wall or panel absorbs at that frequency, with a table of the strongest early reflections; **what goes through the walls** shows the mass-law leakage. Earlier note: a map of the room's bass seen from above. Drag the frequency slider and the loud spots (red) and quiet spots (blue) move; pick the height of the slice; switch between a level map and a moving wave; click a room mode to jump to it; set the room's damping. The line chart shows what the same model says at your seat with your measured response laid over it. It is the standard standing-wave (modal) model for the room's box (the main rectangle for an irregular room), driven by your subs. Treble (reflections off walls and panels) is not in this version.
 - **Speakers honor Faces in 3D**: the Treatment view did not redraw after a speaker was edited, and the Room page's 3D ignored the saved direction; both fixed.
 
 ## Nov 18, 2026 - speaker models from the database, assistant dimensions

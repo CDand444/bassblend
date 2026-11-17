@@ -128,7 +128,7 @@
       const sorted = F.map(f => ({...f, pp: f.poly.map(P)})).map(f => ({...f, depth: f.pp.reduce((s, q) => s + q[2], 0) / f.pp.length}));
       const floor = sorted.find(f => f.kind === 'floor');
       const path = pp => { ctx.beginPath(); pp.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath(); };
-      path(floor.pp); ctx.fillStyle = C.floor; ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 1.2; ctx.stroke();
+      path(floor.pp); ctx.fillStyle = ({carpet: '#b9c0cc', hardwood: '#d9c3a0', laminate: '#dccdb4', vinyl: '#d6d9dc', tile: '#e3e5e6', concrete: '#c9c9c6'})[room.floor] || C.floor; ctx.fill(); ctx.strokeStyle = C.line; ctx.lineWidth = 1.2; ctx.stroke();
       // screen on the front wall's floor line, for orientation
       const fe = edges(pts).filter(e => e.n[1] < -0.9).sort((a, b) => a.a[1] - b.a[1] || b.len - a.len)[0];
       if (fe && room.screen) {       // the real screen, to size: a rectangle on the front wall (dashed and blue when acoustically transparent)

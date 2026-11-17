@@ -16,7 +16,7 @@ ROOM_UNDO = DATA / "room-undo.json"
 C = 343.0
 
 EMPTY = {
-    "room": {"length_m": None, "width_m": None, "height_m": None, "construction": "", "openings": "", "notes": "",
+    "room": {"length_m": None, "width_m": None, "height_m": None, "construction": "", "floor": "", "rug": False, "openings": "", "notes": "",
              # optional real shape (shape.py): floor outline, openings on its walls, sloped/vaulted ceiling
              "outline": None, "shape": "rect", "wall_openings": [], "ceiling": None, "soffits": []},
     "seats": [{"name": "Main seat", "x_m": None, "y_m": None, "z_m": 1.0}],
@@ -58,6 +58,17 @@ def _num(v, lo, hi):
     return v
 
 
+FLOORS = ("carpet", "hardwood", "laminate", "vinyl", "tile", "concrete", "other")
+
+
+def _floor(v) -> str:
+    """The floor's material, or "" when not entered. An unknown one is an error."""
+    v = str(v or "").strip().lower()
+    if v and v not in FLOORS:
+        raise ValueError(f"floor must be one of {', '.join(FLOORS)}")
+    return v
+
+
 def _txt(v, n=300):
     return str(v or "")[:n]
 
@@ -68,6 +79,7 @@ def save_room(body: dict) -> dict:
     rm = body.get("room", {})
     r["room"] = {"length_m": _num(rm.get("length_m"), 1, 50), "width_m": _num(rm.get("width_m"), 1, 50),
                  "height_m": _num(rm.get("height_m"), 1.5, 15), "construction": _txt(rm.get("construction")),
+                 "floor": _floor(rm.get("floor")), "rug": bool(rm.get("rug")),
                  "openings": _txt(rm.get("openings")), "notes": _txt(rm.get("notes"), 1000)}
     r["room"].update(clean_shape(rm, r["room"]))
     seats = []

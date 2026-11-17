@@ -203,3 +203,31 @@ $('#couchRows').addEventListener('change', e => {
   fuInfo(); renderPlan(readRoom());
 });
 $('#couchRows').addEventListener('input', e => { if (e.target.matches('[data-f="x_m"],[data-f="y_m"],[data-f="rotation"]')) { const w = e.target.closest('.fucouch').querySelector('[data-f="against_wall"]'); if (w) w.value = ''; } });
+
+// ---- the modeler: measurements or words become furniture in the form (not saved) with a preview in the plan and 3D, and an Undo
+let mdBefore = null;
+async function mdApply(r, add) {                    // put a proposal's items into the Room form
+  mdBefore = fuRead();
+  const items = add ? mdBefore.concat(r.items) : r.items;
+  fuRender(items); fuInfo(); renderPlan(readRoom()); if (typeof setPlanMode === 'function') setPlanMode('3d');
+  $('#mdUndo').hidden = false; $('#mdMsg').textContent = `Not saved yet. ${r.summary || ''}`;
+  $('#mdOut').innerHTML = (r.assumptions && r.assumptions.length ? `<p class="small" style="margin:0 0 4px"><b>What it assumed</b></p><ul class="small" style="margin:0 0 6px 18px;padding:0">${r.assumptions.map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '')
+    + (r.warnings && r.warnings.length ? `<div class="notice warn small">${r.warnings.map(esc).join('<br>')}</div>` : '');
+}
+async function mdCall(body, btn) {
+  btn.disabled = true; $('#mdMsg').textContent = 'Working…';
+  const rf = readRoom(), r = await post('/api/modeler', {...body, room: {room: {width_m: rf.room.width_m, length_m: rf.room.length_m, height_m: rf.room.height_m}, seats: rf.seats}});
+  btn.disabled = false;
+  if (r.error) { $('#mdMsg').textContent = ''; toast('Modeler', r.error, 'bad'); return null; }
+  return r;
+}
+$('#mdBuild').onclick = async e => {
+  const n = id => $(id).value === '' ? undefined : +$(id).value;
+  const r = await mdCall({action: 'tiers', spec: {rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked}}, e.target);
+  if (r) { const repl = confirm('Replace the furniture in the list with these tiers?\n\nOK replaces it, Cancel adds the tiers to what is there.'); mdApply(r, !repl); }
+};
+$('#mdAsk').onclick = async e => {
+  const existing = fuRead(), r = await mdCall({action: 'text', text: $('#mdText').value, replace: $('#mdReplace').checked, existing}, e.target);
+  if (r) mdApply(r, !$('#mdReplace').checked);
+};
+$('#mdUndo').onclick = () => { if (!mdBefore) return; fuRender(mdBefore); fuInfo(); renderPlan(readRoom()); mdBefore = null; $('#mdUndo').hidden = true; $('#mdMsg').textContent = 'Put back.'; $('#mdOut').innerHTML = ''; };

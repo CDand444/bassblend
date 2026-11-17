@@ -2179,6 +2179,21 @@ class H(BaseHTTPRequestHandler):
             return self._ha_action(path, body)
         if not self._gate(path):
             return
+        if path == "/api/modeler":                     # a furniture proposal from measurements (no AI) or from words (one AI request); nothing is saved
+            from . import modeler
+            from .room import load_room
+            room = load_room()
+            ov = body.get("room") or {}                # the Room form may hold newer sizes and seats than the saved room
+            room = {**room, "room": {**(room.get("room") or {}), **{k: v for k, v in (ov.get("room") or {}).items() if k in ("width_m", "length_m", "height_m") and v}},
+                    "seats": ov.get("seats") or room.get("seats")}
+            try:
+                if body.get("action") == "tiers":
+                    return self._send(200, modeler.tiers(body.get("spec") or {}, room))
+                if body.get("action") == "text":
+                    return self._send(200, modeler.from_text(str(body.get("text") or ""), room, body.get("existing") or [], bool(body.get("replace"))))
+            except (ValueError, RuntimeError) as e:
+                return self._send(400, {"error": str(e)})
+            return self._send(400, {"error": "action must be tiers or text"})
         if path == "/api/workshop":
             return self._workshop(body)
         if path == "/api/backups":

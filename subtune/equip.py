@@ -23,7 +23,10 @@ SPK_FIELDS = {"model": str, "kind": str, "size": str, "crossover_hz": float, "x_
               # the cabinet's size in inches (dims.py): the 3D views draw it, and the hardware database can supply it
               "width_in": float, "height_in": float, "depth_in": float,
               # which way it faces: degrees clockwise on the plan, 0 = at the back wall, 90 = the left wall, 180 = the screen, 270 = the right wall; blank = at the main seat
-              "aim_deg": float}
+              "aim_deg": float,
+              # aiming in 3D: aim_mode is seat (at the main seat), down (straight down: a flat in-ceiling speaker), up_bounce (an up-firing module: at the ceiling spot
+              # whose bounce reaches the seat) or custom (aim_deg and tilt_deg; a blank one is worked out toward the seat); tilt_deg: 0 = level, + up, - down
+              "aim_mode": str, "tilt_deg": float}
 TEXT_LEN = {"model": 80, "aim": 120, "amp": 120, "notes": 500}
 
 
@@ -111,6 +114,12 @@ def clean_speaker(ch: str, d: dict, old: dict | None = None) -> dict:
                 raise ValueError(f"{ch}: size (the receiver's speaker size setting) must be large or small")
         elif f == "crossover_hz":
             v = _num(v, 40, 250, f"{ch} crossover")
+        elif f == "aim_mode":
+            v = str(v or "").lower()
+            if v not in ("", "seat", "down", "up_bounce", "custom"):
+                raise ValueError(f"{ch}: aim_mode must be seat, down, up_bounce or custom")
+        elif f == "tilt_deg":
+            v = None if v in (None, "") else round(_num(v, -90, 90, f"{ch} tilt"), 1)
         elif f == "aim_deg":
             v = None if v in (None, "") else round(_num(v, -3600, 3600, f"{ch} aim") % 360, 1)
         elif f in ("width_in", "height_in", "depth_in"):
@@ -302,7 +311,7 @@ def summary() -> dict:
             "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
             "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},
             "room": r.get("room"), "enclosure": _enclosure(r), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"), "fixtures": r.get("fixtures"),
-            "sizes": __import__("subtune.dims", fromlist=["x"]).sizes(r), "dwelling": r.get("dwelling"), "neighbors": __import__("subtune.dwelling", fromlist=["x"]).profile(r),
+            "sizes": __import__("subtune.dims", fromlist=["x"]).sizes(r), "dwelling": r.get("dwelling"), "speaker_aim": __import__("subtune.dims", fromlist=["x"]).aims(r), "neighbors": __import__("subtune.dwelling", fromlist=["x"]).profile(r),
             "receiver": r.get("avr"), "goals": r.get("goals")}
 
 

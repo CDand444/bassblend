@@ -12,7 +12,7 @@ import math
 BANDS_HZ = (125, 250, 500, 1000, 2000, 4000)
 WALLS = ("front", "back", "left", "right")
 ROTATIONS = (0, 90, 180, 270)
-MAX_ITEMS = 12
+MAX_ITEMS = 24
 LIMITS = {"length_m": (0.6, 4.5), "depth_m": (0.6, 1.4), "seat_h_m": (0.3, 0.6), "back_h_m": (0.6, 1.3)}
 # a riser is a low platform the seats stand on: width across the room, depth front to back, height of its top
 RISER_LIMITS = {"length_m": (0.6, 8.0), "depth_m": (0.6, 4.0), "height_m": (0.05, 0.6)}
@@ -135,6 +135,41 @@ def absorption(item: dict) -> list[float]:
     return [round(a * c, 3) for c in FABRICS.get(item.get("fabric"), FABRICS[DEFAULT_FABRIC])]
 
 
+# floor absorption per octave band (BANDS_HZ): typical published values; a rug on a hard floor adds carpet's over the share it covers
+FLOORS_ABS = {
+    "carpet": (0.08, 0.24, 0.57, 0.69, 0.71, 0.73),
+    "hardwood": (0.15, 0.11, 0.10, 0.07, 0.06, 0.07),
+    "laminate": (0.10, 0.07, 0.06, 0.06, 0.06, 0.07),
+    "vinyl": (0.02, 0.03, 0.03, 0.03, 0.03, 0.02),
+    "tile": (0.01, 0.01, 0.01, 0.02, 0.02, 0.02),
+    "concrete": (0.01, 0.01, 0.02, 0.02, 0.02, 0.03),
+}
+RUG_SHARE = 0.4                         # an area rug is taken to cover about 40% of the floor
+
+
+def floor_kind(room: dict) -> str | None:
+    """The floor's material: what the owner chose, else read from the construction text and notes (the way rooms were described before there was a field), else None."""
+    rm = room.get("room") or {}
+    f = (rm.get("floor") or "").lower()
+    if f in FLOORS_ABS:
+        return f
+    text = ((rm.get("construction") or "") + " " + (rm.get("notes") or "")).lower()
+    for k, words in (("carpet", ("carpet",)), ("hardwood", ("hardwood", "wood floor", "wooden floor", "parquet")), ("laminate", ("laminate",)),
+                     ("tile", ("tile",)), ("vinyl", ("vinyl", "lvp")), ("concrete", ("slab", "concrete floor"))):
+        if any(w in text for w in words):
+            return k
+    return None
+
+
+def floor_coef(room: dict) -> tuple:
+    """The floor's absorption per octave band, with an area rug counted when there is one."""
+    kind = floor_kind(room) or "hardwood"
+    base = FLOORS_ABS[kind]
+    if (room.get("room") or {}).get("rug") and kind != "carpet":
+        return tuple(b * (1 - RUG_SHARE) + c * RUG_SHARE for b, c in zip(base, FLOORS_ABS["carpet"]))
+    return base
+
+
 def _surface_kind(room: dict) -> str:
     text = ((room.get("room") or {}).get("construction") or "").lower()
     for k, words in (("concrete", ("concrete", "cinder", "brick", "block")), ("wood", ("wood", "timber", "plank")),
@@ -152,9 +187,9 @@ def room_rt60(room: dict) -> dict | None:
     L, W, H = rm.get("length_m"), rm.get("width_m"), rm.get("height_m")
     if not (L and W and H):
         return None
-    area = 2 * (L + W) * H + 2 * L * W
     coef = SURFACES[_surface_kind(room)]
-    sabins = [area * c for c in coef]
+    fc = floor_coef(room) if floor_kind(room) or (rm.get("rug")) else coef                    # the floor counts for what it is made of (else as the walls)
+    sabins = [(2 * (L + W) * H + L * W) * c + L * W * f for c, f in zip(coef, fc)]
     for it in couches(room):
         sabins = [s + x for s, x in zip(sabins, absorption(it))]
     vol = L * W * H
@@ -162,7 +197,7 @@ def room_rt60(room: dict) -> dict | None:
     mid = sorted(rt[2:5])[1]
     return {"bands_hz": list(BANDS_HZ), "rt60_s": rt, "mid_s": mid, "estimate": True,
             "note": "Estimate before you measure: from the room's size, its walls and your couches. "
-                    "A real measurement replaces it."}
+                    "A real measurement replaces it." + (f" Floor: {floor_kind(room)}{', with an area rug' if rm.get('rug') else ''}." if floor_kind(room) else "")}
 
 
 def _uv(dx, dy, bx, by):

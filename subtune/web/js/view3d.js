@@ -60,21 +60,44 @@ function v3Cab(rec, saved, fb) {                 // a cabinet's size in meters: 
   if (saved && saved.w_m) return {w: saved.w_m, h: saved.h_m, d: saved.d_m, src: saved.source};
   return {w: fb[0], h: fb[1], d: fb[2], src: 'typical'};
 }
+// which way a speaker points in 3D: the same rules as dims.speaker_aim (a blank mode is chosen by kind: in-ceiling straight down, an atmos module up at the ceiling
+// bounce to the seat, everything else at the seat). Returns {mode, v: unit vector, off: degrees from the direction to the seat, az, tilt}.
+function v3Aim3(ch, rec, pos, seat, H) {
+  rec = rec || {}; const has = x => x !== '' && x != null && !isNaN(+x), to = seat ? [seat.x - pos.x, seat.y - pos.y, seat.z - pos.z] : [0, 1, 0];
+  const mode = rec.aim_mode || (has(rec.aim_deg) ? 'custom' : rec.kind === 'in-ceiling' ? 'down' : rec.kind === 'atmos module' ? 'up_bounce' : 'seat'); let v;
+  if (mode === 'down') v = [0, 0, -1];
+  else if (mode === 'up_bounce' && seat) v = [seat.x - pos.x, seat.y - pos.y, (2 * H - seat.z) - pos.z];
+  else if (mode === 'custom') { const flat = Math.hypot(to[0], to[1]) || 1; let hx = to[0] / flat, hy = to[1] / flat;
+    if (has(rec.aim_deg)) { const a = +rec.aim_deg * Math.PI / 180; hx = -Math.sin(a); hy = Math.cos(a); }
+    const t = has(rec.tilt_deg) ? +rec.tilt_deg * Math.PI / 180 : Math.atan2(to[2], flat); v = [hx * Math.cos(t), hy * Math.cos(t), Math.sin(t)]; }
+  else v = to;
+  const n = Math.hypot(...v) || 1; v = v.map(c => c / n); const tn = Math.hypot(...to) || 1;
+  return {mode, v, off: Math.acos(Math.max(-1, Math.min(1, (v[0] * to[0] + v[1] * to[1] + v[2] * to[2]) / tn))) * 180 / Math.PI,
+          az: (Math.atan2(-v[0], v[1]) * 180 / Math.PI + 360) % 360, tilt: Math.asin(Math.max(-1, Math.min(1, v[2]))) * 180 / Math.PI};
+}
+function v3Beam(p, v, len, color, alpha) {         // a speaker's aim drawn as a centre line and a cone (about 25 degrees each way): lines for RoomView
+  const up = Math.abs(v[2]) > 0.95 ? [1, 0, 0] : [0, 0, 1], u = [v[1] * up[2] - v[2] * up[1], v[2] * up[0] - v[0] * up[2], v[0] * up[1] - v[1] * up[0]], ul = Math.hypot(...u) || 1, w = [v[1] * (u[2] / ul) - v[2] * (u[1] / ul), v[2] * (u[0] / ul) - v[0] * (u[2] / ul), v[0] * (u[1] / ul) - v[1] * (u[0] / ul)];
+  const c = Math.cos(0.436), s = Math.sin(0.436), at = k => [p[0] + k[0] * len, p[1] + k[1] * len, p[2] + k[2] * len], out = [{line: [p, at(v)], color, width: 2, alpha}];
+  [[1, 0], [-1, 0], [0, 1], [0, -1]].forEach(([a, b]) => out.push({line: [p, at([v[0] * c + (u[0] / ul * a + w[0] * b) * s, v[1] * c + (u[1] / ul * a + w[1] * b) * s, v[2] * c + (u[2] / ul * a + w[2] * b) * s])], color, width: 1, alpha: alpha * 0.55, dash: [3, 3]}));
+  return out;
+}
 function v3Face(x, y, seat) { const t = seat && seat.x_m != null ? [seat.x_m - x, seat.y_m - y] : [0, 1]; return Math.hypot(t[0], t[1]) > 0.01 ? t : [0, 1]; }
 
 function v3Speakers(spk, r, ceil) {                              // [{id, x_m, y_m, z_m, kind: 'bed'|'height'}] -> solids
-  const seat = (r.seats || []).find(s => s.x_m != null && s.y_m != null), out = [], RECS = r.speakers || (S.room || {}).speakers || {};      // the Room page's form has no speakers: the saved ones apply
+  const seat = (r.seats || []).find(s => s.x_m != null && s.y_m != null), out = [], beams = [], seat3 = seat ? {x: seat.x_m, y: seat.y_m, z: seat.z_m || 1.05} : null, Hroom = (r.room || {}).height_m || 2.4, RECS = r.speakers || (S.room || {}).speakers || {};      // the Room page's form has no speakers: the saved ones apply
   (spk || []).forEach(s => {
     if (s.x_m == null || s.y_m == null) return;
     const high = s.kind === 'height', rec = s.rec !== false && s.source !== 'suggested', fill = rec ? '#3b3f46' : '#6c717a';
     const cab = v3Cab(RECS[s.id], ((S.hw_sizes || {}).speakers || {})[s.id], high ? [0.2, 0.18, 0.2] : [0.24, 0.42, 0.28]);
     const top = ceil(s.x_m, s.y_m), zc = high ? top - cab.h / 2 : (s.z_m ?? (RECS[s.id] || {}).z_m ?? 1.1), h = Math.max(0.05, cab.h), w = Math.max(0.05, cab.w), d = Math.max(0.04, cab.d);
-    const dir = high ? [0, 0] : v3Dir((RECS[s.id] || {}).aim_deg) || v3Face(s.x_m, s.y_m, seat);
+    const rec3 = RECS[s.id] || {}, aim = v3Aim3(s.id, rec3, {x: s.x_m, y: s.y_m, z: zc}, seat3, Hroom), flat = Math.hypot(aim.v[0], aim.v[1]);
+    const dir = flat > 0.25 ? [aim.v[0], aim.v[1]] : (high ? [0, 1] : v3Face(s.x_m, s.y_m, seat));                  // the box turns to the horizontal part of where the speaker points
+    if (rec) beams.push(...v3Beam([s.x_m, s.y_m, zc], aim.v, high || aim.tilt > 20 ? 1.3 : 0.9, high ? '#c9741a' : '#2a78d6', high ? 0.8 : 0.45));
     if (high) { out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, [0, 1]), z0: top - h, z1: top, fill, alpha: rec ? 1 : 0.55}], label: s.id}); return; }
     out.push({kind: 'solid', boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, dir), z0: Math.max(0, zc - h / 2), z1: zc + h / 2, fill, front: 2, alpha: rec ? 1 : 0.55}], label: s.id});
     if (zc - h / 2 > 0.25) out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, 0.05, 0.05, [0, 1]), z0: 0, z1: Math.max(0, zc - h / 2), fill: '#555a62', alpha: rec ? 0.7 : 0.3}]});   // a stand
   });
-  return out;
+  return out.concat(beams);
 }
 
 function v3Subs(r) {                                             // the subs: a cube with a cone on the face that looks at the main seat

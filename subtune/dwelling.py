@@ -89,6 +89,10 @@ def tips(room: dict) -> list[dict]:
     if d.get("floor") == "basement":
         out.append({"id": "basement", "text": "A basement is usually surrounded by earth and a concrete slab: less bass reaches neighbors, and "
                     "the room modes tend to be strong."})
+    fl = (room.get("room") or {}).get("floor")
+    if fl in ("hardwood", "laminate", "tile", "concrete", "vinyl") and (d.get("shared") or {}).get("below") and d.get("floor") != "basement":
+        out.append({"id": "hard_floor", "text": f"A {fl} floor over a neighbor carries footsteps and bass down: an area rug on a thick pad, and isolation feet "
+                    "under the subs, help most. Check your lease or HOA rules on floor coverings."})
     if p.get("kind") in ("apartment", "condo", "townhouse"):
         out.append({"id": "rental", "text": "For treatment, freestanding panels, panels on stands and adhesive-free hanging avoid drilling. Check your "
                     "lease or HOA rules before you drill, and before you install anything permanent."})

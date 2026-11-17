@@ -46,7 +46,7 @@ def test_bad_rotation_rejected():
 
 
 def test_list_limits():
-    items = fu.clean_items([{"rotation": 0}] * 20 + [{"kind": "chair"}, "junk"])
+    items = fu.clean_items([{"rotation": 0}] * 30 + [{"kind": "chair"}, "junk"])
     assert len(items) == fu.MAX_ITEMS
     assert len({i["id"] for i in items}) == len(items)
 

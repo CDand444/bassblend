@@ -258,6 +258,71 @@ def test_the_assistant_cannot_move_a_recorded_speaker_by_mistaking_its_size_for_
     assert any(t["name"] == "move_speakers" and t.get("approval") for t in assistant.TOOLS) and "move_speakers" in guard.CHANGES
 
 
+def test_height_and_atmos_speakers_get_sensible_aims_and_custom_aims_are_honored():
+    seat = (2.0, 4.0, 1.05)
+    flat = dims.speaker_aim("TFL", {"kind": "in-ceiling"}, (0.8, 1.2, 2.4), seat, 2.4)
+    assert flat["mode"] == "down" and flat["vector"] == [0.0, 0.0, -1.0] and flat["tilt_deg"] == -90.0 and 60 < flat["off_seat_deg"] < 72
+    up = dims.speaker_aim("TFL", {"kind": "atmos module"}, (0.8, 1.2, 1.0), seat, 2.4)
+    assert up["mode"] == "up_bounce" and up["tilt_deg"] > 30 and up["vector"][2] > 0          # up at the ceiling spot whose bounce reaches the seat
+    mirror = (2.0 - 0.8, 4.0 - 1.2, (2 * 2.4 - 1.05) - 1.0)
+    n = sum(c * c for c in mirror) ** 0.5
+    assert all(abs(a - b / n) < 1e-3 for a, b in zip(up["vector"], mirror))
+    at = dims.speaker_aim("FL", {}, (0.8, 0.4, 1.05), seat, 2.4)
+    assert at["mode"] == "seat" and at["off_seat_deg"] == 0.0
+    screen = dims.speaker_aim("FL", {"aim_mode": "custom", "aim_deg": 180, "tilt_deg": 0}, (0.8, 0.4, 1.05), seat, 2.4)
+    assert screen["vector"] == [0.0, -1.0, 0.0] and screen["az_deg"] == 180.0 and screen["off_seat_deg"] > 150
+    tilt_only = dims.speaker_aim("TFL", {"aim_mode": "custom", "tilt_deg": -40}, (0.8, 1.2, 2.4), seat, 2.4)
+    assert abs(tilt_only["tilt_deg"] + 40) < 0.2 and abs(tilt_only["az_deg"] - dims.speaker_aim("TFL", {}, (0.8, 1.2, 2.4), seat, 2.4)["az_deg"]) < 0.5   # the azimuth still points at the seat
+    az_only = dims.speaker_aim("FL", {"aim_deg": 90}, (0.8, 0.4, 1.05), seat, 2.4)            # an old record with only a facing direction is a custom aim
+    assert az_only["mode"] == "custom" and az_only["az_deg"] == 90.0
+    from subtune import equip
+    got = equip.clean_speaker("TFL", {"aim_mode": "Down", "tilt_deg": "-55"})
+    assert got["aim_mode"] == "down" and got["tilt_deg"] == -55.0
+    for bad in ({"aim_mode": "sideways"}, {"tilt_deg": 120}):
+        try:
+            equip.clean_speaker("TFL", bad)
+        except ValueError:
+            continue
+        raise AssertionError(bad)
+    r = {"room": {"height_m": 2.4}, "seats": [{"x_m": 2.0, "y_m": 4.0, "z_m": 1.05}], "speakers": {"TFL": {"x_m": 0.8, "y_m": 1.2, "kind": "in-ceiling"}, "FL": {"x_m": 0.8}}}
+    assert list(dims.aims(r)) == ["TFL"] and dims.aims(r)["TFL"]["mode"] == "down"
+
+
+def test_the_floor_is_known_and_considered():
+    from subtune import furniture
+    r = copy.deepcopy(ROOM)
+    r["room"]["floor"] = "tile"
+    saved = room.save_room({**r, "room": {**r["room"], "floor": "Hardwood", "rug": 1}})
+    assert saved["room"]["floor"] == "hardwood" and saved["room"]["rug"] is True
+    try:
+        room.save_room({**r, "room": {**r["room"], "floor": "lava"}})
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an unknown floor was accepted")
+    assert furniture.floor_kind({"room": {"construction": "drywall over a concrete slab, carpet in the middle"}}) == "carpet"      # the old text still counts when no floor is chosen
+    assert furniture.floor_kind({"room": {"floor": "tile"}}) == "tile" and furniture.floor_kind({"room": {}}) is None
+    tile = furniture.room_rt60({**r, "room": {**r["room"], "floor": "tile", "rug": False}})
+    carpet = furniture.room_rt60({**r, "room": {**r["room"], "floor": "carpet", "rug": False}})
+    rug = furniture.room_rt60({**r, "room": {**r["room"], "floor": "tile", "rug": True}})
+    assert carpet["mid_s"] < tile["mid_s"] and carpet["mid_s"] <= rug["mid_s"] < tile["mid_s"] and "Floor: tile" in tile["note"]
+    base = {**copy.deepcopy(r)}
+    for floor, rug_on, want_item in (("tile", False, True), ("hardwood", False, True), ("carpet", False, False), ("tile", True, False)):
+        rr = copy.deepcopy(base)
+        rr["room"].update(floor=floor, rug=rug_on, construction="drywall")
+        p = _plan(rr)
+        has = any(i["id"] == "rug" for i in p["items"])
+        assert has == want_item, (floor, rug_on, has)
+        if not want_item:
+            assert any("already softens" in n for n in p["notes"])
+    rr = copy.deepcopy(base)
+    rr["room"].update(floor="tile", rug=False)
+    assert "tile" in next(i for i in _plan(rr)["items"] if i["id"] == "rug")["why"]
+    from subtune import dwelling
+    up = {**copy.deepcopy(ROOM), "room": {**ROOM["room"], "floor": "hardwood"}, "dwelling": dwelling.clean({"kind": "condo", "shared": {"below": True}})}
+    assert any(t["id"] == "hard_floor" for t in dwelling.tips(up))
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
