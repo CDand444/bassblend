@@ -110,6 +110,16 @@ main { min-width: 0; padding: 22px 32px 64px; }
 .jump button { border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); border-radius: 999px; padding: 3px 12px; font-size: 12.5px; cursor: pointer; }
 .jump button:hover { color: var(--text); border-color: var(--border-strong); }
 @media (max-width: 900px) { .jump { top: 0; } }
+.rd-banner { display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap; align-items: flex-start; border: 1px solid var(--border); border-left-width: 5px; border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.rd-banner.good { border-left-color: var(--good); } .rd-banner.meh { border-left-color: var(--warn); } .rd-banner.bad { border-left-color: var(--bad); }
+.rd-warns { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--text-2); } .rd-act { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.rd-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; margin-top: 14px; } .rd-group h3 { font-size: 13.5px; margin: 0 0 8px; }
+.rd-item { padding: 6px 0; border-bottom: 1px solid var(--border); } .rd-row { display: flex; align-items: center; gap: 8px; } .rd-label { flex: 1; font-size: 13.5px; font-weight: 600; }
+.rd-chip { font-size: 11px; font-weight: 700; padding: 1px 8px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); min-width: 54px; text-align: center; }
+.rd-chip.good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); } .rd-chip.bad { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.rd-chip.meh { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.rd-mini { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; border: 1px solid var(--border); border-left-width: 5px; border-radius: 10px; padding: 8px 12px; margin: 0 0 12px; font-size: 13.5px; }
+.rd-mini.good { border-left-color: var(--good); } .rd-mini.meh { border-left-color: var(--warn); } .rd-mini.bad { border-left-color: var(--bad); } .rd-mini span { flex: 1; color: var(--text-2); }
 .rs-head h2 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
 .rs-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; margin-top: 16px; align-items: start; }
 @media (max-width: 900px) { .rs-grid { grid-template-columns: minmax(0, 1fr); } }
@@ -768,6 +778,10 @@ details.card[open] > summary::after { transform: rotate(45deg); }
   <nav class="subnav" id="subNav" aria-label="Pages in this section"></nav>
   <div class="view-body" id="viewBody"></div>
   <div class="col" id="homeView">
+    <section class="card" id="rdCard">
+      <div class="card-h"><h2>Is it ready?</h2><span class="sub">what is connected, verified and untested</span></div>
+      <div id="rdOut"><p class="muted">Checking…</p></div>
+    </section>
     <!-- SYSTEM MAP + HEALTH -->
     <section class="card" id="mapCard">
       <div class="card-h"><h2>Your system</h2><span class="sub" id="mapSub"></span><span class="grow"></span>
@@ -795,6 +809,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- WIZARD -->
     <section class="card" id="wizCard">
       <div class="card-h"><h2>Tune my system</h2><span class="sub" id="wizSub"></span></div>
+      <div id="rdMini"></div>
       <ol class="wizsteps" id="wizSteps"></ol>
       <div id="wizBody">
         <div data-step="setup" class="wizpane"><p class="lead" style="margin-bottom:10px">Make sure everything is connected and set up. Each line opens the place to fix it.</p><div id="wizSetup"></div>
@@ -1427,6 +1442,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/measure.js?v=__V__"></script>
 <script src="/js/channels.js?v=__V__"></script>
 <script src="/js/results.js?v=__V__"></script>
+<script src="/js/readiness.js?v=__V__"></script>
 <script src="/js/setup-home.js?v=__V__"></script>
 <script src="/js/liveeq.js?v=__V__"></script>
 <script src="/js/nav.js?v=__V__"></script>

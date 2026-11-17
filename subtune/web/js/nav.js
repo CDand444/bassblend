@@ -212,7 +212,7 @@ function safe(name, fn) {
 let polling = false;
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
-  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'receiver.js': 'renderBlend',
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'receiver.js': 'renderBlend',
                 'measure.js': 'renderDeep', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {
@@ -279,7 +279,7 @@ async function poll() {
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
-      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults};
+      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness};
     for (const [n, f] of Object.entries(parts)) safe(n, () => f());
     safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }
