@@ -58,6 +58,9 @@ def main():
               sel.value = 'PB-2000 Pro'; sel.dispatchEvent(new Event('change', {bubbles: true}));
               const card = sel.closest('.subcard'), g = f => card.querySelector(`[data-f="${f}"]`).value;
               return g('model') === 'PB-2000 Pro' && g('driver') === '12"' && g('enclosure') === 'ported' && +g('width_in') === 17.3 && +g('height_in') === 20.9 && +g('depth_in') === 23.6 && +g('amp_w') === 550 && +g('f3_hz') === 16 && card.querySelector('input[data-f="model"]').hidden || JSON.stringify([g('model'), g('driver'), g('enclosure'), g('width_in'), g('amp_w')]); })()""") is True)
+            check("Sub card: a model htTamer has a controls guide for brings its knobs (no second picker)", page.evaluate("""(() => {
+              const card = document.querySelector('#subRows .subcard:not(.off)'), cat = card.querySelector('input[data-f="catalog"]');
+              return !!cat && cat.value === 'svs-pb2000-pro' && !!card.querySelector('.hwctl [data-c]') && !card.querySelector('select[data-f="catalog"]') || (cat ? cat.value : 'no catalog'); })()""") is True)
             [page.fill(i, v) for i, v in (("#rL", "18"), ("#rW", "13"), ("#rH", "8.5"))]
             page.select_option("#rFloor", "tile")
             page.check("#rRug")
@@ -82,6 +85,19 @@ def main():
             page.evaluate("openSheet('room'); document.querySelectorAll('[data-rpanel]').forEach(p => { p.hidden = false; })"); page.wait_for_timeout(300)
             page.click("#edOpen")
             check("Room editor opens as a pop-out with the room drawn", until(page, "!document.querySelector('#edBack').hidden && !!document.querySelector('#edStage svg')", 4000) is True)
+            page.click("[data-edv='3d']")
+            check("Room editor: the 3D view shows the same room", until(page, "!document.querySelector('#ed3Box').hidden && !!ED.v3 && document.querySelector('#ed3').width > 100", 4000) is True)
+            at = page.evaluate("""(() => { const i = ED.items.findIndex(it => it.k === 'couch'); const it = ED.items[i], p = ED.v3.project([it.d.x_m, it.d.y_m, 0.6]), r = document.querySelector('#ed3').getBoundingClientRect();
+              return [i, r.left + p[0], r.top + p[1], it.d.x_m, it.d.y_m]; })()""")
+            page.mouse.move(at[1], at[2]); page.mouse.down(); page.mouse.move(at[1] + 70, at[2] + 25, steps=8); page.mouse.up()
+            now = page.evaluate(f"[ED.sel, ED.items[{at[0]}].d.x_m, ED.items[{at[0]}].d.y_m]")
+            check("Room editor 3D: dragging a couch picks it and moves it on the floor", now[0] == at[0] and (abs(now[1] - at[3]) > 0.05 or abs(now[2] - at[4]) > 0.05), str([at, now]))
+            yaw = page.evaluate("ED.cam3.yaw"); box = page.locator("#ed3").bounding_box()
+            page.mouse.move(box["x"] + 12, box["y"] + 12); page.mouse.down(); page.mouse.move(box["x"] + 112, box["y"] + 12, steps=5); page.mouse.up()
+            check("Room editor 3D: dragging empty space turns the view instead", abs(page.evaluate("ED.cam3.yaw") - yaw) > 0.3)
+            page.click("#edUndoB")
+            page.click("[data-edv='top']")
+            check("Room editor: back to the top view", page.evaluate("!document.querySelector('#edStage').hidden && document.querySelector('#ed3Box').hidden") is True)
             n0 = page.evaluate("ED.items.length")
             page.click("[data-edadd='couch:three']")
             check("Add a couch from the palette", page.evaluate("ED.items.length") == n0 + 1 and page.evaluate("ED.items[ED.sel].k") == "couch")

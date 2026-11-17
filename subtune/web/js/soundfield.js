@@ -242,3 +242,7 @@ document.addEventListener('click', e => {
   if (md) { SF.mode = md.dataset.sfmodebtn; document.querySelectorAll('[data-sfmodebtn]').forEach(b => b.classList.toggle('on', b === md)); sfRefresh(); }
 });
 window.addEventListener('resize', () => { if (SF.room && $('#sfCanvas')) sfDraw(); });
+
+// the Treatment page's button: the Sound field, comparing the bare room with the treatment switched on there (treble paths, where panels matter)
+document.addEventListener('click', e => { if (!e.target.closest('#trtSf')) return;
+  SF.treat = 'both'; SF.treble = true; const t = $('#sfTreble'); if (t) t.checked = true; SF.key = null; openSheet('soundfield'); if (typeof renderSoundfield === 'function') renderSoundfield(); });

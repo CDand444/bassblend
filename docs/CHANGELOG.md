@@ -1,5 +1,12 @@
 # htTamer changelog
 
+## Nov 19, 2026 - room editor in 3D, smoother risers, one sub picker
+
+- **Room editor in 3D**: a Top / 3D switch in the editor. In 3D, drag an item to move it across the floor (it pulls to walls and neighbours the same way), drag empty space to turn the view, drop new items from the palette onto the floor; the selected item is outlined.
+- **Smoother riser outlines**: a riser along a slanted wall is one straight edge (no staircase), and the editor centres the room.
+- **One sub picker**: the separate "Catalog model" list on each sub card is gone. Pick (or type) the model once; when htTamer has a controls guide for it (Hsu VTF-3 MK5 HP, SVS PB-2000 Pro, SB-1000, Rythmik F12), its knobs appear by themselves. "Remember size" on a sub now also saves its driver, enclosure, rated low end and amp power, and the model list updates.
+- **Treatment page**: "See the bounces with and without it" opens the Sound field comparing the bare room with your treatment.
+
 ## Nov 19, 2026 - flooring, room modeler, speaker aim in 3D
 
 - **Room page is now tabs beside a plan that stays in view**: Size and floor, Shape, Where you live, Screen, Seats, Furniture, Fixtures. The plan / 3D stays on the left (and follows you down the page) while you change things on the right; on a phone the plan sits above the tabs. The tab you were on is remembered.

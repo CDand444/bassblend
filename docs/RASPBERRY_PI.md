@@ -1,7 +1,7 @@
 # htTamer on a Raspberry Pi
 
 Status: the code runs on Linux and has a setup script, but it has **not been tried on a real Pi
-yet**. Expect a first session of small fixes, ideally with Claude connected to the Pi (below).
+yet**. Expect a first session of small fixes, ideally with an AI coding assistant connected to the Pi (below).
 
 ## What you need
 - Raspberry Pi 4 (2 GB+) or Pi 5, with **Raspberry Pi OS Lite (64-bit)**. 32-bit won't work.
@@ -59,15 +59,15 @@ On the Pi, `bassblend-update` checks the code compiles, installs it into `/opt/b
 next refresh. If the new version doesn't start within 30 seconds, the previous one is put back.
 The version shows at the bottom of the Settings file page.
 
-## Developing with Claude on the Pi (live changes)
+## Developing on the Pi with an AI coding assistant (live changes)
 Use the **dev** install, which runs htTamer straight from your checkout as your own user, so edits
 take effect after a restart:
 ```
 cd ~/bassblend
 sudo ./deploy/linux/install.sh --dev
 ```
-Then in the Claude desktop app, start a Code session **over SSH** to the Pi, in `~/bassblend`.
-Claude can edit, run `tests/`, `sudo systemctl restart bassblend`, read `journalctl -u bassblend`,
+Then start an AI coding session **over SSH** to the Pi, in `~/bassblend` (for example a Code session in the Claude desktop app).
+The assistant can edit, run `tests/`, `sudo systemctl restart bassblend`, read `journalctl -u bassblend`,
 and check the dashboard in the browser pane at http://bassblend.local:8765.
 
 ## What's different from Windows

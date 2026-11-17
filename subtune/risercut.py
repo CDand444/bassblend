@@ -215,6 +215,22 @@ def _loops(ok, nx, ny):
     return loops
 
 
+def _onto_room(p, room_pts):
+    """A corner the smoothing pushed a little past a wall is put back on the wall."""
+    if shape.point_in(room_pts, p[0], p[1]):
+        return p
+    best, bd = p, 1e9
+    for i in range(len(room_pts)):
+        (ax, ay), (bx, by) = room_pts[i], room_pts[(i + 1) % len(room_pts)]
+        dx, dy = bx - ax, by - ay
+        t = max(0.0, min(1.0, ((p[0] - ax) * dx + (p[1] - ay) * dy) / ((dx * dx + dy * dy) or 1e-12)))
+        q = (ax + t * dx, ay + t * dy)
+        d = math.hypot(p[0] - q[0], p[1] - q[1])
+        if d < bd:
+            best, bd = q, d
+    return best
+
+
 def contour(rect, room_pts, obs, tol: float = 0.035, min_area: float = 0.15):
     """The riser's outline: the clear part of `rect`, as polygons [[x, y], ...] in meters (smoothed so a slanted wall is one straight edge). None when the clear part has a hole in it
     (an obstacle standing inside the riser), which a single outline cannot hold: the caller then falls back to boxes."""
@@ -233,10 +249,11 @@ def contour(rect, room_pts, obs, tol: float = 0.035, min_area: float = 0.15):
         if len(pts) < 3:
             continue
         far = max(range(len(pts)), key=lambda i: math.hypot(pts[i][0] - pts[0][0], pts[i][1] - pts[0][1]))
-        a1, b1 = _dp(pts[:far + 1], tol), _dp(pts[far:] + pts[:1], tol)
+        t = max(tol, 1.5 * min(cx, cy))                         # at least a cell and a half: the staircase a slanted wall leaves on the grid becomes one straight edge
+        a1, b1 = _dp(pts[:far + 1], t), _dp(pts[far:] + pts[:1], t)
         pts = a1[:-1] + b1[:-1]
         if len(pts) >= 3 and abs(a) * cx * cy >= min_area:
-            polys.append([[round(x, 3), round(y, 3)] for x, y in pts])
+            polys.append([[round(x, 3), round(y, 3)] for x, y in (_onto_room(p, room_pts) for p in pts)])
     return polys
 
 

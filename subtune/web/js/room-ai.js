@@ -29,6 +29,7 @@ document.addEventListener('change', e => {                      // a model picke
     if (ent) { if (ent.driver_in) set('driver', ent.driver_in + '"'); if (ENCL.includes(ent.design)) set('enclosure', ent.design); set('width_in', ent.width_in); set('height_in', ent.height_in); set('depth_in', ent.depth_in); set('f3_hz', ent.f3_hz); set('amp_w', ent.amp_w);
       if (!card.querySelector('[data-f="notes"]').value && ent.tuning) set('notes', 'Tuning: ' + ent.tuning); toast('Subs', `${ent.model}: size, driver and ratings filled in from the database.`); }
   }
+  hwFollow(card);
 });
 function subCard(o, s = {}, used) {
   const v = k => esc(s[k] ?? '');
@@ -105,14 +106,13 @@ const guessCatalog = m => { const t = (m || '').toLowerCase(); return Object.key
 function hwBlock(o, s) {
   if (!VENDORS) return '<div class="hw" data-o="' + o + '"></div>';
   const cid = s.catalog || guessCatalog(s.model);
-  const opts = '<option value="">Not listed</option>' + Object.entries(VENDORS).map(([k, c]) => `<option value="${k}" ${k === cid ? 'selected' : ''}>${esc(c.brand + ' ' + c.model)}</option>`).join('');
-  return `<div class="hw" data-o="${o}"><div class="hw-h">Controls on the sub</div>
-    <label class="f">Catalog model<select data-f="catalog">${opts}</select></label>
+  return `<div class="hw" data-o="${o}"><div class="hw-h">Controls on the sub${cid && VENDORS[cid] ? ` <span class="muted small">(${esc(VENDORS[cid].brand + ' ' + VENDORS[cid].model)})</span>` : ''}</div>
+    <input type="hidden" data-f="catalog" value="${esc(cid)}">
     <div class="hwctl">${hwControls(cid, s.controls || {})}</div></div>`;
 }
 function hwControls(cid, ctl) {
   const c = (VENDORS || {})[cid];
-  if (!c) return '<p class="muted small" style="margin:6px 0 0">Pick your model to record its knobs and switches, so htTamer and the assistant can use them. Not listed? Put them in Notes.</p>';
+  if (!c) return '<p class="muted small" style="margin:6px 0 0">htTamer has a guide to the knobs and switches of some subs; it appears here when you pick one of them as the model above. For any other sub, put its settings in Notes.</p>';
   const v = k => ctl[k] ?? c.controls.find(x => x.key === k).default;
   const w = c.controls.map(x => `<label class="f" ${x.only_if ? `data-only='${JSON.stringify(x.only_if)}'` : ''}>${esc(x.label)}${x.kind === 'choice'
       ? `<select data-c="${x.key}">${x.options.map(([val, lab]) => `<option value="${esc(val)}" ${String(v(x.key)) === String(val) ? 'selected' : ''}>${esc(lab)}</option>`).join('')}</select>`
@@ -121,6 +121,11 @@ function hwControls(cid, ctl) {
     <details class="hwtips"><summary class="muted small">What ${esc(c.brand)} says</summary>${c.q_guide ? `<p class="small">${esc(c.q_guide)}</p>` : ''}
       <ul class="small">${(c.modes || []).filter(m => Object.keys(m.when).length).map(m => `<li><b>${esc(m.name)}</b> (${esc(Object.values(m.when).join(' + ').replace('4in', '4″ port').replace('both', 'both ports').replace('none', 'ports plugged'))}): ${esc(m.for)}</li>`).join('')}
       ${(c.tips || []).map(t => `<li>${esc(t)}</li>`).join('')}</ul><p class="muted small">Source: ${esc(c.source)}</p></details>`;
+}
+function hwFollow(card) {                                       // the controls guide follows the model: pick or type a sub htTamer has a guide for and its knobs appear
+  const inp = card.querySelector('input[data-f="model"]'), cat = card.querySelector('input[data-f="catalog"]'); if (!inp || !cat) return;
+  const cid = guessCatalog(inp.value); if (cid === cat.value) return;
+  cat.value = cid; const box = card.querySelector('.hw'); if (box) box.outerHTML = hwBlock(+card.dataset.o, {model: inp.value, catalog: cid}); hwCheck(card);
 }
 function hwRead(card) {
   const o = {}; card.querySelectorAll('[data-c]').forEach(i => o[i.dataset.c] = i.type === 'number' ? (i.value === '' ? null : +i.value) : i.value); return o;
@@ -143,8 +148,8 @@ function hwCheck(card) {
 }
 $('#subsCard').addEventListener('change', e => {
   const card = e.target.closest('.subcard'); if (!card) return;
-  if (e.target.matches('[data-f="catalog"]')) card.querySelector('.hwctl').innerHTML = hwControls(e.target.value, {});
-  if (e.target.matches('[data-f="catalog"], [data-c]')) hwCheck(card);
+  if (e.target.matches('input[data-f="model"]')) hwFollow(card);
+  if (e.target.matches('[data-c]')) hwCheck(card);
 });
 function initRoom() {
   if (roomInit || !S.room) return; roomInit = true; roomBuild++;

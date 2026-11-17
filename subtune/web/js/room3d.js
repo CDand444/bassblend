@@ -58,7 +58,7 @@
   // ---------------------------------------------------------------- 3D
   function view3d(canvas, opts) {
     const cm = (opts && opts.camera) || {yaw: 0.35, pitch: 0.62, zoom: 1};          // shared with the caller so a redraw keeps the angle
-    let room = null, marks = [], drag = null;
+    let room = null, marks = [], drag = null, view = null;
     const pinch = new Map();
     function faces() {
       const pts = outlineOf(room); if (!pts) return null;
@@ -123,6 +123,7 @@
       const cam = [c[0] - cf[0] * dist, c[1] - cf[1] * dist, c[2] - cf[2] * dist];
       const P = p => { const d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]], depth = d[0] * cf[0] + d[1] * cf[1] + d[2] * cf[2] + dist;
         const s = k / Math.max(0.1, depth); return [cw / 2 + (d[0] * rt[0] + d[1] * rt[1]) * s, ch / 2 - (d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) * s, depth]; };
+      view = {P, cam, cf, rt, up, k, cw, ch};                    // for project() and floorAt()
       const C = {wall: color(canvas, '--surface', '#fcfcfa'), line: color(canvas, '--border-strong', '#b9b7af'), floor: color(canvas, '--surface-2', '#efeee9'),
         text: color(canvas, '--text-2', '#55544f'), door: color(canvas, '--text-3', '#8a8983'), win: color(canvas, '--s3', '#4aa3df'), accent: color(canvas, '--accent', '#2a78d6')};
       const sorted = F.map(f => ({...f, pp: f.poly.map(P)})).map(f => ({...f, depth: f.pp.reduce((s, q) => s + q[2], 0) / f.pp.length}));
@@ -202,7 +203,8 @@
     }
     const ang = ev => [ev.clientX, ev.clientY];
     canvas.style.touchAction = 'none';
-    canvas.addEventListener('pointerdown', ev => { pinch.set(ev.pointerId, ang(ev)); drag = {p: ang(ev), yaw: cm.yaw, pitch: cm.pitch}; canvas.setPointerCapture(ev.pointerId); });
+    canvas.addEventListener('pointerdown', ev => { if (opts && opts.grab && opts.grab(ev)) return;      // an editor took the press (it picked something to move): no turning
+      pinch.set(ev.pointerId, ang(ev)); drag = {p: ang(ev), yaw: cm.yaw, pitch: cm.pitch}; canvas.setPointerCapture(ev.pointerId); });
     canvas.addEventListener('pointermove', ev => {
       if (!pinch.has(ev.pointerId)) return;
       const prev = [...pinch.values()]; pinch.set(ev.pointerId, ang(ev));
@@ -215,7 +217,14 @@
     canvas.addEventListener('wheel', ev => { ev.preventDefault(); cm.zoom = Math.max(0.5, Math.min(3, cm.zoom * (ev.deltaY < 0 ? 1.1 : 0.9))); draw(); }, {passive: false});
     if (window.ResizeObserver) new ResizeObserver(() => room && draw()).observe(canvas);
     canvas.addEventListener('dblclick', () => { cm.yaw = 0.35; cm.pitch = 0.62; cm.zoom = 1; draw(); });
-    return {set(r, m) { room = r; marks = m || []; draw(); }, draw, camera: cm};
+    function project(p) { if (!view) return null; const q = view.P(p); return [q[0], q[1], q[2]]; }        // a room point to canvas pixels (and depth)
+    function floorAt(clientX, clientY, z = 0) {                // the room point at height z under a canvas pixel (the ray from the eye through it)
+      if (!view) return null; const r = canvas.getBoundingClientRect(), u = (clientX - r.left - view.cw / 2) / view.k, v = -(clientY - r.top - view.ch / 2) / view.k;
+      const dir = [view.cf[0] + view.rt[0] * u + view.up[0] * v, view.cf[1] + view.rt[1] * u + view.up[1] * v, view.cf[2] + view.rt[2] * u + view.up[2] * v];
+      if (Math.abs(dir[2]) < 1e-6) return null; const t = (z - view.cam[2]) / dir[2]; if (t <= 0) return null;
+      return [view.cam[0] + dir[0] * t, view.cam[1] + dir[1] * t];
+    }
+    return {set(r, m) { room = r; marks = m || []; draw(); }, draw, camera: cm, project, floorAt};
   }
 
   // ---------------------------------------------------------------- 2D

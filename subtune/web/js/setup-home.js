@@ -225,10 +225,14 @@ document.addEventListener('click', async e => {
   const b = e.target.closest('.hwsize'); if (!b) return;
   const box = b.closest('.subcard, .spkrow'), val = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value.trim() : ''; };
   const model = val('model'), data = {width_in: val('width_in'), height_in: val('height_in'), depth_in: val('depth_in')};
+  if (b.dataset.kind === 'subs') {                         // a sub also brings its driver, enclosure, rated low end and amp, when they are filled in
+    const n = (val('driver').match(/\d+(\.\d+)?/) || [''])[0]; if (n) data.driver_in = n;
+    if (['sealed', 'ported', 'passive radiator'].includes(val('enclosure'))) data.design = val('enclosure');
+    if (val('f3_hz')) data.f3_hz = val('f3_hz'); if (val('amp_w')) data.amp_w = val('amp_w'); }
   if (!model) { toast('Hardware database', 'Type the make and model first.', 'bad'); return; }
   if (!data.width_in || !data.height_in || data.depth_in === '') { toast('Hardware database', 'Fill in width, height and depth first.', 'bad'); return; }
   const r = await post('/api/hwdb', {action: 'save', kind: b.dataset.kind, model, data});
-  if (r.error) toast('Hardware database', r.error, 'bad'); else { toast('Hardware database', `${model}: ${data.width_in} × ${data.height_in} × ${data.depth_in} in remembered.`); hwKey = null; if (b.dataset.kind === 'speakers') spkDbLoad(); }
+  if (r.error) toast('Hardware database', r.error, 'bad'); else { toast('Hardware database', `${model}: ${data.width_in} × ${data.height_in} × ${data.depth_in} in remembered.`); hwKey = null; if (b.dataset.kind === 'speakers') spkDbLoad(); else if (typeof subDbLoad === 'function') subDbLoad(); }
 });
 $('#spkSave').onclick = async () => {
   const speakers = {};

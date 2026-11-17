@@ -48,7 +48,7 @@ function edOpenWin() {
   ED.items.forEach(it => { if (it.k === 'fu') it.k = it.d.kind === 'riser' ? 'riser' : 'couch'; });
   ED.sel = -1; ED.undo = []; ED.redo = []; ED.dirty = false; ED.open = true;
   edBuild(); $('#edBack').hidden = false; document.body.style.overflow = 'hidden';
-  edRender(); edInspector(); setTimeout(() => $('#edStage').focus(), 30);
+  edRender(); edInspector(); if (ED.view === '3d') edView('3d'); setTimeout(() => $('#edStage').focus(), 30);
 }
 function edClose(apply) {
   if (!ED.open) return;
@@ -82,7 +82,8 @@ function edBuild() {
   document.head.appendChild(st);
   const d = document.createElement('div'); d.id = 'edBack'; d.hidden = true;
   d.innerHTML = `<div class="ed-win" role="dialog" aria-modal="true" aria-label="Room editor">
-    <div class="ed-top"><h2>Room editor</h2><span class="muted small">Top-down. Drag things into place; walls and other items pull in close.</span><span class="grow" style="flex:1"></span><label class="cb" style="margin:0;font-size:12px"><input type="checkbox" id="edAuto" checked><span>Wrap risers to walls, door swings and what is in the way</span></label>
+    <div class="ed-top"><h2>Room editor</h2><span class="muted small">Drag things into place, from above or in 3D; walls and other items pull in close.</span><span class="grow" style="flex:1"></span><label class="cb" style="margin:0;font-size:12px"><input type="checkbox" id="edAuto" checked><span title="Risers re-fit themselves around walls, door swings, subs, floor speakers and couches whenever something moves">Auto-wrap risers</span></label>
+      <div class="seg" role="radiogroup" aria-label="Editor view"><button type="button" data-edv="top" class="on">Top</button><button type="button" data-edv="3d">3D</button></div>
       <button type="button" class="btn ghost" id="edUndoB" title="Ctrl+Z">Undo</button><button type="button" class="btn ghost" id="edRedoB" title="Ctrl+Y">Redo</button>
       <button type="button" class="btn ghost" id="edCancel">Cancel</button><button type="button" class="btn primary" id="edApplyB">Apply to the Room card</button></div>
     <div class="ed-main"><div class="ed-pal" aria-label="Add to the room (click, or drag onto the room)">
@@ -90,11 +91,17 @@ function edBuild() {
       <button type="button" class="btn" draggable="true" data-edadd="riser">Riser</button><button type="button" class="btn" draggable="true" data-edadd="seat">Seat</button>
       <p class="muted small" style="margin:8px 0 0">Subs move here too; add or remove them on the Subs page. Speakers and fixtures are shown but fixed for now.</p></div>
       <div class="ed-stage" id="edStage" tabindex="0" aria-label="The room from above"></div>
+      <div class="ed-stage" id="ed3Box" hidden><canvas id="ed3" style="width:100%;height:100%;display:block" aria-label="The room in 3D: drag an item to move it on the floor, drag elsewhere to turn"></canvas></div>
       <div class="ed-side" id="edSide"></div></div>
     <div class="muted small" id="edStatus" style="padding:6px 14px;border-top:1px solid var(--border)" aria-live="polite"></div></div>`;
   document.body.appendChild(d);
   $('#edCancel').onclick = () => edClose(false); $('#edApplyB').onclick = () => edClose(true);
   $('#edUndoB').onclick = () => edUndo(true); $('#edRedoB').onclick = () => edUndo(false);
+  d.addEventListener('click', e => { const b = e.target.closest('[data-edv]'); if (b) edView(b.dataset.edv); });
+  const c3 = $('#ed3');
+  c3.addEventListener('pointermove', ed3Move); c3.addEventListener('pointerup', ed3Up); c3.addEventListener('pointercancel', ed3Up);
+  c3.addEventListener('keydown', edKey); c3.tabIndex = 0;
+  ['dragover', 'drop'].forEach(t => $('#ed3Box').addEventListener(t, e => { e.preventDefault(); if (t === 'drop') { const w = ED.v3 && ED.v3.floorAt(e.clientX, e.clientY); if (w) edAdd(e.dataTransfer.getData('text/plain'), w); } }));
   d.addEventListener('click', e => { const b = e.target.closest('[data-edadd]'); if (b) edAdd(b.dataset.edadd); });
   d.addEventListener('dragstart', e => { const b = e.target.closest('[data-edadd]'); if (b) { e.dataTransfer.setData('text/plain', b.dataset.edadd); e.dataTransfer.effectAllowed = 'copy'; } });
   const stage = $('#edStage');
@@ -132,7 +139,7 @@ function edDuplicate() { const it = ED.items[ED.sel]; if (!it || !(it.k === 'cou
 const edSnapTo = (v, g) => +(Math.round(v / g) * g).toFixed(3);
 function edPoint(e) {
   const svg = $('#edStage svg'); if (!svg) return null; const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
-  const p = pt.matrixTransform(svg.getScreenCTM().inverse()); return [(p.x - ED.pad) / ED.sc, (p.y - ED.pad) / ED.sc];
+  const p = pt.matrixTransform(svg.getScreenCTM().inverse()); return [(p.x - ED.ox) / ED.sc, (p.y - ED.oy) / ED.sc];
 }
 function edLines(skip, x, y, hx, hy) {                        // coordinates things pull toward: axis-aligned walls, and the edges of the other items that are close by
   const xs = [], ys = [], wx = [], wy = [], near = 0.6;
@@ -196,7 +203,8 @@ function edProblems() {
 function edRender() {
   const stage = $('#edStage'); if (!stage) return; const w = stage.clientWidth || 800, h = stage.clientHeight || 560, pad = ED.pad, {pts, es} = ED.ctx, r = ED.room;
   const sc = Math.max(8, Math.min((w - 2 * pad) / ED.W, (h - 2 * pad) / ED.L)); ED.sc = sc;
-  const X = x => pad + x * sc, Y = y => pad + y * sc, P = ED.items.map((it, i) => [it, i]);
+  ED.ox = Math.max(pad, (w - ED.W * sc) / 2); ED.oy = Math.max(pad, (h - ED.L * sc) / 2);       // the room in the middle of the stage
+  const X = x => ED.ox + x * sc, Y = y => ED.oy + y * sc, P = ED.items.map((it, i) => [it, i]);
   let g = `<path d="${pts.map((p, k) => (k ? 'L' : 'M') + X(p[0]).toFixed(1) + ' ' + Y(p[1]).toFixed(1)).join('')}Z" fill="var(--surface-2)" stroke="var(--border-strong)" stroke-width="1.8" stroke-linejoin="round"/>`;
   for (let x = 1; x < ED.W; x++) g += `<line x1="${X(x)}" x2="${X(x)}" y1="${Y(0)}" y2="${Y(ED.L)}" stroke="var(--border)" stroke-width=".6" opacity=".6"/>`;     // a grid line every meter
   for (let y = 1; y < ED.L; y++) g += `<line x1="${X(0)}" x2="${X(ED.W)}" y1="${Y(y)}" y2="${Y(y)}" stroke="var(--border)" stroke-width=".6" opacity=".6"/>`;
@@ -223,7 +231,54 @@ function edRender() {
   stage.innerHTML = `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Top-down view of the room: drag the items">${g}</svg>`;
   $('#edStatus').textContent = prob.msgs.length ? prob.msgs.join(' ') : `${ED.items.filter(i => i.k === 'couch').length} couch(es), ${ED.items.filter(i => i.k === 'riser').length} riser(s), ${ED.items.filter(i => i.k === 'sub').length} sub(s), ${ED.items.filter(i => i.k === 'seat').length} seat position(s). Nothing overlaps or sticks out.`;
   $('#edUndoB').disabled = !ED.undo.length; $('#edRedoB').disabled = !ED.redo.length;
+  if (ED.view === '3d') ed3Draw();
 }
+
+// ---- the 3D view of the same working copy: the page's 3D scene, the selected item outlined; drag an item to move it on the floor, drag anywhere else to turn
+ED.view = 'top'; ED.cam3 = {yaw: 0.35, pitch: 0.75, zoom: 1.05};
+function edView(v) {
+  ED.view = v; document.querySelectorAll('[data-edv]').forEach(b => b.classList.toggle('on', b.dataset.edv === v));
+  $('#edStage').hidden = v === '3d'; $('#ed3Box').hidden = v !== '3d';
+  if (v === '3d') { if (!ED.v3) ED.v3 = RoomView.view3d($('#ed3'), {camera: ED.cam3, grab: ed3Grab}); ed3Draw(); $('#ed3').focus(); } else { edRender(); $('#edStage').focus(); }
+}
+function edRoomNow() {                                        // the working copy as a room the 3D scene can draw
+  const r = ED.room, subs = {}; ED.items.filter(it => it.k === 'sub').forEach(it => { subs[it.o] = it.d; });
+  return {...r, furniture: ED.items.filter(it => it.k === 'couch' || it.k === 'riser').map(it => it.d), subs: {...(r.subs || {}), ...subs}, seats: ED.items.filter(it => it.k === 'seat').map(it => it.d)};
+}
+function ed3Draw() {
+  if (!ED.v3 || !window.RoomView) return; const r = edRoomNow();
+  const spk = Object.entries((S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
+  const sc = v3Scene(r, spk), it = ED.items[ED.sel], extra = [];
+  if (it && edMovable(it)) { const b = edBox(it), cs = edPoly(it) || [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]], z = it.k === 'riser' ? (it.d.height_m || 0.2) + 0.01 : 0.02;
+    cs.forEach((p, i) => { const q = cs[(i + 1) % cs.length]; extra.push({line: [[p[0], p[1], z], [q[0], q[1], z]], color: css('--accent') || '#2a78d6', width: 3, alpha: 1}); }); }
+  ED.guides.forEach(gd => extra.push({line: gd.x != null ? [[gd.x, 0, 0.01], [gd.x, ED.L, 0.01]] : [[0, gd.y, 0.01], [ED.W, gd.y, 0.01]], color: css('--accent') || '#2a78d6', dash: [5, 4], width: 1.2, alpha: 0.9}));
+  ED.v3.set(sc.room, sc.marks.concat(extra));
+}
+function ed3Pick(ev) {                                         // the item under the pointer: the nearest middle (at its top) on screen, within its own size
+  if (!ED.v3) return -1; const rc = $('#ed3').getBoundingClientRect(), x = ev.clientX - rc.left, y = ev.clientY - rc.top; let best = -1, bd = 1e9;
+  ED.items.forEach((it, i) => { if (!edMovable(it)) return; const [hx, hy] = edHalf(it), z = it.k === 'riser' ? it.d.height_m || 0.2 : it.k === 'seat' ? 0.9 : it.k === 'sub' ? 0.4 : 0.6;
+    const c = ED.v3.project([it.d.x_m, it.d.y_m, z]), e = ED.v3.project([it.d.x_m + hx, it.d.y_m + hy, z]); if (!c || !e) return;
+    const reach = Math.max(14, Math.hypot(e[0] - c[0], e[1] - c[1]) * 0.8), d = Math.hypot(x - c[0], y - c[1]) - (it.k === 'riser' ? 6 : 0);
+    if (d < reach && d < bd) { bd = d; best = i; } });
+  return best;
+}
+function ed3Grab(ev) {
+  if (ev.button != null && ev.button > 0) return false; const i = ed3Pick(ev); if (i < 0) return false;
+  const it = ED.items[i], w = ED.v3.floorAt(ev.clientX, ev.clientY); if (!w) return false;
+  ED.sel = i; ED.drag = {i, dx: it.d.x_m - w[0], dy: it.d.y_m - w[1], snap: edSnap(), id: ev.pointerId, three: true}; ED.moved = false;
+  $('#ed3').setPointerCapture(ev.pointerId); ed3Draw(); edInspector(); return true;
+}
+function ed3Move(e) {
+  const dr = ED.drag; if (!dr || !dr.three) return; const it = ED.items[dr.i], w = ED.v3.floorAt(e.clientX, e.clientY); if (!w) return;
+  let x = edSnapTo(w[0] + dr.dx, ED_GRID), y = edSnapTo(w[1] + dr.dy, ED_GRID); const [hx, hy] = edHalf(it), ln = edLines(dr.i, x, y, hx, hy);
+  const px = edPull(x, hx, ln.wx, ln.xs), py = edPull(y, hy, ln.wy, ln.ys); ED.guides = [];
+  if (!e.altKey) { x = px[0]; y = py[0]; if (px[1] != null) ED.guides.push({x: px[1]}); if (py[1] != null) ED.guides.push({y: py[1]}); }
+  if (Math.abs(x - it.d.x_m) > 1e-4 || Math.abs(y - it.d.y_m) > 1e-4) {
+    if (!ED.moved) { ED.undo.push(dr.snap); if (ED.undo.length > 60) ED.undo.shift(); ED.redo = []; ED.dirty = true; ED.moved = true; }
+    edShift(it, x - it.d.x_m, y - it.d.y_m); ed3Draw(); edInspector(true);
+  }
+}
+function ed3Up() { if (!ED.drag || !ED.drag.three) return; const moved = ED.moved; ED.drag = null; ED.guides = []; edRender(); edInspector(); if (moved) edWrapSoon(); }
 
 // ---- the side panel: the selected item's numbers
 function edInspector(keepFocus) {
