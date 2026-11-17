@@ -237,7 +237,12 @@ function safe(name, fn) {
     if (!renderErrs.has(msg)) { renderErrs.add(msg); post('/api/client-error', {where: name, message: String(e && e.message || e).slice(0, 300), page: sheetKey}).catch(() => {}); }
   }
 }
-let polling = false;
+let polling = false, hostKey = null;
+function applyHostWords() {                    // the static labels that name where the test sound comes from
+  const w = HW(), k = w.name; if (k === hostKey) return; hostKey = k;
+  document.querySelectorAll('[data-hw]').forEach(el => { const v = w[el.dataset.hw]; if (!v) return;
+    if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = v; else el.textContent = v; });
+}
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
   const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'enclosure.js': 'enEditorHtml', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
@@ -303,6 +308,7 @@ async function poll() {
     S = st;
     if (uiMode === null) setMode((S.result || {}).tune_id ? 'advanced' : 'basic', false);       // a system that has been calibrated keeps the full view
     safe('terms', () => renderTerms());
+    safe('host words', () => applyHostWords());
     safe('night', () => renderNight());
     if (ev.length) { events = events.concat(ev).slice(-600); lastEv = ev[ev.length - 1].t; safe('activity', renderLog); }
     safe('settings', () => initSettings()); safe('room', () => initRoom());

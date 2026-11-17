@@ -93,10 +93,21 @@ def mic(s, busy):
     return ("ok" if s.get("cal_file") else "warn"), f"{cal}; the room reads about {spl:.0f} dB (unweighted)"
 
 
+def _pc_hdmi(s):
+    """Windows: is there an HDMI audio output, and is it set to enough channels for the 7.1 test?"""
+    from .hdmi import windows_hdmi
+    dev, outs = windows_hdmi(s)
+    if not dev:
+        return "warn", "Windows lists no HDMI audio output (receiver tests use the network player)"
+    if dev["channels"] < 8:
+        return "warn", f"{dev['name']}: Windows plays {dev['channels']} channels on it; set it to 7.1 for the all-speakers check"
+    return "ok", f"{dev['name']}, {dev['channels']} channels"
+
+
 def hdmi(s):
     from .hdmi import HDMI_INPUTS, hdmi_port
     if sys.platform.startswith("win"):
-        return "skip", "not a Pi"
+        return _pc_hdmi(s)
     card = hdmi_port()
     if not card:
         return "warn", "nothing plugged into the Pi's HDMI ports (receiver tests use the network player)"
@@ -125,7 +136,7 @@ def run(mic_busy=False) -> dict:
     _check(out, "miniDSP", lambda: minidsp(s))
     _check(out, "Receiver", lambda: receiver(s))
     _check(out, "Mic", lambda: mic(s, mic_busy))
-    _check(out, "Pi HDMI", lambda: hdmi(s))
+    _check(out, "HDMI", lambda: hdmi(s))
     _check(out, "Storage", lambda: storage(s))
     worst = max((c["status"] for c in out), key=lambda x: ORDER[x])
     return {"t": time.time(), "status": "ok" if worst in ("ok", "skip") else worst, "checks": out}

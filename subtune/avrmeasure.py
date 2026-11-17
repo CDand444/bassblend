@@ -252,7 +252,7 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
 
         def start():
             if src.auto:
-                status("Sending the test file to the receiver…" if mode == "dlna" else "Playing from the Pi's HDMI…")
+                status("Sending the test file to the receiver…" if mode == "dlna" else f"Playing from {hdmi.where()}…")
                 o.set_mode("00")                       # Stereo: left main + bass-managed sub
                 src.play(lay["file"], "htTamer blend test")
                 time.sleep(1.0)

@@ -57,7 +57,7 @@ $('#ckRun').onclick = async () => {
   const r = await post('/api/run', {cmd: 'checkup', pos}); if (r.error) alert(r.error); ckKey = null; poll();
 };
 
-// ---------- all speakers (experimental, 7.1 over the Pi's HDMI)
+// ---------- all speakers (experimental, 7.1 over this device's HDMI)
 let allKey = null;
 function renderAllSpk() {
   const ar = S.allspk || {}, as = S.allspk_status || {}, job = S.job || {};
@@ -71,8 +71,8 @@ function renderAllSpk() {
   const how = manual ? `<ol class="howto"><li>Download <a href="/media/bassblend_all_speakers_7_1.wav" download>bassblend_all_speakers_7_1.wav</a> (8 channels, about a minute) to a USB stick or an HDMI source (PC, streamer, Blu-ray player).</li>
       <li>Set the receiver to a direct or multichannel listening mode (not Stereo or an upmixer) at a normal listening volume.</li>
       <li>Put the mic at your seat, press <b>Start listening</b>, then press play.</li></ol>`
-    : (S.pi_hdmi ? `<p class="muted small" style="margin:0"><b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> ` : `<p class="small" style="margin:0"><b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug a cable from the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on). `) +
-      'This test needs HDMI: the receiver’s network player can’t play 8 channels. htTamer switches the receiver to the input you pick, sets Direct mode so every channel reaches its own speaker, plays the file from the Pi, and puts the input, mode and volume back afterwards.</p>';
+    : (S.pi_hdmi ? `<p class="muted small" style="margin:0"><b style="color:var(--good)">✓ ${esc(HW().where[0].toUpperCase() + HW().where.slice(1))} is connected.</b> ` : `<p class="small" style="margin:0">${HW().win ? '<b style="color:var(--bad)">Windows has no HDMI audio output right now.</b> Plug this computer’s HDMI cable into a free HDMI input on the receiver (receiver on). ' : '<b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug a cable from the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on). '}`) +
+      `This test needs HDMI: the receiver’s network player can’t play 8 channels. htTamer switches the receiver to the input you pick, sets Direct mode so every channel reaches its own speaker, plays the file from ${HW().name}, and puts the input, mode and volume back afterwards.${HW().win ? ' Windows must be set to 7.1 for that output.' : ''}</p>`;
   const hk = manual + '|' + !!S.pi_hdmi;
   if ($('#allHow').dataset.k !== hk) { $('#allHow').dataset.k = hk; $('#allHow').innerHTML = how; }
   const latest = Object.values(ar).sort((a, b) => b.t - a.t)[0];
@@ -96,7 +96,7 @@ $('#allRun').onclick = async () => {
   const pos = +$('#allPos').value, mode = $('#allMode').value, auto = $('#allAuto').checked && mode === 'hdmi', set = S.settings || {};
   const inp = $('#allInp').value, inpName = $('#allInp').selectedOptions[0]?.textContent || inp;
   const msg = mode === 'hdmi'
-    ? `Run the all-speakers check at ${spotName(pos)}?\n\nThe receiver switches to ${inpName} (the Pi’s HDMI). ` + (auto ? `First soft pink noise while htTamer sets the volume to ${Math.round(set.test_spl || 75)} dB at the mic (never above ${set.avr_test_max_volume ?? 'your volume + 12'}). ` : '') +
+    ? `Run the all-speakers check at ${spotName(pos)}?\n\nThe receiver switches to ${inpName} (${HW().where}). ` + (auto ? `First soft pink noise while htTamer sets the volume to ${Math.round(set.test_spl || 75)} dB at the mic (never above ${set.avr_test_max_volume ?? 'your volume + 12'}). ` : '') +
       'Then a sweep on each speaker in turn and the subs, in Direct mode (about a minute). Input, mode, volume and sound settings are put back afterwards.'
     : 'Start listening for the 7.1 test file?\n\nAfter you press OK, press play on the file within 5 minutes. It plays a sweep on each speaker in turn (about a minute) at your receiver’s volume.';
   if (!confirm(msg)) return;
@@ -635,7 +635,7 @@ $('#dcRun').onclick = async () => {
   if (!confirm(`Run the system report at ${spotName(pos)}?\n\n` +
       (auto ? `First soft pink noise plays while htTamer steps the receiver volume until it reads ${tgt} dB at the mic` +
               ` (never above ${mx !== '' ? mx : 'your current volume + 12'}). ` : 'The receiver stays at its current volume. ') +
-      (mode === 'hdmi' ? `The receiver switches to ${$('#dcInp').selectedOptions[0].textContent} (the Pi’s HDMI) for the test. ` : '') +
+      (mode === 'hdmi' ? `The receiver switches to ${$('#dcInp').selectedOptions[0].textContent} (${HW().where}) for the test. ` : '') +
       `Then three 8-second sweeps play: left speaker, right speaker, both (about a minute in all).\n\n` +
       `Your input, listening mode and volume are put back afterwards. Keep the mic at ear height, and the room quiet.`)) return;
   const r = await post('/api/deepcheck', {pos, mode, auto_volume: auto, avr_input: $('#dcInp').value});

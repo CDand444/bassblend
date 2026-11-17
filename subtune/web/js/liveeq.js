@@ -205,7 +205,7 @@ $('#leqAI').onclick = () => {
   if (!S.ai_api) { alert('Auto EQ uses the assistant. Add an AI provider key in Setup → AI analysis first.'); return; }
   chatOpen(true);
   chatSend('Auto EQ my subs with the live EQ: the mic is at the MLP. Start the live analyzer if it isn\'t running'
-    + (leqMode ? ` (play from ${leqMode === 'hdmi' ? 'the Pi\'s HDMI' : 'the network player'})` : '')
+    + (leqMode ? ` (play from ${leqMode === 'hdmi' ? HW().where : 'the network player'})` : '')
     + ', run the auto-fit, check the live curve did what it expected, and tell me the before and after and anything EQ can\'t fix. Don\'t save it into a tune yet.');
 };
 $('#leqOff').onclick = async () => {
@@ -227,7 +227,7 @@ $('#leqHold').onclick = () => {
 $('#leqRun').onclick = async () => {
   if (LQ.analyzer) { $('#leqRun').disabled = true; await post('/api/liveeq', {action: 'stop'}); setTimeout(leqPoll, 500); return; }
   const auto = $('#leqAuto').checked, inp = $('#leqInp');
-  if (!confirm('Start the live analyzer?\n\n' + (leqMode === 'hdmi' ? `The receiver switches to ${inp.selectedOptions[0].textContent} (the Pi’s HDMI). ` : '') +
+  if (!confirm('Start the live analyzer?\n\n' + (leqMode === 'hdmi' ? `The receiver switches to ${inp.selectedOptions[0].textContent} (${HW().where}). ` : '') +
       (auto ? 'It first sets the volume with soft pink noise, then plays ' : 'It plays ') +
       'soft bass noise (15–200 Hz) through the subs and front speakers until you press Stop, at most 10 minutes. Leave the mic at your seat. The receiver is put back when it stops.')) return;
   const r = await post('/api/liveeq', {action: 'start', mode: leqMode, avr_input: inp.value, auto_volume: auto, speed: $('#leqSpeed').value});

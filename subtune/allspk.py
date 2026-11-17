@@ -191,7 +191,8 @@ def stereo_only(out) -> bool:
     return sp["FL"]["heard"] and sp["FR"]["heard"] and not any(sp[c]["heard"] for c in ("C", "SL", "SR", "SBL", "SBR"))
 
 
-from .hdmi import HDMI_INPUTS, HdmiPlayer, hdmi_port  # noqa: E402,F401  (tests patch these names here)
+from . import hdmi as _hdmi  # noqa: E402
+from .hdmi import HDMI_INPUTS, HdmiPlayer, hdmi_port, make_player  # noqa: E402,F401  (tests patch these names here)
 
 ALSA_CHMAP = None
 # The Pi's HDMI port takes 7.1 in the HDMI (CEA-861) slot order FL FR LFE FC RL RR RLC RRC, where a 7.1
@@ -218,11 +219,10 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
     if mode == "hdmi":
         avr_input = (avr_input or s.get("avr_pi_input") or "").upper()
         if avr_input not in HDMI_INPUTS:
-            raise RuntimeError("Pick the receiver input the Pi's HDMI cable is plugged into, then run it again.")
+            raise RuntimeError(f"Pick the receiver input {_hdmi.host()['name']}'s HDMI cable is plugged into, then run it again.")
         card = hdmi_port()
         if not card:
-            raise RuntimeError("The Pi doesn't see anything on its HDMI ports. Plug the Pi's HDMI port (micro-HDMI 0, "
-                               "next to the USB-C power) into a receiver HDMI input, make sure the receiver is on, and try again.")
+            raise RuntimeError(_hdmi.no_output_message())
     rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     if mode == "hdmi":
         from .avr import MEDIA
@@ -240,7 +240,7 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
         autolevel.build_probe()
         snap = o.snapshot()
         dsp_before = dsp.status()["master"]["source"].lower()
-        player = HdmiPlayer(card)
+        player = HdmiPlayer(card) if not _hdmi.IS_WIN else make_player(card)
         playback.update({"port": card, "input": avr_input})
         try:
             status("Getting the receiver ready…")
@@ -254,7 +254,7 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
             if dsp_before == "usb":                       # the subs listen to the receiver (LFE)
                 dsp.batch([dsp.c_source(s.get("restore_source") or "i2s")], "all-speakers check: subs on the receiver's sub out")
             o.set_input(avr_input)
-            log("avr", f"all-speakers check: receiver on {HDMI_INPUTS[avr_input]} (the Pi's HDMI)")
+            log("avr", f"all-speakers check: receiver on {HDMI_INPUTS[avr_input]} ({_hdmi.where()})")
             time.sleep(3.0)                               # HDMI handshake after the input change
             if auto_volume:
                 o.set_mode("00")                          # the stereo probe plays in Stereo
@@ -286,8 +286,8 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
     r.update({"pos": pos, "mode": mode, "level": level, "playback": playback or None,
               "rx_at_measure": channels.snapshot(equip.speakers())})        # measured, not current: the sheet uses these
     if mode == "hdmi" and nothing_heard(r["speakers"]):
-        r["advice"] = [{"ch": "", "status": "fix", "text": "Nothing came through from the Pi's HDMI. Check the receiver "
-                        f"input picked ({HDMI_INPUTS.get(playback.get('input'), playback.get('input'))}) is the one the Pi "
+        r["advice"] = [{"ch": "", "status": "fix", "text": f"Nothing came through from {_hdmi.where()}. Check the receiver "
+                        f"input picked ({HDMI_INPUTS.get(playback.get('input'), playback.get('input'))}) is the one {_hdmi.host()['name']} "
                         "is plugged into, and that the receiver shows a PCM multichannel signal while the test plays."}]
     elif stereo_only(r):
         r["advice"].insert(0, {"ch": "", "status": "fix", "text": "Only the front left and right came through: the receiver "
@@ -299,7 +299,7 @@ def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=N
     allr[str(pos)] = r
     update_state(allspk=allr, allspk_status={"running": False})
     from . import journal
-    journal.add("allspk", "All-speakers check" + (" (Pi HDMI)" if mode == "hdmi" else " (own source)") + ": "
+    journal.add("allspk", "All-speakers check" + (f" ({_hdmi.host()['hdmi']})" if mode == "hdmi" else " (own source)") + ": "
                 + "; ".join(t["text"].split(":")[0] for t in r["advice"])[:300], pos=pos)
     log("measure", f"all-speakers check at spot {pos}: {len(r['advice'])} notes")
     return r

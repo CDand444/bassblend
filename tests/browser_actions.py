@@ -131,6 +131,16 @@ def main():
                 check("Calibrate my subs is held back until the system is ready", "Not ready" in page.inner_text("#rdOut") or page.is_disabled("#qsGo"))
             page.click("#uiModeSeg [data-uimode='advanced']")
 
+            # ---- Not on a Pi: the receiver test pages never talk about "the Pi" (this check runs on a PC or a CI machine)
+            if page.evaluate("!S.host.pi"):
+                import re as _re
+                for key in ("blend", "allspk", "report", "liveeq"):
+                    page.evaluate(f"openSheet('{key}')")
+                    page.wait_for_timeout(500)
+                    txt = page.inner_text("#viewBody")
+                    check(f"No Pi wording on {key} when this is not a Pi", not _re.search(r"Pi", txt), str(_re.findall(r".{20}Pi.{20}", txt))[:200])
+                page.evaluate("openSheet('home')")
+
             # ---- Data that changes behind the page's back reaches the page by itself (the page polls)
             page.goto(base + "/#/allspk")
             page.wait_for_timeout(600)

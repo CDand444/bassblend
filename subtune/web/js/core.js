@@ -4,6 +4,10 @@
 { const f0 = window.fetch.bind(window);
   window.fetch = (u, o) => f0(u, o).then(r => { if (r.status === 401 && !String(u).includes('/api/login')) location.href = '/login'; return r; }); }
 const $ = s => document.querySelector(s);
+// where test sound comes from: "the Pi" on a Raspberry Pi, "this computer" anywhere else (the server says which, in S.host)
+const HW = () => { const h = (typeof S !== 'undefined' && S && S.host) || {pi: true};
+  return h.pi ? {win: false, name: 'the Pi', hdmi: 'Pi HDMI', where: 'the Pi’s HDMI', plugged: 'Pi plugged into', plays: 'The Pi plays it over HDMI'}
+              : {win: h.os === 'windows', name: 'this computer', hdmi: 'PC HDMI', where: 'this computer’s HDMI', plugged: 'This computer plugged into', plays: 'This computer plays it over HDMI'}; };
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 // ---------- notifications: toasts in the page, browser notifications while the tab is in the background

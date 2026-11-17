@@ -18,7 +18,7 @@ AREAS = ("setup", "safety", "hardware", "tune", "blend", "receiver", "dirac", "v
 
 
 def _mode():
-    """Pi HDMI when it's plugged in and its receiver input is known, else the network player."""
+    """This device's HDMI when it is connected and its receiver input is known, else the network player."""
     try:
         from .config import load_settings
         from .hdmi import HDMI_INPUTS, hdmi_port

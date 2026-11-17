@@ -37,9 +37,9 @@ def build(st: dict, settings: dict, now: float | None = None) -> dict:
 
     # ---- connected: from the silent hardware check, with its age
     spec = [("miniDSP", "miniDSP", True, "wizard"), ("Mic", "Measurement mic (UMIK-1)", False, "wizard"), ("Receiver", "Receiver", False, "avr"),
-            ("Pi HDMI", "Pi HDMI to the receiver", False, "avr")]
+            ("HDMI", "HDMI to the receiver", False, "avr")]
     for key, label, blocks, page in spec:
-        c = checks.get(key)
+        c = checks.get(key) or (checks.get("Pi HDMI") if key == "HDMI" else None)          # older results called it Pi HDMI
         if not c:
             connected.append(_item(key, label, "unknown", "not checked yet: run the silent check", None, now, page))
         elif not fresh:

@@ -20,7 +20,7 @@ SETTINGS = {"cal_file": "/x/cal.txt", "subs": [0, 1], "avr_host": "192.168.1.50"
 
 
 def smoke(t=NOW - 60, **status):
-    base = {"miniDSP": ("ok", "slot 3 playing"), "Mic": ("ok", "UMIK-1 found"), "Receiver": ("ok", "on"), "Pi HDMI": ("ok", "connected"), "Storage": ("ok", "20 GB free")}
+    base = {"miniDSP": ("ok", "slot 3 playing"), "Mic": ("ok", "UMIK-1 found"), "Receiver": ("ok", "on"), "HDMI": ("ok", "connected"), "Storage": ("ok", "20 GB free")}
     base.update({k: (v, f"{k} {v}") for k, v in status.items()})
     return {"t": t, "status": "ok", "checks": [{"name": n, "status": s, "detail": d} for n, (s, d) in base.items()]}
 
@@ -58,12 +58,12 @@ def test_a_calibration_file_that_is_not_there_blocks():
 
 
 def test_standby_receiver_is_fine_but_a_missing_hdmi_is_a_warning():
-    r = readiness.build({"smoke": smoke(**{"Pi HDMI": "warn"})}, SETTINGS, NOW)
+    r = readiness.build({"smoke": smoke(**{"HDMI": "warn"})}, SETTINGS, NOW)
     st = smoke()
     st["checks"][2] = {"name": "Receiver", "status": "warn", "detail": "in standby (tests switch it on)"}
     ok = readiness.build({"smoke": st}, SETTINGS, NOW)
     assert item(ok, "Receiver")["status"] == "ok"
-    assert item(r, "Pi HDMI")["status"] == "warn"
+    assert item(r, "HDMI")["status"] == "warn"
 
 
 def test_settings_that_are_only_nice_to_have_warn():

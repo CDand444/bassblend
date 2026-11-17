@@ -894,13 +894,13 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="setupList"></div>
       <div class="row" style="margin-top:14px;align-items:center">
         <button class="btn" id="smokeRun">Check the hardware (silent)</button>
-        <span class="muted small">Reads the miniDSP and receiver, listens to the mic for a second, and checks the Pi's HDMI. Plays nothing and changes nothing.</span>
+        <span class="muted small">Reads the miniDSP and receiver, listens to the mic for a second, and checks the HDMI output. Plays nothing and changes nothing.</span>
       </div>
       <div id="smokeOut" style="margin-top:10px"></div>
       <div class="card-h" style="margin:18px 0 6px"><h3 style="margin:0;font-size:14px">Gain structure <span class="beta">Beta</span></h3><span class="sub" id="gainSub"></span></div>
       <p class="muted small" style="margin:0 0 8px">Can the receiver's sub output overload the miniDSP's input at the loudest you listen? Clipping there happens before any tune and can't be fixed by EQ. Plays a quiet 40 Hz tone through the receiver for a few seconds (volume set automatically and put back).</p>
       <div class="row" style="align-items:end">
-        <label class="f" style="width:auto">Plays from<select id="gainMode"><option value="hdmi">Pi HDMI</option><option value="dlna">Network</option></select></label>
+        <label class="f" style="width:auto">Plays from<select id="gainMode"><option value="hdmi" data-hw="hdmi">Pi HDMI</option><option value="dlna">Network</option></select></label>
         <label class="f" style="width:190px">Loudest you listen (receiver volume)<input id="gainMax" type="number" min="10" max="100" step="0.5" placeholder="e.g. 70"></label>
         <span class="grow"></span><button class="btn" id="gainRun">Check gain structure</button>
       </div>
@@ -958,8 +958,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="row" style="align-items:end">
         <label class="f" style="width:auto">How to play the test
           <div class="seg" id="blendMode" role="radiogroup">
-            <button type="button" data-m="hdmi">Pi HDMI</button><button type="button" data-m="dlna" class="on">Network</button><button type="button" data-m="manual">USB stick</button></div></label>
-        <label class="f piInpF" style="width:auto" id="blendInpF">Pi plugged into<select class="piInp" id="blendInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
+            <button type="button" data-m="hdmi" data-hw="hdmi">Pi HDMI</button><button type="button" data-m="dlna" class="on">Network</button><button type="button" data-m="manual">USB stick</button></div></label>
+        <label class="f piInpF" style="width:auto" id="blendInpF" data-hw="plugged">Pi plugged into<select class="piInp" id="blendInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="f" style="width:auto">Speakers to test
           <div class="seg" id="blendSpk" role="radiogroup">
             <button type="button" data-s="LR" class="on">Left + right</button><button type="button" data-s="L">Left only</button></div></label>
@@ -1096,8 +1096,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="leqNote"></div>
       <div class="row" style="align-items:end">
         <label class="f" style="width:auto">Analyzer plays from
-          <div class="seg" id="leqMode" role="radiogroup"><button type="button" data-m="hdmi">Pi HDMI</button><button type="button" data-m="dlna">Network</button></div></label>
-        <label class="f piInpF" style="width:auto" id="leqInpF">Pi plugged into<select class="piInp" id="leqInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
+          <div class="seg" id="leqMode" role="radiogroup"><button type="button" data-m="hdmi" data-hw="hdmi">Pi HDMI</button><button type="button" data-m="dlna">Network</button></div></label>
+        <label class="f piInpF" style="width:auto" id="leqInpF" data-hw="plugged">Pi plugged into<select class="piInp" id="leqInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="f" style="width:120px">Response<select id="leqSpeed"><option value="fast">Fast</option><option value="normal" selected>Normal</option><option value="slow">Slow, steady</option></select></label>
         <label class="cb" style="max-width:230px"><input type="checkbox" id="leqAuto" checked><span>Set the receiver volume for me<small>To your test level first; put back when you stop.</small></span></label>
         <span class="grow"></span>
@@ -1158,8 +1158,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="lead">A full-range check of your front speakers and subs, the way you listen: a 20 Hz to 20 kHz sweep on the left speaker, the right, then both. About a minute. It finds things that are hard to hear on your own (polarity, timing, reflections, resonances, how long the room rings, distortion, noise) and says what each means and what to do.</p>
       <div class="tune-controls dc-controls">
         <label class="f">Mic at<select id="dcPos"></select></label>
-        <label class="f">Playback<select id="dcMode"><option value="hdmi">The Pi plays it over HDMI</option><option value="dlna" selected>The receiver plays it (network)</option><option value="manual">I'll play it from a USB stick</option></select></label>
-        <label class="f piInpF" id="dcInpF">Pi plugged into<select class="piInp" id="dcInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
+        <label class="f">Playback<select id="dcMode"><option value="hdmi" data-hw="plays">The Pi plays it over HDMI</option><option value="dlna" selected>The receiver plays it (network)</option><option value="manual">I'll play it from a USB stick</option></select></label>
+        <label class="f piInpF" id="dcInpF" data-hw="plugged">Pi plugged into<select class="piInp" id="dcInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="cb" style="max-width:260px"><input type="checkbox" id="dcAuto" checked><span>Set the receiver volume for me<small>Pink noise first, then steps the volume to the target level at the mic. Your volume is put back afterwards.</small></span></label>
         <label class="f">Target level<select id="dcSpl"><option value="70">70 dB (quiet)</option><option value="75">75 dB (standard)</option><option value="80">80 dB (louder)</option></select></label>
         <label class="f">Max volume<span class="unit" data-u="vol"><input id="dcMax" type="number" min="20" max="70" step="0.5" placeholder="auto" title="The highest receiver volume a test may use. Empty = your current volume + 12 (never above 70)."></span></label>
@@ -1176,8 +1176,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="lead">Checks every bed speaker (front, center, surrounds, surround backs and the LFE) for level and distance against the front left, with a 7.1 test file that plays a sweep on each speaker in turn. Height speakers need Dolby Atmos content, so they aren’t covered.</p>
       <div class="tune-controls dc-controls">
         <label class="f" style="width:150px">Mic at<select id="allPos"><option value="1">MLP</option><option value="2">Spot 2</option><option value="3">Spot 3</option></select></label>
-        <label class="f">Playback<select id="allMode"><option value="hdmi">The Pi plays it over HDMI</option><option value="manual">I’ll play it (another HDMI source or USB stick)</option></select></label>
-        <label class="f piInpF" id="allInpF">Pi plugged into<select class="piInp" id="allInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
+        <label class="f">Playback<select id="allMode"><option value="hdmi" data-hw="plays">The Pi plays it over HDMI</option><option value="manual">I’ll play it (another HDMI source or USB stick)</option></select></label>
+        <label class="f piInpF" id="allInpF" data-hw="plugged">Pi plugged into<select class="piInp" id="allInp"><option value="">Pick the receiver input…</option><option value="10">BD/DVD</option><option value="01">CBL/SAT</option><option value="11">STRM BOX</option><option value="02">GAME</option><option value="05">PC</option><option value="03">AUX (front)</option></select></label>
         <label class="cb" style="max-width:240px"><input type="checkbox" id="allAuto" checked><span>Set the receiver volume for me<small>Same as the System report; put back afterwards.</small></span></label>
         <span class="grow"></span><button class="btn primary lg" id="allRun">Run all-speakers check</button></div>
       <div id="allHow" style="margin-top:8px"></div>

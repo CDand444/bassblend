@@ -41,7 +41,8 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "ai_read_only": (int, 0, 1),                 # the assistant (and MCP clients) can only read and advise
             "ai_daily_calls": (int, 20, 2000),          # AI requests per day for the assistant (protects your credit)                     # let the assistant build the hardware database (and look things up)
             "mcp_enabled": (int, 0, 1),                 # outside AI clients may connect at /mcp (or `subtune mcp`)
-            "mcp_actions": (int, 0, 2)}                 # their sound/write tools: 0 refused, 1 ask each time, 2 client asks
+            "mcp_actions": (int, 0, 2),
+            "hdmi_swap_surrounds": (int, 0, 1)}         # Windows: swap the surround and surround-back pairs if a receiver shows them swapped                 # their sound/write tools: 0 refused, 1 ask each time, 2 client asks
 
 
 def _playback(body, modes=("hdmi", "dlna", "manual")):
@@ -58,7 +59,8 @@ def _playback(body, modes=("hdmi", "dlna", "manual")):
         inp = str(body.get("avr_input") or s.get("avr_pi_input") or "")
         inp = inp.upper() if inp.upper() in HDMI_INPUTS else inp
         if inp not in HDMI_INPUTS:
-            raise ValueError("pick the receiver input the Pi's HDMI is plugged into")
+            from . import hdmi as _h
+            raise ValueError(f"pick the receiver input {_h.host()['name']}'s HDMI is plugged into")
         if s.get("avr_pi_input") != inp:
             s["avr_pi_input"] = inp
             save_settings(s)
@@ -1776,8 +1778,13 @@ class H(BaseHTTPRequestHandler):
             s = load_settings()
             st["settings"] = {k: s.get(k) for k in ("preset", "subs", "ref_sub", "cal_file", "sweep_dbfs",
                                                      "restore_source", "avr_pi_input", *SETTABLE)}
-            from .hdmi import hdmi_port
-            st["pi_hdmi"] = hdmi_port()
+            from . import hdmi as _hdmi
+            st["pi_hdmi"] = _hdmi.hdmi_port()
+            st["host"] = _hdmi.host()
+            if _hdmi.IS_WIN:                              # which of the PC's outputs plays the test files, and what Windows offers
+                dev, outs = _hdmi.windows_hdmi(s)
+                st["pc_hdmi"] = {"device": dev["name"] if dev else None, "channels": dev["channels"] if dev else None,
+                                 "chosen": s.get("hdmi_device") or "", "outputs": [{"name": o["name"], "channels": o["channels"]} for o in outs]}
             from . import abtest
             st["ab"] = abtest.view()
             from .legal import status as terms_status
@@ -2053,6 +2060,16 @@ class H(BaseHTTPRequestHandler):
             return
         if path == "/api/backups":
             return self._backups(body)
+        if path == "/api/hdmi-device":                 # Windows: which of the PC's audio outputs plays receiver tests (empty = automatic)
+            from . import hdmi as _h
+            name = str(body.get("device") or "")
+            if name and name not in [o["name"] for o in _h.windows_outputs()]:
+                return self._send(400, {"error": "Windows doesn't list that output right now"})
+            s = load_settings()
+            s["hdmi_device"] = name or None
+            save_settings(s)
+            event("config", f"HDMI audio output set to {name or 'automatic'}")
+            return self._send(200, {"ok": True, "device": name})
         if path == "/api/mcp":                         # the owner makes or revokes the MCP token (shown once)
             from . import mcp
             if body.get("action") == "new_token":

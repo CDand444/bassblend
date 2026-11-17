@@ -455,7 +455,7 @@ def run_rta(mode="hdmi", avr_input=None, auto_volume=True, minutes=MAX_MINUTES, 
     o = avr.receiver()
     src = hdmi.Source(mode, o, avr_input, s, log)
     if not src.auto:
-        raise RuntimeError("the live analyzer plays from the Pi's HDMI or the network player")
+        raise RuntimeError("the live analyzer plays from this device's HDMI or the network player")
     rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     build_noise()
     if auto_volume:

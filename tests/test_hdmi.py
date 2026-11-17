@@ -27,18 +27,18 @@ class Rx:
 
 
 def _patched(fn):
-    saved = (hdmi.hdmi_port, hdmi.HdmiPlayer, hdmi.time.sleep)
+    saved = (hdmi.hdmi_port, hdmi.HdmiPlayer, hdmi.time.sleep, hdmi.IS_WIN, hdmi.is_pi)
     played = []
 
     class P:
         def __init__(self, card): played.append("card " + card)
         def play(self, path, chmap=None): played.append(pathlib.Path(path).name)
         def stop(self): played.append("stop")
-    hdmi.HdmiPlayer, hdmi.time.sleep = P, (lambda s: None)
+    hdmi.HdmiPlayer, hdmi.time.sleep, hdmi.IS_WIN, hdmi.is_pi = P, (lambda s: None), False, (lambda: True)      # these tests are about the Pi
     try:
         return fn(played)
     finally:
-        hdmi.hdmi_port, hdmi.HdmiPlayer, hdmi.time.sleep = saved
+        hdmi.hdmi_port, hdmi.HdmiPlayer, hdmi.time.sleep, hdmi.IS_WIN, hdmi.is_pi = saved
 
 
 def test_hdmi_source_switches_input_and_plays_from_the_pi():

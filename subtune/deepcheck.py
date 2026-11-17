@@ -758,7 +758,7 @@ def run(mode="dlna", pos=1, auto_volume=True, log=None, status=None, label="", a
                 time.sleep(1.0)
 
             def start():
-                status("Sending the test to the receiver…" if mode == "dlna" else "Playing from the Pi's HDMI…")
+                status("Sending the test to the receiver…" if mode == "dlna" else f"Playing from {hdmi.where()}…")
                 src.play(MEDIA_NAME, "htTamer full-range test")
                 time.sleep(1.0)
                 o.set_mode("00")

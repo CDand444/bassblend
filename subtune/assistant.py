@@ -130,7 +130,7 @@ LFE). Before Dirac Live runs, mention the maker's auto-EQ setup when it applies 
 EQ1, Q 0.7).
 - All-speakers check (run_all_speakers / get_overview -> all_speakers_check, experimental): level, arrival and \
 of every bed speaker and the LFE against the front left (level and distance only; it doesn't judge polarity), from a 7.1 test file. It needs HDMI: the Pi \
-plays the file out of its own HDMI port and htTamer switches the receiver to the input the Pi is plugged into \
+plays the file out of its own HDMI port and htTamer switches the receiver to the input this device is plugged into \
 (chosen once on the All speakers page), in Direct mode, volume set automatically, all restored after. The \
 receiver's network player can't play 8 channels, so there is no network option. Mode "manual" = the owner plays \
 the file from another HDMI source or USB stick. Heights can't be tested this way. get_overview's all_speakers_check.setup_sheet is the owner's receiver setup sheet (level and distance changes per channel, final numbers when the receiver's values were recorded at the time; the page /channels prints it): read it out in the receiver's own words, and repeat its warning if the receiver settings changed since the measurement.
@@ -167,7 +167,7 @@ never below protect_hz); keep peak_db at or below 0; don't chase below 20 Hz or 
 two or three lines: what you set and the before/after rms. Then offer to save_live_eq (approval) or to leave the \
 bands live for listening, and stop the analyzer when done (no approval needed).
 - Playback for every receiver test (blend, system report, fix, all speakers): get_overview -> playback says whether \
-the Pi's HDMI is plugged in and which receiver input it's on. When it's ready use mode "hdmi" (the Pi plays the file \
+this device's HDMI is connected and which receiver input it's on. When it's ready use mode "hdmi" (the Pi plays the file \
 out of its HDMI port and htTamer switches the receiver to that input, then back); otherwise "dlna" (the receiver's \
 network player; 2 channels only), or "manual" if the owner prefers a USB stick.
 - Speaker placement (get_overview -> speaker_placement): Dolby-guideline positions for the layout, worked out from \
@@ -334,7 +334,7 @@ TOOLS = [
        "the right, then both (about a minute), then the report. With auto_volume the receiver volume is set "
        "first with soft pink noise and put back afterwards.",
        {"pos": SPOT, "mode": {"type": "string", "enum": ["hdmi", "dlna", "manual"],
-                              "description": "hdmi = the Pi plays it out of its HDMI port (receiver switched to that input; "
+                              "description": "hdmi = this device plays it out of its HDMI port (receiver switched to that input; "
                                              "best when connected); dlna = the receiver's network player; manual = owner plays a file from USB"},
         "auto_volume": {"type": "boolean", "description": "set the receiver volume to the test level first (hdmi or dlna)"}},
        ["pos", "mode", "auto_volume"], approval=True),
@@ -343,7 +343,7 @@ TOOLS = [
        "(new tune on the playing slot, never slot 1) if it helps, then runs a new system report to check. Several "
        "minutes of sweeps; the volume is set automatically and restored.", {"pos": SPOT}, ["pos"], approval=True),
     _t("run_all_speakers", "Experimental: a sweep on each bed speaker in turn plus the LFE from a 7.1 test file, then "
-       "level and arrival (distance) of each against the front left. hdmi = the Pi plays it out of its HDMI "
+       "level and arrival (distance) of each against the front left. hdmi = this device plays it out of its HDMI "
        "port, the receiver is switched to that input in Direct mode (volume set automatically if auto_volume, all "
        "restored after; the input must have been picked on the All speakers page); manual = the owner plays the "
        "file from another HDMI source or USB stick. About a minute of sweeps.",
@@ -359,7 +359,7 @@ TOOLS = [
        "timing/polarity and level that blend best with the speakers. Plays sweeps through the receiver; "
        "with auto_volume it first sets the volume to the test level (and puts it back after).",
        {"pos": SPOT, "mode": {"type": "string", "enum": ["hdmi", "dlna", "manual"],
-                              "description": "hdmi = the Pi plays it out of its HDMI port (receiver switched to that input; "
+                              "description": "hdmi = this device plays it out of its HDMI port (receiver switched to that input; "
                                              "best when connected); dlna = the receiver's network player; manual = owner plays a file from USB"},
         "speakers": {"type": "string", "enum": ["left", "both"],
                      "description": "left = left speaker only (about 30 s); both = left then right (about 40 s), "
@@ -457,7 +457,7 @@ TOOLS = [
     _t("start_live_analyzer", "Start the live analyzer: plays soft bass noise (15-200 Hz) through the receiver until "
        "stopped (max 10 minutes), after setting the volume with the guarded auto-level; the mic's response then shows "
        "in get_live_eq. Needs the mic at the seat being EQ'd (normally the MLP).",
-       {"mode": {"type": "string", "enum": ["hdmi", "dlna"], "description": "hdmi = from the Pi's HDMI (preferred when "
+       {"mode": {"type": "string", "enum": ["hdmi", "dlna"], "description": "hdmi = from this device's HDMI (preferred when "
                                                                              "get_overview -> playback says it's ready)"},
         "auto_volume": {"type": "boolean"}}, ["mode", "auto_volume"], approval=True),
     _t("stop_live_analyzer", "Stop the live analyzer's noise and put the receiver back. The live bands stay on."),
@@ -540,24 +540,24 @@ DESCRIBE = {
     "avr_control": lambda i: f"Receiver: {i['action'].replace('_', ' ')} → {i['value']}",
     "run_avr_blend": lambda i: (f"Blend test through the receiver at spot {i['pos']}, "
                                 + ("left + right speakers" if i.get("speakers") == "both" else "left speaker")
-                                + (" (Pi HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
+                                + (" (HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
                                 + (", volume set automatically" if i.get("auto_volume") and i["mode"] != "manual" else "")),
     "run_all_speakers": lambda i: (f"All-speakers check at spot {i['pos']}: a sweep on every speaker in turn"
-                                   + (" from the Pi's HDMI (receiver switched to that input, Direct mode)" if i["mode"] == "hdmi"
+                                   + (" from this device's HDMI (receiver switched to that input, Direct mode)" if i["mode"] == "hdmi"
                                       else " from your own HDMI source or USB stick")
                                    + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] == "hdmi" else "")),
     "run_headroom": lambda i: f"LOUD: headroom test on output {i['output']} (rising tone bursts, stops automatically)",
     "fix_from_report": lambda i: (f"Fix what htTamer can at spot {i['pos']}: set the receiver's sub level, blend test + "
                                   "blend fix on the playing slot, then a new system report (several minutes of sweeps)"),
     "run_system_report": lambda i: (f"Full-range system report at spot {i['pos']}: sweeps on the left, right and both "
-                                    "front speakers" + (" (Pi HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
+                                    "front speakers" + (" (HDMI)" if i["mode"] == "hdmi" else " (network)" if i["mode"] == "dlna" else " (USB stick)")
                                     + (", volume set automatically and put back after" if i.get("auto_volume") and i["mode"] != "manual" else "")),
     "apply_avr_blend": lambda i: "Apply the blend fix (all measured seats, if any) as a new tune on the playing slot",
     "keep_fixes": lambda i: "Keep the current fixes: make what's playing the new starting point",
     "run_measurement": lambda i: f"Measure every sub at spot {i['pos']} (a sweep on each sub, about a minute)",
     "undo_fixes": lambda i: "Undo all fixes: put the starting tune and receiver sub level back",
     "start_live_analyzer": lambda i: ("Start the live analyzer: soft bass noise through the receiver until stopped (max 10 min)"
-                                      + (" from the Pi's HDMI" if i["mode"] == "hdmi" else " from the network player")
+                                      + (" from this device's HDMI" if i["mode"] == "hdmi" else " from the network player")
                                       + (", volume set automatically and put back after" if i.get("auto_volume") else "")),
     "save_live_eq": lambda i: "Save the live EQ bands into a new tune and apply it to the playing slot",
 }

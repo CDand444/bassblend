@@ -20,6 +20,9 @@ import numpy as np                                    # noqa: E402
 from scipy.signal import fftconvolve                  # noqa: E402
 
 from subtune import allspk as A                       # noqa: E402
+
+A._hdmi.IS_WIN = False                                  # these tests are about the Pi's HDMI (the Windows path has its own tests)
+A._hdmi.is_pi = lambda: True
 from subtune.config import AUDIO_FS as FS             # noqa: E402
 
 

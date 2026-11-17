@@ -2,7 +2,7 @@
 // top-level names are shared between the parts.
 // ---------- receiver (AVR)
 // ---------- playback source shared by every receiver test: Pi HDMI / network / USB stick
-// Default playback for every test: the Pi's HDMI whenever it's plugged in, else the receiver's network player.
+// Default playback for every test: this device's HDMI whenever it is connected, else the receiver's network player.
 // Follows the cable (plug/unplug) until the owner picks a mode on that test themselves.
 const playDefault = () => S.pi_hdmi ? 'hdmi' : 'dlna';
 let playAuto = null; const playPicked = {};
@@ -25,8 +25,24 @@ document.querySelectorAll('.piInp').forEach(x => x.onchange = () => {
   document.querySelectorAll('.piInp').forEach(y => { y.value = x.value; y.dataset.touched = '1'; });
   blendKey = null; renderBlend(); renderDeep(); renderAllSpk();
 });
-const piHint = () => S.pi_hdmi ? '<b style="color:var(--good)">✓ The Pi’s HDMI is connected.</b> htTamer switches the receiver to the input you pick, plays the test from the Pi, and switches back afterwards.'
-  : '<b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on).';
+const piHint = () => { const w = HW();
+  const ok = S.pi_hdmi;
+  let h = ok ? `<b style="color:var(--good)">✓ ${esc(w.where[0].toUpperCase() + w.where.slice(1))} is connected.</b> htTamer switches the receiver to the input you pick, plays the test from ${w.name}, and switches back afterwards.`
+    : w.win ? '<b style="color:var(--bad)">Windows has no HDMI audio output right now.</b> Plug this computer’s HDMI cable into a free HDMI input on the receiver (receiver on), then check Sound settings.'
+    : '<b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on).';
+  return h + (w.win ? pcHdmiPicker() : ''); };
+function pcHdmiPicker() {                                      // Windows: which audio output plays the tests, and whether it is set to 7.1
+  const p = S.pc_hdmi; if (!p || !p.outputs.length) return '';
+  const warn = p.device && p.channels < 8 ? `<span style="color:var(--warn)"> Windows plays ${p.channels} channels on it: for the all-speakers check set it to 7.1 (Sound settings, the output, Configure speakers).</span>` : '';
+  return `<div class="row" style="gap:8px;align-items:center;margin-top:6px"><label class="f" style="width:auto">Audio output<select class="hdmiDev" aria-label="Which Windows audio output goes to the receiver"><option value="">Automatic${p.device ? ' (' + esc(p.device) + ')' : ''}</option>
+    ${p.outputs.map(o => `<option value="${esc(o.name)}" ${p.chosen === o.name ? 'selected' : ''}>${esc(o.name)} · ${o.channels} ch</option>`).join('')}</select></label>
+    <label class="cb" style="margin:0"><input type="checkbox" class="hdmiSwap" ${(S.settings || {}).hdmi_swap_surrounds ? 'checked' : ''}><span>Swap surround and surround back<small>Only if the receiver shows them the wrong way round.</small></span></label>${warn}</div>`;
+}
+document.addEventListener('change', async e => {
+  const d = e.target.closest('.hdmiDev'), sw = e.target.closest('.hdmiSwap');
+  if (d) { const r = await post('/api/hdmi-device', {device: d.value}); if (r.error) alert(r.error); blendKey = null; poll(); }
+  if (sw) { const r = await post('/api/settings', {hdmi_swap_surrounds: sw.checked ? 1 : 0}); if (r.error) alert(r.error); poll(); }
+});
 let AVR = {}, avrKey = null, blendMode = 'dlna', blendSpk = 'LR', blendSide = 'L', blendKey = null;
 const blendFile = () => blendSpk === 'LR' ? 'bassblend_blend_test_left_right.wav' : 'bassblend_blend_test.wav';
 const MODE_OPTS = [['00', 'Stereo'], ['01', 'Direct'], ['0C', 'All Ch Stereo'], ['11', 'Pure Audio'], ['80', 'Dolby Surround'], ['82', 'DTS:X / Neural:X'], ['FF', 'Auto Surround']];
@@ -315,7 +331,7 @@ $('#blendRun').onclick = async () => {
   const tgt = Math.round(set.test_spl || 75), mx = set.avr_test_max_volume;
   if (!confirm(`Run the blend test at ${spotName(pos)}?\n\n` +
       (auto ? `First soft pink noise plays while htTamer steps the receiver volume to ${tgt} dB at the mic (never above ${mx != null ? mx : 'your current volume + 12'}). ` : '') +
-      (blendMode === 'hdmi' ? `The receiver switches to ${$('#blendInp').selectedOptions[0].textContent} (the Pi’s HDMI). ` : '') +
+      (blendMode === 'hdmi' ? `The receiver switches to ${$('#blendInp').selectedOptions[0].textContent} (${HW().where}). ` : '') +
       `The receiver ${blendMode !== 'manual' ? 'plays' : 'will play'} ${blendSpk === 'LR' ? 'three sweeps (left speaker, right speaker, then left again with the subs; about 40 seconds)' : 'two sweeps on the left speaker (about 30 seconds)'}` +
       `${auto ? '' : ' at its current volume'}. Input, mode, volume and power are put back afterwards.`)) return;
   const r = await post('/api/avr/blend', {mode: blendMode, pos, speakers: blendSpk, auto_volume: auto, avr_input: $('#blendInp').value}); if (r.error) alert(r.error); blendKey = null; poll();
