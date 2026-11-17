@@ -92,6 +92,15 @@ function v3Inside(pl, x, y) {                    // is a floor point inside a po
   let n = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) { if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) n = !n; }
   return n;
 }
+function v3Hit(A, B) {                          // do two prisms {pts (convex floor shape), z0, z1} pass through each other? (touching is fine)
+  if (A.z0 >= B.z1 - 0.01 || B.z0 >= A.z1 - 0.01) return false;
+  for (const poly of [A.pts, B.pts]) for (let i = 0; i < poly.length; i++) {
+    const p = poly[i], q = poly[(i + 1) % poly.length], nx = q[1] - p[1], ny = p[0] - q[0], l = Math.hypot(nx, ny); if (l < 1e-9) continue;
+    const pr = pts => pts.map(v => (v[0] * nx + v[1] * ny) / l), a = pr(A.pts), b = pr(B.pts);
+    if (Math.max(...a) <= Math.min(...b) + 0.01 || Math.max(...b) <= Math.min(...a) + 0.01) return false;
+  }
+  return true;
+}
 function v3Slab(pts, z0, z1, fill, alpha) { return {pts, z0, z1, fill, alpha}; }
 function v3Tiles(a, b, zlo, zhi, t, n, cols, rows, fill, alpha, skip) {  // a wall panel zone split into cols x rows slabs, a thickness t in front of the wall (n = the wall's outward normal)
   const out = [], gap = 0.012, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], inw = [-n[0], -n[1]];
@@ -104,29 +113,41 @@ function v3Tiles(a, b, zlo, zhi, t, n, cols, rows, fill, alpha, skip) {  // a wa
   return out;
 }
 
-function v3Treatment(p, room) {                                  // the plan's items as solids; installed ones green, the rest by tier, blocked ones faint
+function v3Treatment(p, room, obst) {                                  // the plan's items as solids; installed ones green, the rest by tier, blocked ones faint
   const out = [], W = p.room.W, L = p.room.L, sh = p.shape || {}, ol = sh.outline && sh.outline.length >= 3 ? sh.outline : [[0, 0], [W, 0], [W, L], [0, L]];
-  (p.items || []).forEach(i => {
+  const placed = (obst || []).slice();            // what is already there: the speakers, subs and furniture, then each treatment as it is placed
+  const place = boxes => boxes.filter(b => { if (placed.some(o => v3Hit(b, o))) return false; placed.push(b); return true; });   // an item never passes through another
+  const edgeLen = k => Math.hypot(ol[(k + 1) % ol.length][0] - ol[k][0], ol[(k + 1) % ol.length][1] - ol[k][1]);
+  const openAt = k => (sh.openings || []).filter(o => o.wall === k);
+  const leg = (k, s, fromEnd) => {                // how far a corner trap's leg can run along edge k from the corner without covering a door, window or opening there
+    let L = s; openAt(k).forEach(o => { if (fromEnd) { const d = edgeLen(k) - (o.from_m + o.width_m); if (d < L && o.from_m + o.width_m > edgeLen(k) - L) L = Math.max(0, d); }
+      else if (o.from_m < L && o.from_m + o.width_m > 0) L = Math.max(0, o.from_m); }); return L; };
+  const items = (p.items || []).slice().sort((a, b) => (b.id === 'corner_traps') - (a.id === 'corner_traps'));      // traps first: they are the corner, panels keep out of them
+  items.forEach(i => {
     const fill = v3Col(trtColor(i)), alpha = i.blocked ? 0.3 : i.installed ? 1 : 0.88, qty = Math.max(1, i.qty || 1), tIn = i.thickness_in || 2;
     if (i.id === 'corner_traps') {
       (i.corners || []).forEach(c => { const k = ol.findIndex(q => Math.abs(q[0] - c.x_m) < .01 && Math.abs(q[1] - c.y_m) < .01); if (k < 0) return;
-        const a = ol[(k - 1 + ol.length) % ol.length], b = ol[(k + 1) % ol.length], s = Math.max(0.3, Math.min(0.7, tIn * 0.0254)), u = q => { const l = Math.hypot(q[0] - c.x_m, q[1] - c.y_m) || 1; return [(q[0] - c.x_m) / l * s, (q[1] - c.y_m) / l * s]; };
-        const [ax, ay] = u(a), [bx, by] = u(b), top = RoomView.ceilAt(room, c.x_m, c.y_m);
+        const n = ol.length, a = ol[(k - 1 + n) % n], b = ol[(k + 1) % n], s = Math.max(0.3, Math.min(0.7, tIn * 0.0254));
+        const sa = leg((k - 1 + n) % n, s, true), sb = leg(k, s, false);                // each leg stops short of a door beside the corner
+        if (sa < 0.12 || sb < 0.12) return;
+        const u = (q, sd) => { const l = Math.hypot(q[0] - c.x_m, q[1] - c.y_m) || 1; return [(q[0] - c.x_m) / l * sd, (q[1] - c.y_m) / l * sd]; };
+        const [ax, ay] = u(a, sa), [bx, by] = u(b, sb), top = RoomView.ceilAt(room, c.x_m, c.y_m);
         const mx = ol.reduce((t, q) => t + q[0], 0) / ol.length, my = ol.reduce((t, q) => t + q[1], 0) / ol.length, ml = Math.hypot(c.x_m - mx, c.y_m - my) || 1;
-        out.push({kind: 'solid', shadow: true, wallN: [(c.x_m - mx) / ml, (c.y_m - my) / ml], boxes: [v3Slab([[c.x_m, c.y_m], [c.x_m + ax, c.y_m + ay], [c.x_m + bx, c.y_m + by]], 0, top, fill, alpha)]}); });
+        const boxes = place([v3Slab([[c.x_m, c.y_m], [c.x_m + ax, c.y_m + ay], [c.x_m + bx, c.y_m + by]], 0, top, fill, alpha)]);
+        if (boxes.length) out.push({kind: 'solid', shadow: true, wallN: [(c.x_m - mx) / ml, (c.y_m - my) / ml], boxes}); });
       return;
     }
     if (!i.rect || i.kind === 'other') return;
     const r = i.rect, z = i.zone || {};
     if (i.wall === 'floor') {
-      out.push({kind: 'solid', shadow: false, boxes: [v3Slab([[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]], 0, 0.02, fill, alpha)]}); return; }
+      out.push({kind: 'solid', shadow: false, flat: true, boxes: [v3Slab([[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]], 0, 0.02, fill, alpha)]}); return; }
     if (i.wall === 'ceiling') {
       const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2, top = RoomView.ceilAt(room, cx, cy) - 0.04, w = r.x1 - r.x0, dd = r.y1 - r.y0;
       const cols = Math.max(1, Math.round(w / V3_PANEL[0])), rows = Math.max(1, Math.round(dd / V3_PANEL[1])), boxes = [];
       const sf = (room.soffits || []).map(s => RoomView.soffitPoly(ol, s)).filter(Boolean), inSoffit = (x, y) => sf.some(pl => v3Inside(pl, x, y));
       for (let c = 0; c < cols; c++) for (let q = 0; q < rows; q++) if (!inSoffit(r.x0 + w * (c + 0.5) / cols, r.y0 + dd * (q + 0.5) / rows)) boxes.push(v3Slab([[r.x0 + w * c / cols + 0.012, r.y0 + dd * q / rows + 0.012], [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * q / rows + 0.012],
         [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * (q + 1) / rows - 0.012], [r.x0 + w * c / cols + 0.012, r.y0 + dd * (q + 1) / rows - 0.012]], top - 0.1, top, fill, alpha));
-      out.push({kind: 'solid', shadow: false, boxes}); return; }
+      const kept = place(boxes); if (kept.length) out.push({kind: 'solid', shadow: false, boxes: kept}); return; }
     const zlo = z.b ? z.b[0] : 0.3, zhi = z.b ? z.b[1] : 2.1, hz = Math.max(0.2, zhi - zlo), t = Math.max(0.04, Math.min(0.3, (tIn + (i.gap_in || 0)) * 0.0254));
     const rows = Math.max(1, Math.round(hz / V3_PANEL[1])), cols = Math.max(1, Math.min(12, Math.ceil(qty / rows)));
     // no tile where a door, double door, window or opening is: a tile's ends are placed on the wall, measured from its first corner, and skipped if they overlap one
@@ -134,7 +155,8 @@ function v3Treatment(p, room) {                                  // the plan's i
     const skip = ops.length ? (a, b, zl, zh) => ops.some(o => { const o0 = o.from_m, o1 = o.from_m + o.width_m, top = o.height_m || 99, bot = o.kind === 'window' ? Math.min(0.9, top - 0.4) : 0;
       const at = t => Math.hypot(r.x0 + (r.x1 - r.x0) * t / rl - A[0], r.y0 + (r.y1 - r.y0) * t / rl - A[1]), w0 = Math.min(at(a), at(b)), w1 = Math.max(at(a), at(b));
       return w0 < o1 && w1 > o0 && zl < top && zh > bot; }) : null;
-    out.push({kind: 'solid', shadow: false, wallN: r.n || null, boxes: v3Tiles([r.x0, r.y0], [r.x1, r.y1], zlo, zhi, t, r.n || [0, 0], cols, rows, fill, alpha, skip)});
+    const tiles = place(v3Tiles([r.x0, r.y0], [r.x1, r.y1], zlo, zhi, t, r.n || [0, 0], cols, rows, fill, alpha, skip));
+    if (tiles.length) out.push({kind: 'solid', shadow: false, wallN: r.n || null, boxes: tiles});
   });
   return out;
 }
@@ -142,6 +164,7 @@ function v3Treatment(p, room) {                                  // the plan's i
 // everything for one 3D view. r = a room as the page holds it ({room, seats, subs, speakers, furniture, screen}); spk = speaker spots.
 function v3Scene(r, spk, plan, extra) {
   const rm = {...r.room, outline: r.room.outline || null, screen: r.screen || null}, ceil = (x, y) => RoomView.ceilAt(rm, x, y);
-  const marks = v3Seats(r).concat(v3Subs(r), fuMarks3d(r.furniture), v3Speakers(spk, r, ceil), plan ? v3Treatment(plan, rm) : [], extra || []);
+  const base = v3Seats(r).concat(v3Subs(r), fuMarks3d(r.furniture), v3Speakers(spk, r, ceil));
+  const marks = base.concat(plan ? v3Treatment(plan, rm, base.flatMap(m => m.boxes || [])) : [], extra || []);
   return {room: rm, marks};
 }

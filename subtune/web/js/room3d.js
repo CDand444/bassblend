@@ -169,7 +169,8 @@
             path(ring(1)); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 1; ctx.stroke(); path(ring(0.38)); ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fill(); } }
         if (cam[2] > b.z1) quad(hi, 'rgba(255,255,255,.12)');
       }
-      shell.concat(items).forEach(f => {
+      const isFlat = f => f.kind === 'mark' && f.m.flat;                                    // a rug lies on the floor: under everything else
+      items.filter(isFlat).concat(shell, items.filter(f => !isFlat(f))).forEach(f => {
         if (f.kind === 'mark' && f.m.boxes) {
           const m = f.m, bs = m.boxes.map(bx => ({...bx, d: P([bx.pts.reduce((t, v) => t + v[0], 0) / bx.pts.length, bx.pts.reduce((t, v) => t + v[1], 0) / bx.pts.length, 0])[2]}));
           bs.sort((x, y) => Math.abs(x.z0 - y.z0) > 1e-3 ? x.z0 - y.z0 : y.d - x.d);          // lower layers first, then far to near

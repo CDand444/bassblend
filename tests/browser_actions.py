@@ -127,6 +127,17 @@ def main():
               const tiles = v3Treatment(p, rm)[0].boxes; if (!tiles.length) return false;
               return tiles.every(b => { const xs = b.pts.map(q => q[0]); return Math.max(...xs) <= 1.0 + 1e-6 || Math.min(...xs) >= 2.0 - 1e-6; }) && tiles.length < 8; })()"""))
 
+            check("Treatment 3D: nothing passes through anything else, and a trap stops short of a door", page.evaluate("""(() => { const rm = {length_m: 6, width_m: 4, height_m: 2.5};
+              const p = {room: {W: 4, L: 6, H: 2.5}, shape: {openings: [{wall: 3, from_m: 0.2, width_m: 0.9, height_m: 2.03, kind: 'door'}]}, items: [
+                {id: 'side', wall: 'left', kind: 'absorber', tier: 1, qty: 6, thickness_in: 4, rect: {x0: 0, x1: 0, y0: 0, y1: 4, n: [-1, 0]}, zone: {edge: 3, s: [0, 4], b: [0.3, 2.0]}},
+                {id: 'rear', wall: 'back', kind: 'absorber', tier: 2, qty: 6, thickness_in: 4, rect: {x0: 0, x1: 4, y0: 6, y1: 6, n: [0, 1]}, zone: {edge: 2, s: [0, 4], b: [0.3, 2.0]}},
+                {id: 'corner_traps', wall: 'corners', kind: 'bass trap', tier: 1, qty: 1, thickness_in: 12, corners: [{x_m: 0, y_m: 6, name: 'back left'}, {x_m: 4, y_m: 6, name: 'back right'}]},
+                {id: 'rug', wall: 'floor', kind: 'rug', tier: 3, qty: 1, rect: {x0: 1, x1: 3, y0: 1, y1: 4}}]};
+              const sol = v3Treatment(p, rm, []), all = sol.filter(x => !x.flat).flatMap(x => x.boxes);
+              for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (v3Hit(all[i], all[j])) return 'overlap ' + i + ' ' + j;
+              const trap = sol.find(x => x.boxes[0].pts.length === 3 && x.boxes[0].pts.some(q => Math.abs(q[0]) < 1e-6 && Math.abs(q[1] - 6) < 1e-6));   // the corner at (0, 6): a door starts 0.2 m along the left wall from it
+              return !!sol.find(x => x.flat) && all.length > 4 && !!trap && trap.boxes[0].pts.every(q => q[1] >= 6 - 0.2 - 1e-6); })()"""))
+
             # ---- Speaker placement in 3D: recommended spots, recorded ones, lines between them; ceiling speakers hang from a soffit
             check("Placement 3D: speakers, lines and the soffit-aware ceiling", page.evaluate("""(() => {
               const rm = {length_m: 6, width_m: 4, height_m: 2.4, soffits: [{wall: 0, from_m: 0, length_m: 4, depth_m: 2, bottom_m: 2.0}]};
