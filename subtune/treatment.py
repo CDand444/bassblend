@@ -431,11 +431,13 @@ def couch_notes(room, seats, measured_rt, notes):
     if est and measured_rt is None:
         notes.append(f"Estimated ring time with your couches: about {est['mid_s']:.2f} s above 250 Hz "
                      "(an estimate before you measure; a system report replaces it).")
-    for s in seats:
-        g = furniture.couch_back_gap(room, s)
-        if g and g["reflects_at_ears"]:
-            notes.append(f"{s['name']}: {g['note']} It is {_ft(g['to_back_m'])} ft behind the head; a lower back or "
-                         "absorption on the wall behind helps.")
+    hit = [(s, g) for s in seats for g in [furniture.couch_back_gap(room, s)] if g and g["reflects_at_ears"]]
+    if hit:                                          # one note for all the seats, not one per seat
+        names = ", ".join(s["name"] for s, _ in hit)
+        gaps = sorted(g["to_back_m"] for _, g in hit)
+        dist = f"{_ft(gaps[0])} ft" if _ft(gaps[0]) == _ft(gaps[-1]) else f"{_ft(gaps[0])} to {_ft(gaps[-1])} ft"
+        notes.append(f"{names}: the couch back reflects sound at your ears. It is {dist} behind the head; a lower back or "
+                     "absorption on the wall behind helps.")
 
 
 def _behind(room, seat, dy=1.0):

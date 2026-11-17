@@ -208,8 +208,8 @@ function show(r) {
   $('#probs').innerHTML = (r.problems || []).map(t => `<div class="msg bad">Can't save yet: ${esc(t)}. Tell the AI below.</div>`).join('');
   const ops = arr(p.openings).filter(o => o && typeof o === 'object');
   $('#details').innerHTML = (ops.length ? `<h2 style="margin-top:12px">Openings</h2><ul class="list">${ops.map(o => `<li>${esc(o.kind)} on wall ${num(o.wall) + 1}: ${num(o.width_ft)} ft wide, ${num(o.from_ft)} ft from its corner${o.height_ft ? `, ${num(o.height_ft)} ft high` : ''}${o.note ? ` (${esc(o.note)})` : ''}</li>`).join('')}</ul>` : '')
-    + (arr(p.assumptions).length ? `<h2>The AI assumed</h2><ul class="list">${arr(p.assumptions).map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '')
-    + (arr(p.questions).length ? `<h2>Please check</h2><ul class="list">${arr(p.questions).map(a => `<li>${esc(a)}</li>`).join('')}</ul>` : '');
+    + (arr(p.assumptions).length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">The AI assumed (${arr(p.assumptions).length})</summary><ul class="list">${arr(p.assumptions).map(a => `<li>${esc(a)}</li>`).join('')}</ul></details>` : '')
+    + (arr(p.questions).length ? `<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Please check (${arr(p.questions).length})</summary><ul class="list">${arr(p.questions).map(a => `<li>${esc(a)}</li>`).join('')}</ul></details>` : '');
   $('#save').disabled = !!(r.problems || []).length;
   const room = {...rm, outline: rm.outline || (rm.width_m ? [[0, 0], [rm.width_m, 0], [rm.width_m, rm.length_m], [0, rm.length_m]] : null)};
   $('#v2').innerHTML = RoomView.svg2d(room, []);

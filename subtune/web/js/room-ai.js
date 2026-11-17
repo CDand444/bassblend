@@ -588,7 +588,7 @@ function renderSuggest() {
   else if (!S.ai_api) h = '<p class="muted" style="margin:6px 0">Save an API key in Room analysis to use this.</p>';
   if (rec && !st.running) {
     const s = rec.suggestion, t = s.dsp_target;
-    h += `<div class="sugpanel">
+    const panel = `<div class="sugpanel">
       <div class="row" style="margin-bottom:4px"><span class="k">For: ${esc(s.goal_summary)}</span><span class="grow"></span><span class="conf">${esc(s.confidence)} confidence</span></div>
       <p>${esc(s.strategy)}</p>
       <h3 style="margin:12px 0 6px">Target curve</h3>
@@ -599,6 +599,7 @@ function renderSuggest() {
       ${s.cautions.length ? `<h3 style="margin:12px 0 6px">Watch out for</h3><ul class="small" style="margin:0;padding-left:18px;color:var(--text-2)">${s.cautions.map(c => `<li>${esc(c)}</li>`).join('')}</ul>` : ''}
       <p class="muted" style="margin-top:10px">${new Date(rec.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'})} · ${rec.had_measurements ? 'used measurements' : 'no measurements yet'} · per-sub settings are on each card below</p>
     </div>`;
+    h += aiFold('suggest', 'Suggested setup', panel, `${esc(s.confidence)} confidence · ${new Date(rec.t * 1000).toLocaleDateString([], {dateStyle: 'medium'})}`);
   }
   $('#sugBox').innerHTML = h;
   const use = $('#sugUse');
@@ -611,10 +612,10 @@ function renderSuggest() {
   // per-sub boxes
   document.querySelectorAll('.sugslot').forEach(el => {
     const o = +el.dataset.o, sub = rec && !st.running ? rec.suggestion.subs.find(x => x.output === o + 1) : null;
-    el.innerHTML = sub ? `<div class="sugg"><div class="t">Suggested<span class="muted" style="font-weight:400">${esc(sub.role)}</span></div>
+    el.innerHTML = sub ? aiFold('sub' + o, 'Suggested settings for this sub', `<div class="sugg"><div class="t">Suggested<span class="muted" style="font-weight:400">${esc(sub.role)}</span></div>
       <dl class="kv"><dt>Gain</dt><dd>${esc(sub.gain)}</dd><dt>Phase</dt><dd>${esc(sub.phase)}</dd><dt>Low-pass</dt><dd>${esc(sub.low_pass)}</dd>
       <dt>Tuning</dt><dd>${esc(sub.tuning_mode)}</dd><dt>Other</dt><dd>${esc(sub.other_controls)}</dd><dt>Placement</dt><dd>${esc(sub.placement)}</dd></dl>
-      <p class="why">${esc(sub.why)}</p></div>` : '';
+      <p class="why">${esc(sub.why)}</p></div>`, esc(sub.role)) : '';
   });
 }
 $('#sugBtn').onclick = async () => {
@@ -668,7 +669,8 @@ function renderAI() {
   const ke = $('#keyEdit'); if (ke) ke.onclick = () => { keyEditing = !showForm; aiFilled = null; renderAI(); };
   const rm = $('#keyRemove'); if (rm) rm.onclick = async () => { if (!confirm(`Remove the saved ${ap.label} key from this device?`)) return; await post('/api/ai', {action: 'remove_key', provider: ap.active}); poll(); };
   const key = a ? String(a.t) : '';
-  if ($('#aiOut').dataset.key !== key) { $('#aiOut').dataset.key = key; $('#aiOut').innerHTML = a ? md(a.markdown) : ''; }
+  if ($('#aiOut').dataset.key !== key) { $('#aiOut').dataset.key = key; const old = a && S.result && S.result.applied && a.t < S.result.applied;
+    $('#aiOut').innerHTML = a ? aiFold('analysis', 'Room analysis', md(a.markdown), `${new Date(a.t * 1000).toLocaleDateString([], {dateStyle: 'medium'})}${old ? ' · older than your current tune' : ''}`) : ''; }
 }
 let keyEditing = false, aiFilled = null;
 const aiProv = () => ((S.ai_provider || {}).providers || []).find(p => p.id === $('#aiProv').value) || {};

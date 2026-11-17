@@ -281,9 +281,10 @@ function renderTreatment() {
       const cmp = p.compare;
       let cmpH = '';
       if (cmp) {
-        cmpH = `<h3 style="margin:18px 0 6px">Before and after</h3><p class="small muted" style="margin:0 0 6px">Since ${esc(new Date(cmp.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}))}: ${esc(cmp.change)}</p>`;
+        cmpH = `<details class="fold" id="trtCmp"><summary>Before and after</summary><p class="small muted" style="margin:0 0 6px">Since ${esc(new Date(cmp.t * 1000).toLocaleString([], {dateStyle: 'medium', timeStyle: 'short'}))}: ${esc(cmp.change)}</p>`;
         if (cmp.rows.length) cmpH += `<div class="tw"><table class="dc-tbl"><thead><tr><th>Measurement</th><th>Before</th><th>After</th><th></th></tr></thead><tbody>${cmp.rows.map(r => `<tr><td>${esc(r.what)}</td><td>${r.before} ${r.unit}</td><td>${r.after} ${r.unit}</td><td>${r.verdict === 'better' ? '✓ better' : r.verdict === 'worse' ? 'worse' : 'about the same'}</td></tr>`).join('')}</tbody></table></div>`;
         if (cmp.waiting.length) cmpH += `<p class="small muted">Run a new ${cmp.waiting.join(' and a new ')} to see the change.</p>`;
+        cmpH += '</details>';
       }
       $('#trtOut').innerHTML = `<div class="notice" style="margin-bottom:12px">${esc(p.honesty)}</div>
         <div class="pl-grid"><div>${trtDrawing(p)}</div><div><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>

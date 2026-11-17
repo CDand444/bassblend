@@ -8,6 +8,27 @@ const $ = s => document.querySelector(s);
 const HW = () => { const h = (typeof S !== 'undefined' && S && S.host) || {pi: true};
   return h.pi ? {win: false, name: 'the Pi', hdmi: 'Pi HDMI', where: 'the Pi’s HDMI', plugged: 'Pi plugged into', plays: 'The Pi plays it over HDMI'}
               : {win: h.os === 'windows', name: 'this computer', hdmi: 'PC HDMI', where: 'this computer’s HDMI', plugged: 'This computer plugged into', plays: 'This computer plays it over HDMI'}; };
+// every AI-written suggestion sits in a fold that stays closed until the owner opens it, and stays as they left it for this tab
+const AIFOLD = (() => { try { return JSON.parse(sessionStorage.getItem('httamer-aifold') || '{}') || {}; } catch (e) { return {}; } })();
+function aiFold(id, title, body, meta = '') {
+  return `<details class="aifold" data-fold="${esc(id)}" ${AIFOLD[id] ? 'open' : ''}><summary><span class="ai-tag">AI</span><span class="ai-title">${esc(title)}</span>${meta ? `<span class="muted small">${meta}</span>` : ''}</summary><div class="ai-body">${body}</div></details>`;
+}
+document.addEventListener('toggle', e => {
+  const d = e.target; if (!d || !d.matches || !d.matches('details.aifold')) return;
+  AIFOLD[d.dataset.fold] = d.open; try { sessionStorage.setItem('httamer-aifold', JSON.stringify(AIFOLD)); } catch (err) { /* private window */ }
+}, true);
+// cards marked .foldable fold from their header; data-fold="closed" starts them closed; the choice is remembered on this device
+const FOLDED = (() => { try { return JSON.parse(localStorage.getItem('httamer-folded') || '{}') || {}; } catch (e) { return {}; } })();
+function initFoldable() {
+  document.querySelectorAll('.card.foldable').forEach(c => { const id = c.id; if (!id) return;
+    const closed = id in FOLDED ? FOLDED[id] : c.dataset.fold === 'closed'; c.classList.toggle('folded', closed); });
+}
+document.addEventListener('click', e => {
+  const h = e.target.closest('.card.foldable > .card-h'); if (!h || e.target.closest('button, a, select, input, .seg')) return;
+  const c = h.parentElement; c.classList.toggle('folded'); FOLDED[c.id] = c.classList.contains('folded');
+  try { localStorage.setItem('httamer-folded', JSON.stringify(FOLDED)); } catch (err) { /* ignore */ }
+  window.dispatchEvent(new Event('resize'));                       // charts inside draw when shown
+});
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 // ---------- notifications: toasts in the page, browser notifications while the tab is in the background

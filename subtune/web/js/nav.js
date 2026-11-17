@@ -223,6 +223,7 @@ document.addEventListener('keydown', e => {
 });
 new ResizeObserver(() => document.documentElement.style.setProperty('--hbar-h', $('header').offsetHeight + 'px')).observe($('header'));
 openSheet(routeKey() || 'home', true);
+initFoldable();
 if (uiMode) setMode(uiMode, false);                           // light up the saved choice in the header
 
 // ---------- polling

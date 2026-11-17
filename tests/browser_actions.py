@@ -166,6 +166,33 @@ def main():
             (data / "state.json").write_text(json.dumps(st))
             check("State written behind the page's back reaches S", until(page, "S.gain_check && S.gain_check.text.startsWith('TEST')", 4000))
 
+            # ---- AI suggestions are folded until opened, and stay as the owner left them
+            st = json.loads((data / "state.json").read_text())
+            st["suggestion"] = {"t": 1800000000.0, "had_measurements": True, "suggestion": {
+                "goal_summary": "Movies", "confidence": "medium", "strategy": "Use both subs.", "avr": "", "cautions": ["Watch the clip"],
+                "dsp_target": {"fmin": 18, "fmax": 120, "house_db": 5, "house_fc": 40, "max_boost_db": 3, "why": "A lift below 40 Hz."},
+                "subs": [{"output": 1, "role": "Main", "gain": "g", "phase": "0", "low_pass": "off", "tuning_mode": "max", "other_controls": "o", "placement": "front", "why": "because"}]}}
+            st["analysis"] = {"t": 1800000100.0, "source": "test", "markdown": "## Summary\n- one finding", "question": ""}
+            (data / "state.json").write_text(json.dumps(st))
+            sj = json.loads((data / "settings.json").read_text()) if (data / "settings.json").exists() else {}      # keep the accepted terms
+            sj["subs"] = [0]
+            (data / "settings.json").write_text(json.dumps(sj))
+            page.evaluate("openSheet('subs')")
+            check("AI setup suggestion appears folded", until(page, "document.querySelectorAll('#subsCard details.aifold').length >= 1", 8000)
+                  and page.evaluate("[...document.querySelectorAll('#subsCard details.aifold')].every(d => !d.open)"),
+                  "no folded suggestion on the Subs page")
+            page.locator("#sugBox details.aifold > summary").scroll_into_view_if_needed()
+            page.locator("#sugBox details.aifold > summary").click(timeout=8000)
+            check("Opening it shows the suggestion", until(page, "document.querySelector('#sugBox details.aifold').open && document.querySelector('#sugBox').textContent.includes('Use both subs')"))
+            page.evaluate("poll()")
+            page.wait_for_timeout(1500)
+            check("It stays open through a refresh", page.evaluate("document.querySelector('#sugBox details.aifold').open"))
+            page.evaluate("openSheet('ai')")
+            page.wait_for_timeout(600)
+            check("The AI analysis is folded by default", page.evaluate("(() => { const d = document.querySelector('#aiOut details.aifold'); return !!d && !d.open; })()"))
+            check("The assistant settings are folded too", page.evaluate("[...document.querySelectorAll('#aiQ ~ details.fold, details.fold')].some(d => !d.open)"))
+            page.evaluate("openSheet('home')")
+
             check("No script errors while clicking around", not errs, "; ".join(errs[:3]))
             browser.close()
     finally:

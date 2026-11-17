@@ -1,5 +1,13 @@
 # htTamer changelog
 
+## Nov 17, 2026 - 1080p review, folded AI suggestions
+
+- **AI suggestions are folded and closed by default** (suggested setup, per-sub suggestions, room analysis, the phone builder's assumptions
+  and questions); the room analysis says when it is older than the current tune. The AI settings sit in a fold too.
+- **Layout at 1080p**: Subs shows two wide cards per row (the page is a third shorter); the automation inputs are a grid instead of one
+  long list; the treatment page folds Before and after, Your constraints and What you have installed and has a jump bar; the couch
+  reflection note appears once, not once per seat; the Home cards that repeat Results start folded.
+
 ## Nov 17, 2026 - Windows: HDMI, the miniDSP lock and wording
 
 - **No Pi wording off the Pi**: pages, messages, the assistant and the CLI say "this computer" unless htTamer runs on a Raspberry Pi.
