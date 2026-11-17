@@ -142,16 +142,17 @@ function v3Treatment(p, room, obst) {                                  // the pl
     if (i.wall === 'floor') {
       out.push({kind: 'solid', shadow: false, flat: true, boxes: [v3Slab([[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]], 0, 0.02, fill, alpha)]}); return; }
     if (i.wall === 'ceiling') {
-      const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2, top = RoomView.ceilAt(room, cx, cy) - 0.04, w = r.x1 - r.x0, dd = r.y1 - r.y0;
+      const w = r.x1 - r.x0, dd = r.y1 - r.y0;
       const cols = Math.max(1, Math.round(w / V3_PANEL[0])), rows = Math.max(1, Math.round(dd / V3_PANEL[1])), boxes = [];
+      const tileTop = (c, q) => RoomView.ceilAt(room, r.x0 + w * (c + 0.5) / cols, r.y0 + dd * (q + 0.5) / rows) - 0.04;       // each tile hangs at its own height, so a cloud follows a sloped ceiling
       const sf = (room.soffits || []).map(s => RoomView.soffitPoly(ol, s)).filter(Boolean), inSoffit = (x, y) => sf.some(pl => v3Inside(pl, x, y));
-      for (let c = 0; c < cols; c++) for (let q = 0; q < rows; q++) if (!inSoffit(r.x0 + w * (c + 0.5) / cols, r.y0 + dd * (q + 0.5) / rows)) boxes.push(v3Slab([[r.x0 + w * c / cols + 0.012, r.y0 + dd * q / rows + 0.012], [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * q / rows + 0.012],
-        [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * (q + 1) / rows - 0.012], [r.x0 + w * c / cols + 0.012, r.y0 + dd * (q + 1) / rows - 0.012]], top - 0.1, top, fill, alpha));
+      for (let c = 0; c < cols; c++) for (let q = 0; q < rows; q++) if (i.on_soffit || !inSoffit(r.x0 + w * (c + 0.5) / cols, r.y0 + dd * (q + 0.5) / rows)) boxes.push(v3Slab([[r.x0 + w * c / cols + 0.012, r.y0 + dd * q / rows + 0.012], [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * q / rows + 0.012],
+        [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * (q + 1) / rows - 0.012], [r.x0 + w * c / cols + 0.012, r.y0 + dd * (q + 1) / rows - 0.012]], tileTop(c, q) - 0.1, tileTop(c, q), fill, alpha));
       const kept = place(boxes); if (kept.length) out.push({kind: 'solid', shadow: false, boxes: kept}); return; }
-    const zlo = z.b ? z.b[0] : 0.3, zhi = z.b ? z.b[1] : 2.1, hz = Math.max(0.2, zhi - zlo), t = Math.max(0.04, Math.min(0.3, (tIn + (i.gap_in || 0)) * 0.0254));
+    const zlo = Math.max(i.freestanding ? 0.2 : 0, z.b ? z.b[0] : 0.3), zhi = z.b ? z.b[1] : 2.1, hz = Math.max(0.2, zhi - zlo), t = Math.max(0.04, Math.min(0.3, (tIn + (i.gap_in || 0)) * 0.0254));
     const rows = Math.max(1, Math.round(hz / V3_PANEL[1])), cols = Math.max(1, Math.min(12, Math.ceil(qty / rows)));
     // no tile where a door, double door, window or opening is: a tile's ends are placed on the wall, measured from its first corner, and skipped if they overlap one
-    const ops = (sh.openings || []).filter(o => z.edge != null && o.wall === z.edge), A = ol[z.edge != null ? z.edge : 0], rl = Math.hypot(r.x1 - r.x0, r.y1 - r.y0) || 1e-9;
+    const ops = i.on_opening || i.freestanding ? [] : (sh.openings || []).filter(o => z.edge != null && o.wall === z.edge), A = ol[z.edge != null ? z.edge : 0], rl = Math.hypot(r.x1 - r.x0, r.y1 - r.y0) || 1e-9;
     const skip = ops.length ? (a, b, zl, zh) => ops.some(o => { const o0 = o.from_m, o1 = o.from_m + o.width_m, top = o.height_m || 99, bot = o.kind === 'window' ? Math.min(0.9, top - 0.4) : 0;
       const at = t => Math.hypot(r.x0 + (r.x1 - r.x0) * t / rl - A[0], r.y0 + (r.y1 - r.y0) * t / rl - A[1]), w0 = Math.min(at(a), at(b)), w1 = Math.max(at(a), at(b));
       return w0 < o1 && w1 > o0 && zl < top && zh > bot; }) : null;

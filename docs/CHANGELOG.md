@@ -1,5 +1,18 @@
 # htTamer changelog
 
+## Nov 18, 2026 - choose what to show on the Treatment page
+
+- **What to show**: beside the plan or 3D view, every item of the treatment plan has a check box (all on by default), grouped by value (Do first, Next, Nice to have, Already installed) with a check box per group and All / None. The plan drawing, the 3D view, the cost and the buy list follow your choice, which is remembered on this device. The summary says how much the shown items still cost and about what share of the plan's benefit they bring.
+- **Buy list**: identical panels are bought together (for example 12 absorber panels, 2 x 4 ft, 4 in + 2 in gap, with what each is for), with a cost range and a Copy as text button.
+- **Ceiling cloud** follows a sloped ceiling tile by tile and keeps clear of the height speakers as well as soffits.
+- **Open back**: when the room opens behind the seats, a freestanding panel or heavy curtain on stands stands in for the missing back wall.
+
+## Nov 18, 2026 - doors, windows and soffits in the treatment plan
+
+- **Doors get treatment**: a double door always gets a panel or heavy curtain on each leaf (big, hard, thin and it rattles); a single door gets one when a reflection lands on it. Windows in a reflection zone get a heavy curtain item. The 3D view draws them on the door or over the glass.
+- **Wall panel counts leave doors, windows and openings out** (the item says how much wall that is).
+- **Soffit undersides** get a thin-panel item (low priority), drawn in 3D under the soffit.
+
 ## Nov 18, 2026 - Dropbox backups
 
 - **Dropbox as a backup copy**: Tools → Backups → Keep a copy in Dropbox. You make a small free Dropbox app once (App folder, files.content read and write), paste its App key, allow access on dropbox.com and paste the code. Every new backup is then also sent to /htTamer-backups (the newest five stay, plus the one made before an update); a failed copy is shown on the card and never stops the backup. Send the newest now, see what is in Dropbox, bring one back (then Restore as usual), or disconnect. Only a refresh token is kept, in the config folder like an AI key: never in settings and never in a backup.

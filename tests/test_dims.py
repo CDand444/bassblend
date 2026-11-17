@@ -144,6 +144,57 @@ def test_height_speaker_under_a_soffit_hangs_from_its_underside_and_says_so():
     assert not any("falls under" in n for n in plain["notes"])
 
 
+def test_double_doors_get_treatment_and_wall_panels_leave_doors_out():
+    r = copy.deepcopy(ROOM)
+    r["room"]["wall_openings"] = [{"wall": 3, "from_m": 1.0, "width_m": 1.5, "height_m": 2.03, "kind": "double_door"},
+                                  {"wall": 1, "from_m": 4.5, "width_m": 0.9, "height_m": 2.03, "kind": "door"}]          # a single door well away from any reflection
+    p = _plan(r)
+    ids = {i["id"]: i for i in p["items"]}
+    dd = ids.get("door_3_0")
+    assert dd and dd["qty"] == 2 and dd["on_opening"] and dd["zone"]["edge"] == 3 and dd["rect"], "the double door gets a panel on each leaf"
+    assert "rattles" in dd["why"] and "handle" in dd["why"]
+    assert not any(k.startswith("door_1") for k in ids), "a single door that no reflection reaches needs nothing"
+    left = next(i for i in p["items"] if i["id"] == "side_panels")
+    plain = next(i for i in _plan(ROOM)["items"] if i["id"] == "side_panels")
+    assert left["qty"] <= plain["qty"] and (left["qty"] < plain["qty"] or left.get("qty_note") is None)
+
+
+def test_a_window_in_a_reflection_zone_gets_a_curtain_and_a_soffit_a_panel():
+    r = copy.deepcopy(ROOM)
+    r["room"]["wall_openings"] = [{"wall": 3, "from_m": 0.5, "width_m": 5.0, "height_m": 2.1, "kind": "window"}]
+    r["room"]["soffits"] = soffit.clean_soffits([{"wall": 0, "from_m": 0.0, "length_m": 4.0, "depth_m": 1.0, "bottom_m": 2.1}], [[0, 0], [4, 0], [4, 6], [0, 6]], 2.4)
+    p = _plan(r)
+    ids = {i["id"]: i for i in p["items"]}
+    assert any(k.startswith("window_3") for k in ids), ids.keys()
+    assert any(k.startswith("soffit_") for k in ids)
+
+
+def test_cloud_follows_a_sloped_ceiling_and_keeps_off_height_speakers():
+    from subtune import shape
+    r = copy.deepcopy(ROOM)
+    r["room"]["ceiling"] = shape.clean_ceiling({"kind": "slope", "low_m": 2.0, "low_side": "back"}, 2.6)
+    r["room"]["height_m"] = 2.6
+    cloud = next((i for i in _plan(r)["items"] if i["id"] == "ceiling_cloud"), None)
+    assert cloud and len(cloud["z_corners"]) == 4 and max(cloud["z_corners"]) - min(cloud["z_corners"]) > 0.05, cloud and cloud.get("z_corners")
+    flat = next(i for i in _plan(ROOM)["items"] if i["id"] == "ceiling_cloud")
+    assert max(flat["z_corners"]) - min(flat["z_corners"]) < 1e-6
+    # a height speaker in the middle of the zone: the cloud moves off it
+    r2 = copy.deepcopy(ROOM)
+    r2["speakers"] = {**REC, "TFL": {"x_m": flat["rect"]["x0"] + 0.3, "y_m": (flat["rect"]["y0"] + flat["rect"]["y1"]) / 2, "z_m": 2.4}}
+    p2 = T.plan(r2, {}, None, room.modal_report(r2, 200))
+    c2 = next((i for i in p2["items"] if i["id"] == "ceiling_cloud"), None)
+    assert c2 and (c2["rect"] != flat["rect"]) and any("TFL" in n for n in p2["notes"]), p2["notes"]
+
+
+def test_an_open_back_gets_a_freestanding_stand_in():
+    r = copy.deepcopy(ROOM)
+    r["room"]["wall_openings"] = [{"wall": 2, "from_m": 0.0, "width_m": 4.0, "kind": "opening"}]        # the back wall is open
+    items = {i["id"]: i for i in _plan(r)["items"]}
+    st = items.get("rear_standin")
+    assert st and st["freestanding"] and st["rect"]["n"] == [0, 1] and st["qty"] >= 1
+    assert st["value"]["each"]["buy"][0] > 0
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

@@ -276,14 +276,13 @@ const TRT3D_CAM = {yaw: 0.35, pitch: 0.62, zoom: 1};
 function trt3dDraw() {                          // the treatment plan in 3D: the room as saved, its furniture, speakers and subs, and every item at its spot
   const p = S.treatment, cv = $('#trt3d'); if (!cv || !p || !S.room || !S.room.room || trtMode !== '3d') return;
   const spk = (p.speakers || []).map(s => ({...s, rec: s.source === 'recorded'}));
-  const sc = v3Scene(S.room, spk, p), view = cv._v3 || (cv._v3 = RoomView.view3d(cv, {camera: TRT3D_CAM}));
+  const sc = v3Scene(S.room, spk, tpVisible(p)), view = cv._v3 || (cv._v3 = RoomView.view3d(cv, {camera: TRT3D_CAM}));
   view.set(sc.room, sc.marks);
 }
 function setTrtMode(m) {
   trtMode = m; try { localStorage.setItem('htTrtView', m); } catch (e) { /* private mode */ }
   document.querySelectorAll('#trtView button').forEach(b => b.classList.toggle('on', b.dataset.tv === m));
   $('#trt3dBox').hidden = m !== '3d'; $('#trt3dHint').hidden = m !== '3d'; $('#trt2d').hidden = m === '3d';
-  const g = $('#trt2d').parentElement.lastElementChild; if (g) g.style.gridColumn = m === '3d' ? '1/-1' : '';
   if (m === '3d') trt3dDraw();
 }
 function renderTreatment() {
@@ -302,7 +301,7 @@ function renderTreatment() {
           ${valBadge(i.value)}${i.measured ? '<span class="conf">from your measurements</span>' : ''}${i.blocked ? '<span class="conf">wall marked untreatable</span>' : ''}${i.over_budget ? '<span class="conf">over budget</span>' : ''}</div>
         <p>${esc(i.effect)}</p>
         <div class="spec">${i.qty} × ${esc(i.size)}${i.kind !== 'rug' && i.kind !== 'bass trap' ? ` · ${i.thickness_in}″ thick${i.gap_in ? ` + ${i.gap_in}″ air gap` : ''}` : ''}${i.absorbs_down_to_hz ? ` · absorbs well above ~${i.absorbs_down_to_hz} Hz` : ''}</div>${costLine(i)}
-        <div class="spec">${esc(trtWhere(i))}</div>
+        <div class="spec">${esc(trtWhere(i))}${i.qty_note ? ` · ${esc(i.qty_note)}` : ''}</div>
         <p class="small">${esc(i.why)}${i.membrane_hz ? ` For ${i.membrane_hz} Hz, a membrane (pressure) trap tuned there does more than porous depth.` : ''}</p>
         ${i.blocked && i.alternative ? `<p class="small"><b>Instead:</b> ${esc(i.alternative)}</p>` : ''}
         <div class="acts">${i.installed ? '' : `<button class="btn" data-trt-mark="${esc(i.id)}">Mark installed</button>`}
@@ -322,11 +321,13 @@ function renderTreatment() {
       $('#trtOut').innerHTML = `<div class="notice" style="margin-bottom:12px">${esc(p.honesty)}</div>
         <div class="row" style="margin:0 0 8px;gap:8px"><div class="seg" id="trtView" role="radiogroup" aria-label="Treatment view"><button type="button" data-tv="2d" class="${trtMode === '2d' ? 'on' : ''}">Plan</button><button type="button" data-tv="3d" class="${trtMode === '3d' ? 'on' : ''}">3D</button></div>
           <span class="muted small" id="trt3dHint" ${trtMode === '3d' ? '' : 'hidden'}>Drag to turn, scroll to zoom, double-click to reset. Panels are drawn where the plan puts them; green = installed.</span></div>
-        <div class="plan plan3d trt3d" id="trt3dBox" ${trtMode === '3d' ? '' : 'hidden'}><canvas id="trt3d" aria-label="Your room with the suggested treatment in 3D: drag to turn"></canvas></div>
-        <div class="pl-grid"><div id="trt2d" ${trtMode === '3d' ? 'hidden' : ''}>${trtDrawing(p)}</div><div style="${trtMode === '3d' ? 'grid-column:1/-1' : ''}"><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
+        <div class="trt-stage"><div class="stage-main"><div class="plan plan3d trt3d" id="trt3dBox" ${trtMode === '3d' ? '' : 'hidden'}><canvas id="trt3d" aria-label="Your room with the suggested treatment in 3D: drag to turn"></canvas></div>
+          <div id="trt2d" ${trtMode === '3d' ? 'hidden' : ''}>${trtDrawing(tpVisible(p))}</div></div>
+          <aside class="trt-pick" id="trtPick" aria-label="Choose which treatments to show">${tpHtml(p)}</aside></div>
+        <div style="margin-top:16px"><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div>
         ${trtCostHtml(p, usd)}${list}${cmpH}
         ${p.notes.length ? `<ul class="wins" style="margin-top:14px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}`;
-      trt3dDraw();
+      tpRefresh(p);
       $('#trtOut').querySelectorAll('#trtView [data-tv]').forEach(b => b.onclick = () => setTrtMode(b.dataset.tv));
       $('#trtOut').querySelectorAll('[data-trt-build]').forEach(b => b.onclick = async () => {
         const r = await post('/api/treatment', {constraints: {build: b.dataset.trtBuild}}); if (r.error) alert(r.error); poll(); });

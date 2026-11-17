@@ -136,7 +136,20 @@ def main():
               const sol = v3Treatment(p, rm, []), all = sol.filter(x => !x.flat).flatMap(x => x.boxes);
               for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) if (v3Hit(all[i], all[j])) return 'overlap ' + i + ' ' + j;
               const trap = sol.find(x => x.boxes[0].pts.length === 3 && x.boxes[0].pts.some(q => Math.abs(q[0]) < 1e-6 && Math.abs(q[1] - 6) < 1e-6));   // the corner at (0, 6): a door starts 0.2 m along the left wall from it
-              return !!sol.find(x => x.flat) && all.length > 4 && !!trap && trap.boxes[0].pts.every(q => q[1] >= 6 - 0.2 - 1e-6); })()"""))
+              return !!sol.find(x => x.flat) && all.length > 4 && !!trap && trap.boxes[0].pts.every(q => q[1] >= 6 - 0.2 - 1e-6); })()""") is True)
+
+            check("Treatment picker: tiers, switching items off, the shown plan, the buy list", page.evaluate("""(() => {
+              const v = (id, tier, kind, size, th, gap, qty, extra = {}) => ({id, title: id, tier, kind, size, thickness_in: th, gap_in: gap, qty, installed: false, value: {left_qty: qty, buy: [100 * qty, 200 * qty], diy: [50 * qty, 100 * qty], benefit: 10 * tier, verdict: 'good'}, ...extra});
+              const p = {tiers: {1: 'Do first', 2: 'Next', 3: 'Nice'}, costs: {build: 'buy'}, room: {W: 4, L: 6, H: 2.5}, shape: {}, items: [
+                v('a', 1, 'absorber', '2 x 4 ft', 4, 2, 4), v('b', 1, 'absorber', '2 x 4 ft', 4, 2, 2), v('c', 2, 'cloud', '2 x 4 ft', 4, 6, 3), v('d', 3, 'rug', '8 x 10 ft', 1, 0, 1),
+                {...v('e', 2, 'absorber', '2 x 4 ft', 4, 2, 1), installed: true}]};
+              TP_OFF.clear();
+              const g = tpGroups(p); if (g.length !== 4 || g[3].name !== 'Already installed' || g[0].items.length !== 2) return 'groups';
+              const buy = tpBuyList(p); const panels = buy.find(x => x.spec.startsWith('Absorber')); if (!panels || panels.qty !== 6 || panels.usedFor.length !== 2) return 'grouped panels ' + JSON.stringify(buy);
+              tpSet(['a', 'b'], false);
+              if (tpVisible(p).items.length !== 3 || tpBuyList(p).some(x => x.spec.startsWith('Absorber'))) return 'off';
+              if (tpShare(p, tpVisible(p).items) !== Math.round(100 * (20 + 30) / (10 + 10 + 20 + 30))) return 'share ' + tpShare(p, tpVisible(p).items);
+              tpSet(['a', 'b'], true); TP_OFF.clear(); return true; })()""") is True)
 
             # ---- Speaker placement in 3D: recommended spots, recorded ones, lines between them; ceiling speakers hang from a soffit
             check("Placement 3D: speakers, lines and the soffit-aware ceiling", page.evaluate("""(() => {

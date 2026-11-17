@@ -229,17 +229,22 @@ OVERLAP_NOTE = {"screen": "the screen is in this area: panels can't go on it, so
                 "opening": "part of this area is an opening to another space: there's no wall to treat there"}
 
 
-def _avoid_soffits(z, rm, margin=0.1):
-    """Trim a ceiling zone so it keeps clear of every soffit's footprint (plus a margin): keep the biggest piece left on either side.
-    Returns (zone, names of the soffits it had to clear). A zone with no room left is returned as it was (and the names say why)."""
+def _avoid_soffits(z, rm, spk=None, margin=0.1):
+    """Trim a ceiling zone so it keeps clear of every soffit's footprint and of the height speakers (plus a margin): keep the biggest
+    piece left on either side. Returns (zone, names of what it had to clear). A zone with no room left is returned as it was."""
     names = []
+    boxes = []
     for r in soffit.rects(rm):
         xs, ys = [p[0] for p in r["poly"]], [p[1] for p in r["poly"]]
-        x0, x1, y0, y1 = min(xs) - margin, max(xs) + margin, min(ys) - margin, max(ys) + margin
+        boxes.append((min(xs) - margin, max(xs) + margin, min(ys) - margin, max(ys) + margin, r.get("name") or "a soffit"))
+    for s in (spk or {}).values():
+        if s.get("kind") == "height":                        # a cloud right under a height speaker would block it
+            boxes.append((s["x_m"] - 0.45, s["x_m"] + 0.45, s["y_m"] - 0.45, s["y_m"] + 0.45, f"the {s['id']} height speaker"))
+    for x0, x1, y0, y1, name in boxes:
         (a0, a1), (b0, b1) = z["a"], z["b"]
         if x1 <= a0 or x0 >= a1 or y1 <= b0 or y0 >= b1:
             continue
-        names.append(r.get("name") or "a soffit")
+        names.append(name)
         cands = [((a0, min(a1, x0)), (b0, b1)), ((max(a0, x1), a1), (b0, b1)), ((a0, a1), (b0, min(b1, y0))), ((a0, a1), (max(b0, y1), b1))]
         ok = [(((p[1] - p[0]) * (q[1] - q[0])), p, q) for p, q in cands if p[1] - p[0] > 0.05 and q[1] - q[0] > 0.05]
         if not ok:
@@ -554,7 +559,7 @@ def value_of(it: dict, build: str = "buy") -> dict:
         z = it["zone"]
         area = (z["a"][1] - z["a"][0]) * (z["b"][1] - z["b"][0]) / FT ** 2
     each = unit_price(it["kind"], it.get("thickness_in"), area)
-    if it.get("blocked") and it["kind"] in ("absorber", "cloud"):
+    if (it.get("blocked") or it.get("freestanding")) and it["kind"] in ("absorber", "cloud"):
         each = {m: [each[m][0] + GOBO_EXTRA[m][0], each[m][1] + GOBO_EXTRA[m][1]] for m in BUILDS}
     total = {m: [each[m][0] * left, each[m][1] * left] for m in BUILDS}
     benefit = round(it["score"] * left / it["qty"], 1) if it["qty"] else 0
@@ -727,20 +732,21 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     z = _zone(refl.get("ceiling") or [], "ceiling", dims)
     cleared = []
     if z:
-        z, cleared = _avoid_soffits(z, rm)
+        z, cleared = _avoid_soffits(z, rm, spk)
     if z:
         add("ceiling_cloud", "Ceiling cloud over the seats", "cloud", "ceiling", z, _panels(z["area_m2"]), "2 x 4 ft",
             4, 6, "Less 'boxy' sound and clearer dialogue; with height speakers, keep it between the front and rear heights.",
             30, "The ceiling reflection is as strong as the side walls' and often the earliest one in rooms with low ceilings.",
-            rect=_rect("ceiling", z, dims), points=refl.get("ceiling"))
+            rect=_rect("ceiling", z, dims), points=refl.get("ceiling"),
+            z_corners=[round(shape.ceiling_z(rm, x, y), 2) for x, y in ((z["a"][0], z["b"][0]), (z["a"][1], z["b"][0]), (z["a"][1], z["b"][1]), (z["a"][0], z["b"][1]))])
         if cleared:
-            notes.append(f"The ceiling cloud is kept clear of {', '.join(sorted(set(cleared)))}: the soffit hangs lower than the ceiling, so the cloud "
-                         "goes beside it. The underside of a soffit is a good place for a thin panel too.")
-        if any(s["kind"] == "height" for s in spk.values()):
+            notes.append(f"The ceiling cloud is kept clear of {', '.join(sorted(set(cleared)))}: a soffit hangs lower than the ceiling and a cloud under a "
+                         "height speaker would block it, so the cloud goes beside them. The underside of a soffit is a good place for a thin panel too.")
+        elif any(s["kind"] == "height" for s in spk.values()):
             notes.append("Don't cover the ceiling right under or in front of the height speakers; a cloud between them is fine.")
         if shape.ceiling(rm)["kind"] != "flat":
-            notes.append("Your ceiling slopes: hang the cloud level (deeper on the high side) or follow the slope; "
-                         "either way keep it over the reflection points shown.")
+            notes.append("Your ceiling slopes: the cloud is drawn following the slope (a little lower where the ceiling is lower). Hang each panel level "
+                         "at its own height, or tilt them to match; either way keep them over the reflection points shown.")
     # corner bass traps: every corner of the real outline that points out of the room (under 180°);
     # inside corners (an L's inner corner) aren't pressure maxima, and corners open to another space don't exist
     ring = next((p for p in probs if p["id"] == "bass_ringing"), None)
@@ -788,6 +794,15 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     if rear_open:
         notes.append("Behind the seats the room opens into another space, so there's no back wall to treat; a freestanding "
                      "panel or a heavy curtain behind the back row can stand in for it.")
+        seat0, hit0 = back_hit
+        if seat0 and hit0 and dims["W"]:
+            ys = round(min(dims["L"] - 0.2, seat0["y_m"] + max(0.6, hit0["dist"] - 0.3)), 2)
+            xa = [round(max(0.0, seat0["x_m"] - 1.2), 2), round(min(dims["W"], seat0["x_m"] + 1.2), 2)]
+            zs = {"axis": ["x_m", "z_m"], "a": xa, "b": [0.6, 1.8], "area_m2": round((xa[1] - xa[0]) * 1.2, 2)}
+            add("rear_standin", "Freestanding panel or heavy curtain behind the back row", "absorber", "back", zs, _panels(zs["area_m2"]), "2 x 4 ft on stands", 4, 2,
+                "Stands in for the missing back wall: less echo from behind, so the surrounds sound more precise.", 28,
+                "Behind the seats the room is open, so nothing stops the sound or soaks up the reflection that comes back from the far space.",
+                rect={"x0": xa[0], "x1": xa[1], "y0": ys, "y1": ys, "n": [0, 1]}, points=None, freestanding=True)
     elif be is not None:
         key, lo, hi = _edge_axis(be)
         if key == "s_m":
@@ -864,6 +879,65 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
                 6, 4, "A little more body where the wall-bounce dip is, and a cleaner image depth. Moving the speakers helps more.",
                 15, "The wall behind the speakers bounces bass back that cancels the direct sound at one pitch." + why_suffix,
                 rect=_seg_rect(fe, zfw))
+    # doors and windows are hard, flat surfaces too: a double door especially (two big thin leaves that also rattle), a single door or a
+    # window when it sits where a reflection lands. They get their own item, hung on the leaf or over the glass; the wall panels leave them out.
+    def _hits(e, s0, s1):
+        return any(it["zone"] and it["zone"].get("edge") == e["i"] and it["zone"].get("s") and it["zone"]["s"][0] < s1 and it["zone"]["s"][1] > s0
+                   and it["wall"] not in ("ceiling", "floor") for it in items)
+    for e in walls.values():
+        for oi, o in enumerate(e["openings"]):
+            if o["kind"] not in ("door", "double_door", "window"):
+                continue
+            s0, s1 = o["from_m"], o["from_m"] + o["width_m"]
+            double = o["kind"] == "double_door"
+            if not (double or _hits(e, s0, s1)):
+                continue
+            top = min(o.get("height_m") or 2.03, _edge_top(room, e), 2.2)
+            bot = 0.2 if o["kind"] != "window" else min(0.9, top - 0.4)
+            zd = {"axis": ["s_m", "z_m"], "a": [round(s0, 2), round(s1, 2)], "b": [round(bot, 2), round(top, 2)], "s": [round(s0, 2), round(s1, 2)],
+                  "area_m2": round((s1 - s0) * (top - bot), 2), "edge": e["i"], "wall_name": e["name"]}
+            leaves = 2 if double else 1
+            if o["kind"] == "window":
+                add(f"window_{e['i']}_{oi}", f"Heavy curtain over the window on the {e['name']}", "absorber", e["side"], zd, 1,
+                    f"as wide as the window ({_ft(s1 - s0):.0f} ft), floor-length", 1, 3,
+                    "Glass reflects the speakers' sound almost fully; a heavy lined curtain, drawn for listening, takes the treble off it.",
+                    24, "A window sits where the speakers' first reflection lands: glass is the most reflective surface in the room.",
+                    rect=_seg_rect(e, zd), points=None, on_opening=True)
+            else:
+                add(f"door_{e['i']}_{oi}", f"{'Double door' if double else 'Door'} on the {e['name']}: a panel or heavy curtain" + (" on each leaf" if double else ""),
+                    "absorber", e["side"], zd, leaves, f"{leaves} x door-width panel, about {_ft((s1 - s0) / leaves):.1f} x {_ft(top - bot):.0f} ft",
+                    2, 0,
+                    "Takes the hard, flat door face out of the reflections; a thin door also stops buzzing and ringing when it is covered.",
+                    30 if double else 22,
+                    ("A double door is two big thin leaves: a large, hard reflector that also rattles with the bass." if double
+                     else "This door sits where the speakers' first reflection lands.") + " Hang the panel on the door (a rail or hooks), keep the handle and the hinge side clear, and take it off or swing it with the door.",
+                    rect=_seg_rect(e, zd), points=None, on_opening=True)
+    # panels on a wall leave out the part of the wall that is a door, window or opening: count only what is left
+    for it in items:
+        z = it.get("zone")
+        if it.get("on_opening") or not z or not z.get("s") or it["kind"] not in ("absorber", "diffuser") or z.get("edge") is None:
+            continue
+        s0, s1 = z["s"]
+        spans = sorted((max(s0, o["from_m"]), min(s1, o["from_m"] + o["width_m"])) for o in walls[z["edge"]]["openings"] if o["from_m"] < s1 and o["from_m"] + o["width_m"] > s0)
+        covered, end = 0.0, s0
+        for a, b in spans:
+            a = max(a, end)
+            if b > a:
+                covered += b - a
+                end = b
+        if covered > 0.05 and s1 > s0:
+            it["qty"] = max(1, round(it["qty"] * (1 - covered / (s1 - s0))))
+            it["qty_note"] = f"{covered / FT:.1f} ft of this wall is a door, window or opening and is left out"
+    # the underside of a soffit is a flat ceiling-height surface: a thin panel there
+    for r in soffit.rects(rm):
+        xs, ys = [p[0] for p in r["poly"]], [p[1] for p in r["poly"]]
+        zs = {"axis": ["x_m", "y_m"], "a": [round(min(xs), 2), round(max(xs), 2)], "b": [round(min(ys), 2), round(max(ys), 2)]}
+        zs["area_m2"] = round((zs["a"][1] - zs["a"][0]) * (zs["b"][1] - zs["b"][0]), 2)
+        if zs["area_m2"] >= 0.6:
+            add(f"soffit_{r['id']}", f"Panels on the underside of {r.get('name') or 'the soffit'}", "absorber", "ceiling", zs, _panels(zs["area_m2"]), "2 x 4 ft", 2, 0,
+                "A soffit's underside is a flat surface just above and in front of you: thin panels take its reflection out.",
+                14, "The soffit hangs lower than the ceiling, so it reflects the front speakers' sound earlier than the ceiling does.",
+                rect=_rect("ceiling", zs, dims), points=None, on_soffit=True)
     # merge the right-side panels into the left item for ranking (one row each, same score)
     for it in items:
         if it["id"] == "side_panels_r":
