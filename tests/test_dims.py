@@ -195,6 +195,18 @@ def test_an_open_back_gets_a_freestanding_stand_in():
     assert st["value"]["each"]["buy"][0] > 0
 
 
+def test_a_speaker_can_have_an_aim():
+    from subtune import equip
+    got = equip.clean_speaker("FL", {"aim_deg": 450})
+    assert got["aim_deg"] == 90.0
+    assert equip.clean_speaker("FL", {"aim_deg": ""}, got)["aim_deg"] is None
+    try:
+        equip.clean_speaker("FL", {"aim_deg": "sideways"})
+    except (ValueError, TypeError):
+        return
+    raise AssertionError("a bad aim was accepted")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

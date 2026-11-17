@@ -21,7 +21,9 @@ SPK_FIELDS = {"model": str, "kind": str, "size": str, "crossover_hz": float, "x_
               # copied from the receiver's Speaker Setup menu (it can't report them over the network)
               "rx_distance_m": float, "rx_level_db": float,
               # the cabinet's size in inches (dims.py): the 3D views draw it, and the hardware database can supply it
-              "width_in": float, "height_in": float, "depth_in": float}
+              "width_in": float, "height_in": float, "depth_in": float,
+              # which way it faces: degrees clockwise on the plan, 0 = at the back wall, 90 = the left wall, 180 = the screen, 270 = the right wall; blank = at the main seat
+              "aim_deg": float}
 TEXT_LEN = {"model": 80, "aim": 120, "amp": 120, "notes": 500}
 
 
@@ -73,6 +75,8 @@ def clean_speaker(ch: str, d: dict, old: dict | None = None) -> dict:
                 raise ValueError(f"{ch}: size (the receiver's speaker size setting) must be large or small")
         elif f == "crossover_hz":
             v = _num(v, 40, 250, f"{ch} crossover")
+        elif f == "aim_deg":
+            v = None if v in (None, "") else round(_num(v, -3600, 3600, f"{ch} aim") % 360, 1)
         elif f in ("width_in", "height_in", "depth_in"):
             v = _num(v, 0, 120, f"{ch} {f[:-3]}")
         elif f in ("x_m", "y_m"):

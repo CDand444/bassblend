@@ -181,6 +181,18 @@ def main():
               return t.includes('Step 2 of 4') && t.includes('Set Ports to 4 inch port open') && t.includes('Great') && t.includes('Both ports open') && !!document.querySelector('[data-wkretest="1"]') && !!document.querySelector('#wkMeasure'); })()""") is True)
             page.evaluate("wkLoad(null)")
 
+            # ---- Speakers: the angle to the main seat, from what is typed in a row
+            page.goto(base + "/#/speakers"); page.wait_for_timeout(400)
+            check("Speakers: distance, angle and aim off the seat are worked out", page.evaluate("""(() => {
+              const old = spkSeat; spkSeat = () => ({x: 2, y: 4, z: 1.05, name: 'MLP'});
+              const row = document.createElement('div'); row.className = 'spkrow'; row.dataset.ch = 'FL';
+              row.innerHTML = ['x_ft', 'y_ft', 'z_ft', 'aim_deg'].map(f => `<input data-f="${f}">`).join('') + '<div class="spk-ang"></div>';
+              const set = (f, v) => { row.querySelector(`[data-f="${f}"]`).value = v; };
+              set('x_ft', 0.8 / 0.3048); set('y_ft', 0.4 / 0.3048); set('z_ft', 1.05 / 0.3048); set('aim_deg', 341.6);
+              const g = spkGeom(row); set('aim_deg', 180); const g2 = spkGeom(row);
+              spkAngles(row); const txt = row.querySelector('.spk-ang').textContent; spkSeat = old;
+              return g.az === -18 && g.el === 0 && Math.abs(g.dist - Math.hypot(1.2, 3.6)) < 0.01 && g.off <= 1 && Math.abs(g2.off - 162) <= 1 && txt.includes('18° left') && txt.includes('at ear height'); })()""") is True)
+
             # ---- Setup: the home-type question saves by itself and shows on the Room page too
             page.goto(base + "/#/setup"); page.wait_for_timeout(500)
             page.select_option("#hmKind", "condo")

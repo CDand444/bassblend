@@ -69,7 +69,7 @@ function v3Speakers(spk, r, ceil) {                              // [{id, x_m, y
     const high = s.kind === 'height', rec = s.rec !== false && s.source !== 'suggested', fill = rec ? '#3b3f46' : '#6c717a';
     const cab = v3Cab((r.speakers || {})[s.id], ((S.hw_sizes || {}).speakers || {})[s.id], high ? [0.2, 0.18, 0.2] : [0.24, 0.42, 0.28]);
     const top = ceil(s.x_m, s.y_m), zc = high ? top - cab.h / 2 : (s.z_m ?? ((r.speakers || {})[s.id] || {}).z_m ?? 1.1), h = Math.max(0.05, cab.h), w = Math.max(0.05, cab.w), d = Math.max(0.04, cab.d);
-    const dir = high ? [0, 0] : v3Face(s.x_m, s.y_m, seat);
+    const dir = high ? [0, 0] : v3Dir(((r.speakers || {})[s.id] || {}).aim_deg) || v3Face(s.x_m, s.y_m, seat);
     if (high) { out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, [0, 1]), z0: top - h, z1: top, fill, alpha: rec ? 1 : 0.55}], label: s.id}); return; }
     out.push({kind: 'solid', boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, dir), z0: Math.max(0, zc - h / 2), z1: zc + h / 2, fill, front: 2, alpha: rec ? 1 : 0.55}], label: s.id});
     if (zc - h / 2 > 0.25) out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, 0.05, 0.05, [0, 1]), z0: 0, z1: Math.max(0, zc - h / 2), fill: '#555a62', alpha: rec ? 0.7 : 0.3}]});   // a stand

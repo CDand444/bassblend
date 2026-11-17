@@ -170,7 +170,15 @@ details.fold > summary { cursor: pointer; font-weight: 600; font-size: 14px; pad
 .col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 aside.col { display: none; }
 .view-body > .card { box-shadow: none; }
-.spk-tbl td { vertical-align: middle; } .spk-tbl input, .spk-tbl select { height: 32px; }
+.spk-list { display: flex; flex-direction: column; gap: 10px; }
+.spkrow { border: 1px solid var(--border); border-radius: 12px; padding: 10px 14px; background: var(--surface); }
+.spk-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 14px; margin-bottom: 8px; }
+.spk-ang { display: flex; flex-wrap: wrap; gap: 6px; } .spk-ang .chip { font-size: 12px; }
+.spk-ang .spk-ok { color: var(--good); } .spk-ang .spk-close { color: var(--warn); } .spk-ang .spk-off { color: var(--bad); }
+.spk-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px 12px; align-items: end; }
+.spk-grid .spk-model { grid-column: span 2; } .spk-grid .spk-size { grid-column: span 2; } .spk-grid .spk-notes { grid-column: 1 / -1; }
+.spk-grid input, .spk-grid select { height: 32px; }
+@media (max-width: 520px) { .spk-grid .spk-model, .spk-grid .spk-size { grid-column: 1 / -1; } }
 .view-body > .card > .card-h:first-child h2, .view-body > details.card > summary { display: none; }
 .view-body > .card > .card-h:first-child:has(> h2:only-child) { display: none; }
 .subnav { display: none; }

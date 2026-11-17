@@ -1,5 +1,10 @@
 # htTamer changelog
 
+## Nov 18, 2026 - the Speakers page
+
+- **Angle to the main seat** on every speaker: how far left or right of straight ahead, how far above or below ear height, how far away, and whether that is inside Dolby's range for the channel, updating as you type. A new **Faces** field says which way the speaker points (blank = at the seat) and the row shows how far off the seat that is; the 3D view turns the speaker to match.
+- **The page fills the width**: one row per speaker with fields that flow to the screen (stacked on a phone) instead of a wide table that scrolled sideways.
+
 ## Nov 18, 2026 - Sub workshop
 
 - **Sub workshop** (Tune → Sub workshop), two guided workflows with a measurement after every change, plain feedback after each, retests and a verification:

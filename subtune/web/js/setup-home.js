@@ -134,34 +134,58 @@ document.addEventListener('click', e => {
 let spkKey = null, spkDirty = false;
 const SPK_KINDS = ['', 'tower', 'bookshelf', 'centre', 'on-wall', 'in-wall', 'in-ceiling', 'atmos module', 'satellite', 'other'];
 const ftOf = m => m == null ? '' : (m / 0.3048).toFixed(1);
+// where a speaker is as seen from the main seat: distance, left or right of straight ahead, up from ear height; against Dolby's range for that channel; and how far off the seat it faces
+function spkSeat() { const st = ((S.room || {}).seats || []).find(x => x.x_m != null && x.y_m != null); return st ? {x: st.x_m, y: st.y_m, z: st.z_m || 1.05, name: st.name || 'the main seat'} : null; }
+function spkGeom(row) {                                  // the numbers for one speaker row, from what is typed in it (null until it has a position)
+  const seat = spkSeat(), v = f => { const i = row.querySelector(`[data-f="${f}"]`); return i && i.value !== '' ? +i.value : null; }, x = v('x_ft'), y = v('y_ft'), z = v('z_ft');
+  if (!seat || x == null || y == null) return null;
+  const dx = x * 0.3048 - seat.x, dy = y * 0.3048 - seat.y, dz = z == null ? null : z * 0.3048 - seat.z, flat = Math.hypot(dx, dy);
+  const az = Math.round(Math.atan2(dx, -dy) * 180 / Math.PI), el = dz == null ? null : Math.round(Math.atan2(dz, flat) * 180 / Math.PI), dist = Math.hypot(flat, dz || 0);
+  const aim = v('aim_deg');
+  let off = null; if (aim != null) { const a = aim * Math.PI / 180, fx = -Math.sin(a), fy = Math.cos(a), sx = -dx / (flat || 1), sy = -dy / (flat || 1); off = Math.round(Math.acos(Math.max(-1, Math.min(1, fx * sx + fy * sy))) * 180 / Math.PI); }
+  return {az, el, dist, off, seat};
+}
+function spkAngles(row) {
+  const el = row.querySelector('.spk-ang'); if (!el) return; const g = spkGeom(row), ch = row.dataset.ch;
+  if (!g) { el.innerHTML = spkSeat() ? '<span class="muted small">Enter where it is to see its angle to the seat.</span>' : '<span class="muted small">Enter your main seat on the Room page to see angles.</span>'; return; }
+  const plan = ((S.placement || {}).speakers || []).find(s => s.id === ch), height = ch.startsWith('T');
+  let verdict = '', cls = '';
+  if (plan && plan.range) {
+    const lo = Math.min(...plan.range.map(Math.abs)), hi = Math.max(...plan.range.map(Math.abs)), val = height ? g.el : Math.abs(g.az);
+    if (val != null) { const d = val < lo ? lo - val : val > hi ? val - hi : 0; verdict = d === 0 ? 'inside Dolby’s range' : d <= 5 ? `${d}° outside Dolby’s range` : `${d}° outside Dolby’s range`; cls = d === 0 ? 'ok' : d <= 5 ? 'close' : 'off'; verdict += ` (${lo}–${hi}°)`; }
+  }
+  const side = g.az === 0 ? 'straight ahead' : `${Math.abs(g.az)}° ${g.az < 0 ? 'left' : 'right'}`;
+  el.innerHTML = `<span class="chip">${side}</span><span class="chip">${g.el == null ? 'height not set' : g.el === 0 ? 'at ear height' : `${Math.abs(g.el)}° ${g.el > 0 ? 'above' : 'below'} ear height`}</span><span class="chip">${fmtFt(g.dist)} away</span>${g.off != null ? `<span class="chip">faces ${g.off}° off the seat</span>` : ''}${verdict ? `<span class="chip spk-${cls}">${esc(verdict)}</span>` : ''}`;
+}
 function renderSpeakers() {
   const chans = S.speaker_channels || [], rec = (S.room || {}).speakers || {};
-  const key = JSON.stringify([chans, rec, (S.hw_sizes || {}).speakers]);
+  const key = JSON.stringify([chans, rec, (S.hw_sizes || {}).speakers, ((S.room || {}).seats || [])[0], (S.placement || {}).speakers && S.placement.speakers.length]);
   if (key === spkKey || spkDirty || $('#spkOut').contains(document.activeElement)) return; spkKey = key;
   const done = chans.filter(c => (rec[c.ch] || {}).model).length;
   $('#spkSub').textContent = chans.length ? `${done} of ${chans.length} recorded` : '';
   if (!chans.length) { $('#spkOut').innerHTML = empty('Speaker layout not set', 'Set your layout (for example 7.1.4) in Setup → Checklist → Speakers and Dirac Live first.'); return; }
   const opt = (list, v) => list.map(x => `<option value="${x}" ${x === (v || '') ? 'selected' : ''}>${x || '–'}</option>`).join('');
-  $('#spkOut').innerHTML = `<div class="tw"><table class="dc-tbl spk-tbl"><thead><tr><th>Speaker</th><th>Model</th><th>Kind</th><th>Receiver size</th><th>Crossover</th><th title="From the receiver's Speaker Setup → Distance (it can't report these over the network)">Receiver distance</th><th title="From the receiver's Speaker Setup → Level Calibration">Receiver level</th><th>From left</th><th>From front</th><th>Height</th><th title="The cabinet in inches: width, height, depth. Blank = from the hardware database, else a typical size">Size (in) W × H × D</th><th>Notes</th></tr></thead><tbody>
-    ${chans.map(c => { const r = rec[c.ch] || {};
-      return `<tr data-ch="${c.ch}"><td><b>${esc(c.name)}</b><div class="muted small">${c.ch}</div></td>
-        <td><input data-f="model" value="${esc(r.model || '')}" placeholder="Make and model" style="min-width:150px"></td>
-        <td><select data-f="kind" style="min-width:128px">${opt(SPK_KINDS, r.kind)}</select></td>
-        <td><select data-f="size" style="min-width:84px">${opt(['', 'small', 'large'], r.size)}</select></td>
-        <td><span class="unit" data-u="Hz"><input data-f="crossover_hz" type="number" min="40" max="250" step="10" value="${r.crossover_hz ?? ''}" style="width:88px"></span></td>
-        <td><span class="unit" data-u="ft"><input data-f="rx_distance_ft" type="number" step="0.1" min="0" max="49" value="${ftOf(r.rx_distance_m)}" style="width:84px"></span></td>
-        <td><span class="unit" data-u="dB"><input data-f="rx_level_db" type="number" step="0.5" min="-12" max="12" value="${r.rx_level_db ?? ''}" style="width:80px"></span></td>
-        <td><span class="unit" data-u="ft"><input data-f="x_ft" type="number" step="0.1" min="0" value="${ftOf(r.x_m)}" style="width:84px"></span></td>
-        <td><span class="unit" data-u="ft"><input data-f="y_ft" type="number" step="0.1" min="0" value="${ftOf(r.y_m)}" style="width:84px"></span></td>
-        <td><span class="unit" data-u="ft"><input data-f="z_ft" type="number" step="0.1" min="0" value="${ftOf(r.z_m)}" style="width:84px"></span></td>
-        <td><span class="row" style="gap:4px;flex-wrap:nowrap"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${r.width_in ?? ''}" placeholder="W" style="width:60px" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${r.height_in ?? ''}" placeholder="H" style="width:60px" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${r.depth_in ?? ''}" placeholder="D" style="width:60px" aria-label="Depth in inches"></span>${(((S.hw_sizes || {}).speakers || {})[c.ch] || {}).source && !r.width_in ? `<div class="muted small">${esc(S.hw_sizes.speakers[c.ch].source)}</div>` : ''}<button type="button" class="btn ghost hwsize" data-kind="speakers" style="height:24px;padding:0 8px;margin-top:2px" title="Remember this size for this model">Remember size</button></td>
-        <td><input data-f="notes" value="${esc(r.notes || '')}" placeholder="Aim, mounting, amp…" style="min-width:140px"></td></tr>`; }).join('')}</tbody></table></div>`;
-  $('#spkOut').querySelectorAll('input, select').forEach(x => x.oninput = () => { spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; });
+  const unit = (f, label, v, u, extra = '') => `<label class="f">${label}<span class="unit" data-u="${u}"><input data-f="${f}" type="number" step="${extra || '0.1'}" min="0" value="${v}"></span></label>`;
+  $('#spkOut').innerHTML = `<div class="spk-list">${chans.map(c => { const r = rec[c.ch] || {};
+    return `<div class="spkrow" data-ch="${c.ch}"><div class="spk-head"><div><b>${esc(c.name)}</b> <span class="muted small">${c.ch}</span></div><div class="spk-ang" data-ang="${c.ch}"></div></div>
+      <div class="spk-grid">
+        <label class="f spk-model">Model<input data-f="model" value="${esc(r.model || '')}" placeholder="Make and model"></label>
+        <label class="f">Kind<select data-f="kind">${opt(SPK_KINDS, r.kind)}</select></label>
+        <label class="f">Receiver size<select data-f="size">${opt(['', 'small', 'large'], r.size)}</select></label>
+        ${unit('crossover_hz', 'Crossover', r.crossover_hz ?? '', 'Hz', '10')}
+        ${unit('x_ft', 'From left', ftOf(r.x_m), 'ft')}${unit('y_ft', 'From front', ftOf(r.y_m), 'ft')}${unit('z_ft', 'Height', ftOf(r.z_m), 'ft')}
+        <label class="f">Faces<span class="unit" data-u="°"><input data-f="aim_deg" type="number" step="5" min="0" max="359" value="${r.aim_deg ?? ''}" placeholder="the seat" title="Degrees clockwise on the plan: 0 = the back wall, 90 = the left wall, 180 = the screen, 270 = the right wall. Blank = aimed at the main seat."></span></label>
+        ${unit('rx_distance_ft', 'Receiver distance', ftOf(r.rx_distance_m), 'ft')}${unit('rx_level_db', 'Receiver level', r.rx_level_db ?? '', 'dB', '0.5')}
+        <label class="f spk-size">Size (in) W × H × D<span class="row" style="gap:4px;flex-wrap:nowrap"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${r.width_in ?? ''}" placeholder="W" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${r.height_in ?? ''}" placeholder="H" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${r.depth_in ?? ''}" placeholder="D" aria-label="Depth in inches"><button type="button" class="btn ghost hwsize" data-kind="speakers" style="height:32px;padding:0 8px;white-space:nowrap" title="Remember this size for this model">Remember</button></span>${(((S.hw_sizes || {}).speakers || {})[c.ch] || {}).source && !r.width_in ? `<small class="muted">Using a ${esc(S.hw_sizes.speakers[c.ch].source)} size.</small>` : ''}</label>
+        <label class="f spk-notes">Notes<input data-f="notes" value="${esc(r.notes || '')}" placeholder="Mounting, amp…"></label>
+      </div></div>`; }).join('')}</div>`;
+  $('#spkOut').querySelectorAll('.spkrow').forEach(spkAngles);
+  $('#spkOut').querySelectorAll('input, select').forEach(x => x.oninput = () => { spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; spkAngles(x.closest('.spkrow')); });
 }
 // "Remember size": put a model's cabinet size in the hardware database (subs or speakers), so every room with that model uses it
 document.addEventListener('click', async e => {
   const b = e.target.closest('.hwsize'); if (!b) return;
-  const box = b.closest('.subcard, tr'), val = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value.trim() : ''; };
+  const box = b.closest('.subcard, .spkrow'), val = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value.trim() : ''; };
   const model = val('model'), data = {width_in: val('width_in'), height_in: val('height_in'), depth_in: val('depth_in')};
   if (!model) { toast('Hardware database', 'Type the make and model first.', 'bad'); return; }
   if (!data.width_in || !data.height_in || data.depth_in === '') { toast('Hardware database', 'Fill in width, height and depth first.', 'bad'); return; }
@@ -170,7 +194,7 @@ document.addEventListener('click', async e => {
 });
 $('#spkSave').onclick = async () => {
   const speakers = {};
-  $('#spkOut').querySelectorAll('tr[data-ch]').forEach(tr => {
+  $('#spkOut').querySelectorAll('.spkrow').forEach(tr => {
     const d = {}; tr.querySelectorAll('[data-f]').forEach(x => { d[x.dataset.f] = x.value.trim(); }); speakers[tr.dataset.ch] = d; });
   const r = await post('/api/speakers', {speakers});
   if (r.error) { $('#spkMsg').textContent = r.error; return; }
