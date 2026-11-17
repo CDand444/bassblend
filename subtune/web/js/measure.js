@@ -286,7 +286,7 @@ function setTrtMode(m) {
   if (m === '3d') trt3dDraw();
 }
 function renderTreatment() {
-  const p = S.treatment, key = JSON.stringify([p, (S.room || {}).furniture, (S.room || {}).fixtures, (S.room || {}).subs, (S.room || {}).screen, (S.room || {}).seats]);
+  const p = S.treatment, key = JSON.stringify([p, (S.room || {}).furniture, (S.room || {}).fixtures, (S.room || {}).speakers, S.hw_sizes, (S.room || {}).subs, (S.room || {}).screen, (S.room || {}).seats]);
   if (key !== trtKey) { trtKey = key;
     if (!p) $('#trtOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and at least the main seat in Room.');
     else {

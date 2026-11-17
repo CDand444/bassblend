@@ -208,6 +208,22 @@ def main():
               spkAngles(row); const txt = row.querySelector('.spk-ang').textContent; spkSeat = old;
               return g.az === -18 && g.el === 0 && Math.abs(g.dist - Math.hypot(1.2, 3.6)) < 0.01 && g.off <= 1 && Math.abs(g2.off - 162) <= 1 && txt.includes('18° left') && txt.includes('at ear height'); })()""") is True)
 
+            # ---- Sound field: the standing-wave model puts the loud and quiet spots where the physics says
+            page.goto(base + "/#/soundfield"); page.wait_for_timeout(400)
+            check("Sound field: a mode builds a loud end and a quiet middle, and the seat response peaks at the mode", page.evaluate("""(() => {
+              const R = {W: 4, L: 6, H: 2.5, subs: [{o: 0, x: 0.1, y: 0.1, z: 0.3}], seat: {x: 1, y: 1.5, z: 1}, irregular: false};
+              SF.room = R; SF.modes = sfModes(R); SF.f = 343 / 12; SF.z = 1; SF.t60 = 0.5; sfCompute();
+              const F = SF.field, col = Math.floor(F.nx / 2), row = y => Math.min(F.ny - 1, Math.floor(y / R.L * F.ny)), at = y => F.amp[row(y) * F.nx + col];
+              const farEnd = at(5.8), middle = at(3.0); if (!(farEnd > 4 * middle)) return 'end ' + farEnd + ' middle ' + middle;
+              const db = sfSeatDb(R, SF.modes, 0.5, [24, 343 / 12, 40]); if (!(db[1] > db[0] + 6)) return 'seat ' + db;
+              const lenModes = SF.modes.filter(m => m.nx === 0 && m.ny === 1 && m.nz === 0); return lenModes.length === 1 && Math.abs(lenModes[0].f - 28.58) < 0.05; })()""") is True)
+
+            check("Speakers: the 3D view turns a speaker to the direction it is set to face (also from the Room page, which has no speaker form)", page.evaluate("""(() => {
+              const old = S.room.speakers; S.room.speakers = {FL: {x_m: 1, y_m: 0.5, aim_deg: 90, width_in: 9, height_in: 40, depth_in: 12}};
+              const r = {room: {length_m: 6, width_m: 4, height_m: 2.4}, seats: [{x_m: 2, y_m: 4}], subs: {}, furniture: [], fixtures: []};
+              const m = v3Speakers([{id: 'FL', x_m: 1, y_m: 0.5, z_m: 1.05, kind: 'bed', rec: true}], r, () => 2.4)[0], b = m.boxes[0], f = [(b.pts[2][0] + b.pts[3][0]) / 2, (b.pts[2][1] + b.pts[3][1]) / 2], c = [(b.pts[0][0] + b.pts[1][0]) / 2, (b.pts[0][1] + b.pts[1][1]) / 2];
+              S.room.speakers = old; return f[0] < c[0] - 0.05 && Math.abs(f[1] - c[1]) < 0.01; })()""") is True)
+
             # ---- Setup: the home-type question saves by itself and shows on the Room page too
             page.goto(base + "/#/setup"); page.wait_for_timeout(500)
             page.select_option("#hmKind", "condo")

@@ -67,8 +67,8 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
-- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 22 parts, loaded in order as
-  classic scripts sharing globals: core, tune, room-ai, furniture, fixtures, view3d, soffit, enclosure, screen, dwelling, backup, receiver, measure, treatpick, workshop, channels, setup-home, liveeq, nav; plus
+- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 23 parts, loaded in order as
+  classic scripts sharing globals: core, tune, room-ai, furniture, fixtures, view3d, soffit, enclosure, screen, dwelling, backup, receiver, measure, treatpick, workshop, soundfield, channels, setup-home, liveeq, nav; plus
   `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
   `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`.
   Shared globals mean a top-level name declared in two parts makes the browser drop the later file entirely

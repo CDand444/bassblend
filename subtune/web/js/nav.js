@@ -59,6 +59,7 @@ const MENU = [
    tag: () => { const c = S.speaker_channels || [], r = (S.room || {}).speakers || {}; if (!c.length) return null;
      const n = c.filter(x => (r[x.ch] || {}).model).length; return [`${n}/${c.length}`, '']; }},
   {grp: 'Survey', key: 'place', icon: 'place', title: 'Speaker placement', full: 'Speaker placement (Dolby guidelines)', el: $('#placeCard'), tag: () => null},
+  {grp: 'Survey', key: 'soundfield', beta: true, icon: 'spl', title: 'Sound field', full: 'Sound field: how bass fills the room', el: $('#sfCard'), tag: () => null},
   {grp: 'Survey', key: 'treatment', beta: true, icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
    tag: () => { const t = S.treatment; if (!t) return null; const n = t.items.filter(i => i.tier === 1 && !i.installed && !i.blocked).length; return n ? [String(n), ''] : ['✓', '']; }},
   {grp: 'Tune', key: 'wizard', icon: 'wand', title: 'Tune my system', full: 'Tune my system', el: $('#wizCard'), tag: () => null},
@@ -249,7 +250,7 @@ function applyHostWords() {                    // the static labels that name wh
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
   const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'fixtures.js': 'fxRender', 'view3d.js': 'v3Scene', 'soffit.js': 'soRect', 'enclosure.js': 'enEditorHtml', 'screen.js': 'scRead', 'dwelling.js': 'dwRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
-                'measure.js': 'renderDeep', 'treatpick.js': 'tpHtml', 'workshop.js': 'wkLoad', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
+                'measure.js': 'renderDeep', 'treatpick.js': 'tpHtml', 'workshop.js': 'wkLoad', 'soundfield.js': 'renderSoundfield', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {
     console.error('[htTamer] scripts that failed to load:', missing);
@@ -317,7 +318,7 @@ async function poll() {
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
-      renderBlend, renderWorkshop, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness, renderQuickStart};
+      renderBlend, renderWorkshop, renderSoundfield, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness, renderQuickStart};
     for (const [n, f] of Object.entries(parts)) safe(n, () => f());
     safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }

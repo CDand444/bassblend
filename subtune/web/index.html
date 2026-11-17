@@ -685,6 +685,12 @@ details.lastone > summary { cursor: pointer; font-weight: 600; font-size: 13.5px
 .plan svg { width: 100%; height: auto; max-height: 380px; display: block; touch-action: none; }
 .plan .vh { cursor: grab; }
 .plan3d { display: block; padding: 0; overflow: hidden; } .plan3d canvas { width: 100%; height: 360px; display: block; cursor: grab; }
+.sf-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(260px, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .sf-grid { grid-template-columns: minmax(0, 1fr); } }
+.sf-view canvas { width: 100%; display: block; border-radius: 10px; }
+.sf-bar { height: 10px; border-radius: 6px; margin-top: 8px; background: linear-gradient(90deg, #1a254e, #266ab0, #4aa3df, #ece9cd, #f4a352, #d6402a, #8e141e); }
+.sf-bar-l { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.sf-side input[type=range] { width: 100%; }
 .wk-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 12px; }
 .wk-choice { border: 1px solid var(--border); border-radius: 12px; padding: 14px; } .wk-choice h3 { margin: 0 0 6px; }
 .wk-step { border: 1px solid var(--accent); border-radius: 12px; padding: 14px; background: var(--accent-soft); margin: 0 0 10px; }
@@ -1184,6 +1190,35 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       </div>
     </section>
 
+    <!-- SOUND FIELD -->
+    <section class="card" id="sfCard">
+      <div class="card-h"><h2>Sound field</h2><span class="sub" id="sfSub"></span></div>
+      <p class="lead">See how bass fills your room. Drag the frequency slider and watch the loud spots (red) and quiet spots (blue) move: where your subs and your seat sit in that pattern is why the bass sounds strong, thin or boomy. It is the room’s standing waves worked out for its box, your subs and your seat; it is a way to learn and to choose where things go, not a replacement for measuring.</p>
+      <div id="sfEmpty" class="muted" hidden>Enter the room size on the Room page to see its sound field.</div>
+      <div id="sfBody" hidden>
+        <div class="sf-grid">
+          <div class="sf-view"><canvas id="sfCanvas" aria-label="Bass pressure in the room seen from above: red is loud, blue is quiet"></canvas><div id="sfLegend"></div></div>
+          <div class="sf-side">
+            <div class="row" style="gap:14px;flex-wrap:wrap">
+              <label class="cb" style="margin:0"><input type="checkbox" id="sfBass" checked disabled><span>Bass<small>20 to 250 Hz: standing waves</small></span></label>
+              <label class="cb" style="margin:0;opacity:.6"><input type="checkbox" id="sfTreble" disabled><span>Treble<small>reflections off walls and panels: the next version</small></span></label>
+            </div>
+            <label class="f" style="margin-top:12px">Frequency <b id="sfFreqNum"></b><input type="range" id="sfFreq" min="0" max="100" step="1" value="35" aria-label="Frequency"></label>
+            <div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0 0" id="sfModes" aria-label="Room modes: click one to jump to it"></div>
+            <label class="f" style="margin-top:12px">Height of the slice <b id="sfHNum"></b><input type="range" id="sfH" min="0" max="2.5" step="0.05" value="1.05" aria-label="Height of the slice through the room"></label>
+            <div class="row" style="gap:8px;margin-top:12px;align-items:center"><div class="seg" role="radiogroup" aria-label="What to show"><button type="button" data-sfview="level" class="on">Level map</button><button type="button" data-sfview="wave">Moving wave</button></div>
+              <label class="cb" id="sfWaveCtl" style="margin:0" hidden><input type="checkbox" id="sfPlay" checked><span>Playing</span></label></div>
+            <label class="f" style="margin-top:12px">Room damping<select id="sfDamp"><option value="live">Live (hard surfaces)</option><option value="normal" selected>Normal</option><option value="dead">Dead (lots of treatment)</option></select></label>
+            <p class="small" id="sfExplain" style="margin:12px 0 0"></p>
+          </div>
+        </div>
+        <h3 style="margin:16px 0 4px">What the seat hears, 20 to 200 Hz</h3>
+        <div id="sfChart" class="chart" style="height:220px"></div><p class="muted small" id="sfChartNote" style="margin:4px 0 0"></p>
+        <details class="fold"><summary>How this is worked out, and what it leaves out</summary>
+          <p class="small">Every closed room has standing waves: frequencies at which sound bounces between the walls and reinforces itself (modes). For the room’s box this adds up the modes that the frequency excites, weighted by where each sub sits, with a damping taken from the room’s ring time. That is the standard model, and it puts peaks and nulls where measurements find them. It treats the walls as rigid and the subs as identical and in phase, and for a room that is not a box it uses the main rectangle. Panels do almost nothing to bass (a 4 in panel only absorbs well above about 200 Hz), so they are not in this picture; furniture, openings, your treatment and each sub’s own settings are why a real room differs.</p></details>
+      </div>
+    </section>
+
     <!-- SUB WORKSHOP -->
     <section class="card" id="wkCard">
       <div class="card-h"><h2>Sub workshop</h2><span class="sub" id="wkSubTitle"></span></div>
@@ -1552,6 +1587,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/measure.js?v=__V__"></script>
 <script src="/js/treatpick.js?v=__V__"></script>
 <script src="/js/workshop.js?v=__V__"></script>
+<script src="/js/soundfield.js?v=__V__"></script>
 <script src="/js/channels.js?v=__V__"></script>
 <script src="/js/results.js?v=__V__"></script>
 <script src="/js/readiness.js?v=__V__"></script>
