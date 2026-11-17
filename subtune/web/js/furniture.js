@@ -8,14 +8,18 @@ const FU_BACK = {0: [0, 1], 90: [-1, 0], 180: [0, -1], 270: [1, 0]};      // uni
 const fuUid = k => (k || 'couch') + '-' + Math.random().toString(36).slice(2, 8);
 const fuRot = c => [[0, 'the back wall'], [90, 'the left wall'], [180, 'the screen'], [270, 'the right wall']].map(([v, n]) => `<option value="${v}"${+(c.rotation || 0) === v ? ' selected' : ''}>${n}</option>`).join('');
 
+const FU_MATERIALS = [['', 'Not set'], ['wood', 'Wood (plywood or hardwood)'], ['carpet', 'Carpeted'], ['painted', 'Painted or laminate'], ['concrete', 'Concrete or block']];
+const FU_RISER_COLOR = {'': '#a58f74', wood: '#a58f74', carpet: '#8a8f9c', painted: '#d6d3cc', concrete: '#a3a3a0'};
+const fuPts = c => Array.isArray(c.points) && c.points.length >= 3 ? c.points : null;
 function fuRiserRow(c = {}) {
   const num = (f, v, title) => `<label class="f">${title}<span class="unit" data-u="ft"><input data-f="${f}" type="number" step="0.1" min="0" value="${toFt(v)}"></span></label>`;
   return `<div class="fucouch" style="border:1px solid var(--border);border-radius:10px;padding:10px;margin:0 0 8px">
-    <input type="hidden" data-f="id" value="${esc(c.id || fuUid('riser'))}"><input type="hidden" data-f="kind" value="riser"><input type="hidden" data-f="against_wall" value="${esc(c.against_wall || '')}">
+    <input type="hidden" data-f="id" value="${esc(c.id || fuUid('riser'))}"><input type="hidden" data-f="kind" value="riser"><input type="hidden" data-f="points" value="${esc(fuPts(c) ? JSON.stringify(fuPts(c)) : '')}"><input type="hidden" data-f="want" value="${esc(Array.isArray(c.want) && c.want.length === 4 && fuPts(c) ? JSON.stringify(c.want) : '')}"><input type="hidden" data-f="against_wall" value="${esc(c.against_wall || '')}">
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;align-items:end">
       <label class="f">Riser name<input data-f="name" value="${esc(c.name || 'Riser')}" maxlength="40"></label>
       ${num('length_m', c.length_m, 'Width across (ft)')}${num('depth_m', c.depth_m, 'Depth (ft)')}${num('height_m', c.height_m, 'Height (ft)')}
       ${num('x_m', c.x_m, 'Middle from left (ft)')}${num('y_m', c.y_m, 'Middle from front (ft)')}
+      <label class="f">Top surface<select data-f="material" title="What the top of the riser is: it changes how much the room absorbs">${FU_MATERIALS.map(([v, n]) => `<option value="${v}"${(c.material || '') === v ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
       <label class="f">Back edge toward<select data-f="rotation">${fuRot(c)}</select></label>
       <span style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="btn ghost" data-fuback title="Put it against the back wall, middle where it is">Against back wall</button><button type="button" class="btn ghost" data-fufit title="Resize and turn this riser to fit the couch on it (or the nearest couch)">Fit to couch</button><button type="button" class="btn icon ghost" data-fudel aria-label="Remove riser">${icon('x')}</button></span>
     </div><p class="small muted fuinfo" style="margin:6px 0 0"></p></div>`;
@@ -39,6 +43,7 @@ function fuRead() {
     const o = {};
     d.querySelectorAll('[data-f]').forEach(i => { o[i.dataset.f] = i.dataset.f.endsWith('_m') ? toM(i.value) : i.value; });
     o.rotation = +o.rotation || 0;
+    if (o.kind === 'riser') { ['points', 'want'].forEach(k => { try { o[k] = o[k] ? JSON.parse(o[k]) : null; } catch (e) { o[k] = null; } }); if (o.points) o.rotation = 0; else o.want = null; } else { delete o.points; delete o.want; }
     return o;
   });
 }
@@ -80,7 +85,7 @@ function fuInfo() {                                // one line under every couch
   rows.forEach((row, i) => { const c = list[i], el = row.querySelector('.fuinfo'); if (!el || !c) return;
     el.style.color = '';
     if (c.x_m == null || c.y_m == null) { el.textContent = ''; return; }
-    if (c.kind === 'riser') { const on = list.filter(k => k.kind !== 'riser' && k.x_m != null && fuOnRiser(list, k) === c); el.textContent = on.length ? `${on.map(k => k.name || 'Couch').join(', ')} sit${on.length === 1 ? 's' : ''} on it and rise${on.length === 1 ? 's' : ''} ${fmtFt(c.height_m)} with it.` : 'Nothing sits on it yet: add a couch, or use Sit on a riser on a couch.'; return; }
+    if (c.kind === 'riser') { const shaped = fuPts(c) ? `Shaped to the room: ${fuPts(c).length} corners. ` : ''; const on = list.filter(k => k.kind !== 'riser' && k.x_m != null && fuOnRiser(list, k) === c); el.textContent = shaped + (on.length ? `${on.map(k => k.name || 'Couch').join(', ')} sit${on.length === 1 ? 's' : ''} on it and rise${on.length === 1 ? 's' : ''} ${fmtFt(c.height_m)} with it.` : 'Nothing sits on it yet: add a couch, or use Sit on a riser on a couch.'); return; }
     const r = fuOnRiser(list, c);
     if (!r) { el.textContent = list.some(k => k.kind === 'riser') ? 'On the floor. Use Sit on a riser to put it on one.' : ''; return; }
     const over = fuOverhang(r, c);
@@ -90,6 +95,7 @@ function fuInfo() {                                // one line under every couch
 function fuRiserH(list, x, y) {                    // height of the tallest riser under a floor point (m), as furniture.riser_at
   let best = 0;
   (list || []).filter(c => c.kind === 'riser' && c.x_m != null && c.y_m != null).forEach(c => {
+    if (fuPts(c)) { if (v3Inside(fuPts(c), x, y)) best = Math.max(best, c.height_m || 0); return; }
     const [bx, by] = FU_BACK[c.rotation || 0] || FU_BACK[0], dx = x - c.x_m, dy = y - c.y_m, v = dx * bx + dy * by, u = -dx * by + dy * bx;
     if (Math.abs(u) <= c.length_m / 2 && Math.abs(v) <= c.depth_m / 2) best = Math.max(best, c.height_m || 0);
   });
@@ -103,7 +109,7 @@ function fuPlanSvg(list, X, Y) {
   const ok = c => c.x_m != null && c.y_m != null && c.length_m && c.depth_m;
   const pt = q => `${X(q[0]).toFixed(1)},${Y(q[1]).toFixed(1)}`;
   const rs = (list || []).filter(c => c.kind === 'riser' && ok(c)).map(c => {
-    const p = fuCorners(c, -c.depth_m / 2, c.depth_m / 2);
+    const p = fuPts(c) || fuCorners(c, -c.depth_m / 2, c.depth_m / 2);
     return `<g class="fu"><polygon points="${p.map(pt).join(' ')}" fill="var(--text-3)" fill-opacity=".12" stroke="var(--text-3)" stroke-width="1.2" stroke-dasharray="5 3"/>
       <text x="${X(c.x_m)}" y="${Y(c.y_m) + 3}" text-anchor="middle" font-size="8.5" fill="var(--text-3)">riser, ${fmtFt(c.height_m)} high</text><title>${esc(c.name || 'Riser')}</title></g>`;
   }).join('');
@@ -122,12 +128,20 @@ function fuCornersUV(c, u0, u1, v0, v1) {            // floor corners of the par
 function fuOnRiser(list, c, slack = 0.25) {          // the riser a couch (or seat point) sits on: its middle is over the riser, give or take a little
   let best = null;
   (list || []).filter(r => r.kind === 'riser' && r.x_m != null && r.y_m != null).forEach(r => {
+    if (fuPts(r)) { if (fuPolyOut(fuPts(r), c.x_m, c.y_m) <= slack && (!best || r.height_m > best.height_m)) best = r; return; }
     const [bx, by] = FU_BACK[r.rotation || 0] || FU_BACK[0], dx = c.x_m - r.x_m, dy = c.y_m - r.y_m, v = dx * bx + dy * by, u = -dx * by + dy * bx;
     if (Math.abs(u) <= r.length_m / 2 + slack && Math.abs(v) <= r.depth_m / 2 + slack && (!best || r.height_m > best.height_m)) best = r;
   });
   return best;
 }
+function fuPolyOut(pl, x, y) {                       // how far a floor point is outside a polygon (0 inside)
+  if (v3Inside(pl, x, y)) return 0; let best = 1e9;
+  pl.forEach((a, i) => { const b = pl[(i + 1) % pl.length], dx = b[0] - a[0], dy = b[1] - a[1], l2 = dx * dx + dy * dy, t = l2 ? Math.max(0, Math.min(1, ((x - a[0]) * dx + (y - a[1]) * dy) / l2)) : 0; best = Math.min(best, Math.hypot(x - a[0] - t * dx, y - a[1] - t * dy)); });
+  return best;
+}
 function fuOverhang(r, c) {                          // how far (m) a couch's footprint sticks out past the riser it sits on (0 = fully on it)
+  if (fuPts(r)) { const [hx, hy] = (c.rotation || 0) % 180 === 0 ? [c.length_m / 2, c.depth_m / 2] : [c.depth_m / 2, c.length_m / 2];
+    return +Math.max(...[-1, 0, 1].flatMap(sx => [-1, 0, 1].map(sy => fuPolyOut(fuPts(r), c.x_m + sx * hx, c.y_m + sy * hy)))).toFixed(2); }
   const [bx, by] = FU_BACK[r.rotation || 0] || FU_BACK[0], [cx, cy] = FU_BACK[c.rotation || 0] || FU_BACK[0];
   const dx = c.x_m - r.x_m, dy = c.y_m - r.y_m, v = dx * bx + dy * by, u = -dx * by + dy * bx;
   const turned = (cx * bx + cy * by) === 0;                                   // a quarter turn from the riser: swap the couch's length and depth
@@ -146,8 +160,8 @@ function fuCouchBoxes(c, lift) {                     // a couch as a frame, a se
 function fuMarks3d(list) {                          // for RoomView: a riser (with a step in front) carries the couches on it as one object; the rest stand on the floor
   const ok = (list || []).filter(c => c.x_m != null && c.y_m != null && c.length_m && c.depth_m), used = new Set(), out = [];
   ok.filter(c => c.kind === 'riser').forEach(r => {
-    const h = r.height_m || 0.2, d = r.depth_m / 2, boxes = [{pts: fuCornersUV(r, -r.length_m / 2, r.length_m / 2, -d, d), z0: 0, z1: h, fill: '#a58f74'}];
-    if (h >= 0.15) boxes.push({pts: fuCornersUV(r, -r.length_m / 2, r.length_m / 2, -d - 0.32, -d), z0: 0, z1: h / 2, fill: '#b9a487'});
+    const h = r.height_m || 0.2, d = r.depth_m / 2, boxes = [{pts: fuPts(r) || fuCornersUV(r, -r.length_m / 2, r.length_m / 2, -d, d), z0: 0, z1: h, fill: FU_RISER_COLOR[r.material || ''] || '#a58f74'}];
+    if (h >= 0.15 && !fuPts(r)) boxes.push({pts: fuCornersUV(r, -r.length_m / 2, r.length_m / 2, -d - 0.32, -d), z0: 0, z1: h / 2, fill: '#b9a487'});
     ok.filter(c => c.kind !== 'riser' && !used.has(c) && fuOnRiser(ok, c) === r).forEach(c => { used.add(c); boxes.push(...fuCouchBoxes(c, h)); });
     out.push({kind: 'solid', boxes, label: r.name && r.name !== 'Riser' ? r.name : ''});
   });
@@ -193,8 +207,11 @@ $('#couchRows').addEventListener('focusin', e => { const row = e.target.closest(
 $('#couchRows').addEventListener('change', e => {
   const row = e.target.closest('.fucouch'); if (!row || !e.target.matches('[data-f]')) return;
   const rows = [...document.querySelectorAll('#couchRows .fucouch')], list = fuRead(), c = list[fuIndex(row)], f = e.target.dataset.f;
+  if (c.kind === 'riser' && fuPts(c) && ['length_m', 'depth_m', 'rotation'].includes(f)) { row.querySelector('[data-f="points"]').value = ''; row.querySelector('[data-f="want"]').value = ''; c.points = null; }       // a new size or turn: back to a plain box
   if (c.kind === 'riser' && row.dataset.old && ['x_m', 'y_m'].includes(f)) {
     const old = JSON.parse(row.dataset.old), dx = (c.x_m ?? old.x_m) - old.x_m, dy = (c.y_m ?? old.y_m) - old.y_m;
+    if (fuPts(old) && (dx || dy)) { const np = old.points.map(p => [+(p[0] + dx).toFixed(3), +(p[1] + dy).toFixed(3)]); row.querySelector('[data-f="points"]').value = JSON.stringify(np);
+      if (old.want) row.querySelector('[data-f="want"]').value = JSON.stringify([old.want[0] + dx, old.want[1] + dy, old.want[2] + dx, old.want[3] + dy].map(v => +v.toFixed(3))); }
     if (old.x_m != null && old.y_m != null && (dx || dy)) list.forEach((k, j) => { if (k.kind !== 'riser' && k.x_m != null && fuOnRiser([old], k) === old) { fuSet(rows[j], 'x_m', k.x_m + dx); fuSet(rows[j], 'y_m', k.y_m + dy); } });
     row.dataset.old = JSON.stringify(c);
   } else if (c.kind !== 'riser' && ['x_m', 'y_m', 'length_m', 'depth_m'].includes(f)) {
@@ -216,15 +233,15 @@ async function mdApply(r, add) {                    // put a proposal's items in
 }
 async function mdCall(body, btn) {
   btn.disabled = true; $('#mdMsg').textContent = 'Working…';
-  const rf = readRoom(), r = await post('/api/modeler', {...body, room: {room: {width_m: rf.room.width_m, length_m: rf.room.length_m, height_m: rf.room.height_m, outline: rf.room.outline}, seats: rf.seats}});
+  const rf = readRoom(), r = await post('/api/modeler', {...body, room: {room: {width_m: rf.room.width_m, length_m: rf.room.length_m, height_m: rf.room.height_m, outline: rf.room.outline, wall_openings: rf.room.wall_openings}, seats: rf.seats, subs: rf.subs}});
   btn.disabled = false;
-  if (r.error) { $('#mdMsg').textContent = ''; toast('Modeler', r.error, 'bad'); return null; }
+  if (r.error) { $('#mdMsg').textContent = ''; $('#mdMsg').dataset.err = r.error; toast('Modeler', r.error, 'bad'); return null; }
   return r;
 }
 $('#mdBuild').onclick = async e => {
   const n = id => $(id).value === '' ? undefined : +$(id).value;
   const existing = $('#mdReplace').checked ? [] : fuRead();
-  const r = await mdCall({action: 'tiers', existing, spec: {avoid: $('#mdAvoid').checked, rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked, use_seats: $('#mdSeats').checked}}, e.target);
+  const r = await mdCall({action: 'tiers', existing, spec: {avoid: $('#mdAvoid').checked, material: $('#mdMaterial').value, rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked, use_seats: $('#mdSeats').checked}}, e.target);
   if (r) mdApply(r, !$('#mdReplace').checked);
 };
 $('#mdAsk').onclick = async e => {

@@ -96,6 +96,27 @@ def seat_rows(room: dict) -> list[dict]:
     return out
 
 
+def refit(room: dict, item: dict, others: list | None = None) -> dict:
+    """Re-fit one riser to the room: its wanted box (`want`, else its own box) is cut to the walls, door swings, subs, floor speakers and the furniture in `others` that is not
+    sitting on it. Returns {items (the riser as one or more outlines, ids kept), notes}."""
+    if item.get("kind") != "riser":
+        raise ValueError("only a riser can be fitted to the room")
+    w = item.get("want")
+    if isinstance(w, (list, tuple)) and len(w) == 4:
+        x0, y0, x1, y1 = (float(v) for v in w)
+    else:
+        hl, hd = (item["length_m"] / 2, item["depth_m"] / 2) if (item.get("rotation") or 0) in (0, 180) else (item["depth_m"] / 2, item["length_m"] / 2)
+        x0, y0, x1, y1 = item["x_m"] - hl, item["y_m"] - hd, item["x_m"] + hl, item["y_m"] + hd
+    box = {**item, "points": None, "want": None, "x_m": (x0 + x1) / 2, "y_m": (y0 + y1) / 2, "length_m": x1 - x0, "depth_m": y1 - y0, "rotation": 0}
+    keep = []
+    for o in others or []:                                       # furniture on this riser is not in its way; everything else standing there is
+        if o.get("kind") == "couch" and x0 <= (o.get("x_m") or -9) <= x1 and y0 <= (o.get("y_m") or -9) <= y1:
+            continue
+        keep.append(o)
+    out, notes = risercut.fit([box], room, keep)
+    return {"items": furniture.clean_items(out), "notes": notes}
+
+
 def fit_warnings(items: list[dict], room: dict) -> list[str]:
     """Things a human would notice: outside the room, a riser reaching the ceiling, two risers that overlap by a lot, a couch off its riser."""
     W, L, H = _box(room)
@@ -141,6 +162,8 @@ def tiers(spec: dict, room: dict, existing: list | None = None) -> dict:
     with_couches = spec.get("couches", True) is not False
     items, n_riser, notes, heights = [], 0, [], []
     avoid = spec.get("avoid", True) is not False
+    material = str(spec.get("material") or "").lower()
+    material = material if material in furniture.RISER_MATERIALS else ""
     srows = seat_rows(room) if spec.get("use_seats") else []
     by_seats = bool(srows) and (spec.get("rows") in (None, "") or len(srows) == rows)
     if by_seats:
@@ -173,7 +196,7 @@ def tiers(spec: dict, room: dict, existing: list | None = None) -> dict:
         heights.append(h)
         if h > 0:
             n_riser += 1
-            items.append({"kind": "riser", "name": f"Tier {k + 1}" if rows > 1 else "Riser", "x_m": cx, "y_m": y, "length_m": w, "depth_m": d, "height_m": h, "rotation": 0})
+            items.append({"kind": "riser", "name": f"Tier {k + 1}" if rows > 1 else "Riser", "x_m": cx, "y_m": y, "length_m": w, "depth_m": d, "height_m": h, "rotation": 0, "material": material})
         if with_couches:
             items.append({"kind": "couch", "name": f"Row {k + 1} couch", "x_m": cx, "y_m": y, "length_m": min(couch_len, w - 0.1),
                           "depth_m": min(0.95, d - 0.05), "seat_h_m": 0.45, "back_h_m": 1.0, "fabric": "fabric", "rotation": 0})
@@ -195,12 +218,12 @@ SCHEMA = {"type": "object", "additionalProperties": False, "required": ["summary
                                              "properties": {"name": {"type": "string"}, "x_ft": {"type": "number"}, "y_ft": {"type": "number"}, "length_ft": {"type": "number"}, "depth_ft": {"type": "number"}}}},
     "furniture": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["kind", "name", "x_ft", "y_ft", "length_ft", "depth_ft", "rotation"], "properties": {
         "kind": {"type": "string", "enum": ["riser", "couch"]}, "name": {"type": "string"}, "x_ft": {"type": "number"}, "y_ft": {"type": "number"}, "length_ft": {"type": "number"},
-        "depth_ft": {"type": "number"}, "height_ft": {"type": "number"}, "rotation": {"type": "integer", "enum": [0, 90, 180, 270]}, "seat_h_ft": {"type": "number"},
+        "depth_ft": {"type": "number"}, "height_ft": {"type": "number"}, "material": {"type": "string", "enum": ["", "wood", "carpet", "painted", "concrete"]}, "rotation": {"type": "integer", "enum": [0, 90, 180, 270]}, "seat_h_ft": {"type": "number"},
         "back_h_ft": {"type": "number"}, "fabric": {"type": "string"}}}}}}
 
 SYSTEM = """You turn a description of risers (platforms) and couches into a list of boxes for a home-theater room planner. Work in feet. The room is a rectangle seen from above:
 x runs from the left wall (0) to the right wall, y from the front (screen) wall (0) to the back wall, both in feet. Every item is given by the position of its MIDDLE (x_ft, y_ft).
-A riser is a flat box: length_ft is its size ACROSS (along x when rotation is 0), depth_ft its size front to back, height_ft how high its top is above the floor (0.16 to 2 ft).
+A riser is a flat box (its "material" is what its top is made of: wood, carpet, painted or concrete, or empty when not said): length_ft is its size ACROSS (along x when rotation is 0), depth_ft its size front to back, height_ft how high its top is above the floor (0.16 to 2 ft).
 A couch has length_ft (across), depth_ft (front to back, usually 3), seat_h_ft (about 1.5), back_h_ft (about 3.3). rotation is which way the BACK points: 0 = the back wall (the normal way
 to face the screen), 90 = the left wall, 180 = the screen, 270 = the right wall; a riser's rotation turns it the same way (use 0 unless the platform runs front to back).
 Rules: use the owner's measurements exactly when they give them; otherwise make reasonable, typical choices and list each in "assumptions" in plain words. Build a stepped
@@ -246,6 +269,7 @@ def from_text(text: str, room: dict, existing: list | None = None, replace: bool
                   "depth_m": float(f["depth_ft"]) * FT, "rotation": int(f.get("rotation") or 0)}
             if f["kind"] == "riser":
                 it["height_m"] = float(f.get("height_ft") or 0.5) * FT
+                it["material"] = str(f.get("material") or "")
             else:
                 it.update(seat_h_m=float(f.get("seat_h_ft") or 1.5) * FT, back_h_m=float(f.get("back_h_ft") or 3.3) * FT, fabric=str(f.get("fabric") or "fabric"))
             items.append(it)

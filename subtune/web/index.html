@@ -679,6 +679,16 @@ details.lastone > summary { cursor: pointer; font-weight: 600; font-size: 13.5px
 @keyframes sp { to { transform: rotate(360deg); } }
 
 /* ---------- room */
+.room-split { display: grid; grid-template-columns: minmax(340px, 5fr) minmax(0, 7fr); gap: 20px; align-items: start; }
+.room-plan { position: sticky; top: calc(var(--hbar-h, 53px) + 6px); max-height: calc(100vh - var(--hbar-h, 53px) - 16px); overflow: auto; min-width: 0; }
+.room-main { min-width: 0; }
+.rtabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--border); margin: 0 0 14px; }
+.rtabs button { border: 1px solid transparent; border-bottom: 0; background: none; color: var(--text-2); border-radius: 8px 8px 0 0; padding: 7px 9px; font-size: 12.5px; cursor: pointer; margin-bottom: -1px; }
+.rtabs button:hover { color: var(--text); background: var(--surface-2); }
+.rtabs button[aria-selected="true"] { color: var(--text); background: var(--surface); border-color: var(--border); border-bottom: 1px solid var(--surface); font-weight: 600; }
+.rpanel[hidden] { display: none; }
+.rpanel > h3:first-child { margin-top: 0; }
+@media (max-width: 980px) { .room-split { grid-template-columns: minmax(0, 1fr); } .room-plan { position: static; max-height: none; } }
 .room-top { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; }
 @media (max-width: 800px) { .room-top { grid-template-columns: minmax(0, 1fr); } }
 .plan { background: var(--surface-2); border-radius: 12px; padding: 12px; min-height: 200px; display: grid; place-items: center; }
@@ -1393,7 +1403,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <span class="muted small" style="flex:1;min-width:220px">A cap on the assistant's requests to your AI provider, so a stuck conversation can't run up your bill. Always on, whatever you set: an approval for anything that plays sound or changes something; never slot 1; level and boost limits; at most 8 sound tests in 10 minutes; a Stop button in the chat; every action in the activity log.</span>
       </div>
       <div class="card-h" style="margin:16px 0 4px"><h3 style="margin:0;font-size:14px">Hardware database <span class="beta">Beta</span></h3><span class="sub" id="hwSub"></span></div>
-      <label class="cb" style="max-width:none"><input type="checkbox" id="hwOn"><span>Let the assistant build the hardware database<small>When your receiver, subs or speakers come up in the chat and htTamer doesn't know them, the assistant looks up their specs (on the web, with Claude) and records them, with the source. That's how support for unknown hardware grows: a receiver's control protocol, a ported sub's safe EQ limit, speaker specs for advice. Every entry is listed below and in the journal. Web lookups use your AI provider's credit.</small></span></label>
+      <label class="cb" style="max-width:none"><input type="checkbox" id="hwOn"><span>Let the assistant build the hardware database<small>When your receiver, subs or speakers come up in the chat and htTamer doesn't know them, the assistant looks up their specs (on the web) and records them, with the source. That's how support for unknown hardware grows: a receiver's control protocol, a ported sub's safe EQ limit, speaker specs for advice. Every entry is listed below and in the journal. Web lookups use your AI provider's credit.</small></span></label>
       <div id="hwList" class="small" style="margin-top:8px"></div>
       </details>
       <div class="md" id="aiOut" style="margin-top:6px"></div>
@@ -1411,8 +1421,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- ROOM -->
     <section class="card" id="roomCard">
       <div class="card-h"><h2>Room</h2><span class="sub">feet, measured from the left wall and the front (screen) wall</span></div>
-      <nav class="jump" aria-label="Jump to a part of this page"><button type="button" data-jump="#rmPlan">Plan</button><button type="button" data-jump="#shapeBox">Shape</button><button type="button" data-jump="#rmScreen">Screen</button><button type="button" data-jump="#rmSeats">Seats</button><button type="button" data-jump="#rmFurniture">Furniture</button><button type="button" data-jump="#mdBox">AI modeler</button><button type="button" data-jump="#rmFixtures">Fixtures</button><button type="button" data-jump="#roomSave">Save</button></nav>
-      <div class="room-top" id="rmPlan">
+      <div class="room-split" id="rmPlan">
+      <div class="room-plan">
         <div>
           <div class="row" style="margin-bottom:8px;gap:8px">
             <span class="beta" title="New: room shapes and the 3D view">Beta</span>
@@ -1434,13 +1444,15 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <div class="plan plan3d" id="plan3dBox" hidden><canvas id="plan3d" aria-label="The room in 3D: drag to turn"></canvas></div>
           <div id="buildBox"></div>
         </div>
-        <div>
+      </div>
+      <div class="room-main">
+      <div class="rtabs" role="tablist" aria-label="Parts of the room"><button type="button" role="tab" id="rtab-size" data-rtab="size" aria-controls="rpanel-size" aria-selected="true">Size and floor</button><button type="button" role="tab" id="rtab-shape" data-rtab="shape" aria-controls="rpanel-shape" aria-selected="false">Shape</button><button type="button" role="tab" id="rtab-home" data-rtab="home" aria-controls="rpanel-home" aria-selected="false">Where you live</button><button type="button" role="tab" id="rtab-screen" data-rtab="screen" aria-controls="rpanel-screen" aria-selected="false">Screen</button><button type="button" role="tab" id="rtab-seats" data-rtab="seats" aria-controls="rpanel-seats" aria-selected="false">Seats</button><button type="button" role="tab" id="rtab-furniture" data-rtab="furniture" aria-controls="rpanel-furniture" aria-selected="false">Furniture</button><button type="button" role="tab" id="rtab-fixtures" data-rtab="fixtures" aria-controls="rpanel-fixtures" aria-selected="false">Fixtures</button></div>
+      <div class="rpanel" role="tabpanel" id="rpanel-size" data-rpanel="size" aria-labelledby="rtab-size">
           <div class="grid g3">
             <label class="f">Length<span class="unit" data-u="ft"><input id="rL" type="number" step="0.1" min="0"></span><span class="hint">front to back</span></label>
             <label class="f">Width<span class="unit" data-u="ft"><input id="rW" type="number" step="0.1" min="0"></span><span class="hint">left to right</span></label>
             <label class="f">Height<span class="unit" data-u="ft"><input id="rH" type="number" step="0.1" min="0"></span><span class="hint">highest point</span></label>
           </div>
-          <div id="shapeBox"></div>
           <div class="grid" style="margin-top:12px">
             <label class="f">Walls<input id="rC" placeholder="Drywall on studs, painted"></label>
             <label class="f">Floor<select id="rFloor" aria-label="What the floor is made of"><option value="">Not entered</option><option value="carpet">Carpet</option><option value="hardwood">Hardwood</option><option value="laminate">Laminate</option><option value="vinyl">Vinyl or LVP</option><option value="tile">Tile</option><option value="concrete">Bare concrete</option><option value="other">Other</option></select></label>
@@ -1449,9 +1461,12 @@ details.card[open] > summary::after { transform: rotate(45deg); }
             <label class="f">AVR<input id="rAvr" placeholder="Model, sub out, crossover setting"></label>
             <label class="f">What you want<input id="rGoals" placeholder="Movies at the MLP, tight bass, second row matters too"></label>
           </div>
-        </div>
+      <div id="modesBox"></div>
       </div>
-
+      <div class="rpanel" role="tabpanel" id="rpanel-shape" data-rpanel="shape" aria-labelledby="rtab-shape" hidden>
+          <div id="shapeBox"></div>
+      </div>
+      <div class="rpanel" role="tabpanel" id="rpanel-home" data-rpanel="home" aria-labelledby="rtab-home" hidden>
       <h3 id="rmDwelling">Where you live</h3>
       <div id="dwBox">
         <p class="muted small" style="margin:0 0 6px">Bass is what neighbors hear. Say what kind of home this is and htTamer adjusts its advice: a gentler bass target, quiet hours, and what to treat.</p>
@@ -1471,6 +1486,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <div id="dwInfo" style="margin-top:4px"></div>
       </div>
 
+      </div>
+      <div class="rpanel" role="tabpanel" id="rpanel-screen" data-rpanel="screen" aria-labelledby="rtab-screen" hidden>
       <h3 id="rmScreen">Screen</h3>
       <div id="scBox">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">
@@ -1492,11 +1509,15 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <p class="muted small" id="scInfo" style="margin:6px 0 0"></p>
       </div>
 
+      </div>
+      <div class="rpanel" role="tabpanel" id="rpanel-seats" data-rpanel="seats" aria-labelledby="rtab-seats" hidden>
       <h3 id="rmSeats">Listening positions</h3>
       <div class="seatrow muted small" aria-hidden="true"><span>Name</span><span>From left</span><span>From front</span><span>Ear height</span><span></span></div>
       <div id="seatRows"></div>
       <button class="btn ghost" id="addSeat">Add position</button>
 
+      </div>
+      <div class="rpanel" role="tabpanel" id="rpanel-furniture" data-rpanel="furniture" aria-labelledby="rtab-furniture" hidden>
       <h3 id="rmFurniture">Furniture</h3>
       <p class="muted small" style="margin:0 0 8px">Optional. A couch changes how long the room rings and where the seat sits against the wall, so htTamer counts it in the treatment plan. A riser is a low platform the seats stand on.</p>
       <div id="couchRows"></div>
@@ -1511,6 +1532,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <label class="f" style="width:130px">Depth of a tier<span class="unit" data-u="ft"><input id="mdDepth" type="number" step="0.5" min="2" value="4"></span></label>
           <label class="f" style="width:150px">First riser height<span class="unit" data-u="in"><input id="mdFirst" type="number" step="1" min="1" value="8"></span></label>
           <label class="f" style="width:150px">Each tier adds<span class="unit" data-u="in"><input id="mdStep" type="number" step="1" min="1" value="8"></span></label>
+          <label class="f" style="width:170px">Riser top<select id="mdMaterial" title="What the top of the risers is made of"><option value="">Not set</option><option value="wood">Wood</option><option value="carpet">Carpeted</option><option value="painted">Painted or laminate</option><option value="concrete">Concrete or block</option></select></label>
           <label class="cb" style="margin:0"><input type="checkbox" id="mdAvoid" checked><span>Wrap around walls and obstacles<small>Cut to the room's outline and around doors, subs, floor speakers and furniture already placed</small></span></label>
           <label class="cb" style="margin:0"><input type="checkbox" id="mdSeats" checked><span>Place rows under my seats<small>Their positions and heights; the boxes above then only set the tier depth</small></span></label>
           <label class="cb" style="margin:0"><input type="checkbox" id="mdFloor" checked><span>Front row on the floor</span></label>
@@ -1522,18 +1544,22 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         <div id="mdOut" style="margin-top:8px"></div>
       </details>
 
+      </div>
+      <div class="rpanel" role="tabpanel" id="rpanel-fixtures" data-rpanel="fixtures" aria-labelledby="rtab-fixtures" hidden>
       <h3 id="rmFixtures">Fixtures: lights, projector, vents</h3>
       <p class="muted small" style="margin:0 0 8px">Optional. What hangs from the ceiling or sits on a wall: lights, a ceiling projector, fans, vents, sprinkler heads, wall lights. The treatment plan keeps clouds and panels clear of them (and of the projector’s beam) and says how to work around them. Speakers in the walls and ceiling count already: set their kind on the Speakers page.</p>
       <div id="fixtureRows"></div>
       <div class="row" style="gap:8px;align-items:center"><select id="fxPreset" aria-label="Kind of fixture" style="width:auto"><option value="recessed_light">Recessed light</option><option value="light">Ceiling light</option><option value="pendant">Pendant light</option><option value="fan">Ceiling fan</option><option value="projector">Projector</option><option value="vent">Vent or register</option><option value="sprinkler">Sprinkler head</option><option value="sconce">Wall light</option><option value="other">Other</option></select><button type="button" class="btn ghost" id="addFixture">Add fixture</button></div>
 
-      <div id="modesBox"></div>
+      </div>
       <div class="save-bar"><button class="btn primary" id="roomSave">Save room</button><span class="muted" id="roomMsg"></span></div>
+      </div>
+      </div>
     </section>
     <section class="card" id="subsCard">
       <div class="card-h"><h2>Subs</h2><span class="sub">one card per miniDSP output; positions in feet like the room</span></div>
       <div class="suggest-head">
-        <div><h3 style="margin:0 0 2px">Suggested setup</h3><p class="muted" style="margin:0">Claude recommends sub settings, placement and a target curve from “What you want”, the room and your subs. Re-run after measuring for a sharper answer.</p></div>
+        <div><h3 style="margin:0 0 2px">Suggested setup</h3><p class="muted" style="margin:0">The AI assistant recommends sub settings, placement and a target curve from “What you want”, the room and your subs. Re-run after measuring for a sharper answer.</p></div>
         <button class="btn primary" id="sugBtn">Suggest setup</button>
       </div>
       <div id="sugBox"></div>
@@ -1630,5 +1656,6 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/setup-home.js?v=__V__"></script>
 <script src="/js/liveeq.js?v=__V__"></script>
 <script src="/js/nav.js?v=__V__"></script>
+<script src="/js/roomedit.js?v=__V__"></script>
 </body>
 </html>

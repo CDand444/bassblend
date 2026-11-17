@@ -40,7 +40,7 @@ def test_three_tiers_climb_by_the_step_and_a_big_build_is_flagged_when_it_does_n
     ys = [i["y_m"] for i in r["items"]]
     assert ys[0] < ys[1] < ys[2]                                                                       # the front tier is nearest the screen
     wide = modeler.tiers({"rows": 2, "width_ft": 20, "depth_ft": 4}, ROOM)
-    assert any("cut to the room" in a for a in wide["assumptions"]) and wide["items"][0]["length_m"] <= 4.01         # too wide for the room: pulled in, and said so
+    assert any("shaped to the room" in a or "cut to the room" in a for a in wide["assumptions"]) and wide["items"][0]["length_m"] <= 4.01         # too wide for the room: pulled in, and said so
 
 
 def test_bad_measurements_are_refused():
@@ -70,56 +70,80 @@ def test_rows_go_under_the_owners_seats_at_their_heights_and_stay_inside_an_angl
     assert bad and "walls" in bad[0]                                                                               # a box through the angled back wall is flagged
 
 
+def _covers(items, x, y):
+    """Is the floor point under any riser (its contour when it has one, else its box)?"""
+    from subtune import furniture
+    for i in items:
+        if i["kind"] != "riser":
+            continue
+        if i.get("points"):
+            if furniture.poly_contains(i["points"], x, y):
+                return True
+        elif abs(x - i["x_m"]) <= i["length_m"] / 2 and abs(y - i["y_m"]) <= i["depth_m"] / 2:
+            return True
+    return False
+
+
 def _inside_all(room, items):
     from subtune import shape
     pts = shape.outline(room["room"])
     for it in items:
         if it["kind"] != "riser":
             continue
-        hl, hd = it["length_m"] / 2, it["depth_m"] / 2
-        if not all(shape.point_in(pts, it["x_m"] + sx * hl, it["y_m"] + sy * hd) for sx in (-1, 1) for sy in (-1, 1)):
+        corners = it["points"] if it.get("points") else [[it["x_m"] + sx * it["length_m"] / 2, it["y_m"] + sy * it["depth_m"] / 2] for sx in (-1, 1) for sy in (-1, 1)]
+        if not all(shape.point_in(pts, x, y) for x, y in corners):
             return False
     return True
 
 
-def test_a_riser_wraps_around_a_notch_in_the_wall_as_touching_boxes_at_one_height():
+def test_a_riser_takes_the_shape_of_a_notched_room_as_one_outline():
     room = {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.5, "outline": [[0, 0], [4, 0], [4, 3], [3, 3], [3, 4], [4, 4], [4, 6], [0, 6]]}, "seats": []}
     r = modeler.tiers({"rows": 1, "front_on_floor": False, "first_in": 8, "depth_ft": 12, "width_ft": 13, "couches": False}, room)           # a tier 13 ft x 12 ft would cut across the notch
     rs = r["items"]
-    assert len(rs) >= 2 and len({i["height_m"] for i in rs}) == 1 and _inside_all(room, rs)                  # several boxes, one height, none through the wall
-    assert any("cut to the room" in a for a in r["assumptions"])
-    area = sum(i["length_m"] * i["depth_m"] for i in rs)
-    assert 0.8 * (4 * 3.66) < area <= 4 * 3.66                                                                  # most of the floor is still covered
-    for a in rs:
-        for b in rs:
-            if a is not b:
-                ox = min(a["x_m"] + a["length_m"] / 2, b["x_m"] + b["length_m"] / 2) - max(a["x_m"] - a["length_m"] / 2, b["x_m"] - b["length_m"] / 2)
-                oy = min(a["y_m"] + a["depth_m"] / 2, b["y_m"] + b["depth_m"] / 2) - max(a["y_m"] - a["depth_m"] / 2, b["y_m"] - b["depth_m"] / 2)
-                assert not (ox > 0.01 and oy > 0.01)                                                           # the boxes do not overlap each other
+    assert len(rs) == 1 and rs[0].get("points") and len(rs[0]["points"]) >= 6 and _inside_all(room, rs)       # one outline with the notch cut out of it, nowhere through a wall
+    assert any("shaped to the room" in a for a in r["assumptions"])
+    assert not _covers(rs, 3.6, 3.5) and _covers(rs, 1.5, 3.5) and _covers(rs, 3.6, 5.0)                       # the notch is clear; the rest is covered
+    from subtune import furniture
+    assert 0.85 * (4 * 3.66 - 1) < furniture.riser_area(rs[0]) <= 4 * 3.66
 
 
-def test_subs_towers_doors_and_couches_already_there_are_kept_clear():
-    base = {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.5, "wall_openings": [{"wall": 2, "from_m": 0.5, "width_m": 1.0, "height_m": 2.0, "kind": "door"}]},
-            "subs": {"0": {"x_m": 2.0, "y_m": 4.6, "width_in": 20, "height_in": 20, "depth_in": 20}}, "seats": []}
+def test_a_door_swing_is_cut_away_as_the_arc_it_sweeps_and_a_sub_is_kept_clear():
+    base = {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.5, "wall_openings": [{"wall": 2, "from_m": 0.5, "width_m": 1.0, "height_m": 2.0, "kind": "door"}]}, "seats": []}
     spec = {"rows": 1, "front_on_floor": False, "depth_ft": 6, "width_ft": 13, "couches": False}
-    r = modeler.tiers(spec, base)
-    sub = (2.0 - 0.254 - 0.03, 4.6 - 0.254 - 0.03, 2.0 + 0.254 + 0.03, 4.6 + 0.254 + 0.03)
-    for i in r["items"]:
-        ox = min(i["x_m"] + i["length_m"] / 2, sub[2]) - max(i["x_m"] - i["length_m"] / 2, sub[0])
-        oy = min(i["y_m"] + i["depth_m"] / 2, sub[3]) - max(i["y_m"] - i["depth_m"] / 2, sub[1])
-        assert not (ox > 0.01 and oy > 0.01), "a riser box covers the sub"
-    assert len(r["items"]) >= 2 and "sub 1" in " ".join(r["assumptions"])
-    swing = [i for i in r["items"] if i["y_m"] + i["depth_m"] / 2 > 5.0 and 2.5 < i["x_m"] + i["length_m"] / 2 and i["x_m"] - i["length_m"] / 2 < 3.5]
-    assert not swing                                                                                             # nothing across the door's 1 m swing on the back wall
+    r = modeler.tiers(spec, base)                                  # the door is on the back wall, hinged at x = 3.5 m, sweeping a quarter circle of 1 m into the room
+    rs = r["items"]
+    assert len(rs) == 1 and rs[0].get("points") and "the door" in " ".join(r["assumptions"])
+    assert not _covers(rs, 3.3, 5.7) and not _covers(rs, 3.0, 5.2) and _covers(rs, 1.0, 5.5)
+    assert _covers(rs, 2.4, 5.2) and _covers(rs, 3.9, 4.5)                                                       # outside the arc the riser is still there (the corner beside the swing, the wall side beyond the hinge)
+    assert not _covers(rs, 3.45, 5.55)                                                                           # inside the arc: cut away
+    withsub = dict(base, subs={"0": {"x_m": 1.5, "y_m": 4.8, "width_in": 20, "height_in": 20, "depth_in": 20}})
+    r2 = modeler.tiers(spec, withsub)
+    assert not _covers(r2["items"], 1.5, 4.8) and "sub 1" in " ".join(r2["assumptions"]) and len(r2["items"]) >= 2   # a sub in the middle of a riser leaves a hole, so it is cut as touching boxes
     plain = modeler.tiers(dict(spec, avoid=False), base)
-    assert len(plain["items"]) == 1                                                                              # turned off: one plain box
+    assert len(plain["items"]) == 1 and not plain["items"][0].get("points")                                     # turned off: one plain box
     couch = {"kind": "couch", "name": "Floor couch", "x_m": 1.0, "y_m": 4.5, "length_m": 2.0, "depth_m": 0.9, "rotation": 0}
     c = modeler.tiers(dict(spec, rows=1), {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.5}, "seats": []}, [couch])
-    assert "Floor couch" in " ".join(c["assumptions"])
-    for i in c["items"]:
-        ox = min(i["x_m"] + i["length_m"] / 2, 2.0) - max(i["x_m"] - i["length_m"] / 2, 0.0)
-        oy = min(i["y_m"] + i["depth_m"] / 2, 4.95) - max(i["y_m"] - i["depth_m"] / 2, 4.05)
-        assert not (ox > 0.01 and oy > 0.01), "a riser box covers the couch on the floor"
+    assert "Floor couch" in " ".join(c["assumptions"]) and not _covers(c["items"], 1.0, 4.5) and not _covers(c["items"], 0.3, 4.5) and _covers(c["items"], 3.0, 5.5)
+
+
+def test_one_riser_is_refitted_around_a_couch_on_the_floor_and_remembers_its_wanted_box():
+    room = {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.5}, "seats": []}
+    riser = {"kind": "riser", "id": "r1", "name": "Riser", "x_m": 2.0, "y_m": 4.6, "length_m": 3.6, "depth_m": 1.6, "height_m": 0.3, "rotation": 0, "material": "carpet"}
+    floor_couch = {"kind": "couch", "id": "c1", "name": "Front couch", "x_m": 2.0, "y_m": 3.7, "length_m": 2.0, "depth_m": 0.9, "rotation": 0}
+    on_it = {"kind": "couch", "id": "c2", "name": "Back couch", "x_m": 2.0, "y_m": 4.8, "length_m": 2.0, "depth_m": 0.9, "rotation": 0}
+    r = modeler.refit(room, riser, [floor_couch, on_it])
+    rs = r["items"]
+    assert len(rs) == 1 and rs[0]["material"] == "carpet" and rs[0]["height_m"] == 0.3
+    assert not _covers(rs, 2.0, 3.7) and _covers(rs, 2.0, 4.8) and "Front couch" in " ".join(r["notes"])      # clear of the floor couch, still under the couch that sits on it
+    if rs[0].get("points"):
+        assert rs[0]["want"] == [0.2, 3.8, 3.8, 5.4]                                                         # the box it was meant to be, kept for the next re-fit
+    moved = modeler.refit(room, rs[0], [dict(floor_couch, y_m=1.0), on_it])                                  # the couch moved away: the riser grows back to its wanted box
+    assert _covers(moved["items"], 2.0, 3.9)
+    try:
+        modeler.refit(room, floor_couch, [])
+    except ValueError:
+        return
+    raise AssertionError("a couch was fitted like a riser")
 
 
 class _Reply:

@@ -8,7 +8,6 @@ Run:  python tests/browser_actions.py            (not part of the offline tests:
 from __future__ import annotations
 
 import json
-import math
 import pathlib
 import sys
 import time
@@ -55,6 +54,15 @@ def main():
             page.wait_for_timeout(1200)
 
             # ---- Room: Save shows in the stored state and the plan without a reload
+            # the Room page is tabs beside a plan that stays in view: test that first, then open every tab at once so the older checks below can reach any field
+            tabs = page.evaluate("[...document.querySelectorAll('[data-rtab]')].map(b => b.dataset.rtab)")
+            check("Room tabs: the parts of the room are tabs", tabs == ["size", "shape", "home", "screen", "seats", "furniture", "fixtures"], str(tabs))
+            page.click("[data-rtab='seats']")
+            check("Room tabs: choosing Seats shows only that part, and the plan stays in view",
+                  page.evaluate("[...document.querySelectorAll('[data-rpanel]')].filter(p => !p.hidden).map(p => p.dataset.rpanel).join()") == "seats" and page.locator("#plan").is_visible())
+            page.click("[data-rtab='size']")
+            check("Room tabs: back to Size shows the length box", page.locator("#rL").is_visible())
+            page.evaluate("document.querySelectorAll('[data-rpanel]').forEach(p => { p.hidden = false; })")
             page.fill("#rL", "20"); page.fill("#rW", "13"); page.fill("#rH", "8")
             page.click("#roomSave")
             check("Room: Save updates the page's state", until(page, "S.room && S.room.room.length_m > 6"))
@@ -395,35 +403,7 @@ def main():
             check("The assistant settings are folded too", page.evaluate("[...document.querySelectorAll('#aiQ ~ details.fold, details.fold')].some(d => !d.open)"))
             page.evaluate("openSheet('home')")
 
-            # ---- Room card: flooring and the modeler
-            page.evaluate("openSheet('room')")
-            page.wait_for_timeout(500)
-            check("Sub card: the model drop-down lists the database, and picking one fills size, driver and ratings", until(page, "SUB_DB && SUB_DB.length > 10", 6000) and page.evaluate("""(() => {
-              const sel = document.querySelector('#subRows .subcard:not(.off) [data-pick="submodel"]'); if (!sel) return 'no used sub card';
-              if (![...sel.options].some(o => o.value === 'PB-2000 Pro')) return 'PB-2000 Pro is not in the list';
-              sel.value = 'PB-2000 Pro'; sel.dispatchEvent(new Event('change', {bubbles: true}));
-              const card = sel.closest('.subcard'), g = f => card.querySelector(`[data-f="${f}"]`).value;
-              return g('model') === 'PB-2000 Pro' && g('driver') === '12"' && g('enclosure') === 'ported' && +g('width_in') === 17.3 && +g('height_in') === 20.9 && +g('depth_in') === 23.6 && +g('amp_w') === 550 && +g('f3_hz') === 16 && card.querySelector('input[data-f="model"]').hidden || JSON.stringify([g('model'), g('driver'), g('enclosure'), g('width_in'), g('amp_w')]); })()""") is True)
-            [page.fill(i, v) for i, v in (("#rL", "18"), ("#rW", "13"), ("#rH", "8.5"))]
-            page.select_option("#rFloor", "tile")
-            page.check("#rRug")
-            page.evaluate("document.querySelector('#mdBox').open = true")
-            page.fill("#mdRows", "3")
-            page.fill("#mdFirst", "6")
-            page.fill("#mdStep", "6")
-            before = page.evaluate("fuRead().length")
-            page.check("#mdReplace")                                         # replace the list, not add to it
-            page.click("#mdBuild")
-            check("The tier builder puts risers and couches into the Room form",
-                  until(page, "fuRead().filter(i => i.kind === 'riser').length >= 2 && fuRead().filter(i => i.kind === 'couch').length === 3", 8000) is True,
-                  f"form has {page.evaluate('fuRead().length')} items (was {before})")
-            check("Undo is offered, and it puts the list back", page.evaluate("!document.querySelector('#mdUndo').hidden") is True)
-            page.click("#mdUndo")
-            check("Undo restores the list", until(page, f"fuRead().length === {before}") is True)
-            page.click("#roomSave")
-            page.wait_for_timeout(1200)
-            saved = page.evaluate("fetch('/api/state').then(r => r.json()).then(r => [r.room.room.floor, r.room.room.rug])")
-            check("Floor and rug are saved with the room", saved == ["tile", True], str(saved))
+            # (the sub drop-down, flooring, modeler and room editor checks live in tests/browser_room_editor.py)
             page.evaluate("openSheet('home')")
 
             check("No script errors while clicking around", not errs, "; ".join(errs[:3]))

@@ -4,7 +4,7 @@ turns that into the room's shape (outline, openings on its walls, ceiling) for t
 * Pairing: the dashboard (already signed in) asks for a one-time code and shows it as a QR code;
   the phone opens http://<the Pi>:<port>/build?pair=<code>, which signs that phone in and opens the
   builder page (build.html). Codes are single use and expire after 10 minutes; they live only in memory.
-* AI: needs an AI key (any provider htTamer supports; Claude, GPT and Gemini all read photos). Each
+* AI: needs an AI key (any provider htTamer supports; Anthropic, OpenAI and Gemini all read photos). Each
   analysis counts against the assistant's daily request budget. The AI only proposes; nothing is
   saved until the owner presses Save, and the save goes through equip.update_room (validated and
   journaled like any other room edit).

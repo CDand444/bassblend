@@ -159,9 +159,9 @@
         const lo = b.pts.map(v => P([v[0], v[1], b.z0])), hi = b.pts.map(v => P([v[0], v[1], b.z1])), al = b.alpha ?? 1, fill = b.fill || C.floor;
         if (b.z0 < 0.03 && sh !== false) { path(b.pts.map(v => P([v[0] + 0.07, v[1] + 0.05, 0]))); ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fill(); }
         const quad = (pp, over) => { path(pp); ctx.globalAlpha = al; ctx.fillStyle = fill; ctx.fill(); if (over) { ctx.fillStyle = over; ctx.fill(); } ctx.globalAlpha = 1; ctx.strokeStyle = 'rgba(0,0,0,.32)'; ctx.lineWidth = 0.8; ctx.stroke(); };
+        const wind = b.pts.reduce((t, v, i) => t + v[0] * b.pts[(i + 1) % n][1] - b.pts[(i + 1) % n][0] * v[1], 0) > 0 ? 1 : -1;        // the polygon's winding gives each side's outward direction (a contoured riser can be concave)
         for (let i = 0; i < n; i++) { const j = (i + 1) % n, ex = b.pts[j][0] - b.pts[i][0], ey = b.pts[j][1] - b.pts[i][1], len = Math.hypot(ex, ey); if (len < 1e-6) continue;
-          const mx = (b.pts[i][0] + b.pts[j][0]) / 2, my = (b.pts[i][1] + b.pts[j][1]) / 2; let nx = ey / len, ny = -ex / len;
-          if ((mx - cx) * nx + (my - cy) * ny < 0) { nx = -nx; ny = -ny; }
+          const mx = (b.pts[i][0] + b.pts[j][0]) / 2, my = (b.pts[i][1] + b.pts[j][1]) / 2; const nx = wind * ey / len, ny = -wind * ex / len;
           if ((cam[0] - mx) * nx + (cam[1] - my) * ny <= 0) continue;
           quad([lo[i], lo[j], hi[j], hi[i]], `rgba(0,0,0,${Math.max(0.02, Math.min(0.42, 0.2 - 0.22 * (nx * LIGHT[0] + ny * LIGHT[1]))).toFixed(2)})`);
           if (b.front === i) { const zc = (b.z0 + b.z1) / 2, r = Math.min(len, b.z1 - b.z0) * (b.cone || 0.34), tx = ex / len, ty = ey / len, ring = k => { const out = [];

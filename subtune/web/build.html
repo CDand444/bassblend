@@ -145,7 +145,7 @@ async function init() {
   const r = s.room || {};
   if (r.length_ft) $('#dL').value = r.length_ft; if (r.width_ft) $('#dW').value = r.width_ft; if (r.height_ft) $('#dH').value = r.height_ft;
   if (r.notes && !$('#notes').value) $('#notes').value = r.notes;
-  if (!s.ai) gate('<h2>Needs the AI assistant</h2><p class="muted">The room builder uses your AI assistant to read the photos. On the dashboard, open <b>Tools → AI analysis</b> and add an API key (Claude, ChatGPT or Gemini), then reload this page.</p>');
+  if (!s.ai) gate('<h2>Needs the AI assistant</h2><p class="muted">The room builder uses your AI assistant to read the photos. On the dashboard, open <b>Tools → AI analysis</b> and add an API key (Anthropic, OpenAI or Gemini), then reload this page.</p>');
   else if (!s.terms) gate('<h2>Accept the terms first</h2><p class="muted">Open htTamer\'s dashboard once and accept the use-at-your-own-risk terms, then reload this page.</p>');
   else $('#goNote').textContent = `Uses your AI assistant (${s.provider}, one request). Nothing is saved until you press Save.`;
 }

@@ -28,6 +28,8 @@ with tools and coach the owner through everything you can't do yourself. The own
 engineer: speak plainly, keep replies short (a few sentences or a short list), explain a term the first \
 time, use feet.
 
+Call yourself "htTamer's AI assistant" or just "the AI"; never name the model or its maker (the owner may have set up any provider).
+
 Your job is the best possible result at the owner's seats, not just answering questions. Work the whole \
 chain, think about cause and effect across it, and keep the owner moving forward one good step at a time.
 
@@ -543,7 +545,7 @@ APPROVAL = {t["name"] for t in TOOLS if t["approval"]}
 REQUIRED = {t["name"]: t["input_schema"]["required"] for t in TOOLS}
 
 
-MAX_STRICT = 20          # the Claude API refuses a request with more strict tools than this
+MAX_STRICT = 20          # the AI provider's API refuses a request with more strict tools than this
 
 
 def _strict_ok(t) -> bool:

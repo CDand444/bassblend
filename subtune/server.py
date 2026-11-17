@@ -2184,16 +2184,19 @@ class H(BaseHTTPRequestHandler):
             from .room import load_room
             room = load_room()
             ov = body.get("room") or {}                # the Room form may hold newer sizes and seats than the saved room
-            room = {**room, "room": {**(room.get("room") or {}), **{k: v for k, v in (ov.get("room") or {}).items() if k in ("width_m", "length_m", "height_m") and v}, **({"outline": ov["room"]["outline"]} if (ov.get("room") or {}).get("outline") else {})},
-                    "seats": ov.get("seats") or room.get("seats")}
+            room = {**room, "room": {**(room.get("room") or {}), **{k: v for k, v in (ov.get("room") or {}).items() if k in ("width_m", "length_m", "height_m") and v}, **({"outline": ov["room"]["outline"]} if (ov.get("room") or {}).get("outline") else {}),
+                             **({"wall_openings": ov["room"]["wall_openings"]} if "wall_openings" in (ov.get("room") or {}) else {})},
+                    "seats": ov.get("seats") or room.get("seats"), "subs": ov["subs"] if isinstance(ov.get("subs"), dict) else room.get("subs")}
             try:
                 if body.get("action") == "tiers":
                     return self._send(200, modeler.tiers(body.get("spec") or {}, room, body.get("existing") or []))
+                if body.get("action") == "cut":
+                    return self._send(200, modeler.refit(room, body.get("item") or {}, body.get("others") or []))
                 if body.get("action") == "text":
                     return self._send(200, modeler.from_text(str(body.get("text") or ""), room, body.get("existing") or [], bool(body.get("replace"))))
             except (ValueError, RuntimeError) as e:
                 return self._send(400, {"error": str(e)})
-            return self._send(400, {"error": "action must be tiers or text"})
+            return self._send(400, {"error": "action must be tiers, text or cut"})
         if path == "/api/workshop":
             return self._workshop(body)
         if path == "/api/backups":

@@ -5,6 +5,7 @@ riser that has to bend around an angled wall, a notch, a door swing, a sub, a to
 look, same rules, no new data type. Pure functions, in meters.
 
   obstacles(room, existing)  what a riser must stay out of: furniture already placed, subs, floor-standing speakers, door swings.
+  contour(rect, room_pts, obs)  the riser's outline: the clear part of a rectangle as polygons (the shape that wraps a slanted wall and a door's swing arc).
   cut(rect, room_pts, obs)   the pieces of one rectangle that lie inside the room and clear of every obstacle (the biggest clear blocks first, a handful of boxes).
   fit(items, room, existing, extra)  the same for every riser in a proposal; couches are left as they are.
 """
@@ -55,16 +56,31 @@ def obstacles(room: dict, existing: list | None = None) -> list[dict]:
         sz = dims.speaker_size(ch, s)
         out.append({"name": f"the {ch} speaker", "poly": rect_poly(s["x_m"], s["y_m"], sz["w_m"], sz["d_m"], 0, CLEAR)})
     rm = room.get("room") or {}
-    for e in shape.edges(rm):                                 # a door needs its swing: as deep as the door is wide
+    for e in shape.edges(rm):                                 # a door needs the quarter circle it sweeps (the arcs the plan draws): one leaf, or two half-width leaves
         for o in e["openings"]:
             if o.get("kind") not in ("door", "double_door"):
                 continue
             (ax, ay), d, n = e["a"], e["dir"], e["n"]
+            inw = (-n[0], -n[1])
             p0 = (ax + d[0] * o["from_m"], ay + d[1] * o["from_m"])
             p1 = (ax + d[0] * (o["from_m"] + o["width_m"]), ay + d[1] * (o["from_m"] + o["width_m"]))
-            w = o["width_m"] / (2 if o["kind"] == "double_door" else 1)      # a double door: each leaf swings half the opening
-            out.append({"name": f"the door on the {e['name']}", "poly": [p0, p1, (p1[0] - n[0] * w, p1[1] - n[1] * w), (p0[0] - n[0] * w, p0[1] - n[1] * w)]})
+            name = f"the door on the {e['name']}"
+            if o["kind"] == "double_door":
+                r = o["width_m"] / 2
+                out.append({"name": name, "poly": _sector(p0, d, inw, r)})
+                out.append({"name": name, "poly": _sector(p1, (-d[0], -d[1]), inw, r)})
+            else:
+                out.append({"name": name, "poly": _sector(p0, d, inw, o["width_m"])})
     return out
+
+
+def _sector(c, u, v, r, steps: int = 10) -> list[tuple[float, float]]:
+    """The quarter disc centered on c, between the unit directions u and v, radius r: where a door leaf hinged at c sweeps (a convex polygon)."""
+    pts = [(c[0], c[1])]
+    for k in range(steps + 1):
+        t = math.pi / 2 * k / steps
+        pts.append((c[0] + r * (u[0] * math.cos(t) + v[0] * math.sin(t)), c[1] + r * (u[1] * math.cos(t) + v[1] * math.sin(t))))
+    return pts
 
 
 def _sat_hits(cell, poly) -> bool:
@@ -144,6 +160,86 @@ def cut(rect, room_pts, obs, min_piece: float = MIN_PIECE, max_pieces: int = MAX
     return out, area < (rect[2] - rect[0]) * (rect[3] - rect[1]) - 1e-3
 
 
+def _dp(pts, tol):
+    """Douglas-Peucker on an open polyline."""
+    if len(pts) < 3:
+        return pts
+    (ax, ay), (bx, by) = pts[0], pts[-1]
+    dx, dy = bx - ax, by - ay
+    ln = math.hypot(dx, dy) or 1e-9
+    k, dm = 0, -1.0
+    for i in range(1, len(pts) - 1):
+        d = abs((pts[i][0] - ax) * dy - (pts[i][1] - ay) * dx) / ln
+        if d > dm:
+            k, dm = i, d
+    if dm <= tol:
+        return [pts[0], pts[-1]]
+    return _dp(pts[:k + 1], tol)[:-1] + _dp(pts[k:], tol)
+
+
+def _loops(ok, nx, ny):
+    """The boundary loops of the clear cells (integer corners): a list of (loop, signed area). Edges are directed so the clear side is always on the same hand."""
+    edges: dict = {}
+    for j in range(ny):
+        for i in range(nx):
+            if not ok[j][i]:
+                continue
+            for a, b in (((i, j), (i + 1, j)), ((i + 1, j), (i + 1, j + 1)), ((i + 1, j + 1), (i, j + 1)), ((i, j + 1), (i, j))):
+                if a in edges.get(b, ()):                           # the neighbouring cell's edge runs the other way: the two cancel (an inner edge)
+                    edges[b].remove(a)
+                    if not edges[b]:
+                        del edges[b]
+                else:
+                    edges.setdefault(a, []).append(b)
+    loops = []
+    while edges:
+        start = next(iter(edges))
+        loop, cur, prev = [start], start, None
+        while True:
+            outs = edges.get(cur)
+            if not outs:
+                break
+            nxt = outs[0]
+            if len(outs) > 1 and prev is not None:                 # two ways on (cells touching at a corner): keep turning the same way so the pieces stay apart
+                dx, dy = cur[0] - prev[0], cur[1] - prev[1]
+                nxt = min(outs, key=lambda q: (dx * (q[1] - cur[1]) - dy * (q[0] - cur[0])))
+            outs.remove(nxt)
+            if not outs:
+                del edges[cur]
+            prev, cur = cur, nxt
+            if cur == start:
+                break
+            loop.append(cur)
+        if len(loop) >= 3:
+            loops.append((loop, sum(p[0] * q[1] - q[0] * p[1] for p, q in zip(loop, loop[1:] + loop[:1])) / 2))
+    return loops
+
+
+def contour(rect, room_pts, obs, tol: float = 0.035, min_area: float = 0.15):
+    """The riser's outline: the clear part of `rect`, as polygons [[x, y], ...] in meters (smoothed so a slanted wall is one straight edge). None when the clear part has a hole in it
+    (an obstacle standing inside the riser), which a single outline cannot hold: the caller then falls back to boxes."""
+    g = GRID if (rect[2] - rect[0]) * (rect[3] - rect[1]) <= 12 else GRID * 2
+    ok, nx, ny, cx, cy = _cells(rect, g, room_pts, obs)
+    loops = _loops(ok, nx, ny)
+    if not loops:
+        return []
+    sign = 1 if max(loops, key=lambda t: abs(t[1]))[1] > 0 else -1
+    if any(a * sign < 0 for _, a in loops):
+        return None
+    polys = []
+    for loop, a in loops:
+        pts = [(rect[0] + i * cx, rect[1] + j * cy) for i, j in loop]
+        pts = [p for k, p in enumerate(pts) if not (abs((pts[k][0] - pts[k - 1][0]) * (pts[(k + 1) % len(pts)][1] - pts[k][1]) - (pts[k][1] - pts[k - 1][1]) * (pts[(k + 1) % len(pts)][0] - pts[k][0])) < 1e-9)]
+        if len(pts) < 3:
+            continue
+        far = max(range(len(pts)), key=lambda i: math.hypot(pts[i][0] - pts[0][0], pts[i][1] - pts[0][1]))
+        a1, b1 = _dp(pts[:far + 1], tol), _dp(pts[far:] + pts[:1], tol)
+        pts = a1[:-1] + b1[:-1]
+        if len(pts) >= 3 and abs(a) * cx * cy >= min_area:
+            polys.append([[round(x, 3), round(y, 3)] for x, y in pts])
+    return polys
+
+
 def fit(items: list[dict], room: dict, existing: list | None = None, extra: list | None = None):
     """Cut every riser in `items` to the room and the obstacles; returns (items, notes). Couches are untouched. `extra` = more obstacle polygons [{name, poly}]."""
     pts = shape.outline(room.get("room") or {})
@@ -158,6 +254,21 @@ def fit(items: list[dict], room: dict, existing: list | None = None, extra: list
         hl, hd = (it["length_m"] / 2, it["depth_m"] / 2) if it.get("rotation", 0) in (0, 180) else (it["depth_m"] / 2, it["length_m"] / 2)
         rect = (it["x_m"] - hl, it["y_m"] - hd, it["x_m"] + hl, it["y_m"] + hd)
         hit = [o["name"] for o in obs if _sat_hits(rect, o["poly"])]
+        polys = contour(rect, pts, obs)
+        if polys is not None:                                     # one outline per separate piece
+            if not polys:
+                notes.append(f"{it['name']} has no room left once the walls and {', '.join(hit) or 'the room'} are kept clear, so it was left out.")
+                continue
+            full = len(polys) == 1 and len(polys[0]) == 4 and all(abs(p[0] - rect[0]) < 0.02 or abs(p[0] - rect[2]) < 0.02 for p in polys[0]) and all(abs(p[1] - rect[1]) < 0.02 or abs(p[1] - rect[3]) < 0.02 for p in polys[0])
+            if full:
+                out.append(it)
+                continue
+            why = list(dict.fromkeys(hit))
+            notes.append(f"{it['name']} was shaped to the room's walls" + (f" and around {', '.join(why)}" if why else "") + (f" ({len(polys)} separate pieces)." if len(polys) > 1 else "."))
+            for k, poly in enumerate(polys):
+                out.append({**it, "id": f"{it.get('id', 'riser')}-{k + 1}" if len(polys) > 1 else it.get("id"), "name": f"{it['name']} ({k + 1}/{len(polys)})" if len(polys) > 1 else it["name"],
+                            "points": poly, "rotation": 0, "want": [round(v, 3) for v in rect]})
+            continue
         boxes, trimmed = cut(rect, pts, obs)
         if not boxes:
             notes.append(f"{it['name']} has no room left once the walls and {', '.join(hit) or 'the room'} are kept clear, so it was left out.")

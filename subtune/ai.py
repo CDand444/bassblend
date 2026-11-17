@@ -1,7 +1,7 @@
 """AI providers for the assistant and the room analysis: pick one, save its key.
 
 Supported:
-  * anthropic - Claude (default, best tested; uses the official SDK)
+  * anthropic - Anthropic (default, best tested; uses the official SDK)
   * openai    - OpenAI Chat Completions
   * gemini    - Google Gemini (generateContent)
   * local     - any OpenAI-compatible server on your network: Ollama, LM Studio,
@@ -28,7 +28,7 @@ import uuid
 from .config import config_dir
 
 PROVIDERS = {
-    "anthropic": {"label": "Anthropic (Claude)", "default_model": "claude-opus-5-5", "needs_key": True,
+    "anthropic": {"label": "Anthropic", "default_model": "claude-opus-5-5", "needs_key": True,
                   "env": ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"], "key_hint": "sk-ant-…",
                   "key_where": "console.anthropic.com → API keys"},
     "openai": {"label": "OpenAI", "default_model": "", "needs_key": True, "env": ["OPENAI_API_KEY"],
@@ -248,7 +248,7 @@ def list_models(p: str | None = None) -> list[str]:
             client = anthropic.Anthropic() if env_key("anthropic") else anthropic.Anthropic(api_key=k)
             ids = [m.id for m in client.models.list(limit=100).data]
         except Exception as e:                     # noqa: BLE001
-            raise AIError(f"Couldn't list Claude models: {e}")
+            raise AIError(f"Couldn't list the provider's models: {e}")
         return ids or [PROVIDERS["anthropic"]["default_model"]]
     if p in ("openai", "local"):
         r = _http(_openai_base(p) + "/models", headers=_openai_headers(p))
@@ -305,7 +305,7 @@ def ensure_model(p: str) -> str:
 
 # ----------------------------------------------------- conversation adapters
 def _clean_for_anthropic(messages):
-    """Drop our private fields (e.g. Gemini signatures) and blocks Claude can't take."""
+    """Drop our private fields (e.g. Gemini signatures) and blocks the API can't take."""
     out = []
     for m in messages:
         c = m["content"]

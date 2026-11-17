@@ -691,7 +691,7 @@ function renderAI() {
   let note = '';
   if (st.running) note = '<p class="muted" style="margin:0"><span class="spin"></span>&nbsp; Reading the measurements and room layout. Takes a minute or two.</p>';
   else if (st.error) note = `<div class="notice bad">${esc(st.error)}</div>`;
-  else if (!S.ai_api) note = '<p class="muted" style="margin:0">Without a key you can still ask Claude in your Claude Code session to write the analysis; it shows up here.</p>';
+  else if (!S.ai_api) note = '<p class="muted" style="margin:0">Without a key you can still ask an AI app connected through MCP (for example Claude Code) to write the analysis; it shows up here.</p>';
   else if (!a) note = '<p class="muted" style="margin:0">Works best after measuring and with sub positions filled in below.</p>';
   if (a && a.question) note += `<p class="muted" style="margin:8px 0 0">Question: ${esc(a.question)}</p>`;
   $('#aiNote').innerHTML = note;

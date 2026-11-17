@@ -40,6 +40,22 @@ function scPlanG(sc, front, X, Y) {             // the screen drawn on the front
   return `<line x1="${X(cx - w / 2)}" x2="${X(cx + w / 2)}" y1="${Y(y)}" y2="${Y(y)}" stroke="${sc.at ? 'var(--accent)' : 'var(--text-2)'}" stroke-width="${sc.kind === 'tv' ? 6 : 4}" stroke-linecap="round"${sc.at ? ' stroke-dasharray="6 3" opacity=".8"' : ''}><title>${esc(label)}</title></line>
     <text x="${X(cx)}" y="${Y(front.a[1]) - 10}" text-anchor="middle" font-size="11" fill="var(--text-3)">${esc(label)}</text>`;
 }
-document.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { const t = document.querySelector(b.dataset.jump); if (!t) return; if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({behavior: 'smooth', block: 'start'}); });
+// the Room card's parts are tabs beside the plan, so the plan and 3D stay in view while you edit (the choice is remembered)
+function roomTab(name, focus) {
+  const btn = document.querySelector(`[data-rtab="${name}"]`); if (!btn) return;
+  document.querySelectorAll('[data-rtab]').forEach(b => { const on = b === btn; b.setAttribute('aria-selected', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1; });
+  document.querySelectorAll('[data-rpanel]').forEach(p => { p.hidden = p.dataset.rpanel !== name; });
+  try { localStorage.setItem('htRoomTab', name); } catch (e) { /* private window: the tab just is not remembered */ }
+  if (focus) btn.focus();
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-rtab]'); if (b) roomTab(b.dataset.rtab); });
+document.addEventListener('keydown', e => {                       // arrow keys move between the tabs
+  const b = e.target.closest('[data-rtab]'); if (!b || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return; e.preventDefault();
+  const all = [...document.querySelectorAll('[data-rtab]')], i = all.indexOf(b), n = e.key === 'Home' ? 0 : e.key === 'End' ? all.length - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + all.length) % all.length;
+  roomTab(all[n].dataset.rtab, true);
+});
+try { const t = localStorage.getItem('htRoomTab'); if (t) roomTab(t); } catch (e) { /* not remembered */ }
+function roomShow(id) { const el = document.querySelector(id), p = el && el.closest('[data-rpanel]'); if (p) roomTab(p.dataset.rpanel); }      // open the tab that holds an element
+document.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { roomShow(b.dataset.jump); const t = document.querySelector(b.dataset.jump); if (!t) return; if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({behavior: 'smooth', block: 'start'}); });
 $('#scBox').addEventListener('input', () => { scSync(); renderPlan(readRoom()); });
 $('#scBox').addEventListener('change', () => { scSync(); renderPlan(readRoom()); });

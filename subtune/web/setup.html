@@ -180,9 +180,9 @@ function avrBody() {
 }
 function aiBody() {
   return `<p>The assistant explains results in plain words and can run tests for you (it always asks first). It needs an AI provider: an API key (billed by that provider per use), or a model you run yourself on another computer.</p>
-    <div class="note">Claude works best with htTamer. Keys: console.anthropic.com (Claude), platform.openai.com (OpenAI) or aistudio.google.com (Gemini). htTamer keeps the key on this device only, sends it only to that provider, and picks a suitable model for you (you can change it later).</div>
+    <div class="note">Anthropic works best with htTamer. Keys: console.anthropic.com (Anthropic), platform.openai.com (OpenAI) or aistudio.google.com (Gemini). htTamer keeps the key on this device only, sends it only to that provider, and picks a suitable model for you (you can change it later).</div>
     <label class="f">AI provider<select id="aiProv">
-      <option value="anthropic">Anthropic (Claude), recommended</option><option value="openai">OpenAI</option>
+      <option value="anthropic">Anthropic, recommended</option><option value="openai">OpenAI</option>
       <option value="gemini">Google Gemini</option><option value="local">A local model on my network (Ollama, LM Studio)</option></select></label>
     <label class="f" id="aiBaseRow" hidden>Local server address<input type="text" id="aiBase" spellcheck="false" placeholder="http://192.168.1.20:11434/v1"></label>
     <label class="f" id="aiKeyRow">API key<input type="password" id="aiKey" autocomplete="off" spellcheck="false"></label>

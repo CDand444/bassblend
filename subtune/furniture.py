@@ -17,6 +17,47 @@ LIMITS = {"length_m": (0.6, 4.5), "depth_m": (0.6, 1.4), "seat_h_m": (0.3, 0.6),
 # a riser is a low platform the seats stand on: width across the room, depth front to back, height of its top
 RISER_LIMITS = {"length_m": (0.3, 8.0), "depth_m": (0.3, 4.0), "height_m": (0.05, 0.6)}      # a riser cut around an obstacle has small pieces
 KINDS = ("couch", "riser")
+RISER_MATERIALS = {"wood": "hardwood", "carpet": "carpet", "painted": "vinyl", "concrete": "concrete"}      # a riser's top, and the floor table it absorbs like
+MAX_POINTS = 48
+
+
+def _clean_points(pts):
+    """A riser's contour: 3-48 [x, y] corners in meters, or None. A shape that folds over itself or has no area is dropped (the riser stays its box)."""
+    if not isinstance(pts, (list, tuple)) or not 3 <= len(pts) <= MAX_POINTS:
+        return None
+    out = []
+    for p in pts:
+        try:
+            x, y = float(p[0]), float(p[1])
+        except (TypeError, ValueError, IndexError, KeyError):
+            return None
+        if not (0 <= x <= 50 and 0 <= y <= 50):
+            return None
+        out.append([round(x, 3), round(y, 3)])
+    a = sum(out[i][0] * out[(i + 1) % len(out)][1] - out[(i + 1) % len(out)][0] * out[i][1] for i in range(len(out))) / 2
+    return out if abs(a) >= 0.05 else None
+
+
+def poly_contains(pts, x, y) -> bool:
+    inside = False
+    for i in range(len(pts)):
+        (ax, ay), (bx, by) = pts[i], pts[(i + 1) % len(pts)]
+        if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
+            inside = not inside
+    return inside
+
+
+def poly_outside(pts, x, y) -> float:
+    """How far (m) the point is outside the polygon; 0 when it is inside or on the edge."""
+    if poly_contains(pts, x, y):
+        return 0.0
+    best = 1e9
+    for i in range(len(pts)):
+        (ax, ay), (bx, by) = pts[i], pts[(i + 1) % len(pts)]
+        dx, dy = bx - ax, by - ay
+        t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+        best = min(best, ((x - ax - t * dx) ** 2 + (y - ay - t * dy) ** 2) ** 0.5)
+    return best
 
 # absorption coefficient per octave band (BANDS_HZ), per m2 of the couch's surface
 FABRICS = {
@@ -66,6 +107,20 @@ def clean_item(d: dict, n: int = 1) -> dict:
         out[k] = None if v in (None, "") else _clamp(v, 0, 50, None)
     for k, (lo, hi) in (RISER_LIMITS if kind == "riser" else LIMITS).items():
         out[k] = _clamp(d.get(k), lo, hi, lo)
+    if kind == "riser":
+        mat = str(d.get("material") or "").lower()
+        out["material"] = mat if mat in RISER_MATERIALS else ""
+        pts = _clean_points(d.get("points"))
+        if pts:                                                 # a contoured riser: its box is the box around the contour
+            xs, ys = [p[0] for p in pts], [p[1] for p in pts]
+            w = d.get("want")
+            try:
+                out["want"] = [round(float(v), 3) for v in w][:4] if isinstance(w, (list, tuple)) and len(w) == 4 else None
+            except (TypeError, ValueError):
+                out["want"] = None
+            out.update(points=pts, rotation=0, x_m=round((min(xs) + max(xs)) / 2, 3), y_m=round((min(ys) + max(ys)) / 2, 3),
+                       length_m=_clamp(max(xs) - min(xs), *RISER_LIMITS["length_m"], 0.3), depth_m=_clamp(max(ys) - min(ys), *RISER_LIMITS["depth_m"], 0.3))
+            rot = 0
     if kind == "couch":
         fab = str(d.get("fabric") or "").lower()
         out["fabric"] = fab if fab in FABRICS else DEFAULT_FABRIC
@@ -97,11 +152,23 @@ def risers(room: dict) -> list[dict]:
     return [i for i in (room.get("furniture") or []) if i.get("kind") == "riser"]
 
 
+def riser_area(r: dict) -> float:
+    """The floor a riser covers (m2): its contour's area, or its box."""
+    pts = r.get("points")
+    if pts:
+        return abs(sum(pts[i][0] * pts[(i + 1) % len(pts)][1] - pts[(i + 1) % len(pts)][0] * pts[i][1] for i in range(len(pts)))) / 2
+    return (r.get("length_m") or 0) * (r.get("depth_m") or 0)
+
+
 def riser_at(room: dict, x: float, y: float) -> float:
     """Height (m) of the tallest riser under the floor point (x, y); 0 when there is none."""
     best = 0.0
     for r in risers(room):
         if r["x_m"] is None or r["y_m"] is None:
+            continue
+        if r.get("points"):
+            if poly_contains(r["points"], x, y):
+                best = max(best, r["height_m"])
             continue
         u, v = _uv(x - r["x_m"], y - r["y_m"], *_DIR[r["rotation"]])
         if abs(u) <= r["length_m"] / 2 and abs(v) <= r["depth_m"] / 2:
@@ -192,6 +259,12 @@ def room_rt60(room: dict) -> dict | None:
     sabins = [(2 * (L + W) * H + L * W) * c + L * W * f for c, f in zip(coef, fc)]
     for it in couches(room):
         sabins = [s + x for s, x in zip(sabins, absorption(it))]
+    for r in risers(room):                                      # a riser's top is a different surface from the floor it covers (carpeted, wood, painted, concrete)
+        mat = RISER_MATERIALS.get(r.get("material") or "")
+        if not mat:
+            continue
+        area = riser_area(r)
+        sabins = [s + area * (m - f) for s, m, f in zip(sabins, FLOORS_ABS[mat], fc)]
     vol = L * W * H
     rt = [round(0.161 * vol / s, 2) for s in sabins]
     mid = sorted(rt[2:5])[1]
@@ -263,12 +336,21 @@ def couch_lift(room: dict, couch: dict) -> dict:
     for r in risers(room):
         if r["x_m"] is None or r["y_m"] is None:
             continue
+        if r.get("points"):                                       # a contoured riser: the couch is on it when its middle is over the contour (or within 25 cm)
+            if poly_outside(r["points"], couch["x_m"], couch["y_m"]) <= 0.25 and (best is None or r["height_m"] > best[0]["height_m"]):
+                best = (r, None, None)
+            continue
         u, v = _uv(couch["x_m"] - r["x_m"], couch["y_m"] - r["y_m"], *_DIR[r["rotation"]])
         if abs(u) <= r["length_m"] / 2 + 0.25 and abs(v) <= r["depth_m"] / 2 + 0.25 and (best is None or r["height_m"] > best[0]["height_m"]):
             best = (r, u, v)
     if not best:
         return out
     r, u, v = best
+    if r.get("points"):                                           # how far the couch's footprint (corners and edge middles) reaches past the contour
+        hx, hy = ((couch["length_m"], couch["depth_m"]) if couch["rotation"] in (0, 180) else (couch["depth_m"], couch["length_m"]))
+        cx, cy = couch["x_m"], couch["y_m"]
+        pts = [(cx + sx * hx / 2, cy + sy * hy / 2) for sx in (-1, 0, 1) for sy in (-1, 0, 1)]
+        return {"riser": r["id"], "lift_m": r["height_m"], "overhang_m": round(max(poly_outside(r["points"], px, py) for px, py in pts), 2)}
     turned = (couch["rotation"] - r["rotation"]) % 180 != 0
     hl, hd = ((couch["depth_m"], couch["length_m"]) if turned else (couch["length_m"], couch["depth_m"]))
     over = max(0.0, abs(u) + hl / 2 - r["length_m"] / 2, abs(v) + hd / 2 - r["depth_m"] / 2)

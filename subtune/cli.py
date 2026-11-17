@@ -1,6 +1,6 @@
 """htTamer (command: subtune) - automatic multi-sub tuning for the miniDSP 2x4HD.
 
-Typical run (Claude drives this; the dashboard shows each step live):
+Typical run (the AI assistant drives this; the dashboard shows each step live):
   subtune setup --cal <file> --preset 4 --subs 1,2,3,4
   subtune prepare          # take over the preset, neutral settings, source=USB
   subtune discover         # which outputs reach the mic

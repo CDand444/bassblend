@@ -2,6 +2,12 @@
 
 ## Nov 19, 2026 - flooring, room modeler, speaker aim in 3D
 
+- **Room page is now tabs beside a plan that stays in view**: Size and floor, Shape, Where you live, Screen, Seats, Furniture, Fixtures. The plan / 3D stays on the left (and follows you down the page) while you change things on the right; on a phone the plan sits above the tabs. The tab you were on is remembered.
+- **Room editor (stage 1)**: an "Edit layout" button opens a pop-out, top-down editor. Drag couches, risers, subs and seat positions; add a couch, loveseat, sectional, recliner, riser or seat by clicking or dragging it onto the room; items pull in to walls and each other (hold Alt to place freely); R turns, Delete removes, arrow keys nudge, Ctrl+Z / Ctrl+Y undo and redo; problems (outside the room, overlapping) are flagged. Apply writes it into the Room card; Save room keeps it.
+- **Risers are now fluid shapes**: a riser can take the shape of the room instead of boxes: it follows an angled wall or notch exactly, and a door's swing is cut away as the quarter circle the door sweeps (two half-width leaves for a double door). It wraps around subs, floor-standing speakers and any couch standing in its way, and re-fits itself in the editor when anything moves. A riser with a sub or column standing inside it falls back to a few touching boxes.
+- **Riser top surface**: wood, carpeted, painted/laminate or concrete. It changes the ring-time estimate (the riser's top replaces the floor under it) and the riser's color in the plan and 3D.
+- The assistant and the setup text no longer name the AI model or its maker: they say "the AI" or "the AI assistant" (outside apps such as Claude Desktop are still named where you connect them).
+
 - **Risers wrap around walls and obstacles**: the modeler (measurements and AI) now cuts each tier to the room's outline (angled walls, notches, alcoves) and around doors (their swing), subs, floor-standing speakers and any furniture already placed, as a few touching boxes at one height; the tier is left whole when nothing is in the way. "Wrap around walls and obstacles" can be turned off. A riser can now be as small as 1 ft (a cut piece), and a room holds up to 40 furniture items. The AI can name obstacles it is told about (a column, a fireplace) and the risers are cut around them.
 - **More SVS subwoofers in the starter database**: the original SB-1000, SB-2000, SB-3000, SB-4000, PB-2000, PB-3000, PB-4000, PC-2000, PC-4000, SB13-Ultra, PB13-Ultra, PB16-Ultra, SB16-Ultra, PB12-NSD and PB12-Plus (33 subs in all).
 

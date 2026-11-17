@@ -1,9 +1,9 @@
 """AI analysis of the room, sub placement and measurements.
 
 build_context() gathers everything htTamer knows into a compact JSON
-document. run_claude() sends it to Claude (needs ANTHROPIC_API_KEY or an
+document. run_claude() sends it to the AI (needs ANTHROPIC_API_KEY or an
 `ant auth login` profile). The same context can be printed with
-`subtune analysis-context` so Claude Code can write the analysis instead,
+`subtune analysis-context` so an outside AI app (such as Claude Code) can write the analysis instead,
 then stored with `subtune set-analysis`.
 """
 from __future__ import annotations
@@ -190,14 +190,14 @@ def _call_claude(system: str, user: str, output_format: dict | None = None):
     except anthropic.AuthenticationError:
         raise AIError("The API key was rejected. Check it in the Anthropic Console, then save it again here.")
     except anthropic.RateLimitError:
-        raise AIError("Rate limited by the Claude API. Try again in a minute.")
+        raise AIError("Rate limited by the AI provider. Try again in a minute.")
     except anthropic.APIStatusError as e:
         if "credit balance" in str(e.message).lower():
             raise AIError("Your Anthropic API account has no credits. Add credits in the Anthropic Console "
                           "(Plans & Billing), then try again. The key itself is fine.")
-        raise AIError(f"Claude API error {e.status_code}: {e.message}")
+        raise AIError(f"AI provider error {e.status_code}: {e.message}")
     except anthropic.APIConnectionError:
-        raise AIError("Could not reach the Claude API (network).")
+        raise AIError("Could not reach the AI provider (network).")
     except Exception as e:      # e.g. no credentials configured at all
         if "authentication method" in str(e):
             raise AIError("No Anthropic API key saved yet. Paste one into the key field and save it.")
@@ -230,13 +230,13 @@ def _call_claude_raw(system: str, messages: list, tools: list):
     except anthropic.AuthenticationError:
         raise AIError("The API key was rejected. Save a valid key in Room analysis.")
     except anthropic.RateLimitError:
-        raise AIError("Rate limited by the Claude API. Try again in a minute.")
+        raise AIError("Rate limited by the AI provider. Try again in a minute.")
     except anthropic.APIStatusError as e:
         if "credit balance" in str(e.message).lower():
             raise AIError("Your Anthropic API account is out of credits.")
-        raise AIError(f"Claude API error {e.status_code}: {e.message}")
+        raise AIError(f"AI provider error {e.status_code}: {e.message}")
     except anthropic.APIConnectionError:
-        raise AIError("Could not reach the Claude API (network).")
+        raise AIError("Could not reach the AI provider (network).")
     except ValueError as e:                         # malformed streamed tool input
         raise AIError(f"The reply was garbled ({e}). Try again.")
     except Exception as e:
@@ -291,7 +291,7 @@ def _fail(msg, key="analysis_status", what="AI analysis"):
 # ------------------------------------------------------- setup suggestion
 SUGGEST_FILE = DATA / "suggestion.json"
 
-SUGGEST_SYSTEM = """You are an experienced subwoofer-integration engineer. From the owner's stated goals \
+SUGGEST_SYSTEM = """You are an experienced subwoofer-integration engineer. Never name the AI model or its maker in what you write: say "the AI" if you must refer to yourself. From the owner's stated goals \
 ("user_goals"), the room, the listening positions, the subwoofers on each miniDSP output and any \
 measurements, recommend how to set the system up.
 
