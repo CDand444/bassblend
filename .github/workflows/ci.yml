@@ -38,6 +38,7 @@ jobs:
         run: |
           python -m playwright install --with-deps chromium
           python tests/browser_check.py
+          python tests/browser_actions.py
 
   windows:
     runs-on: windows-latest

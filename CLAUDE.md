@@ -69,7 +69,8 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
   Always run `tests/test_compile.py` before deploying: the Pi refuses code that doesn't import.
 - Checks on GitHub (`.github/workflows/ci.yml`, every push to main and before every release, which only
   builds when they pass): pyflakes, all offline tests on Linux/Python 3.13 and Windows/3.12, and
-  `tests/browser_check.py` (every page in headless Chromium with real reloads; locally needs
+  `tests/browser_check.py` (every page in headless Chromium with real reloads) and `tests/browser_actions.py` (clicks the
+  buttons that touch no hardware and checks the page updates by itself; locally both need
   `pip install playwright` + `python -m playwright install chromium`). `tests/test_no_personal_info.py`
   enforces the no-personal-info rule.
 - Deploy to the Pi: `bash deploy/push-update.sh` (sends tracked + new files, restarts, rolls back
