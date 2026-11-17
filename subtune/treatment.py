@@ -640,6 +640,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     notes += dwelling.treatment_notes(room)
     couch_notes(room, seats, rt, notes)
     notes += [n for n in (furniture.riser_note(room, s) for s in seats) if n]
+    notes += furniture.riser_notes(room)
     if soffit.front_wall(_rm(room)):
         notes.append("A soffit along the front wall: in-ceiling or height speakers there are close to the wall; "
                      "treat the soffit underside like a ceiling reflection point.")

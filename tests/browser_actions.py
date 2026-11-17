@@ -91,6 +91,23 @@ def main():
             page.click("#roomSave")
             check("Dwelling: clearing it removes it", until(page, "!S.room.dwelling"))
 
+            # ---- Risers: a couch added after a riser sits on it, the page says so, and the 3D view draws both as one object
+            page.wait_for_timeout(500)
+            page.click("#addRiser")
+            page.click("#addCouch")
+            check("Riser: a new couch sits on the riser", until(page, "[...document.querySelectorAll('#couchRows .fuinfo')].some(e => e.textContent.startsWith('Sits on'))"))
+            check("Riser: the 3D scene groups the couch with its riser", page.evaluate("(() => { const m = fuMarks3d(fuRead()); return m.some(x => x.boxes.length >= 7); })()"))
+            check("Treatment 3D: panels, clouds, rugs and traps become solids", page.evaluate("""(() => { const rm = {length_m: 6, width_m: 4, height_m: 2.5};
+              const p = {room: {W: 4, L: 6, H: 2.5}, shape: {}, items: [
+                {id: 'side', wall: 'left', kind: 'absorber', tier: 1, qty: 4, thickness_in: 2, rect: {x0: 0, x1: 0, y0: 1, y1: 3, n: [-1, 0]}, zone: {b: [0.5, 2]}},
+                {id: 'cloud', wall: 'ceiling', kind: 'cloud', tier: 2, qty: 3, thickness_in: 4, rect: {x0: 1, x1: 3, y0: 2, y1: 4}},
+                {id: 'rug', wall: 'floor', kind: 'rug', tier: 3, qty: 1, rect: {x0: 1, x1: 3, y0: 0, y1: 3}},
+                {id: 'corner_traps', wall: 'corners', kind: 'bass trap', tier: 1, qty: 1, thickness_in: 12, corners: [{x_m: 0, y_m: 0, name: 'front left'}]}]};
+              const s = v3Treatment(p, rm); return s.length === 4 && s.every(x => x.boxes.length >= 1 && x.boxes.every(b => b.pts.length >= 3 && b.z1 > b.z0)); })()"""))
+            page.click("#planView [data-pv='3d']")
+            check("Riser: the 3D room view draws without errors", page.locator("#plan3dBox").is_visible())
+            page.click("#planView [data-pv='2d']")
+
             # ---- Turning the room: Mirror and Undo change the stored room and the form
             before = page.evaluate("S.room.furniture[1].x_m")
             page.click("#roTurn [data-op='cw']")

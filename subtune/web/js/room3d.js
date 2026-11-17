@@ -3,7 +3,9 @@
 // works on a home network without internet. Units: meters, x from the left wall, y from the front
 // (screen) wall, z up; outline corners in order, openings on walls (wall i = corner i -> i+1).
 // Usage: RoomView.view3d(canvas) -> {set(room, markers)}; RoomView.svg2d(room, markers) -> '<svg…>'.
-// markers: [{x_m, y_m, z_m, kind: 'seat'|'sub'|'speaker'|'height', label}]
+// markers: [{x_m, y_m, z_m, kind: 'seat'|'sub'|'speaker'|'height', label}], or a solid object:
+//   {kind: 'solid', boxes: [{pts: [[x, y], ...] (a convex floor footprint), z0, z1, fill, alpha, front: face index to put a speaker cone on}], label, labelZ}
+// RoomView.cuboid(x, y, w, d, dir) gives the footprint of a w x d box whose front (face 2) looks along dir.
 (function () {
   'use strict';
   const FT = 0.3048;
@@ -45,8 +47,9 @@
   const color = (el, v, fb) => (getComputedStyle(el).getPropertyValue(v) || '').trim() || fb;
 
   // ---------------------------------------------------------------- 3D
-  function view3d(canvas) {
-    let room = null, marks = [], yaw = 0.35, pitch = 0.62, zoom = 1, drag = null;
+  function view3d(canvas, opts) {
+    const cm = (opts && opts.camera) || {yaw: 0.35, pitch: 0.62, zoom: 1};          // shared with the caller so a redraw keeps the angle
+    let room = null, marks = [], drag = null;
     const pinch = new Map();
     function faces() {
       const pts = outlineOf(room); if (!pts) return null;
@@ -104,9 +107,9 @@
       const F = room && faces();
       if (!F) { ctx.fillStyle = color(canvas, '--text-3', '#888'); ctx.font = '13px system-ui'; ctx.textAlign = 'center'; ctx.fillText('Enter the room size to see it in 3D', cw / 2, ch / 2); return; }
       const pts = outlineOf(room), [W, L] = extent(pts), H = room.height_m || 2.4, c = [W / 2, L / 2, H / 2];
-      const fw = [Math.sin(yaw), -Math.cos(yaw), 0], rt = [Math.cos(yaw), Math.sin(yaw), 0];
-      const cf = [fw[0] * Math.cos(pitch), fw[1] * Math.cos(pitch), -Math.sin(pitch)], up = [fw[0] * Math.sin(pitch), fw[1] * Math.sin(pitch), Math.cos(pitch)];
-      const span = Math.max(W, L, H), dist = span * 2.3, k = Math.min(cw, ch) * 2.1 * zoom;
+      const fw = [Math.sin(cm.yaw), -Math.cos(cm.yaw), 0], rt = [Math.cos(cm.yaw), Math.sin(cm.yaw), 0];
+      const cf = [fw[0] * Math.cos(cm.pitch), fw[1] * Math.cos(cm.pitch), -Math.sin(cm.pitch)], up = [fw[0] * Math.sin(cm.pitch), fw[1] * Math.sin(cm.pitch), Math.cos(cm.pitch)];
+      const span = Math.max(W, L, H), dist = span * 2.3, k = Math.min(cw, ch) * 2.1 * cm.zoom;
       const cam = [c[0] - cf[0] * dist, c[1] - cf[1] * dist, c[2] - cf[2] * dist];
       const P = p => { const d = [p[0] - c[0], p[1] - c[1], p[2] - c[2]], depth = d[0] * cf[0] + d[1] * cf[1] + d[2] * cf[2] + dist;
         const s = k / Math.max(0.1, depth); return [cw / 2 + (d[0] * rt[0] + d[1] * rt[1]) * s, ch / 2 - (d[0] * up[0] + d[1] * up[1] + d[2] * up[2]) * s, depth]; };
@@ -127,22 +130,44 @@
         ctx.strokeStyle = sc.at ? C.accent : C.text; ctx.lineWidth = 2; ctx.setLineDash(sc.at ? [5, 3] : []); ctx.stroke(); ctx.setLineDash([]);
       } else if (fe) { const a = P([fe.a[0] + fe.d[0] * fe.len * .3, fe.a[1], 0.9]), b = P([fe.a[0] + fe.d[0] * fe.len * .7, fe.a[1], 0.9]);
         ctx.strokeStyle = C.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
-      // markers sit on the floor (seats, subs) or where they are (speakers): drawn before the walls in front of them
-      const mk = marks.filter(m => m.x_m != null && m.y_m != null).map(m => { const z = m.kind === 'height' ? ceilZ(room, m.x_m, m.y_m) : (m.z_m ?? (m.kind === 'sub' ? 0.3 : m.kind === 'seat' ? 0.5 : 1.1));
+      // objects (furniture, speakers, subs, treatment) are drawn after the walls, far to near; the soffits are part of that sort
+      const isShell = f => f.wall !== undefined || f.kind === 'hl' || f.kind === 'door' || f.kind === 'window';
+      const mk = marks.filter(m => (m.x_m != null && m.y_m != null) || m.boxes).map(m => {
+        if (m.boxes) { const q = m.boxes.flatMap(bx => bx.pts), cx = q.reduce((t, v) => t + v[0], 0) / q.length, cy = q.reduce((t, v) => t + v[1], 0) / q.length;
+          return {...m, cx, cy, depth: P([cx, cy, 0])[2]}; }
+        const z = m.kind === 'height' ? ceilZ(room, m.x_m, m.y_m) : (m.z_m ?? (m.kind === 'sub' ? 0.3 : m.kind === 'seat' ? 0.5 : 1.1));
         const q = P([m.x_m, m.y_m, z]), g = P([m.x_m, m.y_m, 0]); return {...m, q, g, depth: q[2]}; });
-      const items = sorted.filter(f => f.kind !== 'floor').concat(mk.map(m => ({kind: 'mark', m, depth: m.depth})));
-      items.sort((a, b) => b.depth - a.depth);
-      items.forEach(f => {
-        if (f.kind === 'mark' && f.m.kind === 'couch') {       // a seat box and a back box, drawn face by face
-          f.m.boxes.forEach(b => { const lo = b.pts.map(p => P([p[0], p[1], b.z0])), hi = b.pts.map(p => P([p[0], p[1], b.z1]));
-            const faces = [hi].concat([0, 1, 2, 3].map(i => [lo[i], lo[(i + 1) % 4], hi[(i + 1) % 4], hi[i]]));
-            faces.sort((p, q) => q.reduce((s, v) => s + v[2], 0) - p.reduce((s, v) => s + v[2], 0));
-            faces.forEach(pp => { path(pp); ctx.fillStyle = C.floor; ctx.globalAlpha = 0.95; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = C.text; ctx.lineWidth = 1; ctx.stroke(); }); });
+      const shell = sorted.filter(f => f.kind !== 'floor' && isShell(f)).sort((a, b) => b.depth - a.depth);
+      const items = sorted.filter(f => f.kind !== 'floor' && !isShell(f)).concat(mk.map(m => ({kind: 'mark', m, depth: m.depth}))).sort((a, b) => b.depth - a.depth);
+      const LIGHT = [-0.5, -0.6], txt = (t, x, y) => { ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.lineWidth = 3; ctx.strokeStyle = C.wall; ctx.strokeText(t, x, y); ctx.fillStyle = C.text; ctx.fillText(t, x, y); };
+      function drawBox(b, sh) {                               // one convex prism: culled side faces, shaded by the light, a lighter top, a soft ground shadow
+        const n = b.pts.length, cx = b.pts.reduce((t, v) => t + v[0], 0) / n, cy = b.pts.reduce((t, v) => t + v[1], 0) / n;
+        const lo = b.pts.map(v => P([v[0], v[1], b.z0])), hi = b.pts.map(v => P([v[0], v[1], b.z1])), al = b.alpha ?? 1, fill = b.fill || C.floor;
+        if (b.z0 < 0.03 && sh !== false) { path(b.pts.map(v => P([v[0] + 0.07, v[1] + 0.05, 0]))); ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fill(); }
+        const quad = (pp, over) => { path(pp); ctx.globalAlpha = al; ctx.fillStyle = fill; ctx.fill(); if (over) { ctx.fillStyle = over; ctx.fill(); } ctx.globalAlpha = 1; ctx.strokeStyle = 'rgba(0,0,0,.32)'; ctx.lineWidth = 0.8; ctx.stroke(); };
+        for (let i = 0; i < n; i++) { const j = (i + 1) % n, ex = b.pts[j][0] - b.pts[i][0], ey = b.pts[j][1] - b.pts[i][1], len = Math.hypot(ex, ey); if (len < 1e-6) continue;
+          const mx = (b.pts[i][0] + b.pts[j][0]) / 2, my = (b.pts[i][1] + b.pts[j][1]) / 2; let nx = ey / len, ny = -ex / len;
+          if ((mx - cx) * nx + (my - cy) * ny < 0) { nx = -nx; ny = -ny; }
+          if ((cam[0] - mx) * nx + (cam[1] - my) * ny <= 0) continue;
+          quad([lo[i], lo[j], hi[j], hi[i]], `rgba(0,0,0,${Math.max(0.02, Math.min(0.42, 0.2 - 0.22 * (nx * LIGHT[0] + ny * LIGHT[1]))).toFixed(2)})`);
+          if (b.front === i) { const zc = (b.z0 + b.z1) / 2, r = Math.min(len, b.z1 - b.z0) * (b.cone || 0.34), tx = ex / len, ty = ey / len, ring = k => { const out = [];
+              for (let t = 0; t < 22; t++) { const a = t / 22 * 6.2832, u = Math.cos(a) * r * k, v = Math.sin(a) * r * k; out.push(P([mx + tx * u + nx * 0.004, my + ty * u + ny * 0.004, zc + v])); } return out; };
+            path(ring(1)); ctx.fillStyle = 'rgba(0,0,0,.6)'; ctx.fill(); ctx.strokeStyle = 'rgba(255,255,255,.22)'; ctx.lineWidth = 1; ctx.stroke(); path(ring(0.38)); ctx.fillStyle = 'rgba(255,255,255,.14)'; ctx.fill(); } }
+        if (cam[2] > b.z1) quad(hi, 'rgba(255,255,255,.12)');
+      }
+      shell.concat(items).forEach(f => {
+        if (f.kind === 'mark' && f.m.boxes) {
+          const m = f.m, bs = m.boxes.map(bx => ({...bx, d: P([bx.pts.reduce((t, v) => t + v[0], 0) / bx.pts.length, bx.pts.reduce((t, v) => t + v[1], 0) / bx.pts.length, 0])[2]}));
+          bs.sort((x, y) => Math.abs(x.z0 - y.z0) > 1e-3 ? x.z0 - y.z0 : y.d - x.d);          // lower layers first, then far to near
+          // something fixed to a wall that faces the camera would hide the room: draw it faint, as the wall itself is
+          const fade = m.wallN && ((cam[0] - m.cx) * m.wallN[0] + (cam[1] - m.cy) * m.wallN[1]) > 0 ? 0.22 : 1;
+          bs.forEach(bx => drawBox(fade < 1 ? {...bx, alpha: (bx.alpha ?? 1) * fade} : bx, m.shadow));
+          if (m.label) { const zt = Math.max(...m.boxes.map(bx => bx.z1)), q = P([m.cx, m.cy, (m.labelZ ?? zt) + 0.06]); txt(m.label, q[0], q[1] - 3); }
           return; }
         if (f.kind === 'mark') { const m = f.m, r = m.kind === 'sub' ? 6 : m.kind === 'seat' ? 6 : 4;
           ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.moveTo(m.g[0], m.g[1]); ctx.lineTo(m.q[0], m.q[1]); ctx.stroke(); ctx.setLineDash([]);
           ctx.fillStyle = m.color || (m.kind === 'seat' ? C.text : m.kind === 'sub' ? C.accent : m.kind === 'height' ? color(canvas, '--s4', '#8a5cf5') : color(canvas, '--s1', '#2a78d6'));
-          ctx.beginPath(); if (m.kind === 'seat') ctx.rect(m.q[0] - r, m.q[1] - r, 2 * r, 2 * r); else ctx.arc(m.q[0], m.q[1], r, 0, 7); ctx.fill();
+          ctx.beginPath(); if (m.kind === 'seat') ctx.arc(m.q[0], m.q[1], r + 1.5, 0, 7); else ctx.arc(m.q[0], m.q[1], r, 0, 7); ctx.fill();
           if (m.label) { ctx.fillStyle = C.text; ctx.font = '10px system-ui'; ctx.textAlign = 'center'; ctx.fillText(m.label, m.q[0], m.q[1] - r - 3); }
           return; }
         // a wall facing the camera is drawn see-through so the room stays visible (dollhouse view)
@@ -156,23 +181,24 @@
         ctx.globalAlpha = facing ? 0.35 : 1; ctx.strokeStyle = C.line; ctx.lineWidth = 1; ctx.stroke(); ctx.globalAlpha = 1;
       });
       ctx.fillStyle = C.text; ctx.font = '11px system-ui'; ctx.textAlign = 'left';
-      ctx.fillText(`${(W / FT).toFixed(1)} × ${(L / FT).toFixed(1)} ft · drag to turn`, 8, ch - 8);
+      ctx.fillText(`${(W / FT).toFixed(1)} × ${(L / FT).toFixed(1)} ft · drag to turn, scroll to zoom, double-click to reset`, 8, ch - 8);
     }
     const ang = ev => [ev.clientX, ev.clientY];
     canvas.style.touchAction = 'none';
-    canvas.addEventListener('pointerdown', ev => { pinch.set(ev.pointerId, ang(ev)); drag = {p: ang(ev), yaw, pitch}; canvas.setPointerCapture(ev.pointerId); });
+    canvas.addEventListener('pointerdown', ev => { pinch.set(ev.pointerId, ang(ev)); drag = {p: ang(ev), yaw: cm.yaw, pitch: cm.pitch}; canvas.setPointerCapture(ev.pointerId); });
     canvas.addEventListener('pointermove', ev => {
       if (!pinch.has(ev.pointerId)) return;
       const prev = [...pinch.values()]; pinch.set(ev.pointerId, ang(ev));
       if (pinch.size === 2) { const now = [...pinch.values()], d0 = Math.hypot(prev[0][0] - prev[1][0], prev[0][1] - prev[1][1]), d1 = Math.hypot(now[0][0] - now[1][0], now[0][1] - now[1][1]);
-        if (d0 > 0) zoom = Math.max(0.5, Math.min(3, zoom * d1 / d0)); draw(); return; }
+        if (d0 > 0) cm.zoom = Math.max(0.5, Math.min(3, cm.zoom * d1 / d0)); draw(); return; }
       if (!drag) return; const [x, y] = ang(ev);
-      yaw = drag.yaw + (x - drag.p[0]) * 0.01; pitch = Math.max(0.08, Math.min(1.45, drag.pitch + (y - drag.p[1]) * 0.008)); draw(); });
-    const up = ev => { pinch.delete(ev.pointerId); drag = pinch.size === 1 ? {p: [...pinch.values()][0], yaw, pitch} : null; };
+      cm.yaw = drag.yaw + (x - drag.p[0]) * 0.01; cm.pitch = Math.max(0.08, Math.min(1.45, drag.pitch + (y - drag.p[1]) * 0.008)); draw(); });
+    const up = ev => { pinch.delete(ev.pointerId); drag = pinch.size === 1 ? {p: [...pinch.values()][0], yaw: cm.yaw, pitch: cm.pitch} : null; };
     canvas.addEventListener('pointerup', up); canvas.addEventListener('pointercancel', up);
-    canvas.addEventListener('wheel', ev => { ev.preventDefault(); zoom = Math.max(0.5, Math.min(3, zoom * (ev.deltaY < 0 ? 1.1 : 0.9))); draw(); }, {passive: false});
+    canvas.addEventListener('wheel', ev => { ev.preventDefault(); cm.zoom = Math.max(0.5, Math.min(3, cm.zoom * (ev.deltaY < 0 ? 1.1 : 0.9))); draw(); }, {passive: false});
     if (window.ResizeObserver) new ResizeObserver(() => room && draw()).observe(canvas);
-    return {set(r, m) { room = r; marks = m || []; draw(); }, draw};
+    canvas.addEventListener('dblclick', () => { cm.yaw = 0.35; cm.pitch = 0.62; cm.zoom = 1; draw(); });
+    return {set(r, m) { room = r; marks = m || []; draw(); }, draw, camera: cm};
   }
 
   // ---------------------------------------------------------------- 2D
@@ -195,5 +221,10 @@
     return `<svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" role="img" aria-label="Floor plan seen from above">${g}</svg>`;
   }
 
-  window.RoomView = {view3d, svg2d, ceilZ, outlineOf, soffitPoly};
+  // the footprint of a w x d box centred at (x, y) whose front (face 2, between the last two points) looks along dir
+  function cuboid(x, y, w, d, dir) {
+    const l = Math.hypot(dir[0], dir[1]) || 1, fx = dir[0] / l, fy = dir[1] / l, rx = -fy, ry = fx;
+    return [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]].map(([u, v]) => [x + u * rx + v * fx, y + u * ry + v * fy]);
+  }
+  window.RoomView = {view3d, svg2d, ceilZ, outlineOf, soffitPoly, cuboid};
 })();

@@ -124,6 +124,23 @@ def test_riser_does_not_change_the_rt60_estimate():
     assert fu.room_rt60(room(riser()))["mid_s"] == fu.room_rt60(room())["mid_s"]
 
 
+def test_couch_lift_sits_on_the_riser():
+    r = room(riser(), couch())                                                       # riser 0.2 high, couch in the middle of it
+    lf = fu.couch_lift(r, fu.couches(r)[0])
+    assert lf["lift_m"] == 0.2 and lf["riser"] and lf["overhang_m"] == 0.0
+    off = room(riser(), couch(y_m=1.0))
+    assert fu.couch_lift(off, fu.couches(off)[0]) == {"riser": None, "lift_m": 0.0, "overhang_m": 0.0}
+    assert fu.riser_notes(r) == []
+
+
+def test_couch_hanging_off_the_riser_is_noted():
+    r = room(riser(length_m=1.5, depth_m=1.0), couch(length_m=2.2))
+    lf = fu.couch_lift(r, fu.couches(r)[0])
+    assert lf["overhang_m"] > 0.3 and "hangs" in fu.riser_notes(r)[0]
+    turned = room(riser(length_m=1.5, depth_m=3.0), couch(length_m=2.2, depth_m=0.9, rotation=90))   # a quarter turn: the couch's length runs front to back
+    assert fu.couch_lift(turned, fu.couches(turned)[0])["overhang_m"] == 0.0
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

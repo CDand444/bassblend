@@ -216,3 +216,36 @@ def rear_wall_cover(room: dict) -> dict | None:
     return {"fraction": frac,
             "note": "Your couch already fills most of the back wall and softens treble reflections there. "
                     "It does not absorb bass, so back-wall bass traps still help."}
+
+
+def couch_lift(room: dict, couch: dict) -> dict:
+    """What a couch sits on: {riser (id or None), lift_m (how far the riser raises it), overhang_m (how far it sticks out past the riser)}.
+    A couch is on a riser when its middle is over it (or within 25 cm of its edge), as the page's 3D view does."""
+    out = {"riser": None, "lift_m": 0.0, "overhang_m": 0.0}
+    if couch.get("x_m") is None or couch.get("y_m") is None:
+        return out
+    best = None
+    for r in risers(room):
+        if r["x_m"] is None or r["y_m"] is None:
+            continue
+        u, v = _uv(couch["x_m"] - r["x_m"], couch["y_m"] - r["y_m"], *_DIR[r["rotation"]])
+        if abs(u) <= r["length_m"] / 2 + 0.25 and abs(v) <= r["depth_m"] / 2 + 0.25 and (best is None or r["height_m"] > best[0]["height_m"]):
+            best = (r, u, v)
+    if not best:
+        return out
+    r, u, v = best
+    turned = (couch["rotation"] - r["rotation"]) % 180 != 0
+    hl, hd = ((couch["depth_m"], couch["length_m"]) if turned else (couch["length_m"], couch["depth_m"]))
+    over = max(0.0, abs(u) + hl / 2 - r["length_m"] / 2, abs(v) + hd / 2 - r["depth_m"] / 2)
+    return {"riser": r["id"], "lift_m": r["height_m"], "overhang_m": round(over, 2)}
+
+
+def riser_notes(room: dict) -> list[str]:
+    """Notes about couches and the risers under them: a couch that hangs off its riser."""
+    out = []
+    for c in couches(room):
+        lf = couch_lift(room, c)
+        if lf["riser"] and lf["overhang_m"] > 0.03:
+            out.append(f"{c.get('name') or 'A couch'} hangs {lf['overhang_m'] / 0.3048:.1f} ft off the edge of its riser: widen the riser "
+                       "so nobody sits on the edge.")
+    return out

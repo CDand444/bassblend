@@ -1,5 +1,11 @@
 # htTamer changelog
 
+## Nov 18, 2026 - a better 3D view, treatment in 3D, risers
+
+- **Treatment in 3D**: the Treatment page has a Plan / 3D switch. Wall panels, ceiling clouds, the rug and corner traps are drawn where the plan puts them, with your couches, speakers and subs.
+- **A fuller 3D view** (Room and Treatment): shaded solid objects with ground shadows; speakers as cabinets with a cone facing your seat; ceiling speakers hung from the ceiling; subs as cubes; couches with arms, cushion and back; your view angle is kept; double-click resets it.
+- **Risers**: couches sit on risers by themselves (they rise with them in 3D, stay inside the edges, follow when the riser moves), a new couch lands on a riser, a new riser fits under a couch, and the page says when a couch hangs off its riser. Added Sit on a riser and Fit to couch.
+
 ## Nov 17, 2026 - house, apartment or condo
 
 - **Where you live** on the Room page: home type, floor, who shares your floor, ceiling or walls, wood or concrete. Shared buildings get

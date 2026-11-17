@@ -459,16 +459,14 @@ function renderPlan(r) {
 }
 // ---- the same room in 3D (RoomView, js/room3d.js), and the phone room builder's QR code
 let planMode = '2d', plan3dView = null, plan3dLast = null;
+const PLAN3D_CAM = {yaw: 0.35, pitch: 0.62, zoom: 1};
 try { planMode = localStorage.getItem('htPlanView') === '3d' ? '3d' : '2d'; } catch (e) { planMode = '2d'; }
 function plan3d(r, spk) {
   plan3dLast = [r, spk];
   if (planMode !== '3d' || !window.RoomView) return;
-  if (!plan3dView) plan3dView = RoomView.view3d($('#plan3d'));
-  const rm = r.room, marks = (r.seats || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'seat'}))
-    .concat(Object.entries(r.subs || {}).map(([o, s]) => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m, kind: 'sub', label: `${+o + 1}`, color: css(SUBC[+o % 4])})))
-    .concat(fuMarks3d(r.furniture))
-    .concat((spk || []).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.kind === 'height' ? null : s.z_m, kind: s.kind === 'height' ? 'height' : 'speaker', label: s.id})));
-  plan3dView.set({...rm, outline: rm.outline || null, hl: soHl, screen: r.screen || null}, marks);
+  if (!plan3dView) plan3dView = RoomView.view3d($('#plan3d'), {camera: PLAN3D_CAM});
+  const sc = v3Scene(r, spk);
+  plan3dView.set({...sc.room, hl: soHl}, sc.marks);
 }
 function setPlanMode(m) {
   planMode = m; try { localStorage.setItem('htPlanView', m); } catch (e) { /* private mode */ }

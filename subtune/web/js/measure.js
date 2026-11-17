@@ -253,8 +253,23 @@ function trtDrawing(p) {
   return `<svg viewBox="0 0 ${W * sc + 2 * pad} ${L * sc + 2 * pad}" style="width:100%;max-width:480px" role="img" aria-label="Suggested room treatment positions">${g}</svg>
     <div class="legend"><span><i style="border-color:var(--s2)"></i>Do first</span><span><i style="border-color:var(--s1)"></i>Next</span><span><i style="border-color:var(--s4)"></i>Nice to have</span><span><i style="border-color:var(--good)"></i>Installed</span><span><i class="dash" style="border-color:var(--text-2)"></i>Ceiling cloud</span><span><i class="dot" style="color:var(--text)"></i>Reflection points</span></div>`;
 }
+let trtMode = '2d'; try { trtMode = localStorage.getItem('htTrtView') === '3d' ? '3d' : '2d'; } catch (e) { trtMode = '2d'; }
+const TRT3D_CAM = {yaw: 0.35, pitch: 0.62, zoom: 1};
+function trt3dDraw() {                          // the treatment plan in 3D: the room as saved, its furniture, speakers and subs, and every item at its spot
+  const p = S.treatment, cv = $('#trt3d'); if (!cv || !p || !S.room || !S.room.room || trtMode !== '3d') return;
+  const spk = (p.speakers || []).map(s => ({...s, rec: s.source === 'recorded'}));
+  const sc = v3Scene(S.room, spk, p), view = cv._v3 || (cv._v3 = RoomView.view3d(cv, {camera: TRT3D_CAM}));
+  view.set(sc.room, sc.marks);
+}
+function setTrtMode(m) {
+  trtMode = m; try { localStorage.setItem('htTrtView', m); } catch (e) { /* private mode */ }
+  document.querySelectorAll('#trtView button').forEach(b => b.classList.toggle('on', b.dataset.tv === m));
+  $('#trt3dBox').hidden = m !== '3d'; $('#trt3dHint').hidden = m !== '3d'; $('#trt2d').hidden = m === '3d';
+  const g = $('#trt2d').parentElement.lastElementChild; if (g) g.style.gridColumn = m === '3d' ? '1/-1' : '';
+  if (m === '3d') trt3dDraw();
+}
 function renderTreatment() {
-  const p = S.treatment, key = JSON.stringify(p);
+  const p = S.treatment, key = JSON.stringify([p, (S.room || {}).furniture, (S.room || {}).subs, (S.room || {}).screen, (S.room || {}).seats]);
   if (key !== trtKey) { trtKey = key;
     if (!p) $('#trtOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and at least the main seat in Room.');
     else {
@@ -287,9 +302,14 @@ function renderTreatment() {
         cmpH += '</details>';
       }
       $('#trtOut').innerHTML = `<div class="notice" style="margin-bottom:12px">${esc(p.honesty)}</div>
-        <div class="pl-grid"><div>${trtDrawing(p)}</div><div><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
+        <div class="row" style="margin:0 0 8px;gap:8px"><div class="seg" id="trtView" role="radiogroup" aria-label="Treatment view"><button type="button" data-tv="2d" class="${trtMode === '2d' ? 'on' : ''}">Plan</button><button type="button" data-tv="3d" class="${trtMode === '3d' ? 'on' : ''}">3D</button></div>
+          <span class="muted small" id="trt3dHint" ${trtMode === '3d' ? '' : 'hidden'}>Drag to turn, scroll to zoom, double-click to reset. Panels are drawn where the plan puts them; green = installed.</span></div>
+        <div class="plan plan3d trt3d" id="trt3dBox" ${trtMode === '3d' ? '' : 'hidden'}><canvas id="trt3d" aria-label="Your room with the suggested treatment in 3D: drag to turn"></canvas></div>
+        <div class="pl-grid"><div id="trt2d" ${trtMode === '3d' ? 'hidden' : ''}>${trtDrawing(p)}</div><div style="${trtMode === '3d' ? 'grid-column:1/-1' : ''}"><h3 style="margin:0 0 6px">What the measurements say</h3>${probs}</div></div>
         ${trtCostHtml(p, usd)}${list}${cmpH}
         ${p.notes.length ? `<ul class="wins" style="margin-top:14px">${p.notes.map(n => `<li class="meh"><div>${esc(n)}</div></li>`).join('')}</ul>` : ''}`;
+      trt3dDraw();
+      $('#trtOut').querySelectorAll('#trtView [data-tv]').forEach(b => b.onclick = () => setTrtMode(b.dataset.tv));
       $('#trtOut').querySelectorAll('[data-trt-build]').forEach(b => b.onclick = async () => {
         const r = await post('/api/treatment', {constraints: {build: b.dataset.trtBuild}}); if (r.error) alert(r.error); poll(); });
       $('#trtOut').querySelectorAll('[data-trt-mark]').forEach(b => b.onclick = async () => {
