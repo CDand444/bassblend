@@ -207,6 +207,33 @@ def test_a_speaker_can_have_an_aim():
     raise AssertionError("a bad aim was accepted")
 
 
+def test_the_assistant_can_set_speaker_dimensions_in_any_common_form():
+    from subtune import equip
+    inch = equip.clean_speaker("FL", {"width_in": 9, "height_in": 40, "depth_in": 12})
+    assert (inch["width_in"], inch["height_in"], inch["depth_in"]) == (9, 40, 12)
+    mm = equip.clean_speaker("FL", {"dimensions": "230 x 1020 x 300 mm"})
+    assert abs(mm["width_in"] - 9.06) < 0.02 and abs(mm["height_in"] - 40.16) < 0.02
+    cm = equip.clean_speaker("FL", {"width_cm": 23, "height_cm": 102, "depth_cm": 30})
+    assert abs(cm["height_in"] - 40.16) < 0.02
+    d = equip.clean_speaker("FL", {"dimensions": {"w": 9, "h": 40, "d": 12, "unit": "in"}})
+    assert d["depth_in"] == 12
+    assert equip.clean_speaker("FL", {"dimensions": '9" x 40" x 12"'})["height_in"] == 40
+    assert abs(equip.clean_speaker("FL", {"dimensions": "230mm x 1020mm x 300mm"})["depth_in"] - 11.81) < 0.02
+    for bad in ({"dimensions": "big"}, {"dimensions": {"w": 1, "h": 1, "d": 1, "unit": "furlong"}}, {"weight_kg": 12}):
+        try:
+            equip.clean_speaker("FL", bad)
+        except ValueError as e:
+            assert str(e)
+            continue
+        raise AssertionError(bad)
+    try:
+        equip.clean_speaker("FL", {"width": 9})
+    except ValueError as e:
+        assert "width_in" in str(e) and "receiver" in str(e)                 # the error tells the assistant what to send instead
+    else:
+        raise AssertionError("an unknown field was silently ignored")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

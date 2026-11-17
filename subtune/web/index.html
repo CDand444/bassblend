@@ -551,7 +551,8 @@ a.btn { text-decoration: none; }
 main { padding-bottom: 84px; }
 /* wide screens: the assistant docks beside the page instead of covering it */
 @media (min-width: 1360px) {
-  body.chat-open main { margin-right: 460px; margin-left: max(0px, calc((100vw - 460px - 1080px) / 2)); }
+  /* the whole app (side menu and page) sits in the space left of the assistant: on screens wider than the app's 1840px cap it is centered there */
+  body.chat-open .shell { max-width: min(1840px, calc(100vw - 460px)); margin-left: max(0px, calc((100vw - 460px - 1840px) / 2)); margin-right: 460px; }
   body.chat-open .chat { box-shadow: none; animation: none; }
 }
 

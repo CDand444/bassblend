@@ -184,6 +184,9 @@ every one and a retest: active tuning of a sub's own controls (for a Hsu VTF-3: 
 choice measured, the best kept, a final verification) and a sub crawl (the sub at the seat, the mic at places a sub could go; the smoothest spot wins, \
 then verify at the seat). Scores are lower-is-better (distance from the target curve with levels aligned, ripple, reach). Explain the numbers in plain \
 words, say what to do next, and remember that a measurement through a playing tune includes that tune. You can't start a measurement yourself.
+- When the owner gives a speaker's or sub's dimensions, set them with update_speakers (width_in, height_in, depth_in; or the update_room sub fields), then \
+read the result: if it says nothing changed or refuses, fix the fields and try again instead of telling the owner it is done. When the hardware database is on, \
+also save the model's dimensions with hw_save so every room with that model uses them. The Speakers page offers the database's models in a drop-down.
 - Sizes, aim and screen frame: get_equipment shows each sub's and speaker's cabinet size (sizes: from the owner, the hardware database, or a \
 typical size for its kind, and which) and each sub's aim_deg. Record real sizes with hw_save (width_in, height_in, depth_in) when you look a model up, \
 and tell the owner when a size is only typical. A sub's aim matters little for low bass, but one firing into a wall a few inches away is blocked and \
@@ -403,7 +406,7 @@ TOOLS = [
        "the subs (model, placement, knob settings), the room, seats, receiver and goals. No sound."),
     _t("update_speakers", "Record or correct speakers. Merges the given fields into each channel's record; nothing "
        "else changes. Use it whenever the owner tells you about a speaker. No sound.",
-       {"speakers": {"type": "object", "description": "channel code -> fields to set, e.g. {\"FL\": {\"model\": \"Klipsch RP-8000F\", \"kind\": \"tower\", \"size\": \"small\", \"crossover_hz\": 80, \"aim_deg\": 180}} (aim_deg = which way it faces on the plan: 0 back wall, 90 left, 180 the screen, 270 right; omit = at the main seat). Channels: FL FR C WL WR SL SR BL BR (rear surrounds) TFL TFR TML TMR TRL TRR. Fields: model, kind (tower, bookshelf, center, on-wall, in-wall, in-ceiling, atmos module, satellite, other), size (the receiver's large/small setting), crossover_hz, x_ft/y_ft/z_ft (from the left wall, the front wall, the floor), aim, amp, notes. Only the fields given change."},
+       {"speakers": {"type": "object", "description": "channel code -> fields to set, e.g. {\"FL\": {\"model\": \"Klipsch RP-8000F\", \"kind\": \"tower\", \"size\": \"small\", \"crossover_hz\": 80, \"width_in\": 9, \"height_in\": 40, \"depth_in\": 12, \"aim_deg\": 180}} (the cabinet's physical size is width_in/height_in/depth_in in inches, or give dimensions as \"9 x 40 x 12 in\" or {w, h, d, unit}; size is only the receiver's large or small setting) (aim_deg = which way it faces on the plan: 0 back wall, 90 left, 180 the screen, 270 right; omit = at the main seat). Channels: FL FR C WL WR SL SR BL BR (rear surrounds) TFL TFR TML TMR TRL TRR. Fields: model, kind (tower, bookshelf, center, on-wall, in-wall, in-ceiling, atmos module, satellite, other), size (the receiver's large/small setting), crossover_hz, x_ft/y_ft/z_ft (from the left wall, the front wall, the floor), aim, amp, notes. Only the fields given change."},
         "remove": {"type": "array", "items": {"type": "string"}, "description": "channel codes whose record to clear"}},
        []),
     _t("update_room", "Record or correct the room, seats, subs, receiver description or goals. Partial: only what's given "

@@ -181,6 +181,21 @@ def main():
               return t.includes('Step 2 of 4') && t.includes('Set Ports to 4 inch port open') && t.includes('Great') && t.includes('Both ports open') && !!document.querySelector('[data-wkretest="1"]') && !!document.querySelector('#wkMeasure'); })()""") is True)
             page.evaluate("wkLoad(null)")
 
+            # ---- Speakers: the model drop-down is filled from the hardware database; picking one fills its size and kind, Other lets you type
+            page.evaluate("post('/api/hwdb', {action: 'save', kind: 'speakers', model: 'Acme Tower 5', data: {brand: 'Acme', kind: 'tower', width_in: 8, height_in: 38, depth_in: 11}})")
+            page.wait_for_timeout(300)
+            check("Speakers: the drop-down lists the database and Other, and picking a model fills its size", page.evaluate("""(async () => {
+              S.speaker_channels = [{ch: 'FL', name: 'Front left'}]; SPK_DB = null; spkDirty = false; spkKey = null;
+              await spkDbLoad(); S.speaker_channels = [{ch: 'FL', name: 'Front left'}]; spkKey = null; renderSpeakers();
+              const sel = document.querySelector('#spkOut [data-pick="model"]'); if (!sel) return 'no select';
+              const opts = [...sel.options].map(o => o.value); if (!opts.includes('Acme Tower 5') || !opts.includes('__other')) return 'options ' + opts;
+              sel.value = 'Acme Tower 5'; sel.dispatchEvent(new Event('change', {bubbles: true}));
+              const row = sel.closest('.spkrow'), v = f => row.querySelector(`[data-f="${f}"]`).value;
+              if (v('model') !== 'Acme Tower 5' || v('width_in') !== '8' || v('height_in') !== '38' || v('kind') !== 'tower') return 'fill ' + [v('model'), v('width_in'), v('kind')];
+              const inp = row.querySelector('input[data-f="model"]'); if (!inp.hidden) return 'input should be hidden';
+              sel.value = '__other'; sel.dispatchEvent(new Event('change', {bubbles: true}));
+              return !inp.hidden && inp.value === ''; })()""") is True)
+
             # ---- Speakers: the angle to the main seat, from what is typed in a row
             page.goto(base + "/#/speakers"); page.wait_for_timeout(400)
             check("Speakers: distance, angle and aim off the seat are worked out", page.evaluate("""(() => {

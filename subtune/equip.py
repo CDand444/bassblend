@@ -58,8 +58,44 @@ def _num(v, lo, hi, what):
     return v
 
 
+_UNIT_IN = {"in": 1.0, "inch": 1.0, "inches": 1.0, "cm": 1 / 2.54, "mm": 1 / 25.4, "ft": 12.0, "m": 100 / 2.54}
+
+
+def _dimension_aliases(d: dict) -> dict:
+    """Accept a cabinet size the way people give it: width/height/depth with a unit suffix (_in _cm _mm _ft _m), a "dimensions" object
+    ({"w", "h", "d", "unit"}) or a string such as "9 x 40 x 12 in" or "230 x 1020 x 300 mm" (width x height x depth). Returns the fields as width_in/height_in/depth_in."""
+    import re
+    out = {k: v for k, v in d.items()}
+    for axis in ("width", "height", "depth"):
+        for unit, k in _UNIT_IN.items():
+            key = f"{axis}_{unit}"
+            if key in out and key != f"{axis}_in":
+                v = out.pop(key)
+                if v not in (None, ""):
+                    out[f"{axis}_in"] = round(float(v) * k, 2)
+    dim = out.pop("dimensions", None) or out.pop("dims", None)
+    if isinstance(dim, str):
+        m = re.fullmatch(r"\s*([\d.]+)\s*[\"a-zA-Z]*\s*[x×*]\s*([\d.]+)\s*[\"a-zA-Z]*\s*[x×*]\s*([\d.]+)\s*([\"a-zA-Z]*)\s*", dim)
+        if not m:
+            raise ValueError("dimensions look like 9 x 40 x 12 in (width x height x depth)")
+        dim = {"w": m[1], "h": m[2], "d": m[3], "unit": (m[4] or "in").replace('"', "in")}
+    if isinstance(dim, dict):
+        k = _UNIT_IN.get(str(dim.get("unit") or "in").lower().rstrip("."))
+        if k is None:
+            raise ValueError("dimension unit must be in, cm, mm, ft or m")
+        for axis, short in (("width", "w"), ("height", "h"), ("depth", "d")):
+            v = dim.get(short, dim.get(axis))
+            if v not in (None, ""):
+                out[f"{axis}_in"] = round(float(v) * k, 2)
+    return out
+
+
 def clean_speaker(ch: str, d: dict, old: dict | None = None) -> dict:
-    d = _feet(d)
+    d = _feet(_dimension_aliases(d))
+    unknown = [k for k in d if k not in SPK_FIELDS and k != "name"]
+    if unknown:
+        raise ValueError(f"{ch}: unknown field {', '.join(unknown)}; the fields are {', '.join(SPK_FIELDS)} "
+                         "(width_in/height_in/depth_in are the cabinet in inches; size is only the receiver's large or small setting)")
     out = dict(old or {})
     for f, typ in SPK_FIELDS.items():
         if f not in d:
@@ -212,7 +248,7 @@ def update_room(patch: dict, who="page") -> dict:
     for out, d in (patch.get("subs") or {}).items():
         k = str(int(out) - 1)
         cur = dict(body["subs"].get(k) or {})
-        d = _feet(d or {})
+        d = _feet(_dimension_aliases(d or {}))
         ctl = d.pop("controls", None)
         cur.update(d)
         if ctl is not None:

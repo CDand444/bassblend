@@ -1,5 +1,11 @@
 # htTamer changelog
 
+## Nov 18, 2026 - speaker models from the database, assistant dimensions
+
+- **Speakers page model drop-down**: pick a speaker from the hardware database (its size and kind fill in), or choose Other and type one; Remember adds a typed model to the list.
+- **The assistant can set speaker and sub dimensions**: it takes width, height and depth in inches, cm, mm, feet or metres, or a string like "230 x 1020 x 300 mm", and a field it doesn't know is now an error it can read (before, it was silently ignored, so the assistant reported success while nothing changed).
+- **The assistant docks properly on very wide screens** (no more narrow column).
+
 ## Nov 18, 2026 - the Speakers page
 
 - **Angle to the main seat** on every speaker: how far left or right of straight ahead, how far above or below ear height, how far away, and whether that is inside Dolby's range for the channel, updating as you type. A new **Faces** field says which way the speaker points (blank = at the seat) and the row shows how far off the seat that is; the 3D view turns the speaker to match.

@@ -131,7 +131,13 @@ document.addEventListener('click', e => {
 });
 
 // ---------- speakers: one record per channel of the layout
-let spkKey = null, spkDirty = false;
+let spkKey = null, spkDirty = false, SPK_DB = null;
+async function spkDbLoad() {                          // the hardware database's speakers (brand, model, kind, size...), for the model drop-down
+  try { const d = await fetch('/api/hwdb').then(r => r.json()); SPK_DB = Object.values(d.speakers || {}).sort((a, b) => (a.brand + a.model).localeCompare(b.brand + b.model)); } catch (e) { SPK_DB = SPK_DB || []; }
+  if (!spkDirty) { spkKey = null; renderSpeakers(); return; }
+  document.querySelectorAll('#spkOut [data-pick="model"]').forEach(sel => { const inp = sel.parentElement.querySelector('input[data-f="model"]'), other = !inp.hidden;      // unsaved edits stay: only the lists are refreshed
+    sel.innerHTML = spkModelOptions(inp.value); if (other) sel.value = '__other'; });
+}
 const SPK_KINDS = ['', 'tower', 'bookshelf', 'centre', 'on-wall', 'in-wall', 'in-ceiling', 'atmos module', 'satellite', 'other'];
 const ftOf = m => m == null ? '' : (m / 0.3048).toFixed(1);
 // where a speaker is as seen from the main seat: distance, left or right of straight ahead, up from ear height; against Dolby's range for that channel; and how far off the seat it faces
@@ -157,7 +163,26 @@ function spkAngles(row) {
   const side = g.az === 0 ? 'straight ahead' : `${Math.abs(g.az)}° ${g.az < 0 ? 'left' : 'right'}`;
   el.innerHTML = `<span class="chip">${side}</span><span class="chip">${g.el == null ? 'height not set' : g.el === 0 ? 'at ear height' : `${Math.abs(g.el)}° ${g.el > 0 ? 'above' : 'below'} ear height`}</span><span class="chip">${fmtFt(g.dist)} away</span>${g.off != null ? `<span class="chip">faces ${g.off}° off the seat</span>` : ''}${verdict ? `<span class="chip spk-${cls}">${esc(verdict)}</span>` : ''}`;
 }
+const spkInDb = m => !!m && (SPK_DB || []).some(e => e.model.toLowerCase() === String(m).toLowerCase());
+function spkModelOptions(cur) {
+  const db = SPK_DB || [], inDb = spkInDb(cur);
+  return `<option value="">${db.length ? 'Choose from the database…' : 'Choose…'}</option>` + db.map(e => `<option value="${esc(e.model)}" ${inDb && e.model.toLowerCase() === cur.toLowerCase() ? 'selected' : ''}>${esc([e.brand, e.model].filter(Boolean).join(' '))}${e.width_in ? ` (${e.width_in}×${e.height_in}×${e.depth_in} in)` : ''}</option>`).join('')
+    + `<option value="__other" ${cur && !inDb ? 'selected' : ''}>Other (type it)…</option>`;
+}
+document.addEventListener('change', e => {            // a model picked from the database fills in its kind and size; Other lets you type one
+  const pick = e.target.closest('[data-pick="model"]'); if (!pick) return;
+  const row = pick.closest('.spkrow'), inp = row.querySelector('input[data-f="model"]'), set = (f, v) => { const i = row.querySelector(`[data-f="${f}"]`); if (i && v != null && v !== '') i.value = v; };
+  if (pick.value === '__other') { inp.value = ''; inp.hidden = false; inp.focus(); }
+  else if (pick.value === '') { inp.value = ''; inp.hidden = true; }
+  else {
+    const ent = (SPK_DB || []).find(x => x.model === pick.value); inp.value = pick.value; inp.hidden = true;
+    if (ent) { set('width_in', ent.width_in); set('height_in', ent.height_in); set('depth_in', ent.depth_in); if (SPK_KINDS.includes(ent.kind)) set('kind', ent.kind); if (!row.querySelector('[data-f="crossover_hz"]').value) set('crossover_hz', ent.crossover_hz);
+      toast('Speakers', `${ent.model}: size and kind filled in from the database.`); }
+  }
+  spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; spkAngles(row);
+});
 function renderSpeakers() {
+  if (SPK_DB === null) { SPK_DB = []; spkDbLoad(); }
   const chans = S.speaker_channels || [], rec = (S.room || {}).speakers || {};
   const key = JSON.stringify([chans, rec, (S.hw_sizes || {}).speakers, ((S.room || {}).seats || [])[0], (S.placement || {}).speakers && S.placement.speakers.length]);
   if (key === spkKey || spkDirty || $('#spkOut').contains(document.activeElement)) return; spkKey = key;
@@ -169,7 +194,8 @@ function renderSpeakers() {
   $('#spkOut').innerHTML = `<div class="spk-list">${chans.map(c => { const r = rec[c.ch] || {};
     return `<div class="spkrow" data-ch="${c.ch}"><div class="spk-head"><div><b>${esc(c.name)}</b> <span class="muted small">${c.ch}</span></div><div class="spk-ang" data-ang="${c.ch}"></div></div>
       <div class="spk-grid">
-        <label class="f spk-model">Model<input data-f="model" value="${esc(r.model || '')}" placeholder="Make and model"></label>
+        <label class="f spk-model">Model<select data-pick="model" aria-label="Speaker model: pick one from the database or choose Other">${spkModelOptions(r.model)}</select>
+          <input data-f="model" value="${esc(r.model || '')}" placeholder="Type the make and model" ${spkInDb(r.model) || !r.model ? 'hidden' : ''}></label>
         <label class="f">Kind<select data-f="kind">${opt(SPK_KINDS, r.kind)}</select></label>
         <label class="f">Receiver size<select data-f="size">${opt(['', 'small', 'large'], r.size)}</select></label>
         ${unit('crossover_hz', 'Crossover', r.crossover_hz ?? '', 'Hz', '10')}
@@ -190,7 +216,7 @@ document.addEventListener('click', async e => {
   if (!model) { toast('Hardware database', 'Type the make and model first.', 'bad'); return; }
   if (!data.width_in || !data.height_in || data.depth_in === '') { toast('Hardware database', 'Fill in width, height and depth first.', 'bad'); return; }
   const r = await post('/api/hwdb', {action: 'save', kind: b.dataset.kind, model, data});
-  if (r.error) toast('Hardware database', r.error, 'bad'); else { toast('Hardware database', `${model}: ${data.width_in} × ${data.height_in} × ${data.depth_in} in remembered.`); hwKey = null; }
+  if (r.error) toast('Hardware database', r.error, 'bad'); else { toast('Hardware database', `${model}: ${data.width_in} × ${data.height_in} × ${data.depth_in} in remembered.`); hwKey = null; if (b.dataset.kind === 'speakers') spkDbLoad(); }
 });
 $('#spkSave').onclick = async () => {
   const speakers = {};
