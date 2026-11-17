@@ -3,6 +3,38 @@
 // treatment items are panels, clouds, traps and rugs at the spots the plan gives (measure.js / treatment.py: item.rect, item.zone, corners).
 const V3_PANEL = [0.61, 1.22];                                  // a 2 x 4 ft panel (width, height), as treatment.PANEL
 const v3Col = c => /^var\(/.test(c) ? css(c.slice(4, -1)) : c;   // 'var(--s2)' -> the real color (the canvas can't read variables)
+// ---- which way a sub points: degrees clockwise on the plan (0 = at the back wall, 90 = left wall, 180 = the screen, 270 = right wall), blank = at the main seat
+const v3Dir = deg => { if (deg === '' || deg == null || isNaN(+deg)) return null; const a = +deg * Math.PI / 180; return [-Math.sin(a), Math.cos(a)]; };
+function v3AimHit(rm, x, y, deg) {               // the first wall the ray from (x, y) at `deg` meets: {dist, wall} (as dims.aim_hit)
+  const v = v3Dir(deg), pts = RoomView.outlineOf(rm); if (!v || !pts) return null; let best = null;
+  pts.forEach((a, i) => { const b = pts[(i + 1) % pts.length], ex = b[0] - a[0], ey = b[1] - a[1], den = v[0] * ey - v[1] * ex; if (Math.abs(den) < 1e-9) return;
+    const t = ((a[0] - x) * ey - (a[1] - y) * ex) / den, s = ((a[0] - x) * v[1] - (a[1] - y) * v[0]) / den;
+    if (t > 1e-6 && s >= -1e-6 && s <= 1 + 1e-6 && (!best || t < best.dist)) best = {dist: t, wall: i + 1}; });
+  return best;
+}
+const V3_AIMS = {'': '', 180: 'The screen (front wall)', 0: 'The back wall', 90: 'The left wall', 270: 'The right wall'};
+function v3AimRefresh(card) {                    // keep a sub card's pick, angle and the one-line insight in step
+  const num = card.querySelector('[data-f="aim_deg"]'), sel = card.querySelector('.aimsel'), info = card.querySelector('.aiminfo'); if (!num || !sel) return;
+  const v = num.value === '' ? '' : String(((+num.value % 360) + 360) % 360);
+  if (document.activeElement !== sel) sel.value = v in V3_AIMS ? v : 'x';
+  if (!info) return;
+  const x = toM((card.querySelector('[data-f="x_m"]') || {}).value), y = toM((card.querySelector('[data-f="y_m"]') || {}).value), rm = readRoom().room;
+  if (v === '') { info.textContent = 'Pointing at the main seat. Low bass is hardly directional, but a sub aimed into a close wall is blocked and boomy.'; return; }
+  const h = x != null && y != null ? v3AimHit(rm, x, y, v) : null;
+  info.textContent = h ? (h.dist < 0.35 ? `Points at wall ${h.wall} only ${fmtFt(h.dist)} away: a driver or port that close to a wall is blocked and boomy. Turn it into the room or leave a few inches.` : `Points at wall ${h.wall}, ${fmtFt(h.dist)} away.`) : 'Enter where the sub sits to see what it points at.';
+}
+document.addEventListener('change', e => {      // the pick sets the angle; typing an angle moves the pick
+  const sel = e.target.closest('.aimsel'); if (!sel) return; const card = sel.closest('.subcard'), num = card.querySelector('[data-f="aim_deg"]');
+  if (sel.value !== 'x') num.value = sel.value; else if (num.value === '') num.value = '45';
+  v3AimRefresh(card); renderPlan(readRoom());
+});
+document.addEventListener('input', e => { const num = e.target.closest('[data-f="aim_deg"], .subcard [data-f="x_m"], .subcard [data-f="y_m"]'); if (!num) return; const card = num.closest('.subcard'); if (card) v3AimRefresh(card); });
+function v3Cab(rec, saved, fb) {                 // a cabinet's size in meters: what is typed in the form, else the saved room's (database or typical), else a fallback
+  const f = ['width_in', 'height_in', 'depth_in'].map(k => rec && rec[k] != null && rec[k] !== '' ? +rec[k] : null);
+  if (f[0] && f[1] && f[2] != null) return {w: f[0] * 0.0254, h: f[1] * 0.0254, d: f[2] * 0.0254, src: 'yours'};
+  if (saved && saved.w_m) return {w: saved.w_m, h: saved.h_m, d: saved.d_m, src: saved.source};
+  return {w: fb[0], h: fb[1], d: fb[2], src: 'typical'};
+}
 function v3Face(x, y, seat) { const t = seat && seat.x_m != null ? [seat.x_m - x, seat.y_m - y] : [0, 1]; return Math.hypot(t[0], t[1]) > 0.01 ? t : [0, 1]; }
 
 function v3Speakers(spk, r, ceil) {                              // [{id, x_m, y_m, z_m, kind: 'bed'|'height'}] -> solids
@@ -10,9 +42,10 @@ function v3Speakers(spk, r, ceil) {                              // [{id, x_m, y
   (spk || []).forEach(s => {
     if (s.x_m == null || s.y_m == null) return;
     const high = s.kind === 'height', rec = s.rec !== false && s.source !== 'suggested', fill = rec ? '#3b3f46' : '#6c717a';
-    const top = ceil(s.x_m, s.y_m), zc = high ? top - 0.12 : (s.z_m ?? ((r.speakers || {})[s.id] || {}).z_m ?? 1.1), h = high ? 0.18 : 0.42, w = high ? 0.2 : 0.24, d = high ? 0.2 : 0.28;
+    const cab = v3Cab((r.speakers || {})[s.id], ((S.hw_sizes || {}).speakers || {})[s.id], high ? [0.2, 0.18, 0.2] : [0.24, 0.42, 0.28]);
+    const top = ceil(s.x_m, s.y_m), zc = high ? top - cab.h / 2 : (s.z_m ?? ((r.speakers || {})[s.id] || {}).z_m ?? 1.1), h = Math.max(0.05, cab.h), w = Math.max(0.05, cab.w), d = Math.max(0.04, cab.d);
     const dir = high ? [0, 0] : v3Face(s.x_m, s.y_m, seat);
-    if (high) { out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, [0, 1]), z0: top - 0.2, z1: top, fill, alpha: rec ? 1 : 0.55}], label: s.id}); return; }
+    if (high) { out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, [0, 1]), z0: top - h, z1: top, fill, alpha: rec ? 1 : 0.55}], label: s.id}); return; }
     out.push({kind: 'solid', boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, w, d, dir), z0: Math.max(0, zc - h / 2), z1: zc + h / 2, fill, front: 2, alpha: rec ? 1 : 0.55}], label: s.id});
     if (zc - h / 2 > 0.25) out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, 0.05, 0.05, [0, 1]), z0: 0, z1: Math.max(0, zc - h / 2), fill: '#555a62', alpha: rec ? 0.7 : 0.3}]});   // a stand
   });
@@ -21,14 +54,19 @@ function v3Speakers(spk, r, ceil) {                              // [{id, x_m, y
 
 function v3Subs(r) {                                             // the subs: a cube with a cone on the face that looks at the main seat
   const seat = (r.seats || []).find(s => s.x_m != null && s.y_m != null);
-  return Object.entries(r.subs || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([o, s]) => ({kind: 'solid', label: `${+o + 1}`,
-    boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, 0.46, 0.46, v3Face(s.x_m, s.y_m, seat)), z0: 0, z1: 0.46, fill: css(SUBC[+o % 4]), front: 2, cone: 0.36}]}));
+  return Object.entries(r.subs || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([o, s]) => {
+    const cab = v3Cab(s, ((S.hw_sizes || {}).subs || {})[o], [0.46, 0.46, 0.46]), dir = v3Dir(s.aim_deg) || v3Face(s.x_m, s.y_m, seat);
+    return {kind: 'solid', label: `${+o + 1}`, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, cab.w, cab.d, dir), z0: 0, z1: cab.h, fill: css(SUBC[+o % 4]), front: 2, cone: 0.36}]}; });
 }
 
 function v3Seats(r) {                                            // a listener: head at ear height, a dashed line to the floor
   return (r.seats || []).filter(s => s.x_m != null && s.y_m != null).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m || 1.05, kind: 'seat'}));
 }
 
+function v3Inside(pl, x, y) {                    // is a floor point inside a polygon
+  let n = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) { if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) n = !n; }
+  return n;
+}
 function v3Slab(pts, z0, z1, fill, alpha) { return {pts, z0, z1, fill, alpha}; }
 function v3Tiles(a, b, zlo, zhi, t, n, cols, rows, fill, alpha) {  // a wall panel zone split into cols x rows slabs, a thickness t in front of the wall (n = the wall's outward normal)
   const out = [], gap = 0.012, L = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, d = [(b[0] - a[0]) / L, (b[1] - a[1]) / L], inw = [-n[0], -n[1]];
@@ -59,7 +97,8 @@ function v3Treatment(p, room) {                                  // the plan's i
     if (i.wall === 'ceiling') {
       const cx = (r.x0 + r.x1) / 2, cy = (r.y0 + r.y1) / 2, top = RoomView.ceilZ(room, cx, cy) - 0.04, w = r.x1 - r.x0, dd = r.y1 - r.y0;
       const cols = Math.max(1, Math.round(w / V3_PANEL[0])), rows = Math.max(1, Math.round(dd / V3_PANEL[1])), boxes = [];
-      for (let c = 0; c < cols; c++) for (let q = 0; q < rows; q++) boxes.push(v3Slab([[r.x0 + w * c / cols + 0.012, r.y0 + dd * q / rows + 0.012], [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * q / rows + 0.012],
+      const sf = (room.soffits || []).map(s => RoomView.soffitPoly(ol, s)).filter(Boolean), inSoffit = (x, y) => sf.some(pl => v3Inside(pl, x, y));
+      for (let c = 0; c < cols; c++) for (let q = 0; q < rows; q++) if (!inSoffit(r.x0 + w * (c + 0.5) / cols, r.y0 + dd * (q + 0.5) / rows)) boxes.push(v3Slab([[r.x0 + w * c / cols + 0.012, r.y0 + dd * q / rows + 0.012], [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * q / rows + 0.012],
         [r.x0 + w * (c + 1) / cols - 0.012, r.y0 + dd * (q + 1) / rows - 0.012], [r.x0 + w * c / cols + 0.012, r.y0 + dd * (q + 1) / rows - 0.012]], top - 0.1, top, fill, alpha));
       out.push({kind: 'solid', shadow: false, boxes}); return; }
     const zlo = z.b ? z.b[0] : 0.3, zhi = z.b ? z.b[1] : 2.1, hz = Math.max(0.2, zhi - zlo), t = Math.max(0.04, Math.min(0.3, (tIn + (i.gap_in || 0)) * 0.0254));

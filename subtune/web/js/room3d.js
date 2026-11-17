@@ -75,6 +75,7 @@
           const h = c.h || null;
           if (h) strip(c.s0, c.s1, h, 'wall');                  // the wall above a door, window or doorway
           if (c.kind === 'door') panel(c.s0, c.s1, 0, h || 2.03, 'door');
+          if (c.kind === 'double_door') { const m = (c.s0 + c.s1) / 2; panel(c.s0, m - 0.01, 0, h || 2.03, 'door'); panel(m + 0.01, c.s1, 0, h || 2.03, 'door'); }      // two leaves
           if (c.kind === 'window') panel(c.s0, c.s1, Math.min(0.9, (h || 2.1) - 0.4), h || 2.1, 'window');
           s = Math.max(s, c.s1);
         });
@@ -122,9 +123,12 @@
       // screen on the front wall's floor line, for orientation
       const fe = edges(pts).filter(e => e.n[1] < -0.9).sort((a, b) => a.a[1] - b.a[1] || b.len - a.len)[0];
       if (fe && room.screen) {       // the real screen, to size: a rectangle on the front wall (dashed and blue when acoustically transparent)
-        const sc = room.screen, w = Math.min(sc.width_m, fe.len), mid = Math.min(fe.len - w / 2, Math.max(w / 2, sc.x_m != null ? sc.x_m - fe.a[0] : fe.len / 2));
+        const sc = room.screen, w = Math.min(sc.width_m, Math.max(0.1, fe.len - 2 * (sc.frame_m || 0))), mid = Math.min(fe.len - w / 2, Math.max(w / 2, sc.x_m != null ? sc.x_m - fe.a[0] : fe.len / 2));
         const ix = -fe.n[0] * (sc.behind_m || 0), iy = -fe.n[1] * (sc.behind_m || 0), at = s => [fe.a[0] + fe.d[0] * s + ix, fe.a[1] + fe.d[1] * s + iy];
-        const z0 = sc.bottom_m || 0, z1 = z0 + sc.height_m, p0 = at(mid - w / 2), p1 = at(mid + w / 2);
+        const z0 = sc.bottom_m || 0, z1 = z0 + sc.height_m, p0 = at(mid - w / 2), p1 = at(mid + w / 2), fr = sc.frame_m || 0;
+        if (fr > 0.004) { const q0 = at(mid - w / 2 - fr), q1 = at(mid + w / 2 + fr);          // the frame: a darker border around the picture
+          path([P([q0[0], q0[1], z0 - fr]), P([q1[0], q1[1], z0 - fr]), P([q1[0], q1[1], z1 + fr]), P([q0[0], q0[1], z1 + fr])]);
+          ctx.fillStyle = '#25272b'; ctx.globalAlpha = 0.9; ctx.fill(); ctx.globalAlpha = 1; ctx.strokeStyle = C.text; ctx.lineWidth = 1; ctx.stroke(); }
         path([P([p0[0], p0[1], z0]), P([p1[0], p1[1], z0]), P([p1[0], p1[1], z1]), P([p0[0], p0[1], z1])]);
         ctx.globalAlpha = sc.at ? 0.25 : 0.8; ctx.fillStyle = sc.at ? C.accent : C.text; ctx.fill(); ctx.globalAlpha = 1;
         ctx.strokeStyle = sc.at ? C.accent : C.text; ctx.lineWidth = 2; ctx.setLineDash(sc.at ? [5, 3] : []); ctx.stroke(); ctx.setLineDash([]);

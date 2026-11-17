@@ -119,13 +119,13 @@ const SPK_KINDS = ['', 'tower', 'bookshelf', 'centre', 'on-wall', 'in-wall', 'in
 const ftOf = m => m == null ? '' : (m / 0.3048).toFixed(1);
 function renderSpeakers() {
   const chans = S.speaker_channels || [], rec = (S.room || {}).speakers || {};
-  const key = JSON.stringify([chans, rec]);
+  const key = JSON.stringify([chans, rec, (S.hw_sizes || {}).speakers]);
   if (key === spkKey || spkDirty || $('#spkOut').contains(document.activeElement)) return; spkKey = key;
   const done = chans.filter(c => (rec[c.ch] || {}).model).length;
   $('#spkSub').textContent = chans.length ? `${done} of ${chans.length} recorded` : '';
   if (!chans.length) { $('#spkOut').innerHTML = empty('Speaker layout not set', 'Set your layout (for example 7.1.4) in Setup → Checklist → Speakers and Dirac Live first.'); return; }
   const opt = (list, v) => list.map(x => `<option value="${x}" ${x === (v || '') ? 'selected' : ''}>${x || '–'}</option>`).join('');
-  $('#spkOut').innerHTML = `<div class="tw"><table class="dc-tbl spk-tbl"><thead><tr><th>Speaker</th><th>Model</th><th>Kind</th><th>Receiver size</th><th>Crossover</th><th title="From the receiver's Speaker Setup → Distance (it can't report these over the network)">Receiver distance</th><th title="From the receiver's Speaker Setup → Level Calibration">Receiver level</th><th>From left</th><th>From front</th><th>Height</th><th>Notes</th></tr></thead><tbody>
+  $('#spkOut').innerHTML = `<div class="tw"><table class="dc-tbl spk-tbl"><thead><tr><th>Speaker</th><th>Model</th><th>Kind</th><th>Receiver size</th><th>Crossover</th><th title="From the receiver's Speaker Setup → Distance (it can't report these over the network)">Receiver distance</th><th title="From the receiver's Speaker Setup → Level Calibration">Receiver level</th><th>From left</th><th>From front</th><th>Height</th><th title="The cabinet in inches: width, height, depth. Blank = from the hardware database, else a typical size">Size (in) W × H × D</th><th>Notes</th></tr></thead><tbody>
     ${chans.map(c => { const r = rec[c.ch] || {};
       return `<tr data-ch="${c.ch}"><td><b>${esc(c.name)}</b><div class="muted small">${c.ch}</div></td>
         <td><input data-f="model" value="${esc(r.model || '')}" placeholder="Make and model" style="min-width:150px"></td>
@@ -137,6 +137,7 @@ function renderSpeakers() {
         <td><span class="unit" data-u="ft"><input data-f="x_ft" type="number" step="0.1" min="0" value="${ftOf(r.x_m)}" style="width:84px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="y_ft" type="number" step="0.1" min="0" value="${ftOf(r.y_m)}" style="width:84px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="z_ft" type="number" step="0.1" min="0" value="${ftOf(r.z_m)}" style="width:84px"></span></td>
+        <td><span class="row" style="gap:4px;flex-wrap:nowrap"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${r.width_in ?? ''}" placeholder="W" style="width:60px" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${r.height_in ?? ''}" placeholder="H" style="width:60px" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${r.depth_in ?? ''}" placeholder="D" style="width:60px" aria-label="Depth in inches"></span>${(((S.hw_sizes || {}).speakers || {})[c.ch] || {}).source && !r.width_in ? `<div class="muted small">${esc(S.hw_sizes.speakers[c.ch].source)}</div>` : ''}</td>
         <td><input data-f="notes" value="${esc(r.notes || '')}" placeholder="Aim, mounting, amp…" style="min-width:140px"></td></tr>`; }).join('')}</tbody></table></div>`;
   $('#spkOut').querySelectorAll('input, select').forEach(x => x.oninput = () => { spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; });
 }

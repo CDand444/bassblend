@@ -175,6 +175,11 @@ the room and the main seat (feet from the left and front walls, height; azimuth 
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
 - Open rooms: a room that isn't enclosed (an open-plan living room, a large opening) is recorded as wall_openings of kind "opening": a whole wall open is an opening as wide as that wall (from_ft 0, width_ft = the wall's length). get_equipment shows enclosure (closed, partial or open, and which sides). In an open plan room treat the calculated room modes as a rough guide, expect the subs to need more output, and rely on measurements.
+- Sizes, aim and screen frame: get_equipment shows each sub's and speaker's cabinet size (sizes: from the owner, the hardware database, or a \
+typical size for its kind, and which) and each sub's aim_deg. Record real sizes with hw_save (width_in, height_in, depth_in) when you look a model up, \
+and tell the owner when a size is only typical. A sub's aim matters little for low bass, but one firing into a wall a few inches away is blocked and \
+boomy; suggest turning it into the room. The screen record has frame_in (the bezel or frame width): the plan keeps panels off the screen and its \
+frame, and off any soffit.
 - Home type: update_room records dwelling (house, townhouse, apartment or condo, the floor, who shares its floor, ceiling or walls, wood or concrete). get_equipment shows it with the neighbor level (low, some, close). Deep bass carries through floors and walls, so for shared buildings suggest a gentler bass target (a smaller house_db), tests at considerate hours, quiet hours (night mode on by itself), isolation feet under the subs and freestanding treatment instead of drilling. Ask before assuming; never claim a number of dB a neighbor will hear.
 - Screen, furniture and soffits: update_room also records the screen on the front wall (TV or projector screen: size, aspect, \
 acoustically transparent or not, speakers behind it), the couches and risers, and soffits (bulkheads) along the walls. They \
@@ -387,11 +392,11 @@ TOOLS = [
                  "shape (rect, l, alcove, cut, custom), wall_openings = the full list [{wall (0-based edge: edge i runs "
                  "from corner i to corner i+1; a rectangle's are 0 front, 1 right, 2 back, 3 left), from_ft (along that "
                  "edge from its first corner), width_ft, height_ft (omit = floor to ceiling), kind: opening (open to "
-                 "another space), door or window}], ceiling {kind flat|slope|vault, low_ft, low_side front|back|left|right "
+                 "another space), door, double_door (a pair, about 5 ft) or window}], ceiling {kind flat|slope|vault, low_ft, low_side front|back|left|right "
                  "(slope), ridge length|width (vault)}, soffits = the full list [{wall (same numbering as wall_openings), "
                  "from_ft, length_ft, depth_ft (how far it sticks out), bottom_ft (height of its underside)}]"},
         "screen": {"type": ["object", "null"], "description": "the TV or projector screen on the front wall (null removes it): kind (tv or "
-                   "projector), diagonal_in, aspect (16:9, 16:10, 4:3, 1.85:1, 2.35:1, 2.40:1), at (acoustically transparent: "
+                   "projector), diagonal_in, aspect (16:9, 16:10, 4:3, 1.85:1, 2.35:1, 2.40:1), frame_in (bezel or frame width, inches), at (acoustically transparent: "
                    "projector screens only), lcr_behind (front speakers behind it; needs at), bottom_ft (lower edge above the floor), "
                    "behind_ft (how far its face is in front of the wall), x_ft (its middle along the wall; omit = centered), notes"},
         "dwelling": {"type": ["object", "null"], "description": "what kind of home this is (null removes it): kind (house, townhouse, apartment, "
@@ -405,7 +410,9 @@ TOOLS = [
         "seat": {"type": "object", "description": "one seat to add or update, matched by name: name, x_ft, y_ft, z_ft (ear height)"},
         "seats": {"type": "array", "items": {"type": "object"}, "description": "replace the whole seat list (first = MLP)"},
         "subs": {"type": "object", "description": "1-based sub output -> fields: model, driver, enclosure, location, x_ft, y_ft, "
-                                                  "facing, role (main or nearfield), notes, controls {knob: value}"},
+                                                  "facing, aim_deg (which way it fires: degrees clockwise on the plan, 0 = at the back wall, 90 = the left wall, 180 = the "
+                                                  "screen, 270 = the right wall; omit or null = at the main seat), width_in, height_in, depth_in (the cabinet), "
+                                                  "role (main or nearfield), notes, controls {knob: value}"},
         "goals": {"type": "string"}, "avr": {"type": "string", "description": "receiver model and notes"}},
        []),
     _t("list_backups", "The saved backups (newest first): when, why, which htTamer version and what each holds. Keys, PIN and tokens "
@@ -453,8 +460,9 @@ TOOLS = [
        "change is journaled). Only works when the owner turned on 'Let the assistant build the hardware database'. "
        "receivers: brand, model, protocol (onkyo|denon|jbl|unknown), control_port, channels, sub_outputs, "
        "room_correction, notes, source_url. subs: brand, driver_in, amp_w, f3_hz, design (sealed|ported|passive radiator), "
-       "protect_hz (no EQ boost below this, ported designs), controls, notes, source_url. speakers: brand, kind, "
-       "sensitivity_db, impedance_ohm, low_hz, crossover_hz, notes, source_url. Only facts from the owner or a source "
+       "protect_hz (no EQ boost below this, ported designs), width_in, height_in, depth_in (the cabinet, from the spec sheet), "
+       "controls, notes, source_url. speakers: brand, kind, sensitivity_db, impedance_ohm, low_hz, crossover_hz, width_in, "
+       "height_in, depth_in, notes, source_url. Only facts from the owner or a source "
        "you cite; never guess numbers.",
        {"kind": {"type": "string", "enum": ["receivers", "subs", "speakers"]}, "model": {"type": "string"},
         "data": {"type": "object"}}, ["kind", "model", "data"]),

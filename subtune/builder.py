@@ -139,7 +139,7 @@ SCHEMA = {
             "properties": {"wall": {"type": "integer", "description": "0-based wall number"},
                            "from_ft": {"type": "number"}, "width_ft": {"type": "number"},
                            "height_ft": {"type": "number", "description": "0 = floor to ceiling"},
-                           "kind": {"type": "string", "enum": ["opening", "door", "window"]},
+                           "kind": {"type": "string", "enum": ["opening", "door", "double_door", "window"]},
                            "note": {"type": "string"}}}},
         "soffits": {"type": "array", "description": "bulkheads / drop ceilings along a wall (none: [])", "items": {
             "type": "object", "additionalProperties": False, "required": ["wall", "from_ft", "length_ft", "depth_ft", "bottom_ft"],
@@ -181,7 +181,7 @@ A cut-off (angled) corner replaces one corner with two. Use shape "rect", "l", "
 Walls are numbered from 0: wall i runs from corner i to corner i+1 (the last one back to corner 0); wall 0 is \
 the front wall. openings: every door, open doorway, opening to another room or open-plan space, and window, on \
 its wall, with from_ft = distance along that wall from its first corner, width_ft, height_ft (0 = floor to \
-ceiling), kind: "opening" (no wall there: open doorway, arch, open plan), "door" (a door, shut when watching) or \
+ceiling), kind: "opening" (no wall there: open doorway, arch, open plan), "door" (a single door, shut when watching), "double_door" (a pair of doors, about 5 ft wide) or \
 "window".
 
 height_ft is the highest point of the ceiling. ceiling.kind "flat" (then low_ft 0), "slope" (one sloping plane: \

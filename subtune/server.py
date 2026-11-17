@@ -1823,6 +1823,11 @@ class H(BaseHTTPRequestHandler):
             from .room import load_room, modal_report
             room = load_room()
             st["room"] = room
+            try:
+                from . import dims
+                st["hw_sizes"] = dims.sizes(room)
+            except Exception:                           # noqa: BLE001 - sizes are for drawing only
+                st["hw_sizes"] = {"subs": {}, "speakers": {}}
             st["modes"] = modal_report(room, 200)
             from .subouts import removed_in
             st["result_removed"] = removed_in(st.get("result"), s)   # the playing tune still drives a removed sub

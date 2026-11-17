@@ -19,7 +19,9 @@ SIZES = ("large", "small")
 SPK_FIELDS = {"model": str, "kind": str, "size": str, "crossover_hz": float, "x_m": float, "y_m": float, "z_m": float,
               "aim": str, "amp": str, "notes": str,
               # copied from the receiver's Speaker Setup menu (it can't report them over the network)
-              "rx_distance_m": float, "rx_level_db": float}
+              "rx_distance_m": float, "rx_level_db": float,
+              # the cabinet's size in inches (dims.py): the 3D views draw it, and the hardware database can supply it
+              "width_in": float, "height_in": float, "depth_in": float}
 TEXT_LEN = {"model": 80, "aim": 120, "amp": 120, "notes": 500}
 
 
@@ -71,6 +73,8 @@ def clean_speaker(ch: str, d: dict, old: dict | None = None) -> dict:
                 raise ValueError(f"{ch}: size (the receiver's speaker size setting) must be large or small")
         elif f == "crossover_hz":
             v = _num(v, 40, 250, f"{ch} crossover")
+        elif f in ("width_in", "height_in", "depth_in"):
+            v = _num(v, 0, 120, f"{ch} {f[:-3]}")
         elif f in ("x_m", "y_m"):
             v = _num(v, 0, 50, f"{ch} {f[0]} position")
         elif f == "z_m":
@@ -249,7 +253,7 @@ def summary() -> dict:
             "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
             "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},
             "room": r.get("room"), "enclosure": _enclosure(r), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"),
-            "dwelling": r.get("dwelling"), "neighbors": __import__("subtune.dwelling", fromlist=["x"]).profile(r),
+            "sizes": __import__("subtune.dims", fromlist=["x"]).sizes(r), "dwelling": r.get("dwelling"), "neighbors": __import__("subtune.dwelling", fromlist=["x"]).profile(r),
             "receiver": r.get("avr"), "goals": r.get("goals")}
 
 

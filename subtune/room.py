@@ -32,7 +32,9 @@ EMPTY = {
 
 SUB_FIELDS = {"model": str, "driver": str, "enclosure": str, "tuning_hz": float, "amp_w": float,
               "f3_hz": float, "location": str, "x_m": float, "y_m": float, "z_m": float,
-              "facing": str, "notes": str, "fixed": bool, "role": str}
+              "facing": str, "notes": str, "fixed": bool, "role": str,
+              "aim_deg": float,                                            # which way it fires: degrees clockwise on the plan, 0 = at the back wall (dims.py); blank = at the main seat
+              "width_in": float, "height_in": float, "depth_in": float}   # the cabinet, as the spec sheet gives it (dims.py)
 ROLES = ("main", "nearfield")
 
 
@@ -80,7 +82,11 @@ def save_room(body: dict) -> dict:
         d = {}
         for f, typ in SUB_FIELDS.items():
             v = s.get(f)
-            if typ is float:
+            if f == "aim_deg":
+                d[f] = None if v in (None, "") else round(_num(v, -3600, 3600) % 360, 1)
+            elif f in ("width_in", "height_in", "depth_in"):
+                d[f] = _num(v, 0, 120)
+            elif typ is float:
                 d[f] = _num(v, 0, 100000)
             elif typ is bool:
                 d[f] = bool(v)

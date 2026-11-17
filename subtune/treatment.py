@@ -222,9 +222,48 @@ def _seg_rect(e, z):
     return {"x0": x0, "x1": x1, "y0": y0, "y1": y1, "edge": e["i"], "n": [round(v, 3) for v in e["n"]]}
 
 
-OVERLAP_NOTE = {"window": "a window is in this area: panels can't go on glass, so use heavy curtains or a freestanding panel there",
+OVERLAP_NOTE = {"screen": "the screen is in this area: panels can't go on it, so use the space beside it, or put them behind an acoustically transparent screen",
+                "window": "a window is in this area: panels can't go on glass, so use heavy curtains or a freestanding panel there",
+                "double_door": "a double door is in this area: skip the panel over the doors, or use panels on the leaves themselves",
                 "door": "a door is in this area: skip the panel over the door, or use one on the door itself",
                 "opening": "part of this area is an opening to another space: there's no wall to treat there"}
+
+
+def _avoid_soffits(z, rm, margin=0.1):
+    """Trim a ceiling zone so it keeps clear of every soffit's footprint (plus a margin): keep the biggest piece left on either side.
+    Returns (zone, names of the soffits it had to clear). A zone with no room left is returned as it was (and the names say why)."""
+    names = []
+    for r in soffit.rects(rm):
+        xs, ys = [p[0] for p in r["poly"]], [p[1] for p in r["poly"]]
+        x0, x1, y0, y1 = min(xs) - margin, max(xs) + margin, min(ys) - margin, max(ys) + margin
+        (a0, a1), (b0, b1) = z["a"], z["b"]
+        if x1 <= a0 or x0 >= a1 or y1 <= b0 or y0 >= b1:
+            continue
+        names.append(r.get("name") or "a soffit")
+        cands = [((a0, min(a1, x0)), (b0, b1)), ((max(a0, x1), a1), (b0, b1)), ((a0, a1), (b0, min(b1, y0))), ((a0, a1), (max(b0, y1), b1))]
+        ok = [(((p[1] - p[0]) * (q[1] - q[0])), p, q) for p, q in cands if p[1] - p[0] > 0.05 and q[1] - q[0] > 0.05]
+        if not ok:
+            continue
+        _, p, q = max(ok, key=lambda c: c[0])
+        z = {**z, "a": [round(p[0], 2), round(p[1], 2)], "b": [round(q[0], 2), round(q[1], 2)]}
+        z["area_m2"] = round((p[1] - p[0]) * (q[1] - q[0]), 2)
+    return z, names
+
+
+def _avoid_screen(zfw, room, key, lo, hi):
+    """Keep front-wall panels off the screen and its frame: use the wider free side (or leave the zone and flag the overlap).
+    An acoustically transparent screen can have panels behind it, so nothing changes there."""
+    sc = room.get("screen")
+    fp = screen.front_footprint(room, hi - lo, lo) if sc and key == "x_m" and not sc.get("at") else None
+    if not fp or fp["z1"] <= zfw["b"][0] or fp["z0"] >= zfw["b"][1] or fp["x1"] <= zfw["a"][0] or fp["x0"] >= zfw["a"][1]:
+        return zfw, False
+    left, right = (zfw["a"][0], min(zfw["a"][1], fp["x0"] - 0.05)), (max(zfw["a"][0], fp["x1"] + 0.05), zfw["a"][1])
+    best = max((s for s in (left, right) if s[1] - s[0] >= PANEL[0]), key=lambda s: s[1] - s[0], default=None)
+    if not best:
+        return zfw, True
+    z = {**zfw, "a": [round(best[0], 2), round(best[1], 2)]}
+    z["area_m2"] = round((best[1] - best[0]) * (z["b"][1] - z["b"][0]), 2)
+    return z, False
 
 
 def _panels(area_m2):
@@ -638,6 +677,8 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     notes += screen.notes(room, seats)
     from . import dwelling
     notes += dwelling.treatment_notes(room)
+    from . import dims as cabinet
+    notes += cabinet.aim_notes(room)
     couch_notes(room, seats, rt, notes)
     notes += [n for n in (furniture.riser_note(room, s) for s in seats) if n]
     notes += furniture.riser_notes(room)
@@ -684,11 +725,17 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             overlap_note(z)
     # ceiling cloud
     z = _zone(refl.get("ceiling") or [], "ceiling", dims)
+    cleared = []
+    if z:
+        z, cleared = _avoid_soffits(z, rm)
     if z:
         add("ceiling_cloud", "Ceiling cloud over the seats", "cloud", "ceiling", z, _panels(z["area_m2"]), "2 x 4 ft",
             4, 6, "Less 'boxy' sound and clearer dialogue; with height speakers, keep it between the front and rear heights.",
             30, "The ceiling reflection is as strong as the side walls' and often the earliest one in rooms with low ceilings.",
             rect=_rect("ceiling", z, dims), points=refl.get("ceiling"))
+        if cleared:
+            notes.append(f"The ceiling cloud is kept clear of {', '.join(sorted(set(cleared)))}: the soffit hangs lower than the ceiling, so the cloud "
+                         "goes beside it. The underside of a soffit is a good place for a thin panel too.")
         if any(s["kind"] == "height" for s in spk.values()):
             notes.append("Don't cover the ceiling right under or in front of the height speakers; a cloud between them is fine.")
         if shape.ceiling(rm)["kind"] != "flat":
@@ -809,7 +856,10 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
             # Reuse the geometry from above
             zfw = {"axis": [key, "z_m"], "a": [round(lo, 2), round(hi, 2)], "b": [0.3, min(top, 1.5)], "area_m2": None}
             zfw["area_m2"] = round((hi - lo) * (zfw["b"][1] - zfw["b"][0]), 2)
+            zfw, blocked_by_screen = _avoid_screen(zfw, room, key, lo, hi)
             zfw.update(_edge_extra(fe, zfw))
+            if blocked_by_screen:
+                zfw["overlaps"] = sorted(set(zfw.get("overlaps", [])) | {"screen"})
             add("front_wall", "Front wall behind the speakers", "absorber", "front", zfw, 2 if fe["len"] < 4.5 else 3, "2 x 4 ft",
                 6, 4, "A little more body where the wall-bounce dip is, and a cleaner image depth. Moving the speakers helps more.",
                 15, "The wall behind the speakers bounces bass back that cancels the direct sound at one pitch." + why_suffix,

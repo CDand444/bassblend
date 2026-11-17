@@ -28,11 +28,15 @@ function subCard(o, s = {}, used) {
       <label class="f span2">Where it sits<input data-f="location" value="${v('location')}" placeholder="Front left corner, 8 in from each wall"></label>
       <label class="f">From left${ftInput('x_m', s.x_m)}</label>
       <label class="f">From front${ftInput('y_m', s.y_m)}</label>
+      <label class="f">Points at<select class="aimsel" aria-label="Which way the sub fires"><option value="">The main seat (auto)</option><option value="180">The screen (front wall)</option><option value="0">The back wall</option><option value="90">The left wall</option><option value="270">The right wall</option><option value="x">A custom angle</option></select></label>
+      <label class="f">Angle<span class="unit" data-u="°"><input data-f="aim_deg" type="number" step="5" min="0" max="359" value="${v('aim_deg')}" placeholder="auto" title="Degrees clockwise on the plan: 0 = at the back wall, 90 = the left wall, 180 = the screen, 270 = the right wall"></span></label>
+      <p class="small muted aiminfo span2" style="margin:0"></p>
       <label class="check span2" style="margin-top:2px"><input type="checkbox" data-f="fixed" ${s.fixed ? 'checked' : ''}> Can't be moved (AI works around this spot)</label>
     </div>
     <details><summary>More details</summary><div class="grid g2" style="margin-top:8px">
       <label class="f">Height of driver${ftInput('z_m', s.z_m, '1.0')}</label>
       <label class="f">Facing<input data-f="facing" value="${v('facing')}" placeholder="Into the room"></label>
+      <label class="f span2">Cabinet size (in): width, height, depth<span class="row" style="gap:6px"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${v('width_in')}" placeholder="W" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${v('height_in')}" placeholder="H" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${v('depth_in')}" placeholder="D" aria-label="Depth in inches"></span><small class="muted sizesrc"></small></label>
       <label class="f">Port tuning<span class="unit" data-u="Hz"><input data-f="tuning_hz" type="number" value="${v('tuning_hz')}"></span></label>
       <label class="f">Rated low end (F3)<span class="unit" data-u="Hz"><input data-f="f3_hz" type="number" value="${v('f3_hz')}"></span></label>
       <label class="f">Amp power<span class="unit" data-u="W"><input data-f="amp_w" type="number" value="${v('amp_w')}"></span></label>
@@ -129,6 +133,7 @@ function initRoom() {
   fuRender(r.furniture); scFill(r.screen); dwFill(r.dwelling);
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
+  document.querySelectorAll('#subRows .subcard').forEach(v3AimRefresh);
 }
 [$('#roomCard'), $('#subsCard')].forEach(c => c.addEventListener('input', () => renderPlan(readRoom())));
 async function subOutput(body, done) {
@@ -237,7 +242,8 @@ $('#plan').addEventListener('click', e => {
 });
 let roomShape = {outline: null, shape: 'rect', wall_openings: [], ceiling: null, soffits: []}, planDrag = null, planKey = null;
 const SHAPES = [['rect', 'Rectangle'], ['l', 'L-shape'], ['alcove', 'Alcove'], ['cut', 'Cut corner'], ['custom', 'Custom']];
-const OPEN_KINDS = [['opening', 'Opening (no wall)'], ['door', 'Door'], ['window', 'Window']];
+const OPEN_KINDS = [['opening', 'Opening (no wall)'], ['door', 'Door'], ['double_door', 'Double door'], ['window', 'Window']];
+const DOOR_WIDTH = {door: 0.9, double_door: 1.52};       // the usual widths when one is added: 3 ft, and 5 ft for a pair
 const rectPts = (W, L) => [[0, 0], [W, 0], [W, L], [0, L]];
 const outlineOf = rm => rm && rm.outline && rm.outline.length >= 3 ? rm.outline : (rm && rm.width_m && rm.length_m ? rectPts(rm.width_m, rm.length_m) : null);
 const extentOf = pts => [Math.max(...pts.map(p => p[0])), Math.max(...pts.map(p => p[1]))];
@@ -297,7 +303,9 @@ function renderShapeEditor() {
       <select data-ok="${j}" aria-label="What it is">${OPEN_KINDS.map(([k, n]) => `<option value="${k}" ${k === o.kind ? 'selected' : ''}>${n}</option>`).join('')}</select>
       <button type="button" class="btn icon ghost" data-odel="${j}" aria-label="Remove opening">${icon('x')}</button>
       <label class="f">From corner${ftIn(`data-of="${j}"`, o.from_m)}</label><label class="f">Width${ftIn(`data-owd="${j}"`, o.width_m)}</label><label class="f">Height${ftIn(`data-oh="${j}"`, o.height_m, 'full')}</label></div>`).join('')}
-    <button type="button" class="btn ghost" id="addOpening" ${es.length ? '' : 'disabled title="Enter the room size first"'}>Add opening</button></details>`;
+    <div class="row" style="gap:8px"><button type="button" class="btn ghost" id="addOpening" ${es.length ? '' : 'disabled title="Enter the room size first"'}>Add opening</button>
+      <button type="button" class="btn ghost" id="addDoor" data-kind="door" ${es.length ? '' : 'disabled'}>Add door</button>
+      <button type="button" class="btn ghost" id="addDoubleDoor" data-kind="double_door" ${es.length ? '' : 'disabled'}>Add double door</button></div></details>`;
   h += soEditorHtml(sh, es, ftIn);
   h += `<div class="row"><span class="muted small">Ceiling</span><select id="ceilK" aria-label="Ceiling"><option value="flat">Flat</option><option value="slope" ${c.kind === 'slope' ? 'selected' : ''}>Sloped</option><option value="vault" ${c.kind === 'vault' ? 'selected' : ''}>Vaulted (peaked)</option></select>`;
   if (c.kind === 'slope' || c.kind === 'vault') {
@@ -336,10 +344,12 @@ $('#shapeBox').addEventListener('click', e => {
   if (del) { const i = +del.dataset.cdel, pts = roomShape.outline; if (pts.length <= 3) return;
     const es = edgesOf(pts), prevLen = es[(i - 1 + pts.length) % pts.length].len;
     moveOpeningsOnRemove(i, prevLen); pts.splice(i, 1); roomShape.shape = 'custom'; setPts(pts); return; }
-  if (e.target.closest('#addOpening')) {
+  const addB = e.target.closest('#addOpening, #addDoor, #addDoubleDoor');
+  if (addB) {
+    const kind = addB.dataset.kind || 'door', w0 = DOOR_WIDTH[kind] || 0.9;
     const all = outlineOf({outline: roomShape.outline, width_m: toM($('#rW').value), length_m: toM($('#rL').value)});
-    const es = edgesOf(all), back = es.filter(x => x.side === 'back').sort((a, b) => b.len - a.len)[0] || es[0];
-    roomShape.wall_openings.push({wall: back.i, from_m: r3(Math.max(0, back.len / 2 - 0.45)), width_m: Math.min(0.9, r3(back.len)), height_m: 2.03, kind: 'door'});
+    const es = edgesOf(all), back = es.filter(x => x.side === 'back').sort((a, b) => b.len - a.len)[0] || es[0], w = Math.min(w0, r3(back.len));
+    roomShape.wall_openings.push({wall: back.i, from_m: r3(Math.max(0, back.len / 2 - w / 2)), width_m: w, height_m: 2.03, kind});
     renderShapeEditor(); renderPlan(readRoom()); return;
   }
   const od = e.target.closest('[data-odel]');
@@ -357,7 +367,7 @@ $('#shapeBox').addEventListener('input', e => {
 $('#shapeBox').addEventListener('change', e => {
   const t = e.target, d = t.dataset;
   if (d.ow != null) roomShape.wall_openings[+d.ow].wall = +t.value;
-  else if (d.ok != null) roomShape.wall_openings[+d.ok].kind = t.value;
+  else if (d.ok != null) { const o = roomShape.wall_openings[+d.ok]; o.kind = t.value; if (t.value === 'double_door' && o.width_m < 1.2) o.width_m = DOOR_WIDTH.double_door; else if (t.value === 'door' && o.width_m > 1.2) o.width_m = DOOR_WIDTH.door; }
   else if (t.id === 'ceilK') { roomShape.ceiling = t.value === 'flat' ? null : {kind: t.value, low_m: (roomShape.ceiling || {}).low_m ?? null, low_side: 'back', ridge: 'length'}; renderShapeEditor(); }
   else if (t.id === 'ceilSide') roomShape.ceiling.low_side = t.value;
   else if (t.id === 'ceilRidge') roomShape.ceiling.ridge = t.value;
@@ -447,6 +457,7 @@ function renderPlan(r) {
   (r.seats || []).forEach(s => { if (s.x_m == null || s.y_m == null) return;
     g += `<rect x="${X(s.x_m) - 8}" y="${Y(s.y_m) - 8}" width="16" height="16" rx="4" fill="var(--surface)" stroke="var(--text)" stroke-width="1.5"/><text x="${X(s.x_m)}" y="${Y(s.y_m) + 21}" text-anchor="middle" font-size="9.5" fill="var(--text-2)" stroke="var(--surface)" stroke-width="3" paint-order="stroke">${esc((s.name || '').replace(/^Seat\s*/i, 'S'))}</text>`; });
   Object.entries(r.subs || {}).forEach(([o, s]) => { if (s.x_m == null || s.y_m == null) return;
+    const dv = v3Dir(s.aim_deg); if (dv) g += `<line x1="${X(s.x_m) + dv[0] * 10}" y1="${Y(s.y_m) + dv[1] * 10}" x2="${X(s.x_m) + dv[0] * 24}" y2="${Y(s.y_m) + dv[1] * 24}" stroke="${css(SUBC[+o % 4])}" stroke-width="3" stroke-linecap="round"><title>Sub ${+o + 1} points this way</title></line><circle cx="${X(s.x_m) + dv[0] * 24}" cy="${Y(s.y_m) + dv[1] * 24}" r="3.5" fill="${css(SUBC[+o % 4])}"/>`;
     g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="10" fill="${css(SUBC[+o % 4])}" stroke="var(--surface)" stroke-width="2"/><text x="${X(s.x_m)}" y="${Y(s.y_m) + 4}" text-anchor="middle" font-size="10.5" font-weight="700" fill="#fff">${+o + 1}</text>`; });
   if (edit) {
     es.forEach(e => { const mx = X((e.a[0] + e.b[0]) / 2), my = Y((e.a[1] + e.b[1]) / 2);
@@ -553,6 +564,9 @@ function openingMarks(ops, es, X, Y, bg) {
     const ln = (sw, c, extra = '') => `<line x1="${X(x0)}" y1="${Y(y0)}" x2="${X(x1)}" y2="${Y(y1)}" stroke="${c}" stroke-width="${sw}"${extra}/>`;
     if (o.kind === 'opening') g += ln(5, bg) + ln(1.2, 'var(--text-3)', ' stroke-dasharray="3 3"');
     else if (o.kind === 'window') g += ln(5, bg) + ln(4, 'var(--s3)', ' stroke-opacity=".55"');
+    else if (o.kind === 'double_door') { const r = Math.hypot(X(x1) - X(x0), Y(y1) - Y(y0)) / 2, ix = -e.n[0], iy = -e.n[1], mx = (x0 + x1) / 2, my = (y0 + y1) / 2, sw = signedArea([[0, 0], e.d, [ix, iy]]) > 0 ? 1 : 0;
+      const leaf = (ax, ay, bx, by, flag) => `<path pointer-events="none" d="M${X(ax)} ${Y(ay)}L${X(ax) + ix * r} ${Y(ay) + iy * r}A${r} ${r} 0 0 ${flag} ${X(bx)} ${Y(by)}" fill="none" stroke="var(--text-3)" stroke-width="1"/>`;
+      g += ln(5, bg) + leaf(x0, y0, mx, my, sw) + leaf(x1, y1, mx, my, 1 - sw); }
     else { const r = Math.hypot(X(x1) - X(x0), Y(y1) - Y(y0)), ix = -e.n[0], iy = -e.n[1];
       g += ln(5, bg) + `<path pointer-events="none" d="M${X(x0)} ${Y(y0)}L${X(x0) + ix * r} ${Y(y0) + iy * r}A${r} ${r} 0 0 ${signedArea([[0, 0], e.d, [ix, iy]]) > 0 ? 1 : 0} ${X(x1)} ${Y(y1)}" fill="none" stroke="var(--text-3)" stroke-width="1"/>`; }
   });
@@ -797,7 +811,7 @@ async function renderHwdb(force) {
   const n = ['receivers', 'subs', 'speakers'].map(x => Object.keys(d[x] || {}).length);
   $('#hwSub').textContent = `${n[0]} receivers · ${n[1]} subs · ${n[2]} speakers`;
   const rows = ['receivers', 'subs', 'speakers'].flatMap(kind => Object.values(d[kind] || {}).map(e => ({kind, e})));
-  $('#hwList').innerHTML = rows.length ? `<table><tbody>${rows.map(({kind, e}) => `<tr><td class="muted" style="width:80px">${kind.slice(0, -1)}</td><td><b>${esc([e.brand, e.model].filter(Boolean).join(' '))}</b> ${esc(Object.entries(e).filter(([f]) => !['brand', 'model', 'who', 't', 'source_url', 'notes'].includes(f)).map(([f, v]) => f.replace(/_/g, ' ') + ' ' + v).join(' · '))}${e.source_url ? ` · <a href="${esc(e.source_url)}" target="_blank" rel="noopener">source</a>` : ''}<span class="muted"> · ${e.who === 'assistant' ? 'by the assistant' : 'by you'}</span></td><td style="width:70px"><button class="btn ghost" data-hwrm="${esc(kind)}|${esc(e.model)}">Remove</button></td></tr>`).join('')}</tbody></table>`
+  $('#hwList').innerHTML = rows.length ? `<table><tbody>${rows.map(({kind, e}) => `<tr><td class="muted" style="width:80px">${kind.slice(0, -1)}</td><td><b>${esc([e.brand, e.model].filter(Boolean).join(' '))}</b> ${esc(Object.entries(e).filter(([f]) => !['brand', 'model', 'who', 't', 'source_url', 'notes'].includes(f)).map(([f, v]) => f.replace(/_in$/, ' (in)').replace(/_/g, ' ') + ' ' + v).join(' · '))}${e.source_url ? ` · <a href="${esc(e.source_url)}" target="_blank" rel="noopener">source</a>` : ''}<span class="muted"> · ${e.who === 'assistant' ? 'by the assistant' : 'by you'}</span></td><td style="width:70px"><button class="btn ghost" data-hwrm="${esc(kind)}|${esc(e.model)}">Remove</button></td></tr>`).join('')}</tbody></table>`
     : '<p class="muted" style="margin:0">Nothing recorded yet. Tell the assistant your models, or turn the option on and it records them as they come up.</p>';
   $('#hwList').querySelectorAll('[data-hwrm]').forEach(b => b.onclick = async () => {
     const [kind, model] = b.dataset.hwrm.split('|'); if (!confirm(`Remove ${model} from the hardware database?`)) return;

@@ -8,6 +8,7 @@ records a model's specs. htTamer then uses them:
   receivers  protocol (onkyo | denon | jbl) -> which driver controls it
   subs       protect_hz (no EQ boost below, for ported designs) -> the optimizer and live EQ obey it
   speakers   specs the assistant uses for crossover and placement advice
+  subs, speakers   width_in, height_in, depth_in: the cabinet size, so the 3D views and the treatment plan know how big it is
 
 Every entry records where it came from (who, and a source URL when there is one) and every
 change is journaled, so nothing the assistant adds is invisible.
@@ -24,13 +25,13 @@ FIELDS = {
     "receivers": {"brand": str, "model": str, "protocol": str, "control_port": int, "channels": str,
                   "sub_outputs": int, "room_correction": str, "notes": str, "source_url": str},
     "subs": {"brand": str, "model": str, "driver_in": float, "amp_w": float, "f3_hz": float, "design": str,
-             "protect_hz": float, "controls": str, "notes": str, "source_url": str},
+             "protect_hz": float, "width_in": float, "height_in": float, "depth_in": float, "controls": str, "notes": str, "source_url": str},
     "speakers": {"brand": str, "model": str, "kind": str, "sensitivity_db": float, "impedance_ohm": float,
-                 "low_hz": float, "crossover_hz": float, "notes": str, "source_url": str},
+                 "low_hz": float, "crossover_hz": float, "width_in": float, "height_in": float, "depth_in": float, "notes": str, "source_url": str},
 }
 RANGES = {"control_port": (1, 65535), "sub_outputs": (0, 4), "driver_in": (4, 24), "amp_w": (0, 10000), "f3_hz": (5, 200),
           "protect_hz": (5, 60), "sensitivity_db": (70, 110), "impedance_ohm": (2, 16), "low_hz": (10, 300),
-          "crossover_hz": (40, 250)}
+          "crossover_hz": (40, 250), "width_in": (1, 120), "height_in": (1, 120), "depth_in": (0, 120)}
 
 
 def _file():

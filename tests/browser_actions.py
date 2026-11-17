@@ -108,6 +108,19 @@ def main():
             check("Riser: the 3D room view draws without errors", page.locator("#plan3dBox").is_visible())
             page.click("#planView [data-pv='2d']")
 
+            # ---- Sub aim and size: the pick sets the angle, the card says what it points at, the 3D sub turns and takes its size
+            page.evaluate("(() => { const c = document.querySelector('#subRows .subcard'); if (!c.querySelector('.aimsel')) { const k = [...document.querySelectorAll('#subRows .subadd')][0]; k && k.click(); } })()")
+            page.wait_for_timeout(1500)
+            has_sub = page.evaluate("!!document.querySelector('#subRows .subcard .aimsel')")
+            if has_sub:
+                page.evaluate("(() => { const c = document.querySelector('#subRows .subcard .aimsel').closest('.subcard'); const set = (f, v) => { const i = c.querySelector(`[data-f='${f}']`); i.value = v; i.dispatchEvent(new Event('input', {bubbles: true})); }; set('x_m', '2'); set('y_m', '5'); })()")
+                page.evaluate("(() => { const sel = document.querySelector('#subRows .subcard .aimsel'); sel.value = '90'; sel.dispatchEvent(new Event('change', {bubbles: true})); })()")
+                check("Sub aim: the pick sets the angle", page.evaluate("document.querySelector('#subRows .subcard [data-f=aim_deg]').value === '90'"))
+                check("Sub aim: the card says what it points at", until(page, "document.querySelector('#subRows .subcard .aiminfo').textContent.includes('Points at wall')"))
+                check("Sub aim: the 3D sub takes the angle and a typed size", page.evaluate("""(() => { const r = readRoom(); const k = Object.keys(r.subs)[0]; r.subs[k].width_in = 20; r.subs[k].height_in = 24; r.subs[k].depth_in = 22;
+                  const m = v3Subs(r)[0].boxes[0]; const xs = m.pts.map(p => p[0]), ys = m.pts.map(p => p[1]); return Math.abs((Math.max(...xs) - Math.min(...xs)) - 0.508) < 0.001 || Math.abs((Math.max(...ys) - Math.min(...ys)) - 0.508) < 0.001; })()"""))
+            page.wait_for_timeout(300)
+
             # ---- Turning the room: Mirror and Undo change the stored room and the form
             before = page.evaluate("S.room.furniture[1].x_m")
             page.click("#roTurn [data-op='cw']")

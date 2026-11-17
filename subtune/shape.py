@@ -11,7 +11,8 @@ Stored in room.json under "room":
                   only a label for the page.
   wall_openings   [{wall, from_m, width_m, height_m, kind}] on wall (edge) number `wall` (0-based,
                   edge i runs from corner i to corner i+1), starting `from_m` along it. kind:
-                  "opening" (open to another space: no wall there), "door" (a wall when shut),
+                  "opening" (open to another space: no wall there), "door" (a wall when shut), "double_door" (two
+                  leaves, usually 5 ft wide; a wall when shut),
                   "window" (glass: it reflects, but takes no panels). height_m None = floor to ceiling.
   ceiling         {"kind": "flat" | "slope" | "vault", "low_m": height at the low side,
                    "low_side": "front|back|left|right" (slope), "ridge": "length|width" (vault)}.
@@ -26,7 +27,7 @@ from __future__ import annotations
 import math
 
 SIDES = ("front", "right", "back", "left")
-KINDS = ("opening", "door", "window")
+KINDS = ("opening", "door", "double_door", "window")
 CEILINGS = ("flat", "slope", "vault")
 MAX_CORNERS = 16
 EPS = 1e-6

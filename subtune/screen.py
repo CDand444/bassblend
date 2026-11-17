@@ -2,7 +2,8 @@
 
 Stored in room["screen"] (None = not described): {kind: "tv"|"projector", diagonal_in, aspect, width_m, height_m (worked out
 from the diagonal and aspect), at (acoustically transparent: only a projector screen can be), lcr_behind (the front speakers
-stand behind it: needs at), bottom_m (its lower edge above the floor), behind_m (how far its face stands in front of the wall),
+stand behind it: needs at), frame_in (the width of the bezel or frame around the picture; frame_m is the same in meters,
+so the whole screen is outer_size_m()), bottom_m (its lower edge above the floor), behind_m (how far its face stands in front of the wall),
 x_m (its middle along the front wall, from the left; None = centered), notes}.
 It is drawn on the plan and in 3D and it adds a few plain notes to the treatment plan (viewing angle, what an acoustically
 transparent screen does to the speakers behind it). Nothing here plays sound or changes the receiver.
@@ -16,6 +17,8 @@ ASPECTS = {"16:9": 16 / 9, "16:10": 1.6, "4:3": 4 / 3, "1.85:1": 1.85, "2.35:1":
 DEFAULT_ASPECT = "16:9"
 DIAGONAL_IN = (20.0, 300.0)
 IN = 0.0254
+FRAME_IN = (0.0, 12.0)
+FRAME_DEFAULT_IN = {"tv": 0.5, "projector": 3.0}                   # a TV bezel is thin; a fixed-frame projector screen's frame is not
 GOOD_ANGLE = (30.0, 40.0)        # the usual viewing angle for movies (SMPTE about 30, THX about 36-40)
 SMALL_ANGLE, BIG_ANGLE = 26.0, 50.0
 
@@ -47,12 +50,32 @@ def clean(d) -> dict | None:
     w, h = size_m(diag, aspect)
     at = bool(d.get("at")) and kind == "projector"               # a TV can't pass sound through its panel
     x = d.get("x_m")
-    return {"kind": kind, "diagonal_in": diag, "aspect": aspect, "width_m": w, "height_m": h, "at": at,
+    frame_in = _num(d.get("frame_in"), *FRAME_IN, FRAME_DEFAULT_IN[kind])
+    return {"kind": kind, "frame_in": frame_in, "frame_m": round(frame_in * IN, 3), "diagonal_in": diag, "aspect": aspect, "width_m": w, "height_m": h, "at": at,
             "lcr_behind": bool(d.get("lcr_behind")) and at,
             "bottom_m": _num(d.get("bottom_m"), 0.0, 3.0, 0.8 if kind == "tv" else 0.5),
             "behind_m": _num(d.get("behind_m"), 0.0, 1.5, 0.05 if kind == "tv" else 0.15),
             "x_m": None if x in (None, "") else _num(x, 0.0, 50.0, None),
             "notes": str(d.get("notes") or "")[:300]}
+
+
+def outer_size_m(sc: dict) -> tuple[float, float]:
+    """(width, height) in meters of the whole screen: the picture plus its frame on every side."""
+    f = sc.get("frame_m") or 0.0
+    return round(sc["width_m"] + 2 * f, 3), round(sc["height_m"] + 2 * f, 3)
+
+
+def front_footprint(room: dict, wall_len: float, wall_start: float = 0.0) -> dict | None:
+    """Where the screen, frame included, covers the front wall: {x0, x1 (along the wall, from the room's left), z0, z1 (up from the floor), w, h}.
+    wall_len and wall_start describe the front wall's extent along x; the screen is centered unless it has an x_m."""
+    sc = room.get("screen")
+    if not sc or not wall_len:
+        return None
+    w, h = outer_size_m(sc)
+    mid = sc["x_m"] if sc.get("x_m") is not None else wall_start + wall_len / 2
+    x0, x1 = mid - w / 2, mid + w / 2
+    z0 = max(0.0, sc["bottom_m"] - (sc.get("frame_m") or 0.0))
+    return {"x0": round(max(wall_start, x0), 3), "x1": round(min(wall_start + wall_len, x1), 3), "z0": round(z0, 3), "z1": round(z0 + h, 3), "w": w, "h": h}
 
 
 def viewing_angle(width_m: float, distance_m: float) -> float | None:
@@ -68,6 +91,11 @@ def notes(room: dict, seats: list[dict]) -> list[str]:
     if not sc:
         return []
     out = []
+    ow, oh = outer_size_m(sc)
+    wall_w = (room.get("room") or {}).get("width_m")
+    share = f", about {ow * oh / (wall_w * ((room.get('room') or {}).get('height_m') or 2.4)) * 100:.0f}% of the front wall" if wall_w else ""
+    out.append(f"With its {sc.get('frame_in', 0):.1f} in frame the screen is {ow / 0.3048:.1f} x {oh / 0.3048:.1f} ft{share}: "
+               "that part of the front wall can't take panels" + (" (panels can go behind it: it is acoustically transparent)." if sc.get("at") else "."))
     seat = next((s for s in seats if s.get("y_m") is not None), None)
     if seat:
         dist = seat["y_m"] - sc.get("behind_m", 0.0)

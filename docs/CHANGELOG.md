@@ -1,5 +1,13 @@
 # htTamer changelog
 
+## Nov 18, 2026 - cabinet sizes, sub aim, screen frame, soffit-aware treatment
+
+- **Double door** in the openings catalog (Room → shape → Openings, doors and windows): an Add double door button (5 ft, two leaves on the plan and in 3D), the same panel advice as a door, and the phone builder and assistant know it.
+- **Ceiling treatment respects soffits**: the ceiling cloud is trimmed to stay clear of every soffit (the plan says which), and the 3D view leaves no tile where one hangs.
+- **Sub aim**: each sub has a "Points at" pick and an angle (0 = back wall, 90 = left, 180 = screen, 270 = right; blank = at the main seat). The plan shows an arrow, the 3D sub turns to face it, the card says which wall it points at and how far, and the treatment plan warns when one fires into a wall a few inches away.
+- **Cabinet sizes**: subs and speakers take a width, height and depth in inches, from you, from the hardware database (new fields on subs and speakers, which the assistant can fill in), or a labeled typical size. The 3D views draw the real size.
+- **Screen frame**: the screen has a frame or bezel width; the plan, the 3D view and the treatment plan use the whole outer size, and front-wall panels stay off the screen and its frame (unless it is acoustically transparent).
+
 ## Nov 18, 2026 - a better 3D view, treatment in 3D, risers
 
 - **Treatment in 3D**: the Treatment page has a Plan / 3D switch. Wall panels, ceiling clouds, the rug and corner traps are drawn where the plan puts them, with your couches, speakers and subs.
