@@ -56,7 +56,13 @@ jobs:
         run: pyinstaller deploy/windows/httamer.spec --noconfirm
       - name: Smoke-test the bundle
         shell: bash
-        run: ./dist/htTamer/htTamer.exe -m subtune --help > /dev/null
+        run: |
+          ./dist/htTamer/htTamer.exe -m subtune --help > /dev/null
+          # the silent check with nothing plugged in: it must still run, find the bundled miniDSP tool and load the audio library
+          out=$(./dist/htTamer/htTamer.exe -m subtune smoke 2>&1 || true)
+          echo "$out"
+          echo "$out" | grep -q "miniDSP" || { echo "the silent check printed no miniDSP line"; exit 1; }
+          if echo "$out" | grep -qi "control tool missing\|No module named\|ImportError\|Traceback\|PortAudio library not found"; then echo "the bundle is missing a part"; exit 1; fi
       - name: Installer (Inno Setup)
         run: '& "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /DAppVersion=$env:VER deploy\windows\httamer.iss'
       - name: Attach to the release

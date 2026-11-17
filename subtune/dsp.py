@@ -33,18 +33,38 @@ BUSY_TRIES = 4
 def device_lock():
     with _THREAD_LOCK:
         f = None
-        if not IS_WINDOWS:
-            try:
+        try:
+            DATA.mkdir(parents=True, exist_ok=True)
+            if IS_WINDOWS:
+                import msvcrt
+                f = open(DATA / ".minidsp.lock", "a+b")
+                deadline = time.time() + 120                 # Windows has no blocking file lock: ask again until it is free
+                while True:
+                    try:
+                        f.seek(0)
+                        msvcrt.locking(f.fileno(), msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError:
+                        if time.time() > deadline:
+                            break                            # something is wrong with the other holder: carry on, the busy retries cover it
+                        time.sleep(0.05)
+            else:
                 import fcntl
-                DATA.mkdir(parents=True, exist_ok=True)
                 f = open(DATA / ".minidsp.lock", "a")
                 fcntl.flock(f, fcntl.LOCK_EX)
-            except OSError:
-                f = None
+        except OSError:
+            f = None
         try:
             yield
         finally:
             if f:
+                if IS_WINDOWS:
+                    try:
+                        import msvcrt
+                        f.seek(0)
+                        msvcrt.locking(f.fileno(), msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
                 f.close()
 
 

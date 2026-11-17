@@ -1,5 +1,14 @@
 # htTamer changelog
 
+## Nov 17, 2026 - Windows: HDMI, the miniDSP lock and wording
+
+- **No Pi wording off the Pi**: pages, messages, the assistant and the CLI say "this computer" unless htTamer runs on a Raspberry Pi.
+- **PC HDMI on Windows**: receiver tests, including the 7.1 all-speakers check, can play through the PC's own HDMI output (WASAPI), with
+  an output chooser, a 7.1 setup hint and a swap for surround and surround back. The silent check tests it.
+- **miniDSP lock on Windows**: commands from different processes (a job and the live EQ) now wait for each other, as on Linux.
+- **Firewall help** has a Copy button; the release build's smoke test now runs the silent check and fails if the bundle is missing the
+  miniDSP tool or the audio library.
+
 ## Nov 16, 2026 (night) - a beginner view, one results screen, readiness
 
 Built and tested offline and in a browser against copies of real results; the real-hardware protocol is in `docs/dev/HARDWARE_VALIDATION.md`.

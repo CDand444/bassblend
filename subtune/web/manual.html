@@ -11,6 +11,7 @@
   <a href="#m-report">System report and fixes</a>
   <a href="#m-fixes">What htTamer changed</a>
   <a href="#m-measure">Other tests</a>
+  <a href="#m-windows">On Windows</a>
   <a href="#m-views">Basic and Advanced</a>
   <a href="#m-results">Results and readiness</a>
   <a href="#m-open">Rooms that aren't enclosed</a>
@@ -189,6 +190,9 @@
 </ul>
 
 <p><b>Soffits</b>: a soffit (bulkhead or drop ceiling) is a box along a wall that lowers the ceiling there, common around the screen or over ducts. Under <b>Soffits</b> in the shape block, add one, pick its wall, then set where it starts along the wall, how long it is, how far it sticks out and how high its underside is. A soffit longer than its wall is trimmed to the wall, and its ends are cut by the walls beside it, so next to an angled wall it blends into that wall. The plan draws it hatched and the 3D view as a box under the ceiling. Height speaker spots under it sit at its underside, and when a soffit runs along the front wall the treatment plan adds a note about in-ceiling and height speakers close to that wall. Soffits are small, so the bass (room mode) numbers ignore them. Turning the room turns the soffits with it. Pointing at or clicking into a soffit, opening or corner row in the shape block lights it up on the plan (the wall it is on gets a bar, the soffit or opening itself is filled in), so you can see where a number belongs.</p>
+
+<h2 id="m-windows">On Windows: HDMI, the mic and the miniDSP</h2>
+<p>The Windows app measures with the UMIK-1 and writes the miniDSP over USB with no driver. For tests that play through the receiver it can use <b>this computer's own HDMI output</b>: plug the PC's HDMI cable into a receiver input and pick that input on the test page (<i>This computer plugged into</i>). htTamer finds the HDMI audio output by itself; the <b>Audio output</b> list lets you choose another one. For the 7.1 tests (the all-speakers check) set that output to <b>7.1 surround</b> in Windows (Sound settings, the output, Configure speakers): the page says so when it is set to fewer channels. If the receiver shows the surround and surround-back speakers swapped, tick <b>Swap surround and surround back</b>. Without HDMI, the receiver's network player (stereo) or a USB stick still work. If the receiver can't fetch a test file over the network, Windows Firewall may be blocking it: the help on that page has a command to copy and run once as administrator.</p>
 
 <h2 id="m-views">Basic and Advanced</h2>
 <p>The <b>Basic / Advanced</b> switch at the top changes how much you see. <b>Basic</b> shows only <b>Home</b>, <b>Setup</b>, <b>Calibrate</b>, <b>Results</b> and <b>Compare</b> (the blind A/B test), and hides the acoustic analysis pages and the header's extras until you ask for them: press <b>Show all pages</b> or switch to <b>Advanced</b>. Every page is still one click away from a link (for example "Open" on the readiness panel), and the page you are on stays in the menu. A new system starts in Basic; a system that has already been calibrated keeps the full Advanced view. Each device remembers its own choice.</p>

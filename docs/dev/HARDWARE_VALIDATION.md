@@ -23,11 +23,24 @@ by the guarded auto-level; the receiver is put back exactly as it was.
 | 1.3 | Accept the notice, choose a PIN, press **Run the silent check** on Home. | miniDSP, Mic and Storage show Ready (the silent check plays nothing) |
 | 1.4 | Home should open in **Basic** with the **Your first calibration** card. | Basic menu: Home, Setup, Calibrate, Results, Compare |
 
+## 1b. The Windows installer (same protocol on a clean Windows 10/11 machine)
+
+Run the installer from the release on a PC that has never had htTamer or Python, with the miniDSP and UMIK-1 plugged in.
+
+| Step | Do | Pass when |
+|---|---|---|
+| W.1 | Install (no admin needed), start htTamer, **Run the silent check**. | miniDSP Ready (no driver prompt), Mic Ready, Storage Ready |
+| W.2 | Plug the PC's HDMI cable into a receiver input. In Windows Sound settings pick that output, **Configure speakers**, choose 7.1. | the check's HDMI row reads "<output>, 8 channels" |
+| W.3 | Blend test and Speaker check with **PC HDMI**; pick the receiver input the PC is plugged into. | all channels are heard; **front left, center, right, surrounds and backs are the right speakers** (if the receiver shows surround and surround back swapped, tick *Swap surround and surround back*, then repeat once) |
+| W.4 | Start a calibration and, while it runs, open the Live EQ page and apply a change. | no "resource busy" errors in Activity: the miniDSP calls queue behind each other |
+| W.5 | If a network test can't reach the receiver: run the firewall command from the help (Copy the command; PowerShell as administrator). | the receiver fetches the test file |
+
 ## 2. USB devices and HDMI routing
 
 - Unplug and replug the UMIK-1 and the miniDSP once each; run the silent check again. Both come back without restarting anything.
 - Plug the Pi's micro-HDMI port (next to the USB-C power) into a receiver HDMI input; pick that input once on a test page.
-  **Pi HDMI** shows Ready; the all-speakers check ("Speaker check") later plays through it.
+  **HDMI** shows Ready; the all-speakers check ("Speaker check") later plays through it. (On Windows the PC's own HDMI output plays;
+  see 1b.)
 - Pass when: each device is found by name every time, and a wrong or missing cable shows a clear message instead of a hang.
 
 ## 3. First calibration (Basic mode, no room details entered)

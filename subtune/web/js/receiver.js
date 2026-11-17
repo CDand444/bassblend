@@ -311,6 +311,11 @@ function wireMulti(m) {
   });
 }
 
+document.addEventListener('click', async e => {
+  if (!e.target.closest('[data-copyfw]')) return;
+  const t = $('#fwCmd'), m = $('#fwMsg');
+  try { await navigator.clipboard.writeText(t.textContent); m.textContent = 'Copied. Paste it into PowerShell opened with Run as administrator.'; } catch (err) { m.textContent = 'Copy is blocked here: select the command above and copy it.'; }
+});
 function firewallHelp() {
   const py = AVR.python || 'C:\\path\\to\\python.exe', host = AVR.host || '<receiver IP>', port = AVR.media_port || 8790;
   const cmd = `# Run in PowerShell as Administrator. Lets ONLY your receiver (${host}) fetch htTamer's test file on port ${port}.
@@ -318,7 +323,7 @@ Get-NetFirewallApplicationFilter | Where-Object Program -eq '${py}' | Get-NetFir
 New-NetFirewallRule -DisplayName 'htTamer: receiver fetches test file' -Direction Inbound -Action Allow -Protocol TCP -LocalPort ${port} -RemoteAddress ${host} -Program '${py}'`;
   return `<details style="margin-top:10px" open><summary class="small" style="cursor:pointer"><b>How to let the receiver reach htTamer</b></summary>
     <p class="small" style="margin:8px 0 0">Windows Firewall is blocking Python from accepting connections. This keeps everything blocked except your receiver, on one port:</p>
-    <pre class="cmd">${esc(cmd)}</pre><p class="muted small" style="margin:0">Or skip this and use the USB stick option.</p></details>`;
+    <pre class="cmd" id="fwCmd">${esc(cmd)}</pre><div class="row" style="gap:8px;align-items:center"><button type="button" class="btn ghost" data-copyfw>Copy the command</button><span class="muted small" id="fwMsg">Paste it into PowerShell opened with Run as administrator. Or skip this and use the USB stick option${HW().win ? ' or this computer’s HDMI' : ''}.</span></div></details>`;
 }
 document.querySelectorAll('#blendSpk button').forEach(b => b.onclick = () => {
   blendSpk = b.dataset.s; document.querySelectorAll('#blendSpk button').forEach(x => x.classList.toggle('on', x === b)); blendKey = null; renderBlend();
