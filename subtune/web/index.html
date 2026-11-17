@@ -110,6 +110,22 @@ main { min-width: 0; padding: 22px 32px 64px; }
 .jump button { border: 1px solid var(--border); background: var(--surface-2); color: var(--text-2); border-radius: 999px; padding: 3px 12px; font-size: 12.5px; cursor: pointer; }
 .jump button:hover { color: var(--text); border-color: var(--border-strong); }
 @media (max-width: 900px) { .jump { top: 0; } }
+.rs-head h2 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
+.rs-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; margin-top: 16px; align-items: start; }
+@media (max-width: 900px) { .rs-grid { grid-template-columns: minmax(0, 1fr); } }
+.rs-chart h3, .rs-list h3 { font-size: 13.5px; margin: 0 0 6px; }
+.rs-chart .chart { height: 300px; }
+.rs-secs { display: flex; flex-direction: column; gap: 10px; }
+.rs-sec { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); }
+.rs-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 13px; }
+.rs-h { font-weight: 650; margin: 6px 0 2px; }
+.rs-nums { display: flex; gap: 8px; align-items: baseline; font-size: 17px; }
+.rs-chip { font-size: 11.5px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--text-2); }
+.rs-chip.good { background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.rs-chip.bad { background: color-mix(in srgb, var(--bad) 16%, transparent); color: var(--bad); }
+.rs-chip.meh { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.rs-lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 18px; }
+.rs-list ul { margin: 0; padding-left: 18px; font-size: 13.5px; } .rs-list.good h3 { color: var(--good); } .rs-list.bad h3 { color: var(--bad); }
 .pl-grid { display: grid; grid-template-columns: minmax(280px, 480px) minmax(0, 1fr); gap: 22px; align-items: start; }
 @media (max-width: 900px) { .pl-grid { grid-template-columns: minmax(0, 1fr); } }
 .view-head { display: flex; align-items: center; gap: 10px; margin: 0 0 16px; min-height: 32px; flex-wrap: wrap; }
@@ -1106,6 +1122,11 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div id="ckOut" style="margin-top:16px"></div>
     </section>
 
+    <section class="card" id="resCard">
+      <div class="card-h"><h2>Results</h2><span class="sub">did the calibration help?</span></div>
+      <div id="resOut"></div>
+    </section>
+
     <section class="card" id="deepCard">
       <div class="card-h"><h2>System report</h2><span class="grow"></span><button class="btn ghost" id="dcPrint" hidden title="Opens the print dialog; choose “Save as PDF” to keep a copy">Print / Save as PDF</button><button class="btn ghost ask" data-ask="Walk me through my latest system report. What matters most, what should I do first, and what can I ignore?">Ask about this</button></div>
       <p class="lead">A full-range check of your front speakers and subs, the way you listen: a 20 Hz to 20 kHz sweep on the left speaker, the right, then both. About a minute. It finds things that are hard to hear on your own (polarity, timing, reflections, resonances, how long the room rings, distortion, noise) and says what each means and what to do.</p>
@@ -1405,6 +1426,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/receiver.js?v=__V__"></script>
 <script src="/js/measure.js?v=__V__"></script>
 <script src="/js/channels.js?v=__V__"></script>
+<script src="/js/results.js?v=__V__"></script>
 <script src="/js/setup-home.js?v=__V__"></script>
 <script src="/js/liveeq.js?v=__V__"></script>
 <script src="/js/nav.js?v=__V__"></script>

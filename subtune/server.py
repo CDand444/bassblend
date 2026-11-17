@@ -1712,6 +1712,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, self._setup_status())
         if u.path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):
             return self._send(200, (WEB_DIR / "logo.svg").read_bytes(), "image/svg+xml")
+        if u.path == "/api/results":                   # did the calibration help: before and after, in plain words (reads stored results only)
+            from . import results
+            return self._send(200, results.build(load_state()))
         if u.path in ("/api/channels", "/channels"):    # every-channel report and receiver setup sheet (nothing measured or changed)
             from . import channels, dirac, equip
             data = channels.for_state(load_state(), equip.speakers(), dirac.system(), load_settings().get("avr_make", "Onkyo"))

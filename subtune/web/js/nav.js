@@ -42,7 +42,7 @@ const SECTIONS = [
   {grp: 'Home', icon: 'home', first: 'home'},
   {grp: 'Survey', icon: 'gear', first: 'setup'},
   {grp: 'Tune', icon: 'tune', first: 'wizard'},
-  {grp: 'Verify', icon: 'report', first: 'report'},
+  {grp: 'Verify', icon: 'report', first: 'results'},
   {grp: 'Tools', icon: 'chip', first: 'measured'},
 ];
 const MENU = [
@@ -67,6 +67,8 @@ const MENU = [
    tag: () => (S.avr_blend_status || {}).running ? ['…', ''] : S.avr_blend ? [S.avr_blend.loss_now_db < 1 ? '✓' : '!', S.avr_blend.loss_now_db < 1 ? '' : 'alert'] : null},
   {grp: 'Tune', key: 'liveeq', beta: true, icon: 'eq', title: 'Live EQ', full: 'Live EQ', el: $('#leqCard'),
    tag: () => (S.live_rta_status || {}).running ? ['● live', 'live'] : (S.live_eq || {}).active ? [(S.live_eq || {}).bypass ? 'bypassed' : 'on', ''] : null},
+  {grp: 'Verify', key: 'results', icon: 'match', title: 'Results', full: 'Results: before and after', el: $('#resCard'),
+   tag: () => null},
   {grp: 'Verify', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
   {grp: 'Verify', key: 'allspk', beta: true, icon: 'speakers', title: 'Speaker check', full: 'Speaker levels, distances and LFE', el: $('#allCard'), tag: () => null},
@@ -210,7 +212,7 @@ function safe(name, fn) {
 let polling = false;
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
-  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'receiver.js': 'renderBlend',
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'soffit.js': 'soRect', 'screen.js': 'scRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'receiver.js': 'renderBlend',
                 'measure.js': 'renderDeep', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {
@@ -277,7 +279,7 @@ async function poll() {
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
-      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters};
+      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults};
     for (const [n, f] of Object.entries(parts)) safe(n, () => f());
     safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }
