@@ -107,7 +107,7 @@ def secrets_check(path: Path) -> None:
 def make(reason: str = "manual") -> Path:
     """Write a new backup, check it holds no secret, rotate old ones, copy it off the device. Returns its path."""
     from .state import event, load_state
-    tag = {"manual": "", "before update": "-update", "before restore": "-restore", "weekly": "-weekly"}.get(reason, "")
+    tag = {"manual": "", "before update": "-update", "before restore": "-restore", "weekly": "-weekly", "before AI change": "-ai"}.get(reason, "")
     with _lock:
         folder().mkdir(parents=True, exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -210,9 +210,11 @@ def rotate(keep: int = KEEP, where: Path | None = None) -> None:
     """Keep the newest `keep` backups; the most recent one made before an update always stays."""
     base = where or folder()
     files = sorted((p for p in base.glob("htTamer-backup-*.zip") if NAME_RE.match(p.name)), key=lambda p: p.stat().st_mtime, reverse=True)
-    pre = next((p for p in files if "-update" in p.stem), None)
+    # the newest of each kind that matters stays whatever else is made: an update, a weekly, a manual one (frequent AI-change copies must not push those out)
+    protect = {next((p for p in files if p.stem.endswith(t)), None) for t in ("-update", "-weekly")}
+    protect.add(next((p for p in files if not re.search(r"-(update|weekly|ai|restore)$", p.stem)), None))
     for p in files[keep:]:
-        if p != pre:
+        if p not in protect:
             p.unlink(missing_ok=True)
 
 
@@ -324,6 +326,25 @@ def save_upload(raw: bytes) -> Path:
     finally:
         tmp.unlink(missing_ok=True)
     return dest
+
+
+AI_GAP_S = 600                                                      # one copy covers a stretch of AI edits: another is made after 10 quiet minutes
+_last_ai = 0.0
+
+
+def before_ai_change() -> Path | None:
+    """A backup taken just before the AI assistant (or an AI client) changes anything stored, at most one per AI_GAP_S. Returns it, or None when a recent one still covers this."""
+    global _last_ai
+    with _lock:
+        if time.time() - _last_ai < AI_GAP_S:
+            return None
+        _last_ai = time.time()
+    try:
+        return make("before AI change")
+    except Exception:
+        with _lock:
+            _last_ai = 0.0
+        raise
 
 
 def weekly_loop() -> None:

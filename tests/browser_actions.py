@@ -242,6 +242,16 @@ def main():
               const cv = document.querySelector('#sf3dCanvas'); const ok = !!SF.s3 || !document.querySelector('#sf3dNote').hidden;
               SF.view = 'plan'; SF.treble = false; sfRefresh(); return ok && SF.paths.length === 0 && !!SF.fields.plan; })()""") is True)
 
+            check("Sound field with / without / compare: the bare room's bounces are louder, and compare lays both side by side", page.evaluate("""(() => {
+              const keep = S.treatment; S.treatment = {items: [{id: 'p1', kind: 'absorber', wall: 'left', thickness_in: 4, rect: {x0: 0, x1: 0.1, y0: 0, y1: 6}, zone: {b: [0, 2.5]}}]};
+              SF.room = {W: 4, L: 6, H: 2.5, subs: [], speakers: [{ch: 'FL', x: 1, y: 0.4, z: 1.1, dir3: null}], seat: {x: 2, y: 4, z: 1.05}, construction: 'drywall', structure: 'unknown', irregular: false};
+              SF.modes = sfModes(SF.room); SF.view = 'plan'; SF.bass = false; SF.treble = true; SF.spk = 'FL'; SF.ft = 2000; SF.key = null;
+              const left = () => SF.paths.find(p => p.order === 1 && p.surf[0] === 'x0').level_db;
+              SF.treat = 'with'; sfRefresh(); const w = left(), nb = SF.bare.length;
+              SF.treat = 'without'; sfRefresh(); const wo = left(), nb2 = SF.bare.length;
+              SF.treat = 'both'; sfRefresh(); const nb3 = SF.bare.length, tbl = document.querySelector('#sfChart').textContent;
+              SF.treat = 'with'; SF.treble = false; SF.bass = true; sfRefresh(); S.treatment = keep;
+              return (w < wo - 6 && nb === 0 && nb2 === 0 && nb3 > 0 && tbl.includes('Without treatment') && tbl.includes('All reflections together')) || JSON.stringify([w, wo, nb, nb2, nb3]); })()""") is True)
             check("Height and atmos speakers: sensible default aims, a custom 3D aim is honored, beams are drawn, and the page matches the Python rules", page.evaluate("""(() => {
               const seat = {x: 2, y: 4, z: 1.05}, H = 2.4, pos = {x: 0.8, y: 1.2, z: 2.4};
               const down = v3Aim3('TFL', {kind: 'in-ceiling'}, pos, seat, H); if (down.mode !== 'down' || down.v[2] !== -1 || down.off < 60 || down.off > 72) return 'down ' + JSON.stringify(down);
@@ -388,6 +398,12 @@ def main():
             # ---- Room card: flooring and the modeler
             page.evaluate("openSheet('room')")
             page.wait_for_timeout(500)
+            check("Sub card: the model drop-down lists the database, and picking one fills size, driver and ratings", until(page, "SUB_DB && SUB_DB.length > 10", 6000) and page.evaluate("""(() => {
+              const sel = document.querySelector('#subRows .subcard:not(.off) [data-pick="submodel"]'); if (!sel) return 'no used sub card';
+              if (![...sel.options].some(o => o.value === 'PB-2000 Pro')) return 'PB-2000 Pro is not in the list';
+              sel.value = 'PB-2000 Pro'; sel.dispatchEvent(new Event('change', {bubbles: true}));
+              const card = sel.closest('.subcard'), g = f => card.querySelector(`[data-f="${f}"]`).value;
+              return g('model') === 'PB-2000 Pro' && g('driver') === '12"' && g('enclosure') === 'ported' && +g('width_in') === 17.3 && +g('height_in') === 20.9 && +g('depth_in') === 23.6 && +g('amp_w') === 550 && +g('f3_hz') === 16 && card.querySelector('input[data-f="model"]').hidden || JSON.stringify([g('model'), g('driver'), g('enclosure'), g('width_in'), g('amp_w')]); })()""") is True)
             [page.fill(i, v) for i, v in (("#rL", "18"), ("#rW", "13"), ("#rH", "8.5"))]
             page.select_option("#rFloor", "tile")
             page.check("#rRug")
@@ -395,7 +411,6 @@ def main():
             page.fill("#mdRows", "3")
             page.fill("#mdFirst", "6")
             page.fill("#mdStep", "6")
-            page.once("dialog", lambda d: d.accept())                        # "replace the list?" -> OK
             before = page.evaluate("fuRead().length")
             page.click("#mdBuild")
             check("The tier builder puts risers and couches into the Room form",

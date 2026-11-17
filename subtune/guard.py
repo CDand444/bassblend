@@ -26,6 +26,7 @@ CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_sub_
                    "keep_fixes", "undo_fixes", "update_speakers", "move_speakers", "update_room", "update_system", "hw_save",
                    "set_live_eq", "fit_live_eq", "save_live_eq", "save_simulation", "set_treatment_constraints",
                    "record_treatment", "make_backup", "restore_backup"}
+STORED = CHANGES - SOUND - {"make_backup", "restore_backup", "set_night_mode", "avr_control"}      # tools that rewrite what htTamer keeps: a backup is made before the first of a run of them
 ALWAYS_OK = {"stop_live_analyzer"}           # stopping sound is never blocked
 
 SOUND_PER_10MIN = 8
@@ -169,6 +170,15 @@ def wrap(executors: dict, origin: str) -> dict:
             except Refused as e:
                 event("warn", f"{who}: refused {name}: {e}")
                 raise
+            if name in STORED:
+                try:
+                    from . import backup
+                    made = backup.before_ai_change()
+                except Exception as e:                  # noqa: BLE001 - no safety copy, no change
+                    event("error", f"{who}: {name} not done, the backup before it failed: {e}")
+                    raise Refused(f"I couldn't make a backup first ({e}), so nothing was changed") from None
+                if made:
+                    event("info", f"{who}: backup made before changing anything ({made.name})")
             if name in CHANGES:
                 event("info", f"{who}: {name}" + (f" ({_brief_args(args)})" if args else ""))
             return fn(**args)

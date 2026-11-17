@@ -107,6 +107,31 @@ def run(a, text="go"):
     a._loop()
 
 
+def test_a_backup_is_made_before_the_ai_changes_stored_things_once_per_run():
+    from subtune import backup
+    made, ran = [], []
+    orig = backup.make
+    backup.make = lambda reason="manual": made.append(reason) or pathlib.Path("x.zip")
+    backup._last_ai = 0.0
+    try:
+        ex = guard.wrap({"get_overview": lambda: 1, "update_room": lambda room=None: ran.append("room") or 1, "update_speakers": lambda speakers=None: ran.append("spk") or 1,
+                         "run_verify": lambda pos: 1, "set_night_mode": lambda on: 1}, "assistant")
+        guard._sound_times.clear()
+        ex["get_overview"](); ex["run_verify"](pos=1); ex["set_night_mode"](on=True)
+        assert made == []                                                         # reading, sound tests and night mode store nothing
+        ex["update_room"](room={}); ex["update_speakers"](speakers={})
+        assert made == ["before AI change"] and ran == ["room", "spk"]            # one copy covers the run of edits
+        backup._last_ai = 0.0
+        backup.make = lambda reason="manual": (_ for _ in ()).throw(OSError("disk full"))
+        try:
+            ex["update_room"](room={}); assert False, "no backup, no change"
+        except guard.Refused as e:
+            assert "backup" in str(e) and ran == ["room", "spk"]
+    finally:
+        backup.make = orig
+        backup._last_ai = 0.0
+
+
 def test_secrets_never_reach_the_model():
     a = fake_assistant([tool_msg(("get_overview", {})), text_msg()],
                        {"get_overview": lambda: {"api_key": "sk-ant-api03-ABCDEFGHIJKLMNOPQRSTUV", "note": "ok"}})

@@ -216,14 +216,14 @@ async function mdApply(r, add) {                    // put a proposal's items in
 }
 async function mdCall(body, btn) {
   btn.disabled = true; $('#mdMsg').textContent = 'Working…';
-  const rf = readRoom(), r = await post('/api/modeler', {...body, room: {room: {width_m: rf.room.width_m, length_m: rf.room.length_m, height_m: rf.room.height_m}, seats: rf.seats}});
+  const rf = readRoom(), r = await post('/api/modeler', {...body, room: {room: {width_m: rf.room.width_m, length_m: rf.room.length_m, height_m: rf.room.height_m, outline: rf.room.outline}, seats: rf.seats}});
   btn.disabled = false;
   if (r.error) { $('#mdMsg').textContent = ''; toast('Modeler', r.error, 'bad'); return null; }
   return r;
 }
 $('#mdBuild').onclick = async e => {
   const n = id => $(id).value === '' ? undefined : +$(id).value;
-  const r = await mdCall({action: 'tiers', spec: {rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked}}, e.target);
+  const r = await mdCall({action: 'tiers', spec: {rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked, use_seats: $('#mdSeats').checked}}, e.target);
   if (r) { const repl = confirm('Replace the furniture in the list with these tiers?\n\nOK replaces it, Cancel adds the tiers to what is there.'); mdApply(r, !repl); }
 };
 $('#mdAsk').onclick = async e => {

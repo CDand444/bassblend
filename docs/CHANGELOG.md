@@ -2,6 +2,14 @@
 
 ## Nov 19, 2026 - flooring, room modeler, speaker aim in 3D
 
+- **Starter hardware database filled in**: 18 subwoofers (SVS, Hsu Research) and 60 speakers (SVS Prime, Revel in-room and architectural) with size, driver, rated low end, amp power, sensitivity, weight, frequency response and each maker's page (and owner's manual where the page links one). Every number is checked against the maker's own page text before it is accepted; nothing is estimated.
+- **Sub cards use the database**: each sub on the Room page now has a model drop-down (like the Speakers page); picking one fills the driver, enclosure, cabinet size, rated low end and amp power. Choose Other to type one.
+
+- **A backup before the AI changes anything stored**: the first time the assistant (or an AI client over MCP) edits the room, speakers, tune settings, live EQ and the like, htTamer makes a backup first (one per 10 quiet minutes, shown in Backups as "before the AI changed something"). If the backup can't be made, the change isn't made. Frequent AI backups never push out your newest update, weekly or manual one.
+- **The modeler follows your room**: with "Place rows under my seats" (on by default) the tiers go under your seat rows, as high as the seats' head heights say, and are kept inside an angled or notched outline instead of the bounding box; the text path is told the outline and seat heights too.
+- **Sound field, with and without treatment**: a With / Without / Compare switch; Compare lays the bare room's bounces (red dashed) under the treated ones, thickness showing loudness, with a before/after table.
+- The assistant no longer ends every reply by offering a sweep.
+
 - **Flooring** on the Room card (carpet, hardwood, laminate, vinyl, tile, bare concrete) and an **area rug** box. The ring-time estimate, treatment plan (no rug suggested over carpet or a rug; tile and concrete called out), sound field, 3D floor color, apartment tips and the assistant all use it.
 - **Room modeler** (Room card, under Furniture): build a stepped riser with a couch on each tier from measurements (rows, width, depth, first riser height, step; no AI) or from a plain-text description (the AI assistant, one request). The proposal appears in the form, plan and 3D view, is not saved until Save room, and has an Undo. Up to 24 furniture items now.
 - **Speaker aim in 3D**: each speaker has an Aimed pick (Auto, at the main seat, straight down, up and bouncing off the ceiling to the seat, custom Faces plus Tilt). Auto aims atmos modules up at the ceiling bounce point and in-ceiling speakers down. The Speakers page, Treatment/3D views (with an aim beam) and the sound field follow it.

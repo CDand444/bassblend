@@ -2184,7 +2184,7 @@ class H(BaseHTTPRequestHandler):
             from .room import load_room
             room = load_room()
             ov = body.get("room") or {}                # the Room form may hold newer sizes and seats than the saved room
-            room = {**room, "room": {**(room.get("room") or {}), **{k: v for k, v in (ov.get("room") or {}).items() if k in ("width_m", "length_m", "height_m") and v}},
+            room = {**room, "room": {**(room.get("room") or {}), **{k: v for k, v in (ov.get("room") or {}).items() if k in ("width_m", "length_m", "height_m") and v}, **({"outline": ov["room"]["outline"]} if (ov.get("room") or {}).get("outline") else {})},
                     "seats": ov.get("seats") or room.get("seats")}
             try:
                 if body.get("action") == "tiers":

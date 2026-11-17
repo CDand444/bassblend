@@ -3,7 +3,7 @@ let BK = null;
 const bkSize = n => n > 1e6 ? (n / 1e6).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1e3)) + ' KB';
 const bkRoom = h => { const p = []; if (h.screen) p.push('screen'); if (h.couches) p.push(`${h.couches} couch${h.couches === 1 ? '' : 'es'}`); if (h.risers) p.push(`${h.risers} riser${h.risers === 1 ? '' : 's'}`);
   if (h.soffits) p.push(`${h.soffits} soffit${h.soffits === 1 ? '' : 's'}`); if (h.subs) p.push(`${h.subs} sub${h.subs === 1 ? '' : 's'}`); return p.length ? ` (${p.join(', ')})` : ''; };
-const bkWhy = {manual: 'on demand', weekly: 'weekly', 'before update': 'before an update', 'before restore': 'safety copy before a restore'};
+const bkWhy = {manual: 'on demand', weekly: 'weekly', 'before update': 'before an update', 'before restore': 'safety copy before a restore', 'before AI change': 'before the AI changed something'};
 async function bkLoad() {
   try { BK = await fetch('/api/backups').then(r => r.json()); } catch (e) { return; }
   const el = $('#bkOut'); if (!el) return;

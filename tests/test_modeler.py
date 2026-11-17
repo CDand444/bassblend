@@ -40,7 +40,7 @@ def test_three_tiers_climb_by_the_step_and_a_big_build_is_flagged_when_it_does_n
     ys = [i["y_m"] for i in r["items"]]
     assert ys[0] < ys[1] < ys[2]                                                                       # the front tier is nearest the screen
     wide = modeler.tiers({"rows": 2, "width_ft": 20, "depth_ft": 4}, ROOM)
-    assert any("sticks out" in w for w in wide["warnings"])
+    assert any("narrowed" in a for a in wide["assumptions"]) and wide["items"][0]["length_m"] < 4.0         # too wide for the room: pulled in, and said so
 
 
 def test_bad_measurements_are_refused():
@@ -55,6 +55,19 @@ def test_bad_measurements_are_refused():
     except ValueError:
         return
     raise AssertionError("tiers were built without a room size")
+
+
+def test_rows_go_under_the_owners_seats_at_their_heights_and_stay_inside_an_angled_wall():
+    room = {"room": {"length_m": 6.0, "width_m": 3.7, "height_m": 2.4, "outline": [[0, 0], [3.58, 0], [3.58, 3.8], [3.28, 3.8], [3.28, 4.3], [3.7, 4.3], [3.7, 4.95], [2.7, 5.95], [0, 5.95]]},
+            "seats": [{"name": "MLP", "x_m": 1.8, "y_m": 3.2, "z_m": None}, {"name": "S2", "x_m": 1.2, "y_m": 3.2, "z_m": None},
+                      {"name": "S4", "x_m": 0.6, "y_m": 4.57, "z_m": 1.37}, {"name": "S6", "x_m": 1.8, "y_m": 4.57, "z_m": 1.37}]}
+    r = modeler.tiers({"rows": 2, "use_seats": True, "depth_ft": 4}, room)
+    risers = [i for i in r["items"] if i["kind"] == "riser"]
+    assert len(risers) == 1 and abs(risers[0]["height_m"] - 0.32) < 0.02 and abs(risers[0]["y_m"] - 4.67) < 0.01       # only the raised row gets a riser, as high as its seats say
+    assert risers[0]["x_m"] - risers[0]["length_m"] / 2 >= -0.01 and not r["warnings"]                             # inside the left wall
+    assert modeler.tiers({"rows": 3, "use_seats": True}, room)["assumptions"][0].startswith("Your seats form 2 row")  # a row count that does not match is said so, not forced
+    bad = modeler.fit_warnings([{"kind": "riser", "name": "Out", "x_m": 3.4, "y_m": 5.6, "length_m": 1.0, "depth_m": 0.6, "height_m": 0.3, "rotation": 0}], room)
+    assert bad and "walls" in bad[0]                                                                               # a box through the angled back wall is flagged
 
 
 class _Reply:

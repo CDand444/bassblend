@@ -35,15 +35,80 @@ def _box(room: dict) -> tuple[float, float, float]:
     return float(rm.get("width_m") or 0), float(rm.get("length_m") or 0), float(rm.get("height_m") or 2.4)
 
 
+EAR = 1.05                                                     # a seated ear's height (m) when a seat has none of its own
+
+
+def _outline(room: dict):
+    pl = (room.get("room") or {}).get("outline")
+    try:
+        pts = [(float(p[0]), float(p[1])) for p in pl or []]
+    except (TypeError, ValueError, IndexError):
+        return None
+    return pts if len(pts) >= 3 else None
+
+
+def _crossings(poly, y):
+    xs = []
+    for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
+        if (y1 <= y < y2) or (y2 <= y < y1):
+            xs.append(x1 + (y - y1) / (y2 - y1) * (x2 - x1))
+    xs.sort()
+    return list(zip(xs[0::2], xs[1::2]))
+
+
+def _inside(poly, x, y, tol=0.04):
+    return any(a - tol <= x <= b + tol for a, b in _crossings(poly, y)) or any(a - tol <= x <= b + tol for a, b in _crossings(poly, y + 0.01))
+
+
+def _span(room: dict, y0: float, y1: float, xc: float):
+    """The left-right stretch of floor that is inside the room along the whole band y0..y1 around xc (the room's outline when it has one, else its rectangle)."""
+    W, L, _ = _box(room)
+    poly = _outline(room)
+    if not poly:
+        return 0.0, W
+    lo, hi = -1e9, 1e9
+    ys = [p[1] for p in poly]
+    y0, y1 = max(y0, min(ys) + 0.03), min(y1, max(ys) - 0.03)             # a band reaching a hair past the outline is judged where the room is
+    for k in range(6):
+        y = y0 + (y1 - y0) * k / 5
+        iv = _crossings(poly, y)
+        if not iv:
+            return None
+        a, b = min(iv, key=lambda p: 0 if p[0] <= xc <= p[1] else min(abs(p[0] - xc), abs(p[1] - xc)))
+        lo, hi = max(lo, a), min(hi, b)
+    return (lo, hi) if hi > lo else None
+
+
+def seat_rows(room: dict) -> list[dict]:
+    """The owner's seats grouped into rows (front to back): {y, x0, x1, z} with z the head height of the row's highest seat (None when none was set)."""
+    seats = [s for s in room.get("seats") or [] if s.get("x_m") is not None and s.get("y_m") is not None]
+    seats.sort(key=lambda s: s["y_m"])
+    rows: list[list[dict]] = []
+    for s in seats:
+        if rows and s["y_m"] - rows[-1][-1]["y_m"] < 0.6:
+            rows[-1].append(s)
+        else:
+            rows.append([s])
+    out = []
+    for r in rows:
+        zs = [s["z_m"] for s in r if s.get("z_m")]
+        out.append({"y": sum(s["y_m"] for s in r) / len(r), "x0": min(s["x_m"] for s in r), "x1": max(s["x_m"] for s in r), "z": max(zs) if zs else None})
+    return out
+
+
 def fit_warnings(items: list[dict], room: dict) -> list[str]:
     """Things a human would notice: outside the room, a riser reaching the ceiling, two risers that overlap by a lot, a couch off its riser."""
     W, L, H = _box(room)
+    poly = _outline(room)
     out = []
     for it in items:
         if it.get("x_m") is None or it.get("y_m") is None:
             continue
         hl, hd = (it["length_m"] / 2, it["depth_m"] / 2) if it["rotation"] in (0, 180) else (it["depth_m"] / 2, it["length_m"] / 2)
-        if W and L and (it["x_m"] - hl < -0.05 or it["x_m"] + hl > W + 0.05 or it["y_m"] - hd < -0.05 or it["y_m"] + hd > L + 0.05):
+        if poly:
+            if not all(_inside(poly, it["x_m"] + sx * hl, it["y_m"] + sy * hd) for sx in (-1, 1) for sy in (-1, 1)):
+                out.append(f"{it['name']} sticks out past the room's walls (the outline you drew): check its position and size.")
+        elif W and L and (it["x_m"] - hl < -0.05 or it["x_m"] + hl > W + 0.05 or it["y_m"] - hd < -0.05 or it["y_m"] + hd > L + 0.05):
             out.append(f"{it['name']} sticks out of the room's rectangle: check its position and size.")
         if it["kind"] == "riser" and it["height_m"] + 1.2 > H:
             out.append(f"{it['name']} is {it['height_m'] / FT:.1f} ft high: a person sitting on it would be close to a {H / FT:.1f} ft ceiling.")
@@ -73,20 +138,50 @@ def tiers(spec: dict, room: dict) -> dict:
     front_wall = str(spec.get("against") or "back") == "front"
     couch_len = _num(spec.get("couch_ft"), min(width / FT - 0.5, 7.5), 2, 14, "couch length") * FT
     with_couches = spec.get("couches", True) is not False
-    items, n_riser = [], 0
+    items, n_riser, notes, heights = [], 0, [], []
+    srows = seat_rows(room) if spec.get("use_seats") else []
+    by_seats = bool(srows) and (spec.get("rows") in (None, "") or len(srows) == rows)
+    if by_seats:
+        rows = len(srows)
+    elif spec.get("use_seats"):
+        notes.append(f"Your seats form {len(srows)} row(s), not {rows}, so the tiers were placed from the measurements instead.")
     for k in range(rows):                                      # k = 0 is the row nearest the screen
-        raised = k - (1 if floor_front else 0)
-        h = 0.0 if raised < 0 else first + step * raised
-        y = ((k + 0.5) * depth) if front_wall else (L - (rows - k - 0.5) * depth)
+        if by_seats:                                           # under the owner's own seats: their row, their spread, and the height their head is set to
+            sr = srows[k]
+            h = max(0.0, (sr["z"] or EAR) - EAR)
+            h = round(h / IN * 2) / 2 * IN if h >= 0.02 else 0.0
+            gaps = [abs(srows[j]["y"] - sr["y"]) for j in (k - 1, k + 1) if 0 <= j < rows]
+            d = max(0.9, min([depth] + gaps))
+            y, cx = sr["y"] + 0.1, (sr["x0"] + sr["x1"]) / 2   # the couch's middle sits a little behind where the head is
+            w = width if spec.get("width_ft") not in (None, "") else (sr["x1"] - sr["x0"]) + 1.3
+        else:
+            raised = k - (1 if floor_front else 0)
+            h = 0.0 if raised < 0 else first + step * raised
+            y = ((k + 0.5) * depth) if front_wall else (L - (rows - k - 0.5) * depth)
+            d, cx, w = depth, x, width
+        sp = _span(room, y - d / 2, y + d / 2, cx)
+        if sp is None:
+            raise ValueError(f"row {k + 1} falls outside the room's walls: check the room size and your seat positions")
+        if cx - w / 2 < sp[0] - 0.01 or cx + w / 2 > sp[1] + 0.01:      # keep it inside the walls (an angled or notched wall narrows the room)
+            if sp[1] - sp[0] < 1.0:
+                raise ValueError(f"row {k + 1} would have only {(sp[1] - sp[0]) / FT:.1f} ft of room across: move the seats or shrink the tiers")
+            w = min(w, sp[1] - sp[0])
+            cx = min(max(cx, sp[0] + w / 2), sp[1] - w / 2)
+            notes.append(f"Row {k + 1} was narrowed to {w / FT:.1f} ft to stay inside the walls.")
+        heights.append(h)
         if h > 0:
             n_riser += 1
-            items.append({"kind": "riser", "name": f"Tier {k + 1}" if rows > 1 else "Riser", "x_m": x, "y_m": y, "length_m": width, "depth_m": depth, "height_m": h, "rotation": 0})
+            items.append({"kind": "riser", "name": f"Tier {k + 1}" if rows > 1 else "Riser", "x_m": cx, "y_m": y, "length_m": w, "depth_m": d, "height_m": h, "rotation": 0})
         if with_couches:
-            items.append({"kind": "couch", "name": f"Row {k + 1} couch", "x_m": x, "y_m": y if not front_wall else y, "length_m": min(couch_len, width - 0.1),
-                          "depth_m": min(0.95, depth - 0.05), "seat_h_m": 0.45, "back_h_m": 1.0, "fabric": "fabric", "rotation": 0})
+            items.append({"kind": "couch", "name": f"Row {k + 1} couch", "x_m": cx, "y_m": y, "length_m": min(couch_len, w - 0.1),
+                          "depth_m": min(0.95, d - 0.05), "seat_h_m": 0.45, "back_h_m": 1.0, "fabric": "fabric", "rotation": 0})
     cleaned = furniture.clean_items(items)
-    return {"items": cleaned, "summary": f"{rows} row{'s' if rows > 1 else ''}: {n_riser} riser{'s' if n_riser != 1 else ''} stepping up {step / IN:.0f} in{' with the front row on the floor' if floor_front else ''}"
-            + (", a couch on each row." if with_couches else "."), "assumptions": [], "warnings": fit_warnings(cleaned, room)}
+    if by_seats:
+        summary = f"{rows} row{'s' if rows > 1 else ''} under your seats: " + ", ".join(f"row {i + 1} {'on the floor' if h <= 0 else f'{h / IN:.1f} in up'}" for i, h in enumerate(heights)) + (", a couch on each." if with_couches else ".")
+    else:
+        summary = (f"{rows} row{'s' if rows > 1 else ''}: {n_riser} riser{'s' if n_riser != 1 else ''} stepping up {step / IN:.0f} in{' with the front row on the floor' if floor_front else ''}"
+                   + (", a couch on each row." if with_couches else "."))
+    return {"items": cleaned, "summary": summary, "assumptions": notes, "warnings": fit_warnings(cleaned, room)}
 
 
 SCHEMA = {"type": "object", "additionalProperties": False, "required": ["summary", "assumptions", "furniture"], "properties": {
@@ -103,7 +198,7 @@ A couch has length_ft (across), depth_ft (front to back, usually 3), seat_h_ft (
 to face the screen), 90 = the left wall, 180 = the screen, 270 = the right wall; a riser's rotation turns it the same way (use 0 unless the platform runs front to back).
 Rules: use the owner's measurements exactly when they give them; otherwise make reasonable, typical choices and list each in "assumptions" in plain words. Build a stepped
 platform out of several adjacent risers (each tier its own box, touching the next, each higher than the one in front of it); put each couch at the middle of its tier, the same
-width or a little narrower, and its middle y at the tier's middle. Keep everything inside the room, and a riser no higher than 2 ft. Give each item a short plain name. At most 24 items.
+width or a little narrower, and its middle y at the tier's middle. Keep everything inside the room: when "room_outline_ft_clockwise_points_x_y" is given, the room is that polygon (not the full rectangle), so nothing may stick out through an angled or notched wall. The owner's seats are given with their positions and head heights: put one row of seating under each row of seats (a couch centered across its seats, its middle about 0.3 ft behind the seat y), and make a riser's top as high as "head_height_above_normal_in" says for the seats on it (a seat whose head height is above 3.4 ft is on a riser; one at the normal 3.4 ft is on the floor), unless the owner's description gives other numbers, which win. Keep a riser no higher than 2 ft. Give each item a short plain name. At most 24 items.
 "summary" is one sentence on what you built. Never ask a question: build the best answer you can and say what you assumed."""
 
 
@@ -118,8 +213,13 @@ def from_text(text: str, room: dict, existing: list | None = None, replace: bool
     if ai.key_source() is None:
         raise RuntimeError("the modeler needs the AI assistant: add an AI key on the dashboard (Tools -> AI analysis), or use the tier builder, which needs none")
     W, L, H = _box(room)
-    seats = [{"name": s.get("name"), "x_ft": round(s["x_m"] / FT, 1), "y_ft": round(s["y_m"] / FT, 1)} for s in room.get("seats") or [] if s.get("x_m") is not None]
+    seats = [{"name": s.get("name"), "x_ft": round(s["x_m"] / FT, 1), "y_ft": round(s["y_m"] / FT, 1),
+              "head_height_ft": round((s.get("z_m") or EAR) / FT, 2), "head_height_above_normal_in": round(max(0.0, (s.get("z_m") or EAR) - EAR) / IN, 1)}
+             for s in room.get("seats") or [] if s.get("x_m") is not None]
+    poly = _outline(room)
     ctx = {"room_width_ft": round(W / FT, 1), "room_length_ft": round(L / FT, 1), "ceiling_ft": round(H / FT, 1), "seats": seats,
+           "seat_rows_front_to_back": [{"y_ft": round(r["y"] / FT, 1), "x_from_ft": round(r["x0"] / FT, 1), "x_to_ft": round(r["x1"] / FT, 1)} for r in seat_rows(room)],
+           "room_outline_ft_clockwise_points_x_y": [[round(x / FT, 1), round(y / FT, 1)] for x, y in poly] if poly else None,
            "existing_furniture": [] if replace else [{k: (round(v / FT, 2) if k.endswith("_m") and isinstance(v, (int, float)) else v) for k, v in it.items() if k in ("kind", "name", "x_m", "y_m", "length_m", "depth_m", "height_m", "rotation")} for it in (existing or [])]}
     assistant.spend_ai_call()
     r = ai.complete(SYSTEM, f"The room: {json.dumps(ctx)}\n\nWhat to build:\n{text}", SCHEMA)

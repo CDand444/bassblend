@@ -5,7 +5,7 @@
 //   Treble (250 Hz - 16 kHz): the paths a speaker's sound takes to your seat and the wavefronts it sends round the room (the image-source method, exact for a box with flat
 //          walls), losing energy at every wall by what the wall or your panel absorbs at that frequency; plus what goes through the walls.
 // For an irregular room the box is its main rectangle (labeled). It is for learning and for choosing where things go; measuring decides.
-let SF = {view: 'plan', bass: true, treble: false, fb: 45, ft: 2000, zPlan: 1.05, xSide: null, yEnd: null, mode: 'level', playing: true, damp: 'auto', order: 2, spk: '', leak: false,
+let SF = {view: 'plan', bass: true, treble: false, fb: 45, ft: 2000, zPlan: 1.05, xSide: null, yEnd: null, mode: 'level', playing: true, damp: 'auto', order: 2, spk: '', leak: false, treat: 'with', bare: [],
           room: null, modes: [], key: null, raf: 0, last: 0, phase: 0, tt: 0, fields: {}, cam: {yaw: 2.5, pitch: 0.55, zoom: 1.45}, s3: null, paths: []};
 const SF_DAMP = {live: 0.9, normal: 0.5, dead: 0.25};
 const SF_SPEED = 6;                                                      // m/s: the wavefronts of the treble layer in slow motion (real sound is 343 m/s)
@@ -24,8 +24,9 @@ function sfRoom() {                                                      // the 
   });
   return {W, L, H, x0, y0, subs, speakers, seat, irregular, construction: r.room.construction || '', floor: r.room.floor || '', rug: !!r.room.rug, structure: (r.dwelling || {}).structure || 'unknown'};
 }
-function sfItems() { const p = S.treatment; return p && p.items ? (typeof tpVisible === 'function' ? tpVisible(p).items : p.items) : []; }      // the treatment the Treatment page has switched on
-function sfPatches() { return SF.room ? srPatches(SF.room, sfItems()) : []; }
+function sfItems(on = SF.treat !== 'without') { const p = S.treatment; return !on ? [] : p && p.items ? (typeof tpVisible === 'function' ? tpVisible(p).items : p.items) : []; }      // the treatment the Treatment page has switched on ('without' = the bare room)
+function sfPatches(on) { return SF.room ? srPatches(SF.room, sfItems(on)) : []; }
+const sfBareT60 = f => srT60(SF.room, f, []);
 
 // ---------------------------------------------------------------- bass: modal pressure on any slice plane
 function sfModes(R, fmax = 300) {
@@ -71,7 +72,8 @@ function sfSource() { const R = SF.room, c = R.speakers.find(s => s.ch === SF.sp
 function sfComputePaths() {
   const R = SF.room, src = sfSource(); SF.paths = [];
   if (!SF.treble || !src || !R.seat) return;
-  SF.paths = srPaths(src, R.seat, R, SF.order, SF.ft, sfPatches()).filter(p => p.level_db > -45 && p.order <= SF.order).map(p => ({...p, g: srDirGain(src, p.pts[1][0] - p.pts[0][0], p.pts[1][1] - p.pts[0][1], p.pts[1][2] - p.pts[0][2], SF.ft)}));
+  const mk = on => srPaths(src, R.seat, R, SF.order, SF.ft, sfPatches(on)).filter(p => p.level_db > -45 && p.order <= SF.order).map(p => ({...p, g: srDirGain(src, p.pts[1][0] - p.pts[0][0], p.pts[1][1] - p.pts[0][1], p.pts[1][2] - p.pts[0][2], SF.ft)}));
+  SF.paths = mk(SF.treat !== 'without'); SF.bare = SF.treat === 'both' ? mk(false) : [];                  // compare: the treated room's paths, and the bare room's to lay under them
 }
 function sfImages(src) {                                                 // image sources up to the chosen order, each with the energy its reflections leave
   const R = SF.room, patches = sfPatches(), dims = [R.W, R.L, R.H], out = [], N = SF.order;
@@ -113,7 +115,9 @@ function sfDrawTreble2d(ctx, P, X, Y) {                                  // wave
   const planeAt = P.a === 2 ? SF.zPlan : P.a === 0 ? (SF.xSide ?? SF.room.W / 2) : (SF.yEnd ?? SF.room.L / 2);
   imgs.forEach(im => { const off = Math.abs(im.p[P.a] - planeAt); if (r <= off) return; const rr = Math.sqrt(r * r - off * off), a = Math.min(0.9, 1.6 * Math.sqrt(im.E) / Math.max(1, r * 0.7));
     if (a < 0.03) return; ctx.strokeStyle = im.n === 0 ? `rgba(20,60,140,${Math.min(0.95, a + 0.25)})` : `rgba(235,150,30,${Math.min(0.9, a * 1.4)})`; ctx.lineWidth = im.n === 0 ? 2.2 : 1.4; ctx.beginPath(); ctx.arc(X(P.u(im.p)), Y(P.v(im.p)), rr * pxPerM, 0, 6.2832); ctx.stroke(); });
-  SF.paths.forEach(p => { const a = Math.max(0.12, Math.min(0.9, Math.sqrt(p.E) * p.g)); ctx.strokeStyle = p.order === 0 ? `rgba(20,60,140,${Math.min(1, a + 0.15)})` : `rgba(230,110,30,${a})`; ctx.lineWidth = p.order === 0 ? 1.8 : 1.2; ctx.beginPath();
+  SF.bare.forEach(p => { if (p.order === 0) return; const a = Math.max(0.15, Math.min(0.9, Math.sqrt(p.E) * p.g)); ctx.strokeStyle = `rgba(200,40,40,${a})`; ctx.lineWidth = 1 + 4 * Math.min(1, Math.sqrt(p.E)); ctx.setLineDash([6, 4]); ctx.beginPath();
+    p.pts.forEach((q, k) => { const x = X(P.u(q)), y = Y(P.v(q)); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); ctx.setLineDash([]); });
+  SF.paths.forEach(p => { const a = Math.max(0.12, Math.min(0.9, Math.sqrt(p.E) * p.g)); ctx.strokeStyle = p.order === 0 ? `rgba(20,60,140,${Math.min(1, a + 0.15)})` : `rgba(230,110,30,${a})`; ctx.lineWidth = p.order === 0 ? 1.8 : 1 + 4 * Math.min(1, Math.sqrt(p.E)); ctx.beginPath();
     p.pts.forEach((q, k) => { const x = X(P.u(q)), y = Y(P.v(q)); k ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke(); });
 }
 function sfDrawLeak2d(ctx, P, X, Y, w, h, padL, padT) {                  // arrows leaving the walls: longer = more sound goes through
@@ -133,6 +137,7 @@ function sfScene3d() {
   if (R.seat) pts.push({p: [R.seat.x, R.seat.y, R.seat.z], c: [0.05, 0.05, 0.05, 1], s: 15});
   if (SF.treble) {
     R.speakers.forEach(s => pts.push({p: [s.x, s.y, s.z], c: s.ch === (sfSource() || {}).ch ? [0.16, 0.47, 0.84, 1] : [0.16, 0.47, 0.84, 0.35], s: s.ch === (sfSource() || {}).ch ? 12 : 7}));
+    SF.bare.forEach(p => { if (p.order === 0) return; const a = Math.max(0.2, Math.min(0.95, Math.sqrt(p.E) * p.g)); for (let k = 0; k < p.pts.length - 1; k++) lines.push({a: p.pts[k], b: p.pts[k + 1], c: [0.8, 0.15, 0.15, a]}); });
     SF.paths.forEach(p => { const a = Math.max(0.2, Math.min(0.95, Math.sqrt(p.E) * p.g)), c = p.order === 0 ? [0.08, 0.24, 0.55, Math.min(1, a + 0.15)] : [0.9, 0.45, 0.1, a];
       for (let k = 0; k < p.pts.length - 1; k++) lines.push({a: p.pts[k], b: p.pts[k + 1], c});
       const d = (SF.tt * SF_SPEED) % (sfCycle() * SF_SPEED), q = sfPathAt(p, d); if (q) pts.push({p: q, c: [1, 0.95, 0.5, Math.min(1, a + 0.2)], s: 7}); });
@@ -166,6 +171,8 @@ function sfExplain() {
   if (SF.treble) { const lk = srLeak(R, SF.ft, R.structure), wall = srAlpha(SR_SURF[srKind(R.construction)], SF.ft), src = sfSource(); t += `<br><b>Treble at ${SF.ft >= 1000 ? (SF.ft / 1000).toFixed(1) + ' kHz' : SF.ft + ' Hz'}:</b> the wavelength is ${(SR_C / SF.ft * 100).toFixed(0)} cm. A bare ${srKind(R.construction)} wall soaks up ${(wall * 100).toFixed(0)}% of it each time it bounces; `;
     const pn = sfItems().filter(i => i.rect && ['absorber', 'cloud'].includes(i.kind))[0]; if (pn) t += `your ${pn.thickness_in} in panels soak up ${(srPanelAlpha((pn.thickness_in || 2) * 0.0254, (pn.gap_in || 0) * 0.0254, SF.ft) * 100).toFixed(0)}% at this frequency; `;
     t += `${(lk.share * 100).toFixed(lk.share < 0.01 ? 2 : 1)}% goes through the ${lk.kind} walls (${lk.tl_db.toFixed(0)} dB lost). `; if (src) t += `Blue is the direct sound from ${src.ch}; orange is its reflections, fainter after each bounce.`; }
+  if (SF.treat !== 'with') t += `<br><b>${SF.treat === 'without' ? 'Showing the bare room' : 'Comparing the bare room (red dashed) with your treatment (orange)'}.</b> ` + (sfItems(true).length ? '' : 'No treatment is switched on in the Treatment picker yet, so there is no difference to see. ')
+    + (SF.bass && SF.damp === 'auto' ? `Bare, the room rings about ${sfBareT60(SF.fb).toFixed(2)} s at ${SF.fb.toFixed(0)} Hz; with treatment ${srT60(R, SF.fb, sfPatches(true)).toFixed(2)} s. ` : '');
   $('#sfExplain').innerHTML = t || 'Switch Bass or Treble on to see the waves.';
   $('#sfModes').innerHTML = SF.modes.filter(m => m.f <= 250).slice(0, 12).map(m => `<button type="button" class="chip" data-sfmode="${m.f.toFixed(1)}">${m.f.toFixed(0)} Hz</button>`).join('');
 }
@@ -173,10 +180,17 @@ function sfChart() {
   const R = SF.room; if (!R.seat) { $('#sfChart').innerHTML = '<p class="muted small">Enter your main seat on the Room page to see what the seat hears.</p>'; $('#sfChartNote').textContent = ''; return; }
   if (SF.treble && !SF.bass) {                                            // the early reflections table: what arrives after the direct sound, how late and how loud
     const rows = SF.paths.filter(p => p.order > 0).sort((a, b) => b.level_db - a.level_db).slice(0, 8);
+    if (SF.treat === 'both') {                                            // each reflection bare and treated, side by side, and the total
+      const key = p => p.surf.join('>'), bare = new Map(SF.bare.map(p => [key(p), p])), tot = ps => 10 * Math.log10(ps.filter(p => p.order > 0).reduce((s, p) => s + Math.pow(10, p.level_db / 10), 0) + 1e-12);
+      const bt = tot(SF.bare), tt = tot(SF.paths), ds = (a, b) => `${(a - b > 0 ? '+' : '') + (a - b).toFixed(1)} dB`;
+      $('#sfChart').innerHTML = `<div class="tw"><table class="dc-tbl"><thead><tr><th>Reflection off</th><th>Arrives later by</th><th>Without treatment</th><th>With treatment</th><th>Change</th></tr></thead><tbody>${SF.bare.filter(p => p.order > 0).sort((a, b) => b.level_db - a.level_db).slice(0, 8).map(b => { const w = SF.paths.find(p => key(p) === key(b)), lw = w ? w.level_db : -45;
+        return `<tr><td style="text-align:left">${esc(b.surf.map(srPlaneName).join(', then '))}</td><td>${b.delay_ms.toFixed(1)} ms</td><td>${b.level_db.toFixed(1)} dB</td><td>${w ? w.level_db.toFixed(1) + ' dB' : 'below -45 dB'}</td><td><b>${ds(lw, b.level_db)}</b></td></tr>`; }).join('')}<tr><td style="text-align:left"><b>All reflections together</b></td><td></td><td>${bt.toFixed(1)} dB</td><td>${tt.toFixed(1)} dB</td><td><b>${ds(tt, bt)}</b></td></tr></tbody></table></div>`;
+      $('#sfChartNote').textContent = 'Levels are against the direct sound at your seat. Red dashed lines in the views are the bare room, orange the room with your treatment: thicker means a louder bounce. Switch treatment items on or off on the Treatment page to see their effect.'; return; }
     $('#sfChart').innerHTML = `<div class="tw"><table class="dc-tbl"><thead><tr><th>Reflection off</th><th>Arrives later by</th><th>Level vs the direct sound</th></tr></thead><tbody>${rows.map(p => `<tr><td style="text-align:left">${esc(p.surf.map(srPlaneName).join(', then '))}</td><td>${p.delay_ms.toFixed(1)} ms</td><td>${p.level_db.toFixed(1)} dB</td></tr>`).join('')}</tbody></table></div>`;
     $('#sfChartNote').textContent = 'The strongest early reflections at your seat for this speaker and frequency. Reflections within about 15 ms and louder than -10 dB smear the image: that is what first-reflection panels are for.'; return; }
   const fs = Array.from({length: 181}, (_, i) => 20 + i), mod = sfSeatDb(R, SF.modes, SF.t60 || 0.5, fs), mm = mod.filter((v, i) => fs[i] >= 30 && fs[i] <= 100), m0 = mm.reduce((a, b) => a + b, 0) / mm.length;
-  const series = [{y: mod.map(v => v - m0), color: '#2a78d6', name: 'the model at your seat', w: 2.4}];
+  const series = [{y: mod.map(v => v - m0), color: '#2a78d6', name: SF.treat === 'without' ? 'the bare room at your seat' : 'the model at your seat', w: 2.4}];
+  if (SF.treat === 'both' && SF.damp === 'auto') { const bare = sfSeatDb(R, SF.modes, sfBareT60(SF.fb), fs); series.push({y: bare.map(v => v - m0), color: '#c83030', name: 'without treatment (at the chosen frequency\u2019s ring time)', w: 1.8, op: 0.8}); }
   const meas = ((S.verify || {}).after || {})['1'] || ((S.verify || {}).before || {})['1'], g = S.grid;
   if (meas && g) { const sel = g.map((f, i) => f >= 30 && f <= 100 ? meas[i] : null).filter(v => v != null), mmu = sel.reduce((a, b) => a + b, 0) / sel.length; series.push({y: fs.map(f => { let b = 0; g.forEach((gf, i) => { if (Math.abs(gf - f) < Math.abs(g[b] - f)) b = i; }); return meas[b] - mmu; }), color: '#d65a2a', name: 'measured at the seat', w: 1.8, op: 0.9}); }
   lineChart($('#sfChart'), series, {x: fs, xmin: 20, xmax: 200, ticks: [20, 30, 40, 50, 60, 80, 100, 150, 200], markers: [{f: SF.fb, label: SF.fb.toFixed(0) + ' Hz'}], aria: 'bass response at the main seat from the room model' + (meas ? ' and as measured' : '')});
@@ -186,7 +200,7 @@ function sfSync() {                                                      // show
   const v = SF.view, three = v === '3d'; $('#sfCanvas').hidden = three; $('#sf3dBox').hidden = !three;
   $('#sfBassCtl').hidden = !SF.bass; $('#sfTrebleCtl').hidden = !SF.treble; $('#sfWaveCtl').hidden = !(SF.bass && SF.mode === 'wave');
   $('#sfZRow').hidden = !(SF.bass && (v === 'plan' || three)); $('#sfXRow').hidden = !(SF.bass && (v === 'side' || three)); $('#sfYRow').hidden = !(SF.bass && (v === 'end' || three));
-  $('#sfBassChart').hidden = !(SF.bass || SF.treble); document.querySelectorAll('[data-sfv]').forEach(b => b.classList.toggle('on', b.dataset.sfv === v));
+  $('#sfBassChart').hidden = !(SF.bass || SF.treble); document.querySelectorAll('[data-sftreat]').forEach(b => b.classList.toggle('on', b.dataset.sftreat === SF.treat)); document.querySelectorAll('[data-sfv]').forEach(b => b.classList.toggle('on', b.dataset.sfv === v));
   $('#sfLegend').innerHTML = SF.bass ? `<div class="sf-bar"></div><div class="sf-bar-l"><span>${SF.mode === 'level' ? 'quiet (null)' : 'below normal pressure'}</span><span></span><span>${SF.mode === 'level' ? 'loud (peak)' : 'above normal pressure'}</span></div>` : '';
   $('#sfFbNum').textContent = SF.fb.toFixed(0) + ' Hz'; $('#sfFtNum').textContent = SF.ft >= 1000 ? (SF.ft / 1000).toFixed(1) + ' kHz' : SF.ft + ' Hz';
   $('#sfHNum').textContent = fmtFt(SF.zPlan); $('#sfXNum').textContent = fmtFt(SF.xSide ?? SF.room.W / 2); $('#sfYNum').textContent = fmtFt(SF.yEnd ?? SF.room.L / 2);
@@ -221,7 +235,8 @@ document.addEventListener('change', e => {
   sfRefresh();
 });
 document.addEventListener('click', e => {
-  const m = e.target.closest('[data-sfmode]'), vw = e.target.closest('[data-sfv]'), md = e.target.closest('[data-sfmodebtn]');
+  const m = e.target.closest('[data-sfmode]'), vw = e.target.closest('[data-sfv]'), md = e.target.closest('[data-sfmodebtn]'), tr = e.target.closest('[data-sftreat]');
+  if (tr) { SF.treat = tr.dataset.sftreat; sfRefresh(); }
   if (m) { SF.fb = Math.round(+m.dataset.sfmode); $('#sfFb').value = Math.log(SF.fb / 20) / Math.log(12.5) * 100; sfRefresh(); }
   if (vw) { SF.view = vw.dataset.sfv; sfRefresh(); }
   if (md) { SF.mode = md.dataset.sfmodebtn; document.querySelectorAll('[data-sfmodebtn]').forEach(b => b.classList.toggle('on', b === md)); sfRefresh(); }

@@ -7,6 +7,29 @@ const ftInput = (f, v, ph = '') => `<span class="unit" data-u="ft"><input data-f
 function seatRow(s = {}) {
   return `<div class="seatrow seat"><input data-f="name" value="${esc(s.name)}" placeholder="Name" aria-label="Position name">${ftInput('x_m', s.x_m)}${ftInput('y_m', s.y_m)}${ftInput('z_m', s.z_m, '3.3')}<button class="btn icon ghost" data-del aria-label="Remove position">${icon('x')}</button></div>`;
 }
+let SUB_DB = null;                                              // the hardware database's subwoofers, for the model drop-down on each sub card
+async function subDbLoad() {
+  try { const d = await fetch('/api/hwdb').then(r => r.json()); SUB_DB = Object.values(d.subs || {}).sort((a, b) => (a.brand + a.model).localeCompare(b.brand + b.model)); } catch (e) { SUB_DB = SUB_DB || []; }
+  document.querySelectorAll('#subRows [data-pick="submodel"]').forEach(sel => { const inp = sel.parentElement.querySelector('input[data-f="model"]'), other = !inp.hidden;      // unsaved edits stay: only the lists are refreshed
+    sel.innerHTML = subModelOptions(inp.value); if (other) sel.value = '__other'; if (!inp.value && !other) inp.hidden = true; });
+}
+const subInDb = m => !!m && (SUB_DB || []).some(e => e.model.toLowerCase() === String(m).toLowerCase());
+function subModelOptions(cur) {
+  const db = SUB_DB || [], inDb = subInDb(cur);
+  return `<option value="">${db.length ? 'Choose from the database…' : 'Choose…'}</option>` + db.map(e => `<option value="${esc(e.model)}" ${inDb && e.model.toLowerCase() === cur.toLowerCase() ? 'selected' : ''}>${esc([e.brand, e.model].filter(Boolean).join(' '))}${e.driver_in ? ` (${e.driver_in}")` : ''}</option>`).join('')
+    + `<option value="__other" ${cur && !inDb ? 'selected' : ''}>Other (type it)…</option>`;
+}
+document.addEventListener('change', e => {                      // a model picked from the database fills in its driver, enclosure, size, rated low end and amp; Other lets you type one
+  const pick = e.target.closest('[data-pick="submodel"]'); if (!pick) return;
+  const card = pick.closest('.subcard'), inp = card.querySelector('input[data-f="model"]'), set = (f, v) => { const i = card.querySelector(`[data-f="${f}"]`); if (i && v != null && v !== '') i.value = v; };
+  if (pick.value === '__other') { inp.value = ''; inp.hidden = false; inp.focus(); }
+  else if (pick.value === '') { inp.value = ''; inp.hidden = true; }
+  else {
+    const ent = (SUB_DB || []).find(x => x.model === pick.value); inp.value = pick.value; inp.hidden = true;
+    if (ent) { if (ent.driver_in) set('driver', ent.driver_in + '"'); if (ENCL.includes(ent.design)) set('enclosure', ent.design); set('width_in', ent.width_in); set('height_in', ent.height_in); set('depth_in', ent.depth_in); set('f3_hz', ent.f3_hz); set('amp_w', ent.amp_w);
+      if (!card.querySelector('[data-f="notes"]').value && ent.tuning) set('notes', 'Tuning: ' + ent.tuning); toast('Subs', `${ent.model}: size, driver and ratings filled in from the database.`); }
+  }
+});
 function subCard(o, s = {}, used) {
   const v = k => esc(s[k] ?? '');
   const blank = !Object.values(s).some(x => x !== '' && x != null);
@@ -19,7 +42,8 @@ function subCard(o, s = {}, used) {
       ? `<button type="button" class="btn ghost subrm" data-o="${o}" style="height:26px;padding:0 8px" title="Unplugged, sold or moved: stop using this output for a sub">Remove this sub</button>` : addBtn}</div>${muteNote}
     ${used ? `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency"><option value="30">30 Hz</option><option value="50" selected>50 Hz</option><option value="80">80 Hz</option></select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span></div>` : ''}
     <div class="grid g2">
-      <label class="f">Model<input data-f="model" value="${v('model')}" placeholder="Make and model"></label>
+      <label class="f sub-model">Model<select data-pick="submodel" aria-label="Subwoofer model: pick one from the database or choose Other">${subModelOptions(s.model || '')}</select>
+        <input data-f="model" value="${v('model')}" placeholder="Type the make and model" ${subInDb(s.model) || !s.model ? 'hidden' : ''}></label>
       <label class="f">Role<select data-f="role" title="Nearfield: sits by the seats; the optimizer keeps it near full level and never boosts it">
         <option value="main" ${s.role !== 'nearfield' ? 'selected' : ''}>Main</option>
         <option value="nearfield" ${s.role === 'nearfield' ? 'selected' : ''}>Nearfield</option></select></label>
@@ -75,6 +99,7 @@ function avrProcessing(st) {
 }
 // ---- vendor-aware sub controls (knobs, switches, port plugs the owner sets by hand)
 let VENDORS = null;
+subDbLoad();
 fetch('/api/vendors').then(r => r.json()).then(v => { VENDORS = v; if (roomInit) { roomInit = false; initRoom(); } }).catch(() => {});
 const guessCatalog = m => { const t = (m || '').toLowerCase(); return Object.keys(VENDORS || {}).find(k => (VENDORS[k].match || []).some(x => t.includes(x))) || ''; };
 function hwBlock(o, s) {

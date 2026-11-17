@@ -1207,6 +1207,8 @@ details.card[open] > summary::after { transform: rotate(45deg); }
             <div class="plan plan3d" id="sf3dBox" hidden><canvas id="sf3dCanvas" aria-label="The room in 3D with the sound on slices through it: drag to turn" style="height:clamp(380px,62vh,640px)"></canvas><p class="small" id="sf3dNote" hidden style="padding:10px">3D needs WebGL, which this browser doesn’t offer: use the other views.</p><p class="muted small" style="margin:4px 8px">Drag to turn, scroll to zoom, double-click to reset. Dots are your subs, the black dot is your seat.</p></div>
             <div id="sfLegend"></div></div>
           <div class="sf-side">
+            <div style="margin-bottom:12px"><b>Room treatment</b><div class="seg" role="radiogroup" aria-label="Show the room with or without its treatment" style="margin-top:6px"><button type="button" data-sftreat="with" class="on">With</button><button type="button" data-sftreat="without">Without</button><button type="button" data-sftreat="both">Compare</button></div>
+              <p class="muted small" style="margin:4px 0 0">Uses the items switched on in the Treatment picker. Compare shows the bare room’s bounces in red under the treated ones.</p></div>
             <div id="sfBassCtl"><b>Bass</b>
               <label class="f" style="margin-top:6px">Frequency <b id="sfFbNum"></b><input type="range" id="sfFb" min="0" max="100" step="1" value="38" aria-label="Bass frequency"></label>
               <div class="row" style="gap:6px;flex-wrap:wrap;margin:6px 0 0" id="sfModes" aria-label="Room modes: click one to jump to it"></div>
@@ -1409,7 +1411,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- ROOM -->
     <section class="card" id="roomCard">
       <div class="card-h"><h2>Room</h2><span class="sub">feet, measured from the left wall and the front (screen) wall</span></div>
-      <nav class="jump" aria-label="Jump to a part of this page"><button type="button" data-jump="#rmPlan">Plan</button><button type="button" data-jump="#shapeBox">Shape</button><button type="button" data-jump="#rmScreen">Screen</button><button type="button" data-jump="#rmSeats">Seats</button><button type="button" data-jump="#rmFurniture">Furniture</button><button type="button" data-jump="#rmFixtures">Fixtures</button><button type="button" data-jump="#roomSave">Save</button></nav>
+      <nav class="jump" aria-label="Jump to a part of this page"><button type="button" data-jump="#rmPlan">Plan</button><button type="button" data-jump="#shapeBox">Shape</button><button type="button" data-jump="#rmScreen">Screen</button><button type="button" data-jump="#rmSeats">Seats</button><button type="button" data-jump="#rmFurniture">Furniture</button><button type="button" data-jump="#mdBox">AI modeler</button><button type="button" data-jump="#rmFixtures">Fixtures</button><button type="button" data-jump="#roomSave">Save</button></nav>
       <div class="room-top" id="rmPlan">
         <div>
           <div class="row" style="margin-bottom:8px;gap:8px">
@@ -1501,7 +1503,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="row" style="gap:8px;align-items:center"><select id="fuPreset" aria-label="Kind of couch" style="width:auto"><option value="three">3-seat couch</option><option value="loveseat">Loveseat</option><option value="sectional">Sectional</option><option value="recliner">Recliner</option><option value="custom">Custom size</option></select><button type="button" class="btn ghost" id="addCouch">Add couch</button><button type="button" class="btn ghost" id="addRiser">Add riser</button></div>
 
 
-      <details class="fold" id="mdBox"><summary>Model furniture with measurements or words</summary>
+      <details class="fold" id="mdBox" open><summary><b>AI room modeler</b>: build risers and couches from measurements or words</summary>
         <p class="muted small" style="margin:8px 0">Build a stepped riser with a couch on each tier, from measurements (no AI) or from a description (the AI assistant). The result goes into the list above and the plan and 3D view, <b>not saved</b> until you press Save room; Undo puts the list back.</p>
         <div class="row" style="gap:8px;align-items:end;flex-wrap:wrap" id="mdTiers">
           <label class="f" style="width:90px">Rows<input id="mdRows" type="number" min="1" max="6" value="2"></label>
@@ -1509,6 +1511,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
           <label class="f" style="width:130px">Depth of a tier<span class="unit" data-u="ft"><input id="mdDepth" type="number" step="0.5" min="2" value="4"></span></label>
           <label class="f" style="width:150px">First riser height<span class="unit" data-u="in"><input id="mdFirst" type="number" step="1" min="1" value="8"></span></label>
           <label class="f" style="width:150px">Each tier adds<span class="unit" data-u="in"><input id="mdStep" type="number" step="1" min="1" value="8"></span></label>
+          <label class="cb" style="margin:0"><input type="checkbox" id="mdSeats" checked><span>Place rows under my seats<small>Their positions and heights; the boxes above then only set the tier depth</small></span></label>
           <label class="cb" style="margin:0"><input type="checkbox" id="mdFloor" checked><span>Front row on the floor</span></label>
           <label class="cb" style="margin:0"><input type="checkbox" id="mdCouches" checked><span>A couch on each row</span></label>
           <button type="button" class="btn" id="mdBuild">Build the tiers</button></div>

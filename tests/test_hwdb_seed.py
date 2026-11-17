@@ -100,6 +100,20 @@ def test_the_builder_keeps_only_what_the_page_says():
     assert b.numbers("2,000 W and 17 1/4 in") == [2000.0, 17.25, 17.0, 4.0 and 4.0][:0] or 17.25 in b.numbers("2,000 W and 17 1/4 in")
 
 
+def test_the_starter_database_holds_svs_hsu_and_revel_with_their_known_numbers():
+    d = hwdb.load()
+    subs, spk = d["subs"], d["speakers"]
+    assert len(subs) >= 15 and len(spk) >= 50
+    pb = subs[hwdb.key("PB-2000 Pro")]
+    assert (pb["driver_in"], pb["amp_w"], pb["f3_hz"], pb["design"]) == (12, 550, 16, "ported") and (pb["width_in"], pb["height_in"], pb["depth_in"]) == (17.3, 20.9, 23.6)
+    assert pb["manual_url"].startswith("https://") and pb["source_url"].startswith("https://www.svsound.com/")
+    vtf = subs[hwdb.key("VTF-3 MK5 HP")]
+    assert (vtf["width_in"], vtf["depth_in"], vtf["weight_lb"]) == (17.25, 21.5, 85)                       # 17 1/4 and 21 1/2 inches on the page
+    f208 = spk[hwdb.key("F208")]
+    assert (f208["sensitivity_db"], f208["height_in"], f208["weight_lb"], f208["low_hz"]) == (88.5, 46.6, 80, 31)
+    assert spk[hwdb.key("W228Be")]["kind"] == "in-wall" and spk[hwdb.key("Prime Elevation")]["kind"] == "atmos module"
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
