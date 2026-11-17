@@ -102,8 +102,25 @@ $('#gainRun').onclick = async () => {
   if (!confirm('Check the gain structure?\n\nhtTamer sets the volume with soft pink noise, then plays a quiet 40 Hz tone through the receiver for about 8 seconds while it reads the miniDSP\'s input meter. Everything is put back afterwards.')) return;
   const r = await post('/api/gaincheck', {mode: $('#gainMode').value, avr_input: (S.settings || {}).avr_pi_input}); if (r.error) alert(r.error); gainKey = null; poll();
 };
+// the quick home-type question on Setup (also in Basic mode): saved by itself, the Room page block shows the same record
+let hmKey = null;
+function renderHomeType() {
+  const d = (S.room || {}).dwelling, key = JSON.stringify(d || null); if (!$('#hmKind') || key === hmKey || $('#hmBox').contains(document.activeElement)) return; hmKey = key;
+  $('#hmKind').value = d ? d.kind : ''; const sh = (d && d.shared) || {};
+  $('#hmBelow').checked = !!sh.below; $('#hmAbove').checked = !!sh.above; $('#hmSides').checked = !!sh.sides; $('#hmShared').hidden = !d || d.kind === 'house';
+}
+$('#hmBox').addEventListener('change', async () => {
+  const kind = $('#hmKind').value, old = (S.room || {}).dwelling || {};
+  const d = kind ? {kind, floor: old.floor || null, structure: old.structure || 'unknown', notes: old.notes || '',
+    shared: kind === 'house' ? {below: false, above: false, sides: false} : {below: $('#hmBelow').checked, above: $('#hmAbove').checked, sides: $('#hmSides').checked}} : null;
+  $('#hmShared').hidden = !d || d.kind === 'house';
+  const r = await post('/api/dwelling', {dwelling: d, save: true});
+  if (r.error) { $('#hmMsg').textContent = r.error; return; }
+  $('#hmMsg').textContent = d ? ({none: '', low: 'Saved. Little shared structure, so no changes to the advice.', some: 'Saved. You share walls: htTamer will offer a gentler bass target and quiet hours.', close: 'Saved. You share a floor or ceiling: htTamer will offer a gentler bass target and quiet hours.'}[r.profile.level] || 'Saved.') : 'Cleared.';
+  dwFill(d); hmKey = null; poll();                       // the Room page's block shows it too; the rest of that form is left as it is
+});
 function renderSetup() {
-  renderSmoke(); renderGain();
+  renderSmoke(); renderGain(); renderHomeType();
   const key = JSON.stringify(setupItems());
   if (key === setupKey) return; setupKey = key;
   $('#setupList').innerHTML = setupHtml(); $('#wizSetup').innerHTML = setupHtml();
@@ -137,10 +154,20 @@ function renderSpeakers() {
         <td><span class="unit" data-u="ft"><input data-f="x_ft" type="number" step="0.1" min="0" value="${ftOf(r.x_m)}" style="width:84px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="y_ft" type="number" step="0.1" min="0" value="${ftOf(r.y_m)}" style="width:84px"></span></td>
         <td><span class="unit" data-u="ft"><input data-f="z_ft" type="number" step="0.1" min="0" value="${ftOf(r.z_m)}" style="width:84px"></span></td>
-        <td><span class="row" style="gap:4px;flex-wrap:nowrap"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${r.width_in ?? ''}" placeholder="W" style="width:60px" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${r.height_in ?? ''}" placeholder="H" style="width:60px" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${r.depth_in ?? ''}" placeholder="D" style="width:60px" aria-label="Depth in inches"></span>${(((S.hw_sizes || {}).speakers || {})[c.ch] || {}).source && !r.width_in ? `<div class="muted small">${esc(S.hw_sizes.speakers[c.ch].source)}</div>` : ''}</td>
+        <td><span class="row" style="gap:4px;flex-wrap:nowrap"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${r.width_in ?? ''}" placeholder="W" style="width:60px" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${r.height_in ?? ''}" placeholder="H" style="width:60px" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${r.depth_in ?? ''}" placeholder="D" style="width:60px" aria-label="Depth in inches"></span>${(((S.hw_sizes || {}).speakers || {})[c.ch] || {}).source && !r.width_in ? `<div class="muted small">${esc(S.hw_sizes.speakers[c.ch].source)}</div>` : ''}<button type="button" class="btn ghost hwsize" data-kind="speakers" style="height:24px;padding:0 8px;margin-top:2px" title="Remember this size for this model">Remember size</button></td>
         <td><input data-f="notes" value="${esc(r.notes || '')}" placeholder="Aim, mounting, amp…" style="min-width:140px"></td></tr>`; }).join('')}</tbody></table></div>`;
   $('#spkOut').querySelectorAll('input, select').forEach(x => x.oninput = () => { spkDirty = true; $('#spkMsg').textContent = 'Unsaved changes'; });
 }
+// "Remember size": put a model's cabinet size in the hardware database (subs or speakers), so every room with that model uses it
+document.addEventListener('click', async e => {
+  const b = e.target.closest('.hwsize'); if (!b) return;
+  const box = b.closest('.subcard, tr'), val = f => { const i = box.querySelector(`[data-f="${f}"]`); return i ? i.value.trim() : ''; };
+  const model = val('model'), data = {width_in: val('width_in'), height_in: val('height_in'), depth_in: val('depth_in')};
+  if (!model) { toast('Hardware database', 'Type the make and model first.', 'bad'); return; }
+  if (!data.width_in || !data.height_in || data.depth_in === '') { toast('Hardware database', 'Fill in width, height and depth first.', 'bad'); return; }
+  const r = await post('/api/hwdb', {action: 'save', kind: b.dataset.kind, model, data});
+  if (r.error) toast('Hardware database', r.error, 'bad'); else { toast('Hardware database', `${model}: ${data.width_in} × ${data.height_in} × ${data.depth_in} in remembered.`); hwKey = null; }
+});
 $('#spkSave').onclick = async () => {
   const speakers = {};
   $('#spkOut').querySelectorAll('tr[data-ch]').forEach(tr => {

@@ -98,6 +98,38 @@ def test_quiet_hours_switch_on_once_and_respect_the_owner():
     assert automation._on_time_due(off, {"night_on_at": "22:00"}, _at(23, 59))                   # no off time: stays on until turned off
 
 
+def test_the_assistant_can_set_quiet_hours_but_only_with_real_times():
+    from subtune import assistant, guard
+    assert any(t["name"] == "set_quiet_hours" for t in assistant.TOOLS) and "set_quiet_hours" in guard.CHANGES
+    guard.check("set_quiet_hours", {"start": "22:00", "end": "07:00"}, {})
+    guard.check("set_quiet_hours", {"start": "", "end": ""}, {})
+    for bad in ({"start": "25:00", "end": ""}, {"start": "22:00", "end": "7"}, {"start": 22, "end": ""}):
+        try:
+            guard.check("set_quiet_hours", bad, {})
+        except guard.Refused:
+            continue
+        raise AssertionError(bad)
+    try:
+        guard.check("set_quiet_hours", {"start": "22:00", "end": ""}, {"ai_read_only": 1})
+    except guard.Refused:
+        return
+    raise AssertionError("read-only mode did not stop a change")
+
+
+def test_a_loose_install_record_does_not_count_for_a_door_item():
+    import copy
+    from subtune import room as _room, treatment as T
+    r = {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.4, "construction": "drywall",
+                  "wall_openings": [{"wall": 3, "from_m": 1.0, "width_m": 1.5, "height_m": 2.03, "kind": "double_door"}]},
+         "seats": [{"name": "MLP", "x_m": 2.0, "y_m": 3.8, "z_m": 1.05}], "subs": {}, "speakers": {"FL": {"x_m": 0.8, "y_m": 0.5, "z_m": 1.05}, "FR": {"x_m": 3.2, "y_m": 0.5, "z_m": 1.05}, "C": {"x_m": 2.0, "y_m": 0.4, "z_m": 0.8}},
+         "treatment": {"installed": [{"kind": "absorber", "wall": "left", "qty": 9, "id": "t1"}], "constraints": {}, "history": []}}
+    items = {i["id"]: i for i in T.plan(copy.deepcopy(r), {}, None, _room.modal_report(r, 200))["items"]}
+    assert items["door_3_0"]["installed_qty"] == 0 and items["side_panels"]["installed_qty"] == 9
+    r["treatment"]["installed"] = [{"kind": "absorber", "wall": "left", "qty": 2, "plan_id": "door_3_0", "id": "t2"}]
+    again = {i["id"]: i for i in T.plan(copy.deepcopy(r), {}, None, _room.modal_report(r, 200))["items"]}
+    assert again["door_3_0"]["installed"] is True and again["side_panels"]["installed_qty"] == 0
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

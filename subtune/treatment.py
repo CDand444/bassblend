@@ -24,7 +24,7 @@ from __future__ import annotations
 import math
 import time
 
-from . import furniture, screen, soffit
+from . import fixtures, furniture, screen, soffit
 
 FT = 0.3048
 IN = 0.0254
@@ -229,7 +229,7 @@ OVERLAP_NOTE = {"screen": "the screen is in this area: panels can't go on it, so
                 "opening": "part of this area is an opening to another space: there's no wall to treat there"}
 
 
-def _avoid_soffits(z, rm, spk=None, margin=0.1):
+def _avoid_soffits(z, rm, spk=None, extra=None, margin=0.1):
     """Trim a ceiling zone so it keeps clear of every soffit's footprint and of the height speakers (plus a margin): keep the biggest
     piece left on either side. Returns (zone, names of what it had to clear). A zone with no room left is returned as it was."""
     names = []
@@ -240,6 +240,8 @@ def _avoid_soffits(z, rm, spk=None, margin=0.1):
     for s in (spk or {}).values():
         if s.get("kind") == "height":                        # a cloud right under a height speaker would block it
             boxes.append((s["x_m"] - 0.45, s["x_m"] + 0.45, s["y_m"] - 0.45, s["y_m"] + 0.45, f"the {s['id']} height speaker"))
+    for k in extra or []:                                    # lights, a projector and its beam, vents, sprinklers, in-ceiling speakers
+        boxes.append((k["x0"], k["x1"], k["y0"], k["y1"], k["name"]))
     for x0, x1, y0, y1, name in boxes:
         (a0, a1), (b0, b1) = z["a"], z["b"]
         if x1 <= a0 or x0 >= a1 or y1 <= b0 or y0 >= b1:
@@ -684,6 +686,7 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     notes += dwelling.treatment_notes(room)
     from . import dims as cabinet
     notes += cabinet.aim_notes(room)
+    notes += fixtures.guidance(room)
     couch_notes(room, seats, rt, notes)
     notes += [n for n in (furniture.riser_note(room, s) for s in seats) if n]
     notes += furniture.riser_notes(room)
@@ -728,11 +731,12 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
                 45, "The first reflections of the front speakers off the side walls arrive within a few milliseconds and blur the image.",
                 rect=_seg_rect(e, z), points=pts_)
             overlap_note(z)
+    ko = fixtures.keepouts(room)                           # what lights, a projector, vents and wall or ceiling speakers block
     # ceiling cloud
     z = _zone(refl.get("ceiling") or [], "ceiling", dims)
     cleared = []
     if z:
-        z, cleared = _avoid_soffits(z, rm, spk)
+        z, cleared = _avoid_soffits(z, rm, spk, ko["ceiling"])
     if z:
         add("ceiling_cloud", "Ceiling cloud over the seats", "cloud", "ceiling", z, _panels(z["area_m2"]), "2 x 4 ft",
             4, 6, "Less 'boxy' sound and clearer dialogue; with height speakers, keep it between the front and rear heights.",
@@ -928,6 +932,19 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
         if covered > 0.05 and s1 > s0:
             it["qty"] = max(1, round(it["qty"] * (1 - covered / (s1 - s0))))
             it["qty_note"] = f"{covered / FT:.1f} ft of this wall is a door, window or opening and is left out"
+    for it in items:                                   # and what is on the wall: a wall light, an on-wall or in-wall speaker, a vent
+        z = it.get("zone")
+        if it.get("on_opening") or it.get("freestanding") or not z or not z.get("s") or z.get("edge") is None or it["kind"] not in ("absorber", "diffuser"):
+            continue
+        hit = [(k, fixtures.overlap_area(z, k)) for k in ko["wall"]]
+        hit = [(k, a) for k, a in hit if a > 0.02]
+        if hit:
+            zone_area = max(0.1, (z["s"][1] - z["s"][0]) * (z["b"][1] - z["b"][0]))
+            lost = min(0.85, sum(a for _, a in hit) / zone_area)
+            it["qty"] = max(1, round(it["qty"] * (1 - lost)))
+            it["obstacles"] = sorted({k["name"] for k, _ in hit})
+            it["qty_note"] = ((it.get("qty_note") or "") + (" · " if it.get("qty_note") else "") +
+                              f"panels go around {', '.join(it['obstacles'])} ({lost * 100:.0f}% of the zone)")
     # the underside of a soffit is a flat ceiling-height surface: a thin panel there
     for r in soffit.rects(rm):
         xs, ys = [p[0] for p in r["poly"]], [p[1] for p in r["poly"]]
@@ -946,8 +963,9 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     # installed?
     inst = tr["installed"]
     for it in items:
+        loose = not (it.get("on_opening") or it.get("freestanding") or it.get("on_soffit"))       # doors, windows, stand-ins and soffit panels match only by plan_id
         mine = [x for x in inst if x.get("plan_id") == it["id"] or
-                (not x.get("plan_id") and x.get("kind") == it["kind"] and x.get("wall") == it["wall"])]
+                (loose and not x.get("plan_id") and x.get("kind") == it["kind"] and x.get("wall") == it["wall"])]
         it["installed_qty"] = sum(int(x.get("qty") or 1) for x in mine)
         it["installed"] = it["installed_qty"] >= it["qty"]
     # don't add more absorption to a dead room

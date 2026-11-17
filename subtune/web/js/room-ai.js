@@ -36,7 +36,7 @@ function subCard(o, s = {}, used) {
     <details><summary>More details</summary><div class="grid g2" style="margin-top:8px">
       <label class="f">Height of driver${ftInput('z_m', s.z_m, '1.0')}</label>
       <label class="f">Facing<input data-f="facing" value="${v('facing')}" placeholder="Into the room"></label>
-      <label class="f span2">Cabinet size (in): width, height, depth<span class="row" style="gap:6px"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${v('width_in')}" placeholder="W" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${v('height_in')}" placeholder="H" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${v('depth_in')}" placeholder="D" aria-label="Depth in inches"></span><small class="muted sizesrc"></small></label>
+      <label class="f span2">Cabinet size (in): width, height, depth<span class="row" style="gap:6px"><input data-f="width_in" type="number" step="0.5" min="1" max="120" value="${v('width_in')}" placeholder="W" aria-label="Width in inches"><input data-f="height_in" type="number" step="0.5" min="1" max="120" value="${v('height_in')}" placeholder="H" aria-label="Height in inches"><input data-f="depth_in" type="number" step="0.5" min="0" max="120" value="${v('depth_in')}" placeholder="D" aria-label="Depth in inches"><button type="button" class="btn ghost hwsize" data-kind="subs" title="Remember this size for this model, so any room with it uses it" style="height:30px;padding:0 10px;white-space:nowrap">Remember size</button></span><small class="muted sizesrc">${((((S.hw_sizes || {}).subs || {})[o]) || {}).source && !s.width_in ? 'Using a ' + S.hw_sizes.subs[o].source + ' size.' : ''}</small></label>
       <label class="f">Port tuning<span class="unit" data-u="Hz"><input data-f="tuning_hz" type="number" value="${v('tuning_hz')}"></span></label>
       <label class="f">Rated low end (F3)<span class="unit" data-u="Hz"><input data-f="f3_hz" type="number" value="${v('f3_hz')}"></span></label>
       <label class="f">Amp power<span class="unit" data-u="W"><input data-f="amp_w" type="number" value="${v('amp_w')}"></span></label>
@@ -130,7 +130,7 @@ function initRoom() {
   roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null, soffits: cp(rm.soffits) || []};
   renderShapeEditor(); planKey = null;
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
-  fuRender(r.furniture); scFill(r.screen); dwFill(r.dwelling);
+  fuRender(r.furniture); fxRender(r.fixtures); scFill(r.screen); dwFill(r.dwelling);
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
   document.querySelectorAll('#subRows .subcard').forEach(v3AimRefresh);
@@ -203,7 +203,7 @@ function readRoom() {
   return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
                  outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0), soffits: (sh.soffits || []).filter(s => s.length_m > 0),
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
-          seats, subs, furniture: fuRead(), screen: scRead(), dwelling: dwRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
+          seats, subs, furniture: fuRead(), fixtures: fxRead(), screen: scRead(), dwelling: dwRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
 [['#roomSave', '#roomMsg'], ['#subsSave', '#subsMsg']].forEach(([btn, msg]) => $(btn).onclick = async () => {    // one save for both pages
   $(btn).disabled = true;
@@ -425,7 +425,7 @@ function renderPlan(r) {
   const spk = Object.entries(r.speakers || (S.room || {}).speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([id, s]) => ({id, x_m: s.x_m, y_m: s.y_m, kind: id.startsWith('T') ? 'height' : 'bed', rec: true}));
   // suggested spots come from the saved room: while the outline is being edited, hide the ones now outside it
   const sug = spk.length || !pts ? [] : ((S.placement || {}).speakers || []).filter(s => insidePts(pts, s.x_m, s.y_m)).map(s => ({...s, rec: false}));
-  const key = JSON.stringify([swPick, r.screen, r.room, r.seats, r.subs, r.furniture, spk, sug, roomShape.outline ? 1 : 0]);
+  const key = JSON.stringify([swPick, r.screen, r.room, r.seats, r.subs, r.furniture, r.fixtures, spk, sug, roomShape.outline ? 1 : 0]);
   if (key === planKey && el.querySelector('svg')) return; planKey = key;
   plan3d(r, spk.concat(sug));
   if (!pts) { el.innerHTML = '<p class="muted" style="margin:0;text-align:center">Enter the room length and width<br>to draw a plan.</p>'; return; }
@@ -450,7 +450,7 @@ function renderPlan(r) {
   soHlCtx = {rm: r.room, es, X, Y};
   g += soOpHits(r.room.wall_openings, es, X, Y) + `<g id="soHlLayer">${soHlG(soHl, r.room, es, X, Y)}</g>`;
   if (swPick) es.forEach(e => { if (!e.angled) g += `<line class="swl" data-sw="${e.side}" x1="${X(e.a[0])}" y1="${Y(e.a[1])}" x2="${X(e.b[0])}" y2="${Y(e.b[1])}" stroke="var(--accent)" stroke-width="10" stroke-linecap="round" opacity=".4" style="cursor:pointer"><title>Make this the screen wall</title></line>`; });
-  g += fuPlanSvg(r.furniture, X, Y);
+  g += fuPlanSvg(r.furniture, X, Y) + fxPlanSvg(r.fixtures, X, Y);
   spk.concat(sug).forEach(s => { const c = s.kind === 'height' ? 'var(--s4)' : 'var(--s1)';
     g += `<circle cx="${X(s.x_m)}" cy="${Y(s.y_m)}" r="${s.kind === 'height' ? 4.5 : 5}" fill="${s.rec ? c : 'var(--surface)'}" stroke="${c}" stroke-width="1.5"${s.rec ? '' : ' stroke-dasharray="2 2"'}><title>${esc(s.id)}${s.rec ? '' : ' (suggested spot)'}</title></circle>
       <text x="${X(s.x_m)}" y="${Y(s.y_m) + (s.y_m < L / 2 ? 15 : -8)}" text-anchor="middle" font-size="8.5" fill="var(--text-3)">${esc(s.id)}</text>`; });

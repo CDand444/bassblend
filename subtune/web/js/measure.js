@@ -176,13 +176,13 @@ function pdMove(d) {                                     // what to do to move y
   return parts.length ? parts.join(', ') : 'none';
 }
 function renderPlacement() {
-  const p = S.placement, key = JSON.stringify([p, (S.room || {}).room, (S.room || {}).speakers, (S.room || {}).subs, (S.room || {}).furniture, (S.room || {}).screen]);
+  const p = S.placement, key = JSON.stringify([p, (S.room || {}).room, (S.room || {}).speakers, (S.room || {}).subs, (S.room || {}).furniture, (S.room || {}).fixtures, (S.room || {}).screen]);
   if (key === placeKey) return; placeKey = key;
   if (!p) { $('#placeOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and the main seat position in Room, and the speaker layout in Tune my system.'); return; }
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
   const cmp = (p.compare && p.compare.speakers) ? p.compare : null;
   const pair = s => { const c = cmp && cmp.speakers[s.id]; return (c && c.actual && c.delta) ? c : null; };
-  let g = roomOutlineSvg(p.outline, p.openings, W, L, X, Y) + v3SoffitSvg((S.room || {}).room, p.outline, W, L, X, Y) + `
+  let g = roomOutlineSvg(p.outline, p.openings, W, L, X, Y) + v3SoffitSvg((S.room || {}).room, p.outline, W, L, X, Y) + fxPlanSvg((S.room || {}).fixtures, X, Y) + `
     <line x1="${X(W * .25)}" x2="${X(W * .75)}" y1="${Y(0) + 3}" y2="${Y(0) + 3}" stroke="var(--text-2)" stroke-width="3" stroke-linecap="round"/>
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   p.speakers.forEach(s => {
@@ -245,7 +245,7 @@ function roomOutlineSvg(outline, openings, W, L, X, Y) {
 function trtDrawing(p) {
   const {L, W} = p.room, pad = 26, sc = Math.min(380 / W, 340 / L), X = x => pad + x * sc, Y = y => pad + y * sc;
   const sh = p.shape || {};
-  let g = roomOutlineSvg(sh.outline, sh.openings, W, L, X, Y) + v3SoffitSvg((S.room || {}).room, sh.outline, W, L, X, Y) + `
+  let g = roomOutlineSvg(sh.outline, sh.openings, W, L, X, Y) + v3SoffitSvg((S.room || {}).room, sh.outline, W, L, X, Y) + fxPlanSvg((S.room || {}).fixtures, X, Y) + `
     <text x="${X(W / 2)}" y="${Y(0) - 8}" text-anchor="middle" font-size="10.5" fill="var(--text-3)">screen</text>`;
   const items = p.items;
   // floor and ceiling zones first (underneath)
@@ -286,7 +286,7 @@ function setTrtMode(m) {
   if (m === '3d') trt3dDraw();
 }
 function renderTreatment() {
-  const p = S.treatment, key = JSON.stringify([p, (S.room || {}).furniture, (S.room || {}).subs, (S.room || {}).screen, (S.room || {}).seats]);
+  const p = S.treatment, key = JSON.stringify([p, (S.room || {}).furniture, (S.room || {}).fixtures, (S.room || {}).subs, (S.room || {}).screen, (S.room || {}).seats]);
   if (key !== trtKey) { trtKey = key;
     if (!p) $('#trtOut').innerHTML = empty('Not enough to work with yet', 'Enter the room size and at least the main seat in Room.');
     else {

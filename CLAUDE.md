@@ -44,6 +44,14 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     `avr.hdmi_inputs()` per make. Only Onkyo is hardware-tested.
   - `hwdb.py`: hardware database (receivers/subs/speakers) the owner or, with setting `ai_hwdb`, the
     assistant grows (`hw_lookup`/`hw_save`, plus Claude web_search); used for driver choice and `protect_hz`.
+  - `workshop.py` + `js/workshop.js`: the Sub workshop (Tune > Sub workshop): guided active tuning of a catalog sub's own controls (Hsu: ports, EQ, Q) and a sub crawl, each a
+    list of measured trials (`Rig.probe`, `subtune probe`, started by the owner's Measure press) with score, plain feedback, retests, a final verification.
+  - `fixtures.py`: lights, a ceiling projector (and its beam), fans, vents, sprinkler heads, wall lights, plus on-wall/in-wall/in-ceiling speakers: what
+    they block (`keepouts`) so the treatment plan works around them, and plain guidance; the Room page Fixtures block is `js/fixtures.js`.
+  - `dwelling.py`: house/apartment/condo awareness (neighbor level, gentler target offer, tips; the Room page block, coach steps, quiet hours
+    in `automation.py` via `night_on_at`). `dims.py`: sub aim and cabinet sizes (owner entry > hardware database > typical), `aim_hit`.
+    `view3d.js`: what goes into the 3D view (speakers, subs, treatment solids that never pass through each other); `treatpick.js`: the
+    Treatment page picker (items and value tiers on/off, cost, buy list; kept in localStorage, never changes the plan).
   - `dropbox.py`: optional Dropbox copy of every backup (owner's own scoped app, PKCE sign-in, refresh token in the config folder like an AI key); `_open` is the only network call, tests replace it.
   - `backup.py`: automatic backups (weekly, before an update, on demand) and restore; never holds keys/tokens/PIN
     (`secrets_check`). Card Tools -> Backups, `/api/backups`.
@@ -59,8 +67,8 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
   - `smoke.py`: silent hardware check. `state.py`: state.json (locked read-modify-write), events
   - Data/model: `config.py` (paths, settings), `room.py`, `equip.py`, `dirac.py`, `layout.py`,
     `vendors.py`, `coach.py`, `journal.py`, `helper.py`, `bundle.py`, `auth.py`
-- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 20 parts, loaded in order as
-  classic scripts sharing globals: core, tune, room-ai, furniture, view3d, soffit, enclosure, screen, dwelling, backup, receiver, measure, treatpick, channels, setup-home, liveeq, nav; plus
+- `subtune/web/`: `index.html` (markup + CSS), `js/*.js` (page script in 22 parts, loaded in order as
+  classic scripts sharing globals: core, tune, room-ai, furniture, fixtures, view3d, soffit, enclosure, screen, dwelling, backup, receiver, measure, treatpick, workshop, channels, setup-home, liveeq, nav; plus
   `room3d.js`, a standalone 2D/3D room viewer (`window.RoomView`) shared with `build.html`),
   `manual.html` (user manual, also `/manual`), `setup.html`, `build.html` (phone room builder, `/build`), `logo.svg`.
   Shared globals mean a top-level name declared in two parts makes the browser drop the later file entirely

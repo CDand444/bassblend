@@ -175,6 +175,15 @@ the room and the main seat (feet from the left and front walls, height; azimuth 
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
 - Open rooms: a room that isn't enclosed (an open-plan living room, a large opening) is recorded as wall_openings of kind "opening": a whole wall open is an opening as wide as that wall (from_ft 0, width_ft = the wall's length). get_equipment shows enclosure (closed, partial or open, and which sides). In an open plan room treat the calculated room modes as a rough guide, expect the subs to need more output, and rely on measurements.
+- Fixtures: update_room also records fixtures on the ceiling and walls (lights, a ceiling projector, fans, vents, sprinkler heads, wall lights), \
+and the plan keeps clouds and panels clear of them, of the projector's beam, and of in-ceiling, in-wall and on-wall speakers; get_equipment shows them. \
+Give guidance, not just numbers: panels go around an on-wall speaker, clouds between speakers and lights, dark fabric near a projector, and never over \
+a sprinkler head or a vent (about 18 in and 1 ft clear). Ask where the fixtures are before assuming a clear ceiling.
+- Sub workshop (get_sub_workshop): on the Sub workshop page the owner is guided through two things, each a list of measured trials with feedback after \
+every one and a retest: active tuning of a sub's own controls (for a Hsu VTF-3: ports, then the EQ switch, then Q; one control at a time, every \
+choice measured, the best kept, a final verification) and a sub crawl (the sub at the seat, the mic at places a sub could go; the smoothest spot wins, \
+then verify at the seat). Scores are lower-is-better (distance from the target curve with levels aligned, ripple, reach). Explain the numbers in plain \
+words, say what to do next, and remember that a measurement through a playing tune includes that tune. You can't start a measurement yourself.
 - Sizes, aim and screen frame: get_equipment shows each sub's and speaker's cabinet size (sizes: from the owner, the hardware database, or a \
 typical size for its kind, and which) and each sub's aim_deg. Record real sizes with hw_save (width_in, height_in, depth_in) when you look a model up, \
 and tell the owner when a size is only typical. A sub's aim matters little for low bass, but one firing into a wall a few inches away is blocked and \
@@ -199,7 +208,12 @@ positions: zones are in first_reflection_zones_ft. Be honest: EQ fixes peaks, tr
 and decay; a porous panel only absorbs well down to about 1000 / depth-in-inches Hz (thin 1-2 in. panels do nothing \
 for bass, little below 200 Hz without real depth), and under about 40 Hz the subs and EQ do the work. When the owner \
 names a constraint (budget, looks, walls they can't treat, furniture, WAF), save it with set_treatment_constraints \
-and re-read the plan: blocked walls get freestanding alternatives, the budget marks what's over it. Suggest \
+and re-read the plan: blocked walls get freestanding alternatives, the budget marks what's over it. The plan also has items for \
+the double door or a door where a reflection lands (a panel or heavy curtain hung on the leaf), windows in a reflection zone (heavy curtain), \
+the underside of a soffit, and freestanding panels on stands where the room opens behind the seats; wall panel counts leave doors, windows and \
+openings out; the ceiling cloud follows a sloped ceiling and keeps clear of soffits and height speakers. The owner can switch any item or \
+value group on and off on the Treatment page (3D view and buy list follow it; that choice is theirs and is not in the plan), so say "in the \
+plan" for what htTamer suggests and don't assume what is shown. Suggest \
 practical swaps (bookshelf as diffuser, curtains, art-print panels, a rug) when looks matter. When the owner says \
 they put something up, record it with record_treatment (plan_id from the item when it matches), then suggest a new \
 system report and check-up so before_after can show the change; read before_after rather than guessing. For "what \
@@ -299,6 +313,15 @@ TOOLS = [
     _t("set_night_mode", "Night mode: on = cut ALL bass from the subs (the miniDSP's master mute; no slot is written), "
        "off = the subs play again. Sound tests are refused while it's on. get_overview -> automation shows it.",
        {"on": {"type": "boolean"}}, ["on"], approval=True),
+    _t("get_sub_workshop", "The sub workshop (guided active tuning of a sub's own controls, or a sub crawl to find the best place for it): the "
+       "newest session, or one by id, with every trial's score, the plain-words feedback, what to do next and the recommendation. Read only: "
+       "the owner presses Measure on the Sub workshop page (each measurement plays a sweep), so explain the results and the next step, don't promise to run them.",
+       {"id": {"type": "string", "description": "a session id from the list; omit for the newest"}}, []),
+    _t("set_quiet_hours", "Quiet hours: night mode switches itself on at `start` (HH:MM, 24 hour) and, if `end` is set, off again then. "
+       "Empty string = off. Changes only that setting: it mutes the subs by itself later, so tell the owner the times. Useful in a shared building "
+       "(get_equipment -> neighbors; get_overview -> automation shows the current times).",
+       {"start": {"type": "string", "description": "HH:MM, or empty for never"}, "end": {"type": "string", "description": "HH:MM, or empty for 'stays on until turned off'"}},
+       ["start", "end"], approval=True),
     _t("set_sub_output", "Take a miniDSP output out of the sub list (sub unplugged, sold or moved), put one back, or mute "
        "a removed one on the miniDSP. remove/add write nothing to the miniDSP; tunes made with a removed output go "
        "stale (apply is refused) until it is back or a new tune is optimized from the remaining subs' measurements. "
@@ -402,6 +425,10 @@ TOOLS = [
         "dwelling": {"type": ["object", "null"], "description": "what kind of home this is (null removes it): kind (house, townhouse, apartment, "
                      "condo), floor (basement, ground, upper), structure (wood, concrete, unknown), shared {below, above, sides} (true when "
                      "someone lives below, above or through a wall), notes"},
+        "fixtures": {"type": "array", "items": {"type": "object"}, "description": "the full list of fixtures treatment must work around: kind "
+                     "(recessed_light, light, pendant, fan, projector, vent, sprinkler, sconce, other), name, mount (ceiling or wall), x_ft, y_ft (under it, "
+                     "or on the wall), z_ft (wall fixtures: height of the middle), width_in-style sizes as width_ft, height_ft, depth_ft (how far it hangs "
+                     "or sticks out), notes"},
         "furniture": {"type": "array", "items": {"type": "object"}, "description": "the full list of couches and risers. Couch: kind "
                       "couch, name, x_ft, y_ft (its middle), length_ft, depth_ft, seat_h_ft, back_h_ft, fabric (fabric, microfiber, "
                       "velvet, linen, leather, vinyl), rotation (0 back toward the back wall, 90 left wall, 180 the screen, 270 right wall), "
@@ -542,6 +569,8 @@ DESCRIBE = {
                                  "mute": f"Mute output {i['output']} on the miniDSP (htTamer's slot only)"}.get(
                                      i.get("action"), f"Change sub output {i['output']}"),
     "restore_backup": lambda i: f"Restore the backup {i['name']}: your room, tunes, measurements and settings go back to that moment (a safety copy is made first)",
+    "set_quiet_hours": lambda i: (f"Quiet hours: night mode on by itself at {i['start']}" + (f" and off at {i['end']}" if i.get("end") else " (stays on until you turn it off)")
+                                  if i.get("start") else "Quiet hours off: night mode only comes on when you turn it on"),
     "set_night_mode": lambda i: ("Night mode ON: mute the subs completely (no bass from them)" if i["on"]
                                  else "Night mode OFF: the subs play again"),
     "run_checkup": lambda i: f"Run a check-up at spot {i['pos']} (one sweep through the subs)",
@@ -805,7 +834,7 @@ def _brief(name, inp, out):
     label = {"get_overview": "Looked at the current state", "list_tunes": "Read the saved tunes",
              "simulate_tune": "Tried a tune offline", "save_simulation": "Saved the trial tune",
              "set_target_settings": "Changed the tuning target", "apply_tune": "Applied a tune",
-             "switch_slot": "Switched slot", "set_sub_output": "Changed the sub outputs", "set_night_mode": "Changed night mode", "run_checkup": "Ran a check-up", "run_verify": "Verified",
+             "switch_slot": "Switched slot", "set_sub_output": "Changed the sub outputs", "set_night_mode": "Changed night mode", "get_sub_workshop": "Read the sub workshop", "set_quiet_hours": "Changed quiet hours", "run_checkup": "Ran a check-up", "run_verify": "Verified",
              "level_match": "Compared sub levels", "test_tone": "Played a test tone",
              "start_autotune": "Started auto-tune", "avr_status": "Checked the receiver",
              "avr_control": "Changed the receiver", "run_avr_blend": "Ran the blend test",

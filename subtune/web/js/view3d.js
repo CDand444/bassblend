@@ -84,6 +84,43 @@ function v3Subs(r) {                                             // the subs: a 
     return {kind: 'solid', label: `${+o + 1}`, boxes: [{pts: RoomView.cuboid(s.x_m, s.y_m, cab.w, cab.d, dir), z0: 0, z1: cab.h, fill: css(SUBC[+o % 4]), front: 2, cone: 0.36}]}; });
 }
 
+// fixtures: lights, a projector, fans, vents, sprinkler heads and wall lights, drawn small and solid so a treatment can be seen keeping clear of them
+function v3WallNear(rm, x, y) {                    // the wall nearest a floor point: the point on it and the unit direction into the room
+  const pts = RoomView.outlineOf(rm); if (!pts) return null; let best = null;
+  pts.forEach((a, i) => { const b = pts[(i + 1) % pts.length], ex = b[0] - a[0], ey = b[1] - a[1], l = Math.hypot(ex, ey) || 1e-9, t = Math.max(0, Math.min(1, ((x - a[0]) * ex + (y - a[1]) * ey) / (l * l)));
+    const px = a[0] + ex * t, py = a[1] + ey * t, d = Math.hypot(x - px, y - py); if (!best || d < best.d) best = {d, x: px, y: py, nx: ey / l, ny: -ex / l}; });
+  if (!best) return null;
+  const cx = pts.reduce((s, q) => s + q[0], 0) / pts.length, cy = pts.reduce((s, q) => s + q[1], 0) / pts.length;     // inward = toward the middle of the room
+  let nx = best.nx, ny = best.ny; if ((cx - best.x) * nx + (cy - best.y) * ny < 0) { nx = -nx; ny = -ny; }
+  return {x: best.x, y: best.y, nx, ny};
+}
+function v3Ngon(x, y, d, n = 10) { return Array.from({length: n}, (_, i) => [x + Math.cos(i / n * 6.2832) * d / 2, y + Math.sin(i / n * 6.2832) * d / 2]); }
+function v3Fixtures(r, ceil) {
+  const rm = r.room || {}, out = [], sc = r.screen;
+  (r.fixtures || []).filter(f => f.x_m != null && f.y_m != null).forEach(f => {
+    const w = Math.max(0.04, f.width_m || 0.2), dp = Math.max(0, f.depth_m || 0), h = Math.max(0.04, f.height_m || w), lab = f.name || fxName(f.kind);
+    if (f.mount === 'wall') {
+      const wl = v3WallNear(rm, f.x_m, f.y_m); if (!wl) return; const z = f.z_m ?? 1.8, th = Math.max(0.03, dp);
+      out.push({kind: 'solid', shadow: false, boxes: [{pts: RoomView.cuboid(wl.x + wl.nx * th / 2, wl.y + wl.ny * th / 2, w, th, [wl.nx, wl.ny]), z0: z - h / 2, z1: z + h / 2, fill: f.kind === 'vent' ? '#b8bcc2' : '#f1deaa', front: 2, cone: 0.0}], fixture: true}); return; }
+    const top = ceil(f.x_m, f.y_m), boxes = [];
+    if (f.kind === 'recessed_light') boxes.push({pts: v3Ngon(f.x_m, f.y_m, w), z0: top - 0.02, z1: top, fill: '#f6efc7'});
+    else if (f.kind === 'light') boxes.push({pts: v3Ngon(f.x_m, f.y_m, w), z0: top - Math.max(0.05, dp), z1: top, fill: '#efe6c8'});
+    else if (f.kind === 'pendant') { boxes.push({pts: v3Ngon(f.x_m, f.y_m, 0.02, 6), z0: top - dp + 0.22, z1: top, fill: '#444'}); boxes.push({pts: v3Ngon(f.x_m, f.y_m, w), z0: top - dp, z1: top - dp + 0.24, fill: '#e0c872'}); }
+    else if (f.kind === 'fan') { boxes.push({pts: v3Ngon(f.x_m, f.y_m, 0.28), z0: top - Math.max(0.18, dp), z1: top, fill: '#6f6a60'});
+      [[1, 0], [0, 1]].forEach(v => boxes.push({pts: RoomView.cuboid(f.x_m, f.y_m, 0.16, w, v), z0: top - Math.max(0.18, dp) - 0.02, z1: top - Math.max(0.18, dp), fill: '#8b7a5a'})); }
+    else if (f.kind === 'projector') { boxes.push({pts: RoomView.cuboid(f.x_m, f.y_m, w, w, [0, -1]), z0: top - Math.max(0.1, dp), z1: top, fill: '#3a3a3d', front: 2, cone: 0.3});
+      if (sc) { const zc = (sc.bottom_m || 0) + (sc.height_m || 1) / 2; out.push({line: [[f.x_m, f.y_m - w / 2, top - 0.1], [f.x_m, (sc.behind_m || 0), zc]], color: '#e8b04a', dash: [4, 4], width: 1.2, alpha: 0.7}); } }
+    else if (f.kind === 'vent') boxes.push({pts: RoomView.cuboid(f.x_m, f.y_m, w, h, [0, 1]), z0: top - 0.03, z1: top, fill: '#b8bcc2'});
+    else if (f.kind === 'sprinkler') boxes.push({pts: v3Ngon(f.x_m, f.y_m, Math.max(0.06, w), 8), z0: top - Math.max(0.05, dp), z1: top, fill: '#c43d3d'});
+    else boxes.push({pts: RoomView.cuboid(f.x_m, f.y_m, w, h, [0, 1]), z0: top - Math.max(0.05, dp), z1: top, fill: '#a9a6a0'});
+    out.push({kind: 'solid', shadow: false, boxes, fixture: true, label: f.kind === 'projector' ? lab : ''});
+  });
+  return out;
+}
+function v3Grow(b, m) {                            // a box a little bigger all round: the gap treatments keep from a speaker or fixture
+  const cx = b.pts.reduce((t, q) => t + q[0], 0) / b.pts.length, cy = b.pts.reduce((t, q) => t + q[1], 0) / b.pts.length;
+  return {...b, pts: b.pts.map(q => { const dx = q[0] - cx, dy = q[1] - cy, l = Math.hypot(dx, dy) || 1; return [q[0] + dx / l * m, q[1] + dy / l * m]; }), z0: b.z0 - m, z1: b.z1 + m};
+}
 function v3Seats(r) {                                            // a listener: head at ear height, a dashed line to the floor
   return (r.seats || []).filter(s => s.x_m != null && s.y_m != null).map(s => ({x_m: s.x_m, y_m: s.y_m, z_m: s.z_m || 1.05, kind: 'seat'}));
 }
@@ -115,7 +152,7 @@ function v3Tiles(a, b, zlo, zhi, t, n, cols, rows, fill, alpha, skip) {  // a wa
 
 function v3Treatment(p, room, obst) {                                  // the plan's items as solids; installed ones green, the rest by tier, blocked ones faint
   const out = [], W = p.room.W, L = p.room.L, sh = p.shape || {}, ol = sh.outline && sh.outline.length >= 3 ? sh.outline : [[0, 0], [W, 0], [W, L], [0, L]];
-  const placed = (obst || []).slice();            // what is already there: the speakers, subs and furniture, then each treatment as it is placed
+  const placed = (obst || []).map(b => v3Grow(b, 0.06));            // what is already there: the speakers, subs and furniture, then each treatment as it is placed
   const place = boxes => boxes.filter(b => { if (placed.some(o => v3Hit(b, o))) return false; placed.push(b); return true; });   // an item never passes through another
   const edgeLen = k => Math.hypot(ol[(k + 1) % ol.length][0] - ol[k][0], ol[(k + 1) % ol.length][1] - ol[k][1]);
   const openAt = k => (sh.openings || []).filter(o => o.wall === k);
@@ -165,7 +202,7 @@ function v3Treatment(p, room, obst) {                                  // the pl
 // everything for one 3D view. r = a room as the page holds it ({room, seats, subs, speakers, furniture, screen}); spk = speaker spots.
 function v3Scene(r, spk, plan, extra) {
   const rm = {...r.room, outline: r.room.outline || null, screen: r.screen || null}, ceil = (x, y) => RoomView.ceilAt(rm, x, y);
-  const base = v3Seats(r).concat(v3Subs(r), fuMarks3d(r.furniture), v3Speakers(spk, r, ceil));
+  const base = v3Seats(r).concat(v3Subs(r), fuMarks3d(r.furniture), v3Fixtures({...r, room: rm}, ceil), v3Speakers(spk, r, ceil));
   const marks = base.concat(plan ? v3Treatment(plan, rm, base.flatMap(m => m.boxes || [])) : [], extra || []);
   return {room: rm, marks};
 }

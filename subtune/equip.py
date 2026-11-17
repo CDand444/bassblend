@@ -198,6 +198,8 @@ def update_room(patch: dict, who="page") -> dict:
         body["screen"] = _feet(patch["screen"]) if patch["screen"] else None
     if "dwelling" in patch:                                     # house / apartment / condo; null removes it
         body["dwelling"] = patch["dwelling"] or None
+    if "fixtures" in patch:                                     # the full list of lights, a projector, vents...
+        body["fixtures"] = [_feet(i) for i in patch["fixtures"] or []]
     if "furniture" in patch:                                    # the full list of couches and risers
         body["furniture"] = [_feet(i) for i in patch["furniture"] or []]
     for k in ("goals", "avr"):
@@ -252,7 +254,7 @@ def summary() -> dict:
             "speakers": [{"channel": c, "name": nm.get(c, c), **(spk.get(c) or {})} for c in chans],
             "speakers_missing": [c for c in chans if not (spk.get(c) or {}).get("model")],
             "subs": {str(int(k) + 1): {f: v for f, v in d.items() if v not in (None, "", {})} for k, d in (r.get("subs") or {}).items()},
-            "room": r.get("room"), "enclosure": _enclosure(r), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"),
+            "room": r.get("room"), "enclosure": _enclosure(r), "seats": r.get("seats"), "screen": r.get("screen"), "furniture": r.get("furniture"), "fixtures": r.get("fixtures"),
             "sizes": __import__("subtune.dims", fromlist=["x"]).sizes(r), "dwelling": r.get("dwelling"), "neighbors": __import__("subtune.dwelling", fromlist=["x"]).profile(r),
             "receiver": r.get("avr"), "goals": r.get("goals")}
 

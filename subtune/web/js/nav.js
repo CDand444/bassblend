@@ -62,6 +62,7 @@ const MENU = [
   {grp: 'Survey', key: 'treatment', beta: true, icon: 'panel', title: 'Room treatment', full: 'Room treatment planner', el: $('#trtCard'),
    tag: () => { const t = S.treatment; if (!t) return null; const n = t.items.filter(i => i.tier === 1 && !i.installed && !i.blocked).length; return n ? [String(n), ''] : ['✓', '']; }},
   {grp: 'Tune', key: 'wizard', icon: 'wand', title: 'Tune my system', full: 'Tune my system', el: $('#wizCard'), tag: () => null},
+  {grp: 'Tune', key: 'workshop', beta: true, icon: 'meters', title: 'Sub workshop', full: 'Sub workshop: tune a sub, find its best place', el: $('#wkCard'), tag: () => null},
   {grp: 'Tune', key: 'tunes', icon: 'tunes', title: 'Tunes & slots', full: 'Saved tunes & DSP slots', el: $('#tunesCard'),
    tag: () => liveMaster ? [`slot ${liveMaster.preset + 1}`, ''] : null},
   {grp: 'Tune', key: 'blend', icon: 'avr', title: 'Blend test', full: 'Blend the subs with your speakers', el: $('#blendCard'), home: $('#wizBlend'),
@@ -199,6 +200,7 @@ function openSheet(key, fromHash = false) {
   if (m.key === 'tunes') loadTunes();
   if (m.key === 'updates') loadUpdates();
   if (m.key === 'backups') bkLoad();
+  if (m.key === 'workshop') wkLoad();
   if (m.key === 'feedback') loadFeedback();
   if (m.key === 'automation' || m.key === 'ab') loadAutomation();
   if (m.key === 'mcp') loadMcp();
@@ -246,8 +248,8 @@ function applyHostWords() {                    // the static labels that name wh
 }
 // every page script must have loaded: one that fails to parse would leave whole pages empty, so say which
 (() => {
-  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'view3d.js': 'v3Scene', 'soffit.js': 'soRect', 'enclosure.js': 'enEditorHtml', 'screen.js': 'scRead', 'dwelling.js': 'dwRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
-                'measure.js': 'renderDeep', 'treatpick.js': 'tpHtml', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
+  const need = {'core.js': 'lineChart', 'tune.js': 'initSettings', 'room-ai.js': 'initRoom', 'furniture.js': 'fuRender', 'fixtures.js': 'fxRender', 'view3d.js': 'v3Scene', 'soffit.js': 'soRect', 'enclosure.js': 'enEditorHtml', 'screen.js': 'scRead', 'dwelling.js': 'dwRead', 'backup.js': 'bkLoad', 'channels.js': 'chLoad', 'results.js': 'rsLoad', 'readiness.js': 'rdLoad', 'quickstart.js': 'qsStart', 'receiver.js': 'renderBlend',
+                'measure.js': 'renderDeep', 'treatpick.js': 'tpHtml', 'workshop.js': 'wkLoad', 'setup-home.js': 'renderSetup', 'liveeq.js': 'renderLeq'};
   const missing = Object.entries(need).filter(([, fn]) => typeof window[fn] !== 'function').map(([f]) => f);
   if (missing.length) {
     console.error('[htTamer] scripts that failed to load:', missing);
@@ -315,7 +317,7 @@ async function poll() {
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
-      renderBlend, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness, renderQuickStart};
+      renderBlend, renderWorkshop, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness, renderQuickStart};
     for (const [n, f] of Object.entries(parts)) safe(n, () => f());
     safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }

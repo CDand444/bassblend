@@ -134,6 +134,25 @@ def cmd_measure(a):
     print(json.dumps({str(k): v for k, v in q.items()}, indent=2))
 
 
+def cmd_probe(a):
+    """One workshop measurement (the owner pressed Measure on the Sub workshop page): sweep the session's sub once, analyse, store the trial."""
+    from . import audio, workshop
+    s = workshop.get(a.session)
+    spec = s.get("pending")
+    if not spec:
+        sys.exit("nothing is armed in that workshop session")
+    out0 = s["out"] - 1
+    with busy(f"sub workshop: {spec['label']}"):
+        rig = _rig()
+        if out0 not in rig.subs:
+            sys.exit(f"output {s['out']} is not a sub output")
+        db, q = _restoring(rig, lambda: rig.probe([out0]))
+        s = workshop.get(a.session)                          # fresh copy: the page may have saved a note meanwhile
+        t = workshop.record(s, spec, db, audio.GRID.tolist(), quality=q)
+        workshop.save(s)
+    print(json.dumps({"trial": t["n"], "score": t["metrics"]["score"], "feedback": t["feedback"]}))
+
+
 def cmd_clear(a):
     for f in MEAS_DIR.glob("pos*.npz"):
         f.unlink()
@@ -599,6 +618,7 @@ def main(argv=None):
     s = sp.add_parser("level"); s.add_argument("--snr", type=float, default=40); s.set_defaults(fn=cmd_level)
     s = sp.add_parser("selftest"); s.add_argument("--output"); s.set_defaults(fn=cmd_selftest)
     s = sp.add_parser("measure"); s.add_argument("--pos", type=int, required=True); s.set_defaults(fn=cmd_measure)
+    s = sp.add_parser("probe", help="one sub-workshop measurement (plays a sweep on one sub)"); s.add_argument("--session", required=True); s.set_defaults(fn=cmd_probe)
     sp.add_parser("clear").set_defaults(fn=cmd_clear)
     sp.add_parser("optimize").set_defaults(fn=cmd_optimize)
     s = sp.add_parser("apply"); s.add_argument("--lpf", type=float, help="optional LR4 low-pass Hz")

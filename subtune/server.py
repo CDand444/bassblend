@@ -125,6 +125,20 @@ class Runner:
         self.cmd = " ".join(args[3:])
         return self.cmd
 
+    def start_probe(self, sid):
+        """One sub-workshop measurement for a stored session (its id is a short hex string, checked here)."""
+        import re as _re
+        if not _re.fullmatch(r"[0-9a-f]{8}", str(sid)):
+            raise ValueError("bad session id")
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        from . import automation
+        automation.refuse_if_night("probe")
+        args = [sys.executable, "-m", "subtune", "probe", "--session", str(sid)]
+        self.proc = self._popen(args)
+        self.cmd = " ".join(args[3:])
+        return self.cmd
+
     def start_tone(self, body):
         """Test tone on one sub output; every value range-checked here."""
         if self.running() or load_state().get("busy"):
@@ -848,6 +862,26 @@ def build_executors(origin="assistant"):
         st = automation.set_night(bool(on), "assistant")
         return {**st, "summary": "subs muted for the night" if on else "subs playing again"}
 
+    def sub_workshop(id=None):
+        from . import workshop
+        ls = workshop.listing()
+        if not (id or ls):
+            return {"sessions": [], "summary": "no sub workshop session yet: the owner starts one on the Sub workshop page"}
+        return {"sessions": ls, "session": workshop.view(workshop.get(id or ls[0]["id"]))}
+
+    def quiet_hours(start, end):
+        import re as _re
+        from .config import load_settings as _ls, save_settings as _ss
+        s = _ls()
+        for k, v in (("night_on_at", start), ("night_off_at", end)):
+            v = str(v or "").strip()
+            if v and not _re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v):
+                raise ValueError("times look like 22:00")
+            s[k] = v
+        _ss(s)
+        return {"night_on_at": s["night_on_at"], "night_off_at": s["night_off_at"],
+                "summary": f"quiet hours {s['night_on_at'] or 'off'}" + (f" to {s['night_off_at']}" if s["night_off_at"] else "")}
+
     def _measure(start, key, timeout=180):
         t0 = time.time()
         start()
@@ -1182,7 +1216,7 @@ def build_executors(origin="assistant"):
 
     from . import guard
     return guard.wrap({"get_overview": overview, "list_tunes": tunes, "simulate_tune": simulate, "save_simulation": save_sim,
-            "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot, "set_sub_output": sub_output, "set_night_mode": night_mode,
+            "set_target_settings": set_target, "apply_tune": apply_tune, "switch_slot": switch_slot, "set_sub_output": sub_output, "set_night_mode": night_mode, "set_quiet_hours": quiet_hours, "get_sub_workshop": sub_workshop,
             "run_checkup": checkup, "run_verify": verify, "level_match": level_match, "test_tone": tone,
             "start_autotune": autotune, "avr_status": avr_st, "avr_control": avr_ctl, "run_avr_blend": blend,
             "apply_avr_blend": blend_apply, "keep_fixes": fixes_keep, "undo_fixes": fixes_undo,
@@ -1978,6 +2012,18 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/api/vendors":
             from . import vendors
             return self._send(200, vendors.catalog_view())
+        if u.path == "/api/workshop":                   # the sub workshop: the list, one session, and its curves
+            from . import workshop
+            sid = q.get("id", [""])[0]
+            out = {"sessions": workshop.listing(), "session": None, "grid": None, "curves": None, "subs": [o + 1 for o in load_settings().get("subs", [])]}
+            if sid:
+                try:
+                    s = workshop.get(sid)
+                except ValueError as e:
+                    return self._send(404, {"error": str(e)})
+                from .audio import GRID
+                out.update(session=workshop.view(s), grid=[round(float(f), 3) for f in GRID], curves=workshop.curves(sid)["trials"])
+            return self._send(200, out)
         if u.path == "/api/backups":
             from . import backup
             s = load_settings()
@@ -2015,6 +2061,48 @@ class H(BaseHTTPRequestHandler):
             self.wfile.write(data)
             return
         self._send(404, {"error": "not found"})
+
+    def _workshop(self, body):
+        """Start, measure, retest, apply or delete a sub-workshop session (the Sub workshop page). Measuring plays a sweep: only on the owner's press."""
+        from . import equip, workshop
+        from .room import load_room
+        act = body.get("action")
+        try:
+            if act == "start":
+                out = int(body.get("out"))
+                if out - 1 not in load_settings().get("subs", []):
+                    raise ValueError(f"output {out} is not a sub output")
+                sub = (load_room().get("subs") or {}).get(str(out - 1)) or {}
+                s = workshop.new_session(str(body.get("kind")), out, sub.get("catalog") or None, sub.get("controls") or {}, body.get("spots"))
+                workshop.save(s)
+                return self._send(200, {"session": workshop.view(s)})
+            sid = str(body.get("id") or "")
+            if act == "measure":
+                workshop.arm(sid)
+                event("config", f"sub workshop: measuring {workshop.get(sid)['pending']['label']}")
+                return self._send(200, {"started": RUN.start_probe(sid)})
+            if act == "retest":
+                workshop.arm(sid, int(body.get("trial")))
+                return self._send(200, {"started": RUN.start_probe(sid)})
+            if act == "delete":
+                workshop.delete(sid)
+                return self._send(200, {"sessions": workshop.listing()})
+            if act == "apply":                              # write down what the session found (never touches the sub or the miniDSP)
+                s = workshop.get(sid)
+                rec = workshop.recommendation(s)
+                if s["kind"] == "settings":
+                    if not rec["settings"]:
+                        raise ValueError("no step is finished yet")
+                    equip.update_room({"subs": {str(s["out"]): {"controls": {**s["start_controls"], **rec["settings"]}}}}, who="page")
+                    return self._send(200, {"applied": rec["settings"], "summary": "Recorded on the Subs card: " + rec["summary"]})
+                best = rec["best"][0]["spot"] if rec["best"] else None
+                if not best or best.get("x_m") is None or best.get("y_m") is None:
+                    raise ValueError("the best spot has no position: enter where it is on the Subs card yourself")
+                equip.update_room({"subs": {str(s["out"]): {"x_m": best["x_m"], "y_m": best["y_m"]}}}, who="page")
+                return self._send(200, {"applied": best, "summary": f"Sub {s['out']}'s position set to {best['name']}"})
+        except (ValueError, RuntimeError, OSError) as e:
+            return self._send(400, {"error": str(e)})
+        return self._send(400, {"error": "action must be start, measure, retest, apply or delete"})
 
     def _backups(self, body):
         """Make, restore, delete, upload or set the options of backups (the page's Backups card)."""
@@ -2086,6 +2174,8 @@ class H(BaseHTTPRequestHandler):
             return self._ha_action(path, body)
         if not self._gate(path):
             return
+        if path == "/api/workshop":
+            return self._workshop(body)
         if path == "/api/backups":
             return self._backups(body)
         if path == "/api/hdmi-device":                 # Windows: which of the PC's audio outputs plays receiver tests (empty = automatic)
@@ -2448,6 +2538,9 @@ class H(BaseHTTPRequestHandler):
                 except ValueError as e:
                     return self._send(400, {"error": str(e)})
                 rm = {"dwelling": d}
+                if body.get("save") is True:                 # the Setup page's quick question: store it, merging into the saved room (nothing else changes)
+                    from . import equip
+                    equip.update_room({"dwelling": d}, who="page")
                 return self._send(200, {"ok": True, "profile": dwelling.profile(rm), "tips": dwelling.tips(rm)})
             if path == "/api/room":
                 from .room import load_room, save_room

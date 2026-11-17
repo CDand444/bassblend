@@ -1,5 +1,25 @@
 # htTamer changelog
 
+## Nov 18, 2026 - Sub workshop
+
+- **Sub workshop** (Tune → Sub workshop), two guided workflows with a measurement after every change, plain feedback after each, retests and a verification:
+  - **Tune the sub's own controls**: for a sub picked from the catalog (a Hsu VTF-3: ports, then the EQ switch, then Q). One control at a time: you set it, press Measure, and htTamer scores it against the target curve (shape, ripple, reach), says what changed, keeps the best, and finishes with a verification of the winners. **Record these on the Subs card** writes down the settings (nothing is sent to the sub).
+  - **Sub crawl**: the sub at the seat, the mic at places a sub could go (eight default spots, or your own with positions); the smoothest spots win, then verify at the seat after moving the sub. The best spot can be set as the sub's position.
+  - Every trial has Measure again (is it repeatable?), a chart overlays them, and the assistant can read and explain a session. Each measurement is one sweep through one sub and only starts when you press Measure; night mode blocks it.
+
+## Nov 18, 2026 - fixtures and wall or ceiling speakers in the treatment plan
+
+- **Fixtures** on the Room page: lights, a ceiling projector, fans, vents, sprinkler heads and wall lights, each with a position and size. The plan keeps clouds and panels clear of them (a recessed light, the projector's beam to the screen, 18 in round a sprinkler head, a foot round a vent), reduces panel counts where a wall light or speaker covers the zone, and gives plain guidance for working around each. They appear on the plans and in 3D, where treatment never passes through them.
+- **Speakers on walls and in the ceiling** (set their kind on the Speakers page) are obstacles too: panels leave about 5 in round an on-wall or in-wall speaker and clouds stay clear of in-ceiling and height speakers.
+
+## Nov 18, 2026 - full-stack review fixes
+
+- **Home type on Setup** (reachable in Basic): a quick question that saves by itself, shared with the Room page block.
+- **Remember size**: save a sub's or speaker's cabinet size to the hardware database from its card or row.
+- **Assistant**: a set_quiet_hours tool (guarded, asks first, refused in read-only mode) and the prompt knows the new treatment items and the picker.
+- **Phones**: the header wraps in Advanced mode instead of running off the screen. **Settings file**: the Windows HDMI output name is not carried to another computer.
+- **Installed treatment**: records for doors, windows, stand-ins and soffit panels match only by plan id, so a panel on a wall is no longer counted twice.
+
 ## Nov 18, 2026 - choose what to show on the Treatment page
 
 - **What to show**: beside the plan or 3D view, every item of the treatment plan has a check box (all on by default), grouped by value (Do first, Next, Nice to have, Already installed) with a check box per group and All / None. The plan drawing, the 3D view, the cost and the buy list follow your choice, which is remembered on this device. The summary says how much the shown items still cost and about what share of the plan's benefit they bring.

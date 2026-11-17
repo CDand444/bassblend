@@ -88,6 +88,17 @@ polarity every time, no hardware check reporting a failure, and every run verifi
 **Overall pass** = every step above passes in all three runs and `compare` says PASS. File what failed as an issue with the
 snapshot JSON attached (it holds no keys, PIN or personal details).
 
+## 8. Sub workshop (not yet tried on real hardware)
+
+The Sub workshop (Tune → Sub workshop) measures with `Rig.probe`: one normal sweep through one sub, with the others muted. Everything else is
+tested offline with synthetic curves. On real hardware check, for one sub from the catalog (a Hsu VTF-3, say):
+
+1. **Tuning**: start a Tuning session; Measure should play a single sweep on only that sub and return to the page with a score and feedback; the other subs stay muted
+   and are unmuted afterwards; the receiver input is put back. Run the first Ports choice twice with **Measure again**: the feedback should say it repeats within about 1 dB.
+2. **A real change shows**: plug a port, measure; the feedback should say what moved (less bass at 20 to 30 Hz, a smoother response) in the direction a ported-to-sealed change does.
+3. **Crawl**: put the sub at the seat, measure two mic spots a few feet apart; the scores should differ and the plot should show different curves. Nothing plays unless you press Measure.
+4. **Night mode on**: Measure is refused with the night-mode message.
+
 ## What the app records for you
 
 - **Home → Is it ready?** shows what was connected, set up, verified (with when) and never tested, and whether it is safe to proceed.

@@ -227,6 +227,24 @@ class Rig:
         event("measure", f"{tag}: combined response at pos {pos} captured")
         return Hc
 
+    def probe(self, outputs):
+        """One sweep through the chosen sub output(s) only (the others muted) at the current mic spot, for the sub workshop.
+        Returns (the calibrated response, smoothed 1/12 octave, in dB on GRID, the quality numbers). Plays a normal measurement sweep."""
+        self.wake()
+        sw = self._sweep()
+        sig = np.concatenate([np.zeros(int(PRE * FS)), sw, np.zeros(int(TAIL * FS))])
+        self.dsp.batch(self.mute_except(outputs), f"workshop: only output(s) {[o + 1 for o in outputs]} on")
+        event("measure", f"workshop: sweeping output(s) {[o + 1 for o in outputs]}")
+        try:
+            rec = audio.playrec(self._stereo(sig), self.play, self.rec)
+        finally:
+            self.dsp.batch(self.mute_except(self.subs), "unmute all subs")
+        ir = audio.deconvolve(rec, sw, self.s["sweep_f1"], self.s["sweep_f2"])
+        a = audio.find_arrival(ir, int(PRE * FS), int((PRE + 1.5) * FS))
+        H = audio.apply_cal(audio.window_response(ir, a), self.cal)
+        q = self._quality(rec, a, a + len(sw))
+        return np.round(audio.smooth_db(H, 12), 2), q
+
     def tone(self, out: int, freq=50.0, seconds=3.0, dbfs=None):
         """Play a sine tone on ONE output (others muted) and report whether
         the mic heard it. Switches the owned preset to USB input first."""

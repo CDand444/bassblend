@@ -199,7 +199,7 @@ aside.col { display: none; }
   .chat-fab { bottom: calc(74px + env(safe-area-inset-bottom)) !important; }
 }
 @media (max-width: 600px) {
-  .hbar { padding: 8px 16px; flex-wrap: nowrap; } .col { gap: 16px; }
+  .hbar { padding: 8px 16px; flex-wrap: wrap; } .col { gap: 16px; }
   #inputSeg, #micPill, #dspPill { display: none; }   /* still shown on the Setup checklist and the Home system map */
 }
 
@@ -676,6 +676,15 @@ details.lastone > summary { cursor: pointer; font-weight: 600; font-size: 13.5px
 .plan svg { width: 100%; height: auto; max-height: 380px; display: block; touch-action: none; }
 .plan .vh { cursor: grab; }
 .plan3d { display: block; padding: 0; overflow: hidden; } .plan3d canvas { width: 100%; height: 360px; display: block; cursor: grab; }
+.wk-choices { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 12px; }
+.wk-choice { border: 1px solid var(--border); border-radius: 12px; padding: 14px; } .wk-choice h3 { margin: 0 0 6px; }
+.wk-step { border: 1px solid var(--accent); border-radius: 12px; padding: 14px; background: var(--accent-soft); margin: 0 0 10px; }
+.wk-do { font-size: 16px; font-weight: 600; margin: 4px 0; }
+.wk-fb { margin: 6px 0 0 18px; padding: 0; font-size: 13.5px; } .wk-fb li { margin: 3px 0; }
+.wk-grade { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 9px; border-radius: 999px; background: var(--surface-2); }
+.wk-grade.great, .wk-grade.good { color: var(--good); } .wk-grade.fair { color: var(--warn); } .wk-grade.poor { color: var(--bad); }
+.wk-rec { margin: 14px 0 0; padding: 12px 14px; border-radius: 12px; background: var(--surface-2); } .wk-rec ul, .wk-rec ol { margin: 6px 0 8px 18px; padding: 0; }
+.wk-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 4px 0 10px; }
 .trt-stage { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
 @media (max-width: 1100px) { .trt-stage { grid-template-columns: minmax(0, 1fr); } }
 .trt-pick { border: 1px solid var(--border); border-radius: 12px; padding: 12px; background: var(--surface); position: sticky; top: 12px; max-height: calc(100vh - 24px); overflow: auto; }
@@ -920,6 +929,16 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="card-h"><h2>Setup</h2></div>
       <p class="lead" style="margin-bottom:10px">Everything htTamer needs, in one place.</p>
       <div id="setupList"></div>
+      <div class="notice" id="hmBox" style="margin-top:14px">
+        <b>Where is the theater?</b> <span class="muted small">Bass carries through floors and walls, so htTamer is kinder to neighbors when it knows. Optional; the Room page has the full details.</span>
+        <div class="row" style="align-items:end;gap:10px;margin-top:8px;flex-wrap:wrap">
+          <label class="f" style="width:160px">Home type<select id="hmKind"><option value="">Not entered</option><option value="house">House</option><option value="townhouse">Townhouse</option><option value="apartment">Apartment</option><option value="condo">Condo</option></select></label>
+          <span id="hmShared" class="row" style="gap:12px;flex-wrap:wrap" hidden>
+            <label class="cb" style="margin:0"><input type="checkbox" id="hmBelow"><span>Someone lives below</span></label>
+            <label class="cb" style="margin:0"><input type="checkbox" id="hmAbove"><span>Someone lives above</span></label>
+            <label class="cb" style="margin:0"><input type="checkbox" id="hmSides"><span>Shared wall</span></label></span>
+          <span class="muted small" id="hmMsg"></span></div>
+      </div>
       <div class="row" style="margin-top:14px;align-items:center">
         <button class="btn" id="smokeRun">Check the hardware (silent)</button>
         <span class="muted small">Reads the miniDSP and receiver, listens to the mic for a second, and checks the HDMI output. Plays nothing and changes nothing.</span>
@@ -1156,6 +1175,13 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       </div>
     </section>
 
+    <!-- SUB WORKSHOP -->
+    <section class="card" id="wkCard">
+      <div class="card-h"><h2>Sub workshop</h2><span class="sub" id="wkSubTitle"></span></div>
+      <p class="lead">Guided, hands-on work with one sub, with a measurement after every change and plain feedback after each: tune the sub’s own controls (ports, EQ switch, Q) or crawl the mic round the room to find the best place for it. Every measurement plays one 20-second sweep through that sub, and only when you press Measure.</p>
+      <div id="wkOut"></div>
+    </section>
+
     <!-- TUNES -->
     <section class="card" id="tunesCard">
       <div class="card-h"><h2>Saved tunes</h2></div>
@@ -1329,7 +1355,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
     <!-- ROOM -->
     <section class="card" id="roomCard">
       <div class="card-h"><h2>Room</h2><span class="sub">feet, measured from the left wall and the front (screen) wall</span></div>
-      <nav class="jump" aria-label="Jump to a part of this page"><button type="button" data-jump="#rmPlan">Plan</button><button type="button" data-jump="#shapeBox">Shape</button><button type="button" data-jump="#rmScreen">Screen</button><button type="button" data-jump="#rmSeats">Seats</button><button type="button" data-jump="#rmFurniture">Furniture</button><button type="button" data-jump="#roomSave">Save</button></nav>
+      <nav class="jump" aria-label="Jump to a part of this page"><button type="button" data-jump="#rmPlan">Plan</button><button type="button" data-jump="#shapeBox">Shape</button><button type="button" data-jump="#rmScreen">Screen</button><button type="button" data-jump="#rmSeats">Seats</button><button type="button" data-jump="#rmFurniture">Furniture</button><button type="button" data-jump="#rmFixtures">Fixtures</button><button type="button" data-jump="#roomSave">Save</button></nav>
       <div class="room-top" id="rmPlan">
         <div>
           <div class="row" style="margin-bottom:8px;gap:8px">
@@ -1419,6 +1445,11 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <div class="row" style="gap:8px;align-items:center"><select id="fuPreset" aria-label="Kind of couch" style="width:auto"><option value="three">3-seat couch</option><option value="loveseat">Loveseat</option><option value="sectional">Sectional</option><option value="recliner">Recliner</option><option value="custom">Custom size</option></select><button type="button" class="btn ghost" id="addCouch">Add couch</button><button type="button" class="btn ghost" id="addRiser">Add riser</button></div>
 
 
+      <h3 id="rmFixtures">Fixtures: lights, projector, vents</h3>
+      <p class="muted small" style="margin:0 0 8px">Optional. What hangs from the ceiling or sits on a wall: lights, a ceiling projector, fans, vents, sprinkler heads, wall lights. The treatment plan keeps clouds and panels clear of them (and of the projector’s beam) and says how to work around them. Speakers in the walls and ceiling count already: set their kind on the Speakers page.</p>
+      <div id="fixtureRows"></div>
+      <div class="row" style="gap:8px;align-items:center"><select id="fxPreset" aria-label="Kind of fixture" style="width:auto"><option value="recessed_light">Recessed light</option><option value="light">Ceiling light</option><option value="pendant">Pendant light</option><option value="fan">Ceiling fan</option><option value="projector">Projector</option><option value="vent">Vent or register</option><option value="sprinkler">Sprinkler head</option><option value="sconce">Wall light</option><option value="other">Other</option></select><button type="button" class="btn ghost" id="addFixture">Add fixture</button></div>
+
       <div id="modesBox"></div>
       <div class="save-bar"><button class="btn primary" id="roomSave">Save room</button><span class="muted" id="roomMsg"></span></div>
     </section>
@@ -1501,6 +1532,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/tune.js?v=__V__"></script>
 <script src="/js/room-ai.js?v=__V__"></script>
 <script src="/js/furniture.js?v=__V__"></script>
+<script src="/js/fixtures.js?v=__V__"></script>
 <script src="/js/view3d.js?v=__V__"></script>
 <script src="/js/soffit.js?v=__V__"></script>
 <script src="/js/enclosure.js?v=__V__"></script>
@@ -1510,6 +1542,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/receiver.js?v=__V__"></script>
 <script src="/js/measure.js?v=__V__"></script>
 <script src="/js/treatpick.js?v=__V__"></script>
+<script src="/js/workshop.js?v=__V__"></script>
 <script src="/js/channels.js?v=__V__"></script>
 <script src="/js/results.js?v=__V__"></script>
 <script src="/js/readiness.js?v=__V__"></script>

@@ -23,7 +23,7 @@ import time
 
 WATCH_EVERY_S = 60
 SUB_LEVEL_TOL_DB = 0.5
-SOUND_CMDS = {"level", "selftest", "measure", "verify", "baseline", "checkup", "levelmatch", "headroom", "tone",
+SOUND_CMDS = {"probe", "level", "selftest", "measure", "verify", "baseline", "checkup", "levelmatch", "headroom", "tone",
               "avrblend", "deepcheck", "allspeakers", "fixup", "liveeq", "gaincheck", "discover"}
 
 _mem = {"seen": None, "watched": 0.0, "lock": threading.Lock()}

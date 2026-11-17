@@ -26,6 +26,7 @@ EMPTY = {
     "treatment": {},     # installed acoustic treatment + the owner's constraints (treatment.py)
     "screen": None,      # the TV or projector screen on the front wall (screen.py)
     "dwelling": None,    # house / apartment / condo and who shares its walls (dwelling.py)
+    "fixtures": [],      # lights, a projector, vents, sprinklers, wall lights (fixtures.py): what treatment is planned around
     "furniture": [],     # couches (furniture.py): {id, kind, name, x_m, y_m, length_m, depth_m, seat_h_m, back_h_m, fabric, rotation, against_wall}
     "speakers": {},      # channel ("FL", "TFL", ...) -> {model, kind, size, crossover_hz, x_m, y_m, z_m, aim, amp, notes}
 }
@@ -107,6 +108,9 @@ def save_room(body: dict) -> dict:
     if "dwelling" in body:
         from . import dwelling
         r["dwelling"] = dwelling.clean(body.get("dwelling"))
+    if "fixtures" in body:
+        from . import fixtures
+        r["fixtures"] = fixtures.clean_items(body.get("fixtures"))
     if "furniture" in body:
         from . import furniture
         r["furniture"] = furniture.clean_items(body.get("furniture"))

@@ -36,7 +36,7 @@ VERSION = 1
 PENDING = DATA / "import-pending.json"        # dropped here by the first-boot import (Linux service)
 
 # Settings that describe one computer, not your room: never exported, never imported.
-MACHINE_KEYS = {"minidsp_url", "play_device", "rec_device", "hostapi", "cal_file", "onboarded"}
+MACHINE_KEYS = {"minidsp_url", "play_device", "rec_device", "hostapi", "hdmi_device", "cal_file", "onboarded"}
 # Parts of the dashboard state that are results worth keeping (not busy flags or live readings).
 STATE_KEYS = ("result", "measurements", "grid", "verify", "verify_meta", "checkups", "level_match",
               "analysis", "suggestion", "tone_tests", "avr_blend", "avr_blend_multi", "avr_blend_seats",

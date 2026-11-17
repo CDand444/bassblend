@@ -22,7 +22,7 @@ import time
 SOUND = {"run_checkup", "run_verify", "level_match", "test_tone", "start_autotune", "run_avr_blend",
          "run_system_report", "fix_from_report", "run_headroom", "run_all_speakers", "run_measurement",
          "start_live_analyzer"}
-CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_sub_output", "set_night_mode", "avr_control", "apply_avr_blend",
+CHANGES = SOUND | {"set_target_settings", "apply_tune", "switch_slot", "set_sub_output", "set_night_mode", "set_quiet_hours", "avr_control", "apply_avr_blend",
                    "keep_fixes", "undo_fixes", "update_speakers", "update_room", "update_system", "hw_save",
                    "set_live_eq", "fit_live_eq", "save_live_eq", "save_simulation", "set_treatment_constraints",
                    "record_treatment", "make_backup", "restore_backup"}
@@ -81,14 +81,19 @@ def check(name: str, args: dict, s=None) -> None:
         if slot not in SLOTS:
             raise Refused("slot must be 2, 3 or 4")
     elif name == "update_room":
-        if len(a.get("furniture") or []) > 12 or len((a.get("room") or {}).get("soffits") or []) > 12:
-            raise Refused("at most 12 furniture items and 12 soffits")
+        if len(a.get("furniture") or []) > 12 or len((a.get("room") or {}).get("soffits") or []) > 12 or len(a.get("fixtures") or []) > 24:
+            raise Refused("at most 12 furniture items, 12 soffits and 24 fixtures")
     elif name == "restore_backup":
         if not isinstance(a.get("name"), str) or not a["name"].startswith("htTamer-backup-"):
             raise Refused("name must be a backup from list_backups")
     elif name == "switch_slot":
         if _int(a.get("slot"), "slot") not in SLOTS:
             raise Refused("slot must be 1-4")
+    elif name == "set_quiet_hours":
+        import re
+        for k in ("start", "end"):
+            if not isinstance(a.get(k), str) or (a[k] and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", a[k])):
+                raise Refused("start and end are HH:MM (24 hour) or an empty string")
     elif name == "set_sub_output":
         if a.get("action") not in ("remove", "add", "mute"):
             raise Refused("action must be remove, add or mute")

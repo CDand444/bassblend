@@ -151,6 +151,46 @@ def main():
               if (tpShare(p, tpVisible(p).items) !== Math.round(100 * (20 + 30) / (10 + 10 + 20 + 30))) return 'share ' + tpShare(p, tpVisible(p).items);
               tpSet(['a', 'b'], true); TP_OFF.clear(); return true; })()""") is True)
 
+            # ---- Fixtures: add a projector and a wall light, they are saved with the room, drawn in 3D, and treatment keeps clear of them
+            page.select_option("#fxPreset", "projector"); page.click("#addFixture")
+            page.select_option("#fxPreset", "sconce"); page.click("#addFixture")
+            check("Fixtures: two rows appear", page.evaluate("document.querySelectorAll('#fixtureRows .fxrow').length === 2"))
+            page.click("#roomSave")
+            check("Fixtures: they are saved with the room", until(page, "(S.room.fixtures || []).length === 2 && S.room.fixtures[0].kind === 'projector' && S.room.fixtures[1].mount === 'wall'"))
+            check("Fixtures: 3D draws them and a treatment tile does not pass through one", page.evaluate("""(() => { const r = readRoom(); const rm = {...r.room, outline: r.room.outline || null};
+              const fx = v3Fixtures({...r, room: rm}, (x, y) => rm.height_m || 2.4); if (fx.length < 2) return 'fixtures ' + fx.length;
+              const f = r.fixtures[0], p = {room: {W: rm.width_m, L: rm.length_m, H: rm.height_m}, shape: {}, items: [{id: 'cloud', wall: 'ceiling', kind: 'cloud', tier: 1, qty: 6, thickness_in: 4,
+                rect: {x0: f.x_m - 1, x1: f.x_m + 1, y0: f.y_m - 1, y1: f.y_m + 1}}]};
+              const tiles = (v3Treatment(p, rm, fx.flatMap(m => m.boxes || []))[0] || {boxes: []}).boxes; const all = fx.flatMap(m => m.boxes || []).map(b => v3Grow(b, 0.06));
+              return tiles.length > 0 && tiles.every(t => !all.some(o => v3Hit(t, o))); })()""") is True)
+            page.evaluate("(() => { document.querySelectorAll('#fixtureRows [data-fxdel]').forEach(b => b.click()); })()")
+            page.click("#roomSave")
+            check("Fixtures: removing them clears the list", until(page, "(S.room.fixtures || []).length === 0"))
+
+            # ---- Sub workshop: the page draws a session (next step, feedback, trials, retest, recommendation) from what the server sends
+            page.goto(base + "/#/workshop"); page.wait_for_timeout(500)
+            check("Sub workshop: the start page offers both workflows", page.evaluate("[...document.querySelectorAll('#wkOut [data-wkstart]')].map(b => b.dataset.wkstart).join() === 'settings,crawl' || document.querySelector('#wkOut').textContent.includes('No sub outputs')"))
+            check("Sub workshop: a session shows the step, the feedback, the trials and the best settings", page.evaluate("""(() => {
+              const m = {score: 1.9, grade: 'great', f3_hz: 22, peak_db: 2, peak_hz: 48, null_db: -3, null_hz: 70};
+              const s = {id: 'abcd1234', kind: 'settings', out: 1, status: 'active', steps: [{id: 'ports', why: 'Ports matter.'}],
+                trials: [{n: 1, spec: {label: 'Ports: Both ports open', kind: 'main'}, metrics: m, feedback: ['Ports: Both ports open: very close to the target curve.']}],
+                next: {kind: 'main', step: 'ports', label: 'Ports: 4 inch port open', instruction: 'Set Ports to 4 inch port open, then measure.', progress: [2, 4]}, ranking: [{n: 1, score: 1.9}],
+                recommendation: {kind: 'settings', settings: {ports: 'both'}, wins: [{control: 'ports', label: 'Ports', value: 'both', value_label: 'Both ports open', finished: false}], summary: ''}};
+              WK = {sessions: [], session: s, grid: [20, 30, 40, 60, 80], curves: [{n: 1, label: 'x', db: [0, 1, 2, 1, 0]}], subs: [1]}; wkRender();
+              const t = document.querySelector('#wkOut').textContent;
+              return t.includes('Step 2 of 4') && t.includes('Set Ports to 4 inch port open') && t.includes('Great') && t.includes('Both ports open') && !!document.querySelector('[data-wkretest="1"]') && !!document.querySelector('#wkMeasure'); })()""") is True)
+            page.evaluate("wkLoad(null)")
+
+            # ---- Setup: the home-type question saves by itself and shows on the Room page too
+            page.goto(base + "/#/setup"); page.wait_for_timeout(500)
+            page.select_option("#hmKind", "condo")
+            check("Setup: the home-type question saves", until(page, "S.room.dwelling && S.room.dwelling.kind === 'condo'"))
+            page.check("#hmBelow")
+            check("Setup: shared floor is saved too", until(page, "S.room.dwelling.shared.below === true && document.querySelector('#dwKind').value === 'condo'"))
+            page.select_option("#hmKind", "")
+            check("Setup: clearing it removes it", until(page, "!S.room.dwelling"))
+            page.goto(base + "/#/room"); page.wait_for_timeout(400)
+
             # ---- Speaker placement in 3D: recommended spots, recorded ones, lines between them; ceiling speakers hang from a soffit
             check("Placement 3D: speakers, lines and the soffit-aware ceiling", page.evaluate("""(() => {
               const rm = {length_m: 6, width_m: 4, height_m: 2.4, soffits: [{wall: 0, from_m: 0, length_m: 4, depth_m: 2, bottom_m: 2.0}]};
