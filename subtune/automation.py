@@ -5,7 +5,7 @@ here plays sound, and everything pauses while a test, the blind A/B test or anot
 
   Night mode: the subs are cut completely, with the miniDSP's master mute. It isn't stored in any slot,
       so slot 1 is never touched. Sound tests are refused while it's on, and it can switch itself off at
-      a set time (night_off_at, "HH:MM").
+      a set time (night_off_at, "HH:MM"), and on again at night_on_at (quiet hours; the owner's own choice in between stands).
   Automatic slot: when the receiver's input or listening mode changes, the miniDSP switches to the slot
       the owner chose for it (auto_slot_map: {"in:<input code>": slot, "mode:<mode code>": slot}; a
       listening-mode rule wins over an input rule). Only on a change, so a slot picked by hand stays until
@@ -72,6 +72,36 @@ def _off_time_passed(n: dict, s: dict, now: float) -> bool:
     if target > now:                                  # today's time is still ahead: was yesterday's after it started?
         target -= 86400
     return n.get("since", now) < target <= now
+
+
+def _hhmm(v):
+    try:
+        hh, mm = (int(x) for x in (v or "").strip().split(":"))
+        return hh, mm
+    except ValueError:
+        return None
+
+
+def _on_time_due(n: dict, s: dict, now: float) -> bool:
+    """Quiet hours: night mode switches itself on from night_on_at, once per window. It does not come back on after the
+    owner (or the off time) turned it off since the window began, and it is not turned on after the window ended."""
+    on_at = _hhmm(s.get("night_on_at"))
+    if n.get("on") or not on_at:
+        return False
+    lt = time.localtime(now)
+    start = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, on_at[0], on_at[1], 0, 0, 0, -1))
+    if start > now:
+        start -= 86400
+    if n.get("since", 0) >= start:                    # night mode changed since the window began: the owner's choice stands
+        return False
+    off_at = _hhmm(s.get("night_off_at"))
+    if off_at:
+        end = time.mktime((lt.tm_year, lt.tm_mon, lt.tm_mday, off_at[0], off_at[1], 0, 0, 0, -1))
+        while end <= start:
+            end += 86400
+        if now >= end:
+            return False
+    return True
 
 
 # ------------------------------------------------------------------ automatic slot
@@ -222,6 +252,10 @@ def tick(busy, avr_status, receiver=None, dsp=None, now=None, refresh=lambda: No
             set_night(False, f"switched off at {s.get('night_off_at')}", dsp)
             did.append("night off (time)")
             n = night()
+        if _on_time_due(n, s, now) and not busy():
+            set_night(True, f"quiet hours from {s.get('night_on_at')}", dsp)
+            did.append("night on (quiet hours)")
+            n = night()
 
         if s.get("avr_idle_off_min"):
             did += _idle_off(s, avr_status, receiver, dsp, now, busy)
@@ -315,7 +349,7 @@ def status(s=None) -> dict:
     from .state import load_state
     s = s or load_settings()
     st = load_state()
-    return {"night": st.get("night") or {"on": False}, "night_off_at": s.get("night_off_at") or "",
+    return {"night": st.get("night") or {"on": False}, "night_off_at": s.get("night_off_at") or "", "night_on_at": s.get("night_on_at") or "",
             "auto_slot_on": bool(s.get("auto_slot_on")), "auto_slot_map": s.get("auto_slot_map") or {},
             "auto_slot_last": st.get("auto_slot"),
             "watchdog_on": bool(s.get("watchdog_on")), "watchdog_fix": bool(s.get("watchdog_fix", 1)),

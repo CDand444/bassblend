@@ -636,6 +636,8 @@ def plan(room: dict, state: dict | None = None, placement: dict | None = None, m
     rt = (room_metrics(state).get("report") or {}).get("rt60_mid_s")
     items, notes = [], []
     notes += screen.notes(room, seats)
+    from . import dwelling
+    notes += dwelling.treatment_notes(room)
     couch_notes(room, seats, rt, notes)
     notes += [n for n in (furniture.riser_note(room, s) for s in seats) if n]
     if soffit.front_wall(_rm(room)):

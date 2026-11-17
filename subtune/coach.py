@@ -249,6 +249,18 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
                              ask="The tune isn't as good as it could be. What's limiting it, and what should I change first?"))
     except Exception:                               # noqa: BLE001 - advice must never break the plan
         pass
+    try:                                            # neighbors: offer a gentler bass lift and quiet hours (never applied for the owner)
+        from . import dwelling
+        nb = dwelling.neighbor_target(room, settings.get("house_db"))
+        if nb:
+            out.append(_step(9, "neighbor_target", "tune", f"Use a gentler bass lift for your neighbors ({nb['house_db']:g} dB)",
+                             "You share a wall, floor or ceiling, and deep bass is what carries. A smaller lift below 40 Hz is kinder; the next tune uses it.",
+                             tool="set_target_settings", inp=nb, ask="Set a neighbor-friendly bass target for my home."))
+        if dwelling.profile(room)["level"] in ("some", "close") and not settings.get("night_on_at"):
+            out.append(_step(19, "quiet_hours", "setup", "Set quiet hours",
+                             "Night mode can switch itself on at a set time so the subs go quiet for your neighbors.", who="owner", open="automation"))
+    except Exception:                               # noqa: BLE001
+        pass
     if not st.get("checkups"):
         out.append(_step(16, "checkup", "verify", "Run a check-up", "Room noise, distortion and how long bass rings: 20 seconds.",
                          sound=True, open="checkup", tool="run_checkup", inp={"pos": 1}))

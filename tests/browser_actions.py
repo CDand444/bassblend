@@ -80,6 +80,17 @@ def main():
             check("Enclosure: Closed removes the openings", until(page, "roomShape.wall_openings.filter(o => o.kind === 'opening').length === 0"))
             page.click("#roomSave")
 
+            page.wait_for_timeout(1000)                                  # the save above re-fills the form: let it finish
+            # ---- Where you live: an apartment with someone below shows neighbor advice and is saved with the room
+            page.select_option("#dwKind", "apartment")
+            page.check("#dwBelow")
+            check("Dwelling: advice appears for a shared floor", until(page, "document.querySelector('#dwInfo').textContent.includes('Keep it modest')"))
+            page.click("#roomSave")
+            check("Dwelling: it is saved with the room", until(page, "S.room.dwelling && S.room.dwelling.kind === 'apartment' && S.room.dwelling.shared.below === true"))
+            page.select_option("#dwKind", "")
+            page.click("#roomSave")
+            check("Dwelling: clearing it removes it", until(page, "!S.room.dwelling"))
+
             # ---- Turning the room: Mirror and Undo change the stored room and the form
             before = page.evaluate("S.room.furniture[1].x_m")
             page.click("#roTurn [data-op='cw']")

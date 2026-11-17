@@ -175,6 +175,7 @@ the room and the main seat (feet from the left and front walls, height; azimuth 
 heights) and notes when the room forces a compromise. htTamer doesn't know where the owner's speakers actually \
 are: ask, compare with these, and suggest moves only where they'd be clearly outside the range.
 - Open rooms: a room that isn't enclosed (an open-plan living room, a large opening) is recorded as wall_openings of kind "opening": a whole wall open is an opening as wide as that wall (from_ft 0, width_ft = the wall's length). get_equipment shows enclosure (closed, partial or open, and which sides). In an open plan room treat the calculated room modes as a rough guide, expect the subs to need more output, and rely on measurements.
+- Home type: update_room records dwelling (house, townhouse, apartment or condo, the floor, who shares its floor, ceiling or walls, wood or concrete). get_equipment shows it with the neighbor level (low, some, close). Deep bass carries through floors and walls, so for shared buildings suggest a gentler bass target (a smaller house_db), tests at considerate hours, quiet hours (night mode on by itself), isolation feet under the subs and freestanding treatment instead of drilling. Ask before assuming; never claim a number of dB a neighbor will hear.
 - Screen, furniture and soffits: update_room also records the screen on the front wall (TV or projector screen: size, aspect, \
 acoustically transparent or not, speakers behind it), the couches and risers, and soffits (bulkheads) along the walls. They \
 add viewing-angle, ring-time and ceiling notes to the treatment plan; a TV cannot be acoustically transparent. get_equipment \
@@ -393,6 +394,9 @@ TOOLS = [
                    "projector), diagonal_in, aspect (16:9, 16:10, 4:3, 1.85:1, 2.35:1, 2.40:1), at (acoustically transparent: "
                    "projector screens only), lcr_behind (front speakers behind it; needs at), bottom_ft (lower edge above the floor), "
                    "behind_ft (how far its face is in front of the wall), x_ft (its middle along the wall; omit = centered), notes"},
+        "dwelling": {"type": ["object", "null"], "description": "what kind of home this is (null removes it): kind (house, townhouse, apartment, "
+                     "condo), floor (basement, ground, upper), structure (wood, concrete, unknown), shared {below, above, sides} (true when "
+                     "someone lives below, above or through a wall), notes"},
         "furniture": {"type": "array", "items": {"type": "object"}, "description": "the full list of couches and risers. Couch: kind "
                       "couch, name, x_ft, y_ft (its middle), length_ft, depth_ft, seat_h_ft, back_h_ft, fabric (fabric, microfiber, "
                       "velvet, linen, leather, vinyl), rotation (0 back toward the back wall, 90 left wall, 180 the screen, 270 right wall), "

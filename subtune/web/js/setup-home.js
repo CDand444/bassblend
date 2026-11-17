@@ -524,9 +524,12 @@ $('#nightPill').onclick = () => setNight(!(S.night || {}).on);
 $('#nightBtn').onclick = () => setNight(!(S.night || {}).on);
 $('#nightOff').onchange = async () => { const r = await post('/api/automation', {action: 'settings', night_off_at: $('#nightOff').value});
   $('#nightMsg').textContent = r.error || ($('#nightOff').value ? `Switches off by itself at ${$('#nightOff').value}.` : 'Stays on until you turn it off.'); };
+$('#nightOn').onchange = async () => { const r = await post('/api/automation', {action: 'settings', night_on_at: $('#nightOn').value});
+  $('#nightMsg').textContent = r.error || ($('#nightOn').value ? `Night mode switches on by itself at ${$('#nightOn').value}.` : 'Night mode only comes on when you turn it on.'); };
 function renderAutomation() {
   if (!AUTO) return;
   const k = JSON.stringify(AUTO); if (k === autoKey) return; autoKey = k;
+  if (document.activeElement !== $('#nightOn')) $('#nightOn').value = AUTO.night_on_at || '';
   if (document.activeElement !== $('#nightOff')) $('#nightOff').value = AUTO.night_off_at || '';
   const ai = AUTO.avr_idle || {};
   $('#idleOn').checked = !!ai.minutes;

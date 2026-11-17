@@ -1,5 +1,12 @@
 # htTamer changelog
 
+## Nov 17, 2026 - house, apartment or condo
+
+- **Where you live** on the Room page: home type, floor, who shares your floor, ceiling or walls, wood or concrete. Shared buildings get
+  a gentler bass-lift step on Home, a quiet-hours suggestion, test-timing and sub-placement tips, rental-friendly treatment notes and a
+  structure note on room modes. The assistant can record it too.
+- **Quiet hours**: night mode can switch itself on at a set time (Automation); turning it off yourself overnight is respected.
+
 ## Nov 17, 2026 - 1080p review, folded AI suggestions
 
 - **AI suggestions are folded and closed by default** (suggested setup, per-sub suggestions, room analysis, the phone builder's assumptions

@@ -1024,6 +1024,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
       <p class="muted" style="margin:0 0 8px">Cuts all bass from the subs (the miniDSP's master mute; nothing is written to a slot). Whatever the receiver plays, the subs stay silent until you turn it off. Sound tests wait while it's on. The <b>Night</b> button at the top does the same.</p>
       <div class="row" style="align-items:end">
         <button class="btn primary" id="nightBtn">Turn night mode on</button>
+        <label class="f" style="width:200px">Quiet hours start (night mode on by itself)<input id="nightOn" type="time" title="Empty = never switches on by itself"></label>
         <label class="f" style="width:200px">Switch off by itself at<input id="nightOff" type="time" title="Empty = stays on until you turn it off"></label>
         <span class="muted small" id="nightMsg"></span>
       </div>
@@ -1354,6 +1355,25 @@ details.card[open] > summary::after { transform: rotate(45deg); }
         </div>
       </div>
 
+      <h3 id="rmDwelling">Where you live</h3>
+      <div id="dwBox">
+        <p class="muted small" style="margin:0 0 6px">Bass is what neighbors hear. Say what kind of home this is and htTamer adjusts its advice: a gentler bass target, quiet hours, and what to treat.</p>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">
+          <label class="f">Home type<select id="dwKind"><option value="">Not entered</option><option value="house">House</option><option value="townhouse">Townhouse</option><option value="apartment">Apartment</option><option value="condo">Condo</option></select></label>
+        </div>
+        <div id="dwFields" style="margin-top:8px" hidden>
+          <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">
+            <label class="f">Floor<select id="dwFloor"><option value="">Not sure</option><option value="basement">Basement</option><option value="ground">Ground floor</option><option value="upper">Upper floor</option></select></label>
+            <label class="f">Building is<select id="dwStruct"><option value="unknown">Not sure</option><option value="wood">Wood frame</option><option value="concrete">Concrete or masonry</option></select></label>
+          </div>
+          <label class="cb"><input type="checkbox" id="dwBelow"><span>Someone lives below this room</span></label>
+          <label class="cb"><input type="checkbox" id="dwAbove"><span>Someone lives above this room</span></label>
+          <label class="cb"><input type="checkbox" id="dwSides"><span>This room shares a wall with a neighbor</span></label>
+          <label class="f" style="margin-top:6px">Notes<input id="dwNotes" maxlength="300" placeholder="Neighbor below works nights, HOA quiet hours after 22:00"></label>
+        </div>
+        <div id="dwInfo" style="margin-top:4px"></div>
+      </div>
+
       <h3 id="rmScreen">Screen</h3>
       <div id="scBox">
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end">
@@ -1470,6 +1490,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
 <script src="/js/soffit.js?v=__V__"></script>
 <script src="/js/enclosure.js?v=__V__"></script>
 <script src="/js/screen.js?v=__V__"></script>
+<script src="/js/dwelling.js?v=__V__"></script>
 <script src="/js/backup.js?v=__V__"></script>
 <script src="/js/receiver.js?v=__V__"></script>
 <script src="/js/measure.js?v=__V__"></script>

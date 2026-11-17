@@ -743,7 +743,7 @@ def build_executors(origin="assistant"):
             out["tuning_limits"] = {"error": str(e)[:120]}
         from . import abtest, automation
         a = automation.status(s)
-        out["automation"] = {"night_mode": a["night"], "night_off_at": a["night_off_at"],
+        out["automation"] = {"night_mode": a["night"], "night_off_at": a["night_off_at"], "night_on_at": a["night_on_at"],
                              "auto_slot": {"on": a["auto_slot_on"], "rules": a["auto_slot_map"], "last": a["auto_slot_last"]},
                              "watchdog": {"on": a["watchdog_on"], "fix": a["watchdog_fix"], "keep_sub_level": a["keep_sub_level"],
                                           "last": a["watchdog"]},
@@ -2413,6 +2413,14 @@ class H(BaseHTTPRequestHandler):
                     return self._send(400, {"error": str(e)})
                 event("config", f"room turned: {op}")
                 return self._send(200, {"ok": True, "room": r, "undo": orient_undo_depth()})
+            if path == "/api/dwelling":               # advice for a described home (pure: nothing is saved or played)
+                from . import dwelling
+                try:
+                    d = dwelling.clean(body.get("dwelling"))
+                except ValueError as e:
+                    return self._send(400, {"error": str(e)})
+                rm = {"dwelling": d}
+                return self._send(200, {"ok": True, "profile": dwelling.profile(rm), "tips": dwelling.tips(rm)})
             if path == "/api/room":
                 from .room import load_room, save_room
                 before = load_room().get("subs") or {}
@@ -2608,6 +2616,11 @@ def _automation_action(body):
             if v and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v):
                 raise ValueError("night mode's off time looks like 07:30")
             s["night_off_at"] = v
+        if "night_on_at" in body:
+            v = str(body["night_on_at"] or "").strip()
+            if v and not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", v):
+                raise ValueError("quiet hours start looks like 22:00")
+            s["night_on_at"] = v
         save_settings(s)
         event("config", "automation settings changed")
         return automation.status(s)

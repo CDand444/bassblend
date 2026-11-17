@@ -25,6 +25,7 @@ EMPTY = {
     "goals": "",
     "treatment": {},     # installed acoustic treatment + the owner's constraints (treatment.py)
     "screen": None,      # the TV or projector screen on the front wall (screen.py)
+    "dwelling": None,    # house / apartment / condo and who shares its walls (dwelling.py)
     "furniture": [],     # couches (furniture.py): {id, kind, name, x_m, y_m, length_m, depth_m, seat_h_m, back_h_m, fabric, rotation, against_wall}
     "speakers": {},      # channel ("FL", "TFL", ...) -> {model, kind, size, crossover_hz, x_m, y_m, z_m, aim, amp, notes}
 }
@@ -97,6 +98,9 @@ def save_room(body: dict) -> dict:
     if "screen" in body:
         from . import screen
         r["screen"] = screen.clean(body.get("screen"))
+    if "dwelling" in body:
+        from . import dwelling
+        r["dwelling"] = dwelling.clean(body.get("dwelling"))
     if "furniture" in body:
         from . import furniture
         r["furniture"] = furniture.clean_items(body.get("furniture"))
@@ -246,6 +250,9 @@ def modal_report(room: dict, fmax=150.0) -> dict | None:
     schroeder = 2000 * math.sqrt(0.4 / vol)
     rep = {"modes": modes, "axial": axial, "schroeder_hz": round(schroeder, 0),
            "volume_m3": round(vol, 1), "coupling": {}}
+    from . import dwelling
+    if dwelling.mode_note(room):
+        rep["structure_note"] = dwelling.mode_note(room)
     if irregular or sloped or shape.open_width(rm):
         rep.update(_irregular_notes(rm, box, axial, irregular, sloped, fmax))
     # how strongly each sub drives / each seat hears the first axial + tangential modes

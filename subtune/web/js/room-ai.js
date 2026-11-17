@@ -126,7 +126,7 @@ function initRoom() {
   roomShape = {outline: cp(rm.outline) || null, shape: rm.outline ? (rm.shape || 'custom') : 'rect', wall_openings: cp(rm.wall_openings) || [], ceiling: cp(rm.ceiling) || null, soffits: cp(rm.soffits) || []};
   renderShapeEditor(); planKey = null;
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
-  fuRender(r.furniture); scFill(r.screen);
+  fuRender(r.furniture); scFill(r.screen); dwFill(r.dwelling);
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
 }
@@ -198,7 +198,7 @@ function readRoom() {
   return {room: {length_m: ol, width_m: ow, height_m: toM($('#rH').value), construction: $('#rC').value, openings: $('#rO').value, notes: '',
                  outline: sh.outline ? normPts(sh.outline) : null, shape: sh.shape, wall_openings: sh.wall_openings.filter(o => o.width_m > 0), soffits: (sh.soffits || []).filter(s => s.length_m > 0),
                  ceiling: sh.ceiling && sh.ceiling.kind !== 'flat' ? sh.ceiling : null},
-          seats, subs, furniture: fuRead(), screen: scRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
+          seats, subs, furniture: fuRead(), screen: scRead(), dwelling: dwRead(), avr: $('#rAvr').value, goals: $('#rGoals').value};
 }
 [['#roomSave', '#roomMsg'], ['#subsSave', '#subsMsg']].forEach(([btn, msg]) => $(btn).onclick = async () => {    // one save for both pages
   $(btn).disabled = true;
