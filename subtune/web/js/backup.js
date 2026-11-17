@@ -16,7 +16,7 @@ async function bkLoad() {
       <td>${b.has.room ? 'room' + bkRoom(b.has) + ', ' : ''}${b.has.tunes} tune${b.has.tunes === 1 ? '' : 's'}, ${b.has.measurements} measurement file${b.has.measurements === 1 ? '' : 's'}${b.has.chat ? ', chat' : ''}</td><td>${bkSize(b.size)}</td>
       <td style="white-space:nowrap"><button class="btn" data-bkrestore="${esc(b.name)}" ${busy ? 'disabled' : ''}>Restore</button>
         <a class="btn ghost" href="/api/backups/download?name=${encodeURIComponent(b.name)}" download>Download</a>
-        <button class="btn icon ghost" data-bkdel="${esc(b.name)}" aria-label="Delete this backup">✕</button></td></tr>`).join('')}</tbody></table></div>`
+        <button class="btn icon ghost" data-bkdel="${esc(b.name)}" aria-label="Delete this backup">${icon('x')}</button></td></tr>`).join('')}</tbody></table></div>`
       : '<p class="muted">No backups yet. One is made every week, before every update, and whenever you press the button.</p>');
 }
 async function bkAct(body, busyBtn) {

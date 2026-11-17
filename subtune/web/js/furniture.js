@@ -17,7 +17,7 @@ function fuRiserRow(c = {}) {
       ${num('length_m', c.length_m, 'Width across (ft)')}${num('depth_m', c.depth_m, 'Depth (ft)')}${num('height_m', c.height_m, 'Height (ft)')}
       ${num('x_m', c.x_m, 'Middle from left (ft)')}${num('y_m', c.y_m, 'Middle from front (ft)')}
       <label class="f">Back edge toward<select data-f="rotation">${fuRot(c)}</select></label>
-      <span style="display:flex;gap:6px"><button type="button" class="btn ghost" data-fuback title="Put it against the back wall, middle where it is">Against back wall</button><button type="button" class="btn icon ghost" data-fudel aria-label="Remove riser">✕</button></span>
+      <span style="display:flex;gap:6px"><button type="button" class="btn ghost" data-fuback title="Put it against the back wall, middle where it is">Against back wall</button><button type="button" class="btn icon ghost" data-fudel aria-label="Remove riser">${icon('x')}</button></span>
     </div></div>`;
 }
 function fuRow(c = {}) {
@@ -31,7 +31,7 @@ function fuRow(c = {}) {
       ${num('x_m', c.x_m, 'Middle from left (ft)')}${num('y_m', c.y_m, 'Middle from front (ft)')}
       <label class="f">Fabric<select data-f="fabric">${FU_FABRICS.map(([k, n]) => `<option value="${k}"${(c.fabric || 'fabric') === k ? ' selected' : ''}>${n}</option>`).join('')}</select></label>
       <label class="f">Back faces<select data-f="rotation">${fuRot(c)}</select></label>
-      <span style="display:flex;gap:6px"><button type="button" class="btn ghost" data-fuback title="Put it against the back wall, middle where it is">Against back wall</button><button type="button" class="btn icon ghost" data-fudel aria-label="Remove couch">✕</button></span>
+      <span style="display:flex;gap:6px"><button type="button" class="btn ghost" data-fuback title="Put it against the back wall, middle where it is">Against back wall</button><button type="button" class="btn icon ghost" data-fudel aria-label="Remove couch">${icon('x')}</button></span>
     </div></div>`;
 }
 function fuRead() {

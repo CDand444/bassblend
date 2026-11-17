@@ -117,7 +117,7 @@ def build(st: dict, settings: dict, now: float | None = None) -> dict:
     if lim:
         warns.append("A protective limiter proposal needs your review before it can be applied.")
     if blockers:
-        verdict, summary = "blocked", "Not ready: " + "; ".join(i["label"].lower() + " (" + i["detail"] + ")" for i in blockers)
+        verdict, summary = "blocked", "Fix first: " + "; ".join(i["label"].lower() + " (" + i["detail"] + ")" for i in blockers)
     elif warns:
         verdict, summary = "caution", "Ready to go, with things to know. Nothing plays until you press the button."
     else:

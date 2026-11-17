@@ -29,17 +29,17 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif; }
 main { max-width: 680px; margin: 0 auto; padding: 32px 16px 64px; }
-header { margin-bottom: 22px; }
-header .brand { font-weight: 700; font-size: 15px; color: var(--text-2); margin-bottom: 14px; }
+header { margin-bottom: 24px; }
+header .brand { font-weight: 600; font-size: 15px; color: var(--text-2); margin-bottom: 16px; }
 h1 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.01em; }
 .lead { color: var(--text-2); margin: 0; max-width: 60ch; }
 .progress { display: flex; gap: 6px; margin: 20px 0 0; }
 .progress i { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-3); }
 .progress i.done { background: var(--good); } .progress i.cur { background: var(--accent); }
-.step { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 22px; margin-top: 14px; }
+.step { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-top: 16px; }
 .step.later { opacity: .55; }
 .step .head { display: flex; gap: 12px; align-items: center; }
-.step .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 700; font-size: 13px;
+.step .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none; font-weight: 600; font-size: 13px;
   background: var(--surface-3); color: var(--text-2); }
 .step.done .n { background: var(--good); color: #fff; } .step.cur .n { background: var(--accent); color: #fff; }
 .step h2 { font-size: 17px; margin: 0; flex: 1; }
@@ -49,27 +49,27 @@ h1 { font-size: 26px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -.01em;
 .step p { margin: 0 0 12px; color: var(--text-2); font-size: 14px; max-width: 58ch; }
 .step.done .body, .step.later .body { display: none; }
 .step.done.open .body { display: block; }
-.imp { margin-top: 14px; padding: 14px 18px; border: 1px dashed var(--border); border-radius: 14px; display: flex; gap: 12px;
+.imp { margin-top: 16px; padding: 16px 20px; border: 1px dashed var(--border); border-radius: 14px; display: flex; gap: 12px;
   align-items: center; flex-wrap: wrap; font-size: 14px; color: var(--text-2); }
 .imp b { color: var(--text-1); } .imp .grow { flex: 1 1 260px; }
-label.f { display: flex; flex-direction: column; gap: 5px; font-size: 13px; color: var(--text-2); margin-bottom: 10px; }
-input[type=password], input[type=text] { height: 42px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text);
+label.f { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--text-2); margin-bottom: 12px; }
+input[type=password], input[type=text] { height: 42px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text);
   padding: 0 12px; font: inherit; font-size: 16px; width: 100%; max-width: 360px; }
 input:focus-visible, button:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-select { height: 42px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); color: var(--text); padding: 0 10px; font: inherit; }
-.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.btn { height: 40px; padding: 0 16px; border-radius: 9px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
+select { height: 42px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); padding: 0 12px; font: inherit; }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.btn { height: 40px; padding: 0 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text);
   font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
 .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn.link { border: 0; background: none; color: var(--text-2); padding: 0 6px; font-weight: 500; text-decoration: underline; text-underline-offset: 3px; }
 .btn:disabled { opacity: .55; cursor: default; }
-.msg { font-size: 13.5px; margin: 10px 0 0; min-height: 1.2em; }
+.msg { font-size: 13.5px; margin: 12px 0 0; min-height: 1.2em; }
 .msg.bad { color: var(--bad); } .msg.good { color: var(--good); }
-.note { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; font-size: 13px; color: var(--text-2); margin: 0 0 12px; max-width: 58ch; }
+.note { background: var(--surface-2); border-radius: 10px; padding: 12px 12px; font-size: 13px; color: var(--text-2); margin: 0 0 12px; max-width: 58ch; }
 .found { display: grid; gap: 8px; margin: 0 0 12px; }
-.found button { text-align: left; height: auto; padding: 10px 12px; }
+.found button { text-align: left; height: auto; padding: 12px 12px; }
 .found small { display: block; color: var(--text-3); font-weight: 400; }
-.finish { margin-top: 22px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+.finish { margin-top: 24px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
 .spin { width: 14px; height: 14px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: s .8s linear infinite; }
 @keyframes s { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
@@ -86,7 +86,7 @@ select { height: 42px; border: 1px solid var(--border); border-radius: 9px; back
 <main>
   <header>
     <div class="brand"><img src="/logo.svg" alt="" width="26" height="26" style="vertical-align:-7px;margin-right:8px">htTamer</div>
-    <h1 id="title">Welcome. Let’s set up htTamer.</h1>
+    <h1 id="title">Set up htTamer</h1>
     <p class="lead" id="lead">Four short steps, about five minutes. Nothing here makes a sound, and you can change any of it later from the Setup checklist.</p>
     <div class="progress" id="progress" aria-hidden="true"></div>
   </header>

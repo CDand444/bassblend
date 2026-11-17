@@ -5,7 +5,7 @@ let roomInit = false, roomBuild = 0;
 const ENCL = ['', 'sealed', 'ported', 'passive radiator', 'other'];
 const ftInput = (f, v, ph = '') => `<span class="unit" data-u="ft"><input data-f="${f}" type="number" step="0.1" min="0" value="${toFt(v)}" placeholder="${ph}"></span>`;
 function seatRow(s = {}) {
-  return `<div class="seatrow seat"><input data-f="name" value="${esc(s.name)}" placeholder="Name" aria-label="Position name">${ftInput('x_m', s.x_m)}${ftInput('y_m', s.y_m)}${ftInput('z_m', s.z_m, '3.3')}<button class="btn icon ghost" data-del aria-label="Remove position">✕</button></div>`;
+  return `<div class="seatrow seat"><input data-f="name" value="${esc(s.name)}" placeholder="Name" aria-label="Position name">${ftInput('x_m', s.x_m)}${ftInput('y_m', s.y_m)}${ftInput('z_m', s.z_m, '3.3')}<button class="btn icon ghost" data-del aria-label="Remove position">${icon('x')}</button></div>`;
 }
 function subCard(o, s = {}, used) {
   const v = k => esc(s[k] ?? '');
@@ -110,7 +110,7 @@ function hwCheck(card) {
   if (st.lpf && st.lpf !== 'lfe' && st.lpf !== 'off') notes.push(['warn', `Low-pass at ${st.lpf} Hz while the receiver also crosses over: the filters stack. LFE/off is recommended.`]);
   if (st.lpf_mode === '80' || st.lpf_mode === '50') notes.push(['warn', `Low-pass at ${st.lpf_mode} Hz / 24 dB while the receiver also crosses over: the filters stack. The 12 dB / AVR setting is recommended.`]);
   if (st.power === 'off') notes.push(['danger', 'Power switch OFF: this sub won’t play.']);
-  box.innerHTML = notes.map(([l, t]) => `<div class="hwnote ${l}">${l === 'danger' ? '⚠ ' : ''}${esc(t)}</div>`).join('');
+  box.innerHTML = notes.map(([l, t]) => `<div class="hwnote ${l}">${l === 'danger' ? icon('warn') + ' ' : ''}${esc(t)}</div>`).join('');
 }
 $('#subsCard').addEventListener('change', e => {
   const card = e.target.closest('.subcard'); if (!card) return;
@@ -288,13 +288,13 @@ function renderShapeEditor() {
     <p class="muted small" style="margin:6px 0">In order around the room, feet from the left wall and the front (screen) wall. Drag them on the plan, or click + on a wall to add a corner.</p>
     <div class="crow muted small" aria-hidden="true"><span>#</span><span>From left</span><span>From front</span><span></span></div>
     ${pts.map((p, i) => `<div class="crow"><b>${i + 1}</b>${ftIn(`data-cx="${i}" aria-label="Corner ${i + 1} from left"`, p[0])}${ftIn(`data-cy="${i}" aria-label="Corner ${i + 1} from front"`, p[1])}
-      <button type="button" class="btn icon ghost" data-cdel="${i}" aria-label="Remove corner ${i + 1}" ${pts.length <= 3 ? 'disabled' : ''}>✕</button></div>`).join('')}</details>`;
+      <button type="button" class="btn icon ghost" data-cdel="${i}" aria-label="Remove corner ${i + 1}" ${pts.length <= 3 ? 'disabled' : ''}>${icon('x')}</button></div>`).join('')}</details>`;
   h += `<details ${ops.length ? 'open' : ''}><summary>Openings, doors and windows (${ops.length})</summary>
     <p class="muted small" style="margin:6px 0">An opening to another room or an open-plan space has no wall: no reflection, no panel, no corner trap there. Distance is along the wall from its first corner (the corner with the same number). Leave the height empty for floor to ceiling.</p>
     ${ops.map((o, j) => `<div class="orow">
       <select data-ow="${j}" aria-label="Wall" style="grid-column:span 2">${es.map(e => `<option value="${e.i}" ${e.i === o.wall ? 'selected' : ''}>${esc(edgeLabel(e))}</option>`).join('')}</select>
       <select data-ok="${j}" aria-label="What it is">${OPEN_KINDS.map(([k, n]) => `<option value="${k}" ${k === o.kind ? 'selected' : ''}>${n}</option>`).join('')}</select>
-      <button type="button" class="btn icon ghost" data-odel="${j}" aria-label="Remove opening">✕</button>
+      <button type="button" class="btn icon ghost" data-odel="${j}" aria-label="Remove opening">${icon('x')}</button>
       <label class="f">From corner${ftIn(`data-of="${j}"`, o.from_m)}</label><label class="f">Width${ftIn(`data-owd="${j}"`, o.width_m)}</label><label class="f">Height${ftIn(`data-oh="${j}"`, o.height_m, 'full')}</label></div>`).join('')}
     <button type="button" class="btn ghost" id="addOpening" ${es.length ? '' : 'disabled title="Enter the room size first"'}>Add opening</button></details>`;
   h += soEditorHtml(sh, es, ftIn);
@@ -740,8 +740,8 @@ function renderChat() {
   if (key === chatKey) return; chatKey = key;
   const log = $('#chatLog');
   let h = '';
-  if (!CHAT.display.length) h = `<div class="msg assistant"><p>${S.ai_key ? 'Hi! I can run checks, try tune ideas offline, compare tunes, and control the receiver. I’ll always ask before playing sound or changing anything.'
-    : 'Hi! I’m htTamer’s built-in helper. With no AI provider set up I can still explain your results, your subs and receiver settings, and what to do next. Add an AI provider in Setup → AI analysis for a full assistant that can run tests for you.'}</p></div>
+  if (!CHAT.display.length) h = `<div class="msg assistant"><p>${S.ai_key ? 'I can run checks, try tune ideas offline, compare tunes, and control the receiver. I’ll always ask before playing sound or changing anything.'
+    : 'This is htTamer’s built-in helper. With no AI provider set up I can still explain your results, your subs and receiver settings, and what to do next. Add an AI provider in Setup → AI analysis for a full assistant that can run tests for you.'}</p></div>
     <div class="chips2">${SUGGEST.map(s => `<button type="button" data-s="${esc(s)}">${esc(s)}</button>`).join('')}</div>`;
   CHAT.display.forEach(d => {
     if (d.role === 'user') h += `<div class="msg user">${esc(d.text)}</div>`;

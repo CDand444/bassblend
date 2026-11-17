@@ -30,6 +30,7 @@ const IC = {
   panel: '<rect x="2" y="2.5" width="4" height="11" rx=".6"/><rect x="10" y="2.5" width="4" height="11" rx=".6"/><path d="M6 5.5h4M6 10.5h4"/>',
   eq: '<path d="M1.5 10c2 0 2.5-6 4.5-6s2 9 4.5 9 2.5-5 4-5"/><circle cx="6" cy="4" r="1.3"/><circle cx="10.5" cy="13" r="1.3"/>',
 };
+IC.x = '<path d="M4 4l8 8M12 4l-8 8"/>'; IC.warn = '<path d="M8 2.5l6 10.5H2z"/><path d="M8 7v3M8 11.6v.1"/>'; IC.moon = '<path d="M13 9.5A5.5 5.5 0 0 1 6.5 3a5.5 5.5 0 1 0 6.5 6.5z"/>';
 const icon = k => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${IC[k]}</svg>`;
 let seenErrors = 0;
 try {   // first visit: count only errors from now on, not old history
@@ -111,7 +112,7 @@ const RISK = {
 const RISKY = {wizard: 'sound', blend: 'sound', liveeq: 'sound', report: 'sound', allspk: 'sound', checkup: 'sound', headroom: 'loud', tunes: 'dsp', filters: 'dsp'};
 MENU.forEach(m => { const r = RISKY[m.key]; if (!r || !m.el || m.el.querySelector(':scope > .risk')) return;
   const h = m.el.querySelector(':scope > .card-h'); const n = document.createElement('div'); n.className = 'risk'; n.setAttribute('role', 'note');
-  n.innerHTML = `<b>⚠ ${r === 'dsp' ? 'Changes your DSP' : 'Plays sound'}</b><span>${RISK[r]}</span>`;
+  n.innerHTML = `<b>${icon('warn')} ${r === 'dsp' ? 'Changes your DSP' : 'Plays sound'}</b><span>${RISK[r]}</span>`;
   if (h) h.after(n); else m.el.prepend(n); });
 MENU.filter(m => m.beta).forEach(m => { const h = m.el.querySelector('h2'); if (h && !h.querySelector('.beta')) h.insertAdjacentHTML('beforeend', ' <span class="beta" title="New, or not yet proven on every system">Beta</span>'); });
 MENU.forEach(m => { if (m.key !== 'home') homeOf(m).appendChild(m.el); });   // pages wait off-screen until opened
@@ -222,6 +223,7 @@ document.addEventListener('keydown', e => {
 });
 new ResizeObserver(() => document.documentElement.style.setProperty('--hbar-h', $('header').offsetHeight + 'px')).observe($('header'));
 openSheet(routeKey() || 'home', true);
+if (uiMode) setMode(uiMode, false);                           // light up the saved choice in the header
 
 // ---------- polling
 // Each part of the page redraws on its own: one that fails is logged (browser console, and once to

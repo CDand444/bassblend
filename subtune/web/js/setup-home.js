@@ -511,7 +511,7 @@ async function loadAutomation() {
 function renderNight() {
   const on = !!(S.night || {}).on, b = $('#nightPill');
   b.classList.toggle('on', on); b.setAttribute('aria-pressed', String(on));
-  b.textContent = on ? '☾ Night: subs off' : '☾ Night';
+  b.innerHTML = icon('moon') + (on ? ' Night: subs off' : ' Night');
   const nb = $('#nightBtn'); if (nb) { nb.textContent = on ? 'Turn night mode off' : 'Turn night mode on'; nb.classList.toggle('danger', on); }
 }
 async function setNight(on) {
