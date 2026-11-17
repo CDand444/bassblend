@@ -54,6 +54,62 @@
    "source_url": "https://www.svsound.com/products/pb-1000-pro-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb-1000pro_manual_web_02252025.pdf?v=1740519639"
   },
+  "pb12nsd": {
+   "brand": "SVS",
+   "model": "PB12-NSD",
+   "driver_in": 12.0,
+   "amp_w": 400.0,
+   "f3_hz": 18.0,
+   "ports": "Single 4\"",
+   "freq_response": "18-150 Hz ±3dB",
+   "width_in": 17.3,
+   "height_in": 20.9,
+   "depth_in": 22.0,
+   "weight_lb": 66.0,
+   "source_url": "https://www.svsound.com/products/pb12-nsd"
+  },
+  "pb12plus": {
+   "brand": "SVS",
+   "model": "PB12-Plus",
+   "driver_in": 12.0,
+   "amp_w": 800.0,
+   "f3_hz": 18.0,
+   "design": "ported",
+   "ports": "Triple 3\"",
+   "freq_response": "18-250 Hz ± 3 dB (20 Hz mode)",
+   "width_in": 19.8,
+   "height_in": 22.0,
+   "depth_in": 26.6,
+   "weight_lb": 127.0,
+   "source_url": "https://www.svsound.com/products/pb12-plus"
+  },
+  "pb13ultra": {
+   "brand": "SVS",
+   "model": "PB13-Ultra",
+   "driver_in": 13.5,
+   "amp_w": 1000.0,
+   "f3_hz": 17.0,
+   "ports": "Triple 3.5\"",
+   "freq_response": "17-200 Hz ±3 dB (20 Hz mode)",
+   "width_in": 20.5,
+   "height_in": 22.5,
+   "depth_in": 28.0,
+   "weight_lb": 155.0,
+   "source_url": "https://www.svsound.com/products/pb13-ultra"
+  },
+  "pb16ultra": {
+   "brand": "SVS",
+   "model": "PB16-Ultra",
+   "driver_in": 16.0,
+   "amp_w": 1500.0,
+   "f3_hz": 15.0,
+   "freq_response": "15-280 Hz +/- 3 dB (standard mode)",
+   "width_in": 21.7,
+   "height_in": 25.0,
+   "depth_in": 30.9,
+   "source_url": "https://www.svsound.com/products/pb16-ultra",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb16-ultra_manual_08122024.pdf?v=1723487549"
+  },
   "pb17ultrarevolution": {
    "brand": "SVS",
    "model": "PB17-Ultra R|Evolution",
@@ -67,6 +123,19 @@
    "depth_in": 29.3,
    "source_url": "https://www.svsound.com/products/pb17-ultra-revolution-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb17-ultra_revolution_manual_web_08062026.pdf?v=1786115487"
+  },
+  "pb2000": {
+   "brand": "SVS",
+   "model": "PB-2000",
+   "driver_in": 12.0,
+   "amp_w": 500.0,
+   "f3_hz": 17.0,
+   "design": "ported",
+   "freq_response": "17-260 Hz ± 3 dB",
+   "width_in": 17.3,
+   "height_in": 20.9,
+   "depth_in": 23.2,
+   "source_url": "https://www.svsound.com/products/pb-2000"
   },
   "pb2000pro": {
    "brand": "SVS",
@@ -82,6 +151,20 @@
    "source_url": "https://www.svsound.com/products/pb-2000-pro",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb-2000pro_manual_web_02252025.pdf?v=1740519640"
   },
+  "pb3000": {
+   "brand": "SVS",
+   "model": "PB-3000",
+   "driver_in": 13.0,
+   "amp_w": 800.0,
+   "f3_hz": 16.0,
+   "design": "ported",
+   "freq_response": "16-260 Hz ±3 dB (standard mode)",
+   "width_in": 18.3,
+   "height_in": 21.9,
+   "depth_in": 26.0,
+   "source_url": "https://www.svsound.com/products/pb-3000",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb-3000_manual_12302019_0a5cdaa1-987f-4379-a6c8-6b334dbcedf6.pdf?v=1782328042"
+  },
   "pb3000revolution": {
    "brand": "SVS",
    "model": "PB-3000 R|Evolution",
@@ -95,6 +178,20 @@
    "depth_in": 24.7,
    "source_url": "https://www.svsound.com/products/pb-3000-revolution-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb-3000_revolution_manual_web_08062026.pdf?v=1786115486"
+  },
+  "pb4000": {
+   "brand": "SVS",
+   "model": "PB-4000",
+   "driver_in": 13.5,
+   "amp_w": 1200.0,
+   "f3_hz": 16.0,
+   "design": "ported",
+   "freq_response": "16-200 Hz ±3 dB (standard mode)",
+   "width_in": 20.5,
+   "height_in": 23.4,
+   "depth_in": 30.0,
+   "source_url": "https://www.svsound.com/products/pb-4000",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb-4000_manual_02252025.pdf?v=1740519638"
   },
   "pb5000revolution": {
    "brand": "SVS",
@@ -110,6 +207,18 @@
    "source_url": "https://www.svsound.com/products/pb-5000-revolution-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pb-5000_revolution_manual_web_08062026.pdf?v=1786115487"
   },
+  "pc2000": {
+   "brand": "SVS",
+   "model": "PC-2000",
+   "driver_in": 12.0,
+   "amp_w": 500.0,
+   "f3_hz": 16.0,
+   "freq_response": "16-260 Hz ± 3 dB",
+   "width_in": 16.6,
+   "height_in": 34.34,
+   "depth_in": 16.6,
+   "source_url": "https://www.svsound.com/products/pc-2000"
+  },
   "pc2000pro": {
    "brand": "SVS",
    "model": "PC-2000 Pro",
@@ -123,6 +232,34 @@
    "depth_in": 16.6,
    "source_url": "https://www.svsound.com/products/pc-2000-pro",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pc-2000pro_manual_web_02252025.pdf?v=1740519640"
+  },
+  "pc4000": {
+   "brand": "SVS",
+   "model": "PC-4000",
+   "driver_in": 13.5,
+   "amp_w": 1200.0,
+   "f3_hz": 17.0,
+   "design": "ported",
+   "freq_response": "17-200 Hz ±3 dB (standard mode)",
+   "width_in": 16.6,
+   "height_in": 47.0,
+   "depth_in": 16.6,
+   "weight_lb": 92.4,
+   "source_url": "https://www.svsound.com/products/pc-4000",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/pc-4000_manual_02252025.pdf?v=1740519638"
+  },
+  "sb1000": {
+   "brand": "SVS",
+   "model": "SB-1000",
+   "driver_in": 12.0,
+   "amp_w": 300.0,
+   "f3_hz": 24.0,
+   "design": "sealed",
+   "freq_response": "24-260 Hz ±3dB",
+   "width_in": 13.0,
+   "height_in": 13.5,
+   "depth_in": 14.0,
+   "source_url": "https://www.svsound.com/products/sb-1000"
   },
   "sb1000pro": {
    "brand": "SVS",
@@ -138,6 +275,33 @@
    "source_url": "https://www.svsound.com/products/sb-1000-pro-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb-1000pro_manual_web_02252025.pdf?v=1740519640"
   },
+  "sb13ultra": {
+   "brand": "SVS",
+   "model": "SB13-Ultra",
+   "driver_in": 13.5,
+   "amp_w": 1000.0,
+   "f3_hz": 20.0,
+   "ports": "N/A",
+   "freq_response": "20-460Hz ±3 dB",
+   "width_in": 17.4,
+   "height_in": 17.4,
+   "depth_in": 18.5,
+   "weight_lb": 92.0,
+   "source_url": "https://www.svsound.com/products/sb13-ultra"
+  },
+  "sb16ultra": {
+   "brand": "SVS",
+   "model": "SB16-Ultra",
+   "driver_in": 16.0,
+   "amp_w": 1500.0,
+   "f3_hz": 16.0,
+   "freq_response": "16-460 Hz ±3dB",
+   "width_in": 19.5,
+   "height_in": 20.0,
+   "depth_in": 20.1,
+   "source_url": "https://www.svsound.com/products/sb16-ultra",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb16-ultra_manual_02252025.pdf?v=1740519638"
+  },
   "sb17ultrarevolution": {
    "brand": "SVS",
    "model": "SB17-Ultra R|Evolution",
@@ -150,6 +314,19 @@
    "depth_in": 21.2,
    "source_url": "https://www.svsound.com/products/sb17-ultra-revolution-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb17-ultra_revolution_manual_web_08062026.pdf?v=1786115487"
+  },
+  "sb2000": {
+   "brand": "SVS",
+   "model": "SB-2000",
+   "driver_in": 12.0,
+   "amp_w": 500.0,
+   "f3_hz": 19.0,
+   "design": "sealed",
+   "freq_response": "19-220 hz ±3 DB",
+   "width_in": 14.2,
+   "height_in": 14.6,
+   "depth_in": 15.4,
+   "source_url": "https://www.svsound.com/products/sb-2000"
   },
   "sb2000pro": {
    "brand": "SVS",
@@ -165,6 +342,20 @@
    "source_url": "https://www.svsound.com/products/sb-2000-pro",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb-2000pro_manual_web_02252025.pdf?v=1740519640"
   },
+  "sb3000": {
+   "brand": "SVS",
+   "model": "SB-3000",
+   "driver_in": 13.0,
+   "amp_w": 800.0,
+   "f3_hz": 18.0,
+   "design": "sealed",
+   "freq_response": "18-270Hz ±3 dB",
+   "width_in": 15.2,
+   "height_in": 15.6,
+   "depth_in": 17.8,
+   "source_url": "https://www.svsound.com/products/sb-3000",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb-3000_manual_11232020.pdf?v=1782328042"
+  },
   "sb3000revolution": {
    "brand": "SVS",
    "model": "SB-3000 R|Evolution",
@@ -178,6 +369,20 @@
    "depth_in": 16.8,
    "source_url": "https://www.svsound.com/products/sb-3000-revolution-subwoofer",
    "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb-3000_revolution_manual_web_08062026.pdf?v=1786115486"
+  },
+  "sb4000": {
+   "brand": "SVS",
+   "model": "SB-4000",
+   "driver_in": 13.5,
+   "amp_w": 1200.0,
+   "f3_hz": 19.0,
+   "design": "sealed",
+   "freq_response": "19-310Hz ±3 dB",
+   "width_in": 17.8,
+   "height_in": 18.3,
+   "depth_in": 20.9,
+   "source_url": "https://www.svsound.com/products/sb-4000",
+   "manual_url": "https://cdn.shopify.com/s/files/1/0921/3560/files/sb-4000_manual_02252025.pdf?v=1740519638"
   },
   "sb5000revolution": {
    "brand": "SVS",

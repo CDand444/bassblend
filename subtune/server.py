@@ -2188,7 +2188,7 @@ class H(BaseHTTPRequestHandler):
                     "seats": ov.get("seats") or room.get("seats")}
             try:
                 if body.get("action") == "tiers":
-                    return self._send(200, modeler.tiers(body.get("spec") or {}, room))
+                    return self._send(200, modeler.tiers(body.get("spec") or {}, room, body.get("existing") or []))
                 if body.get("action") == "text":
                     return self._send(200, modeler.from_text(str(body.get("text") or ""), room, body.get("existing") or [], bool(body.get("replace"))))
             except (ValueError, RuntimeError) as e:

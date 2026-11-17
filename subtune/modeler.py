@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import json
 
-from . import furniture
+from . import furniture, risercut, shape
 
 FT = 0.3048
 IN = 0.0254
@@ -106,7 +106,7 @@ def fit_warnings(items: list[dict], room: dict) -> list[str]:
             continue
         hl, hd = (it["length_m"] / 2, it["depth_m"] / 2) if it["rotation"] in (0, 180) else (it["depth_m"] / 2, it["length_m"] / 2)
         if poly:
-            if not all(_inside(poly, it["x_m"] + sx * hl, it["y_m"] + sy * hd) for sx in (-1, 1) for sy in (-1, 1)):
+            if not all(shape.point_in(poly, it["x_m"] + sx * hl, it["y_m"] + sy * hd) for sx in (-1, 1) for sy in (-1, 1)):
                 out.append(f"{it['name']} sticks out past the room's walls (the outline you drew): check its position and size.")
         elif W and L and (it["x_m"] - hl < -0.05 or it["x_m"] + hl > W + 0.05 or it["y_m"] - hd < -0.05 or it["y_m"] + hd > L + 0.05):
             out.append(f"{it['name']} sticks out of the room's rectangle: check its position and size.")
@@ -120,11 +120,12 @@ def fit_warnings(items: list[dict], room: dict) -> list[str]:
     return out
 
 
-def tiers(spec: dict, room: dict) -> dict:
+def tiers(spec: dict, room: dict, existing: list | None = None) -> dict:
     """Stepped risers across the room against the back wall (a home-theater stand), the front row on the floor or raised, with a couch on each tier.
     spec (feet and inches): rows (1-6), width_ft (across; blank = the room's width less a foot), depth_ft (each tier's depth, default 4), first_in (the first raised tier's
     height, default 8), step_in (what each further tier adds, default 8), front_on_floor (the front row sits on the floor), couches (true/false), couch_ft (couch length),
-    x_ft (the middle across; blank = centered), against ('back' | 'front')."""
+    x_ft (the middle across; blank = centered), against ('back' | 'front'), avoid (default true: cut each tier to the room's outline and around doors' swings, subs, floor-standing
+    speakers and `existing` furniture, as several touching boxes at one height), use_seats."""
     W, L, H = _box(room)
     if not (W and L):
         raise ValueError("enter the room size on the Room page first")
@@ -139,6 +140,7 @@ def tiers(spec: dict, room: dict) -> dict:
     couch_len = _num(spec.get("couch_ft"), min(width / FT - 0.5, 7.5), 2, 14, "couch length") * FT
     with_couches = spec.get("couches", True) is not False
     items, n_riser, notes, heights = [], 0, [], []
+    avoid = spec.get("avoid", True) is not False
     srows = seat_rows(room) if spec.get("use_seats") else []
     by_seats = bool(srows) and (spec.get("rows") in (None, "") or len(srows) == rows)
     if by_seats:
@@ -159,10 +161,10 @@ def tiers(spec: dict, room: dict) -> dict:
             h = 0.0 if raised < 0 else first + step * raised
             y = ((k + 0.5) * depth) if front_wall else (L - (rows - k - 0.5) * depth)
             d, cx, w = depth, x, width
-        sp = _span(room, y - d / 2, y + d / 2, cx)
-        if sp is None:
+        sp = None if avoid else _span(room, y - d / 2, y + d / 2, cx)      # with avoid on, the riser is cut to the walls afterwards (several boxes); without, it is narrowed to one box
+        if not avoid and sp is None:
             raise ValueError(f"row {k + 1} falls outside the room's walls: check the room size and your seat positions")
-        if cx - w / 2 < sp[0] - 0.01 or cx + w / 2 > sp[1] + 0.01:      # keep it inside the walls (an angled or notched wall narrows the room)
+        if sp and (cx - w / 2 < sp[0] - 0.01 or cx + w / 2 > sp[1] + 0.01):      # keep it inside the walls (an angled or notched wall narrows the room)
             if sp[1] - sp[0] < 1.0:
                 raise ValueError(f"row {k + 1} would have only {(sp[1] - sp[0]) / FT:.1f} ft of room across: move the seats or shrink the tiers")
             w = min(w, sp[1] - sp[0])
@@ -175,6 +177,9 @@ def tiers(spec: dict, room: dict) -> dict:
         if with_couches:
             items.append({"kind": "couch", "name": f"Row {k + 1} couch", "x_m": cx, "y_m": y, "length_m": min(couch_len, w - 0.1),
                           "depth_m": min(0.95, d - 0.05), "seat_h_m": 0.45, "back_h_m": 1.0, "fabric": "fabric", "rotation": 0})
+    if avoid:
+        items, cutnotes = risercut.fit(items, room, existing)
+        notes += cutnotes
     cleaned = furniture.clean_items(items)
     if by_seats:
         summary = f"{rows} row{'s' if rows > 1 else ''} under your seats: " + ", ".join(f"row {i + 1} {'on the floor' if h <= 0 else f'{h / IN:.1f} in up'}" for i, h in enumerate(heights)) + (", a couch on each." if with_couches else ".")
@@ -184,8 +189,10 @@ def tiers(spec: dict, room: dict) -> dict:
     return {"items": cleaned, "summary": summary, "assumptions": notes, "warnings": fit_warnings(cleaned, room)}
 
 
-SCHEMA = {"type": "object", "additionalProperties": False, "required": ["summary", "assumptions", "furniture"], "properties": {
+SCHEMA = {"type": "object", "additionalProperties": False, "required": ["summary", "assumptions", "obstacles", "furniture"], "properties": {
     "summary": {"type": "string"}, "assumptions": {"type": "array", "items": {"type": "string"}},
+    "obstacles": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["name", "x_ft", "y_ft", "length_ft", "depth_ft"],
+                                             "properties": {"name": {"type": "string"}, "x_ft": {"type": "number"}, "y_ft": {"type": "number"}, "length_ft": {"type": "number"}, "depth_ft": {"type": "number"}}}},
     "furniture": {"type": "array", "items": {"type": "object", "additionalProperties": False, "required": ["kind", "name", "x_ft", "y_ft", "length_ft", "depth_ft", "rotation"], "properties": {
         "kind": {"type": "string", "enum": ["riser", "couch"]}, "name": {"type": "string"}, "x_ft": {"type": "number"}, "y_ft": {"type": "number"}, "length_ft": {"type": "number"},
         "depth_ft": {"type": "number"}, "height_ft": {"type": "number"}, "rotation": {"type": "integer", "enum": [0, 90, 180, 270]}, "seat_h_ft": {"type": "number"},
@@ -199,6 +206,8 @@ to face the screen), 90 = the left wall, 180 = the screen, 270 = the right wall;
 Rules: use the owner's measurements exactly when they give them; otherwise make reasonable, typical choices and list each in "assumptions" in plain words. Build a stepped
 platform out of several adjacent risers (each tier its own box, touching the next, each higher than the one in front of it); put each couch at the middle of its tier, the same
 width or a little narrower, and its middle y at the tier's middle. Keep everything inside the room: when "room_outline_ft_clockwise_points_x_y" is given, the room is that polygon (not the full rectangle), so nothing may stick out through an angled or notched wall. The owner's seats are given with their positions and head heights: put one row of seating under each row of seats (a couch centered across its seats, its middle about 0.3 ft behind the seat y), and make a riser's top as high as "head_height_above_normal_in" says for the seats on it (a seat whose head height is above 3.4 ft is on a riser; one at the normal 3.4 ft is on the floor), unless the owner's description gives other numbers, which win. Keep a riser no higher than 2 ft. Give each item a short plain name. At most 24 items.
+Things the description says are in the way of a riser (a column, a fireplace, a built-in, a stair) go in "obstacles" as boxes (middle x_ft, y_ft and size); the program cuts the risers around them,
+so give each riser its full intended rectangle and do not shape it yourself. The program also cuts risers to the room's outline, door swings, subs, floor speakers and the furniture already there.
 "summary" is one sentence on what you built. Never ask a question: build the best answer you can and say what you assumed."""
 
 
@@ -244,9 +253,17 @@ def from_text(text: str, room: dict, existing: list | None = None, replace: bool
             continue
     if not items:
         raise RuntimeError("the AI didn't build anything from that: add measurements or say how many rows and how high")
+    extra, notes = [], []
+    for o in (d.get("obstacles") or [])[:12]:
+        try:
+            extra.append({"name": str(o.get("name") or "an obstacle")[:40], "poly": risercut.rect_poly(float(o["x_ft"]) * FT, float(o["y_ft"]) * FT, float(o["length_ft"]) * FT, float(o["depth_ft"]) * FT, 0, risercut.CLEAR)})
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue
     try:
+        items, cutnotes = risercut.fit(furniture.clean_items(items), room, None if replace else existing, extra)
+        notes += cutnotes
         cleaned = furniture.clean_items(items)
     except ValueError as e:
         raise RuntimeError(f"the AI gave an item that can't be used ({e}); try again")
-    return {"items": cleaned, "summary": str(d.get("summary") or "")[:300], "assumptions": [str(a)[:200] for a in (d.get("assumptions") or [])][:12],
+    return {"items": cleaned, "summary": str(d.get("summary") or "")[:300], "assumptions": [str(a)[:200] for a in (d.get("assumptions") or [])][:12] + notes,
             "warnings": fit_warnings(cleaned, room), "model": getattr(r, "model", None)}

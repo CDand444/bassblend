@@ -412,9 +412,10 @@ def main():
             page.fill("#mdFirst", "6")
             page.fill("#mdStep", "6")
             before = page.evaluate("fuRead().length")
+            page.check("#mdReplace")                                         # replace the list, not add to it
             page.click("#mdBuild")
             check("The tier builder puts risers and couches into the Room form",
-                  until(page, "fuRead().filter(i => i.kind === 'riser').length === 2 && fuRead().filter(i => i.kind === 'couch').length === 3", 8000) is True,
+                  until(page, "fuRead().filter(i => i.kind === 'riser').length >= 2 && fuRead().filter(i => i.kind === 'couch').length === 3", 8000) is True,
                   f"form has {page.evaluate('fuRead().length')} items (was {before})")
             check("Undo is offered, and it puts the list back", page.evaluate("!document.querySelector('#mdUndo').hidden") is True)
             page.click("#mdUndo")

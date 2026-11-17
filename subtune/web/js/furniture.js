@@ -223,8 +223,9 @@ async function mdCall(body, btn) {
 }
 $('#mdBuild').onclick = async e => {
   const n = id => $(id).value === '' ? undefined : +$(id).value;
-  const r = await mdCall({action: 'tiers', spec: {rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked, use_seats: $('#mdSeats').checked}}, e.target);
-  if (r) { const repl = confirm('Replace the furniture in the list with these tiers?\n\nOK replaces it, Cancel adds the tiers to what is there.'); mdApply(r, !repl); }
+  const existing = $('#mdReplace').checked ? [] : fuRead();
+  const r = await mdCall({action: 'tiers', existing, spec: {avoid: $('#mdAvoid').checked, rows: n('#mdRows'), width_ft: n('#mdWidth'), depth_ft: n('#mdDepth'), first_in: n('#mdFirst'), step_in: n('#mdStep'), front_on_floor: $('#mdFloor').checked, couches: $('#mdCouches').checked, use_seats: $('#mdSeats').checked}}, e.target);
+  if (r) mdApply(r, !$('#mdReplace').checked);
 };
 $('#mdAsk').onclick = async e => {
   const existing = fuRead(), r = await mdCall({action: 'text', text: $('#mdText').value, replace: $('#mdReplace').checked, existing}, e.target);

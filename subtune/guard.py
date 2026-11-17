@@ -82,8 +82,8 @@ def check(name: str, args: dict, s=None) -> None:
         if slot not in SLOTS:
             raise Refused("slot must be 2, 3 or 4")
     elif name == "update_room":
-        if len(a.get("furniture") or []) > 24 or len((a.get("room") or {}).get("soffits") or []) > 12 or len(a.get("fixtures") or []) > 24:
-            raise Refused("at most 24 furniture items, 12 soffits and 24 fixtures")
+        if len(a.get("furniture") or []) > 40 or len((a.get("room") or {}).get("soffits") or []) > 12 or len(a.get("fixtures") or []) > 24:
+            raise Refused("at most 40 furniture items, 12 soffits and 24 fixtures")
     elif name == "restore_backup":
         if not isinstance(a.get("name"), str) or not a["name"].startswith("htTamer-backup-"):
             raise Refused("name must be a backup from list_backups")

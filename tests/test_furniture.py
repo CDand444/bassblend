@@ -46,7 +46,7 @@ def test_bad_rotation_rejected():
 
 
 def test_list_limits():
-    items = fu.clean_items([{"rotation": 0}] * 30 + [{"kind": "chair"}, "junk"])
+    items = fu.clean_items([{"rotation": 0}] * 50 + [{"kind": "chair"}, "junk"])
     assert len(items) == fu.MAX_ITEMS
     assert len({i["id"] for i in items}) == len(items)
 
@@ -99,7 +99,7 @@ def riser(**kw):
 
 def test_riser_clean_and_limits():
     r = fu.clean_item({"kind": "riser", "length_m": 99, "depth_m": 0.1, "height_m": 5, "fabric": "velvet"})
-    assert r["kind"] == "riser" and r["length_m"] == 8.0 and r["depth_m"] == 0.6 and r["height_m"] == 0.6 and "fabric" not in r
+    assert r["kind"] == "riser" and r["length_m"] == 8.0 and r["depth_m"] == 0.3 and r["height_m"] == 0.6 and "fabric" not in r
     items = fu.clean_items([{"kind": "riser"}, {"kind": "couch"}, {"kind": "table"}])
     assert [i["kind"] for i in items] == ["riser", "couch"]
     try:

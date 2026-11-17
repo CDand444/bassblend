@@ -12,10 +12,10 @@ import math
 BANDS_HZ = (125, 250, 500, 1000, 2000, 4000)
 WALLS = ("front", "back", "left", "right")
 ROTATIONS = (0, 90, 180, 270)
-MAX_ITEMS = 24
+MAX_ITEMS = 40
 LIMITS = {"length_m": (0.6, 4.5), "depth_m": (0.6, 1.4), "seat_h_m": (0.3, 0.6), "back_h_m": (0.6, 1.3)}
 # a riser is a low platform the seats stand on: width across the room, depth front to back, height of its top
-RISER_LIMITS = {"length_m": (0.6, 8.0), "depth_m": (0.6, 4.0), "height_m": (0.05, 0.6)}
+RISER_LIMITS = {"length_m": (0.3, 8.0), "depth_m": (0.3, 4.0), "height_m": (0.05, 0.6)}      # a riser cut around an obstacle has small pieces
 KINDS = ("couch", "riser")
 
 # absorption coefficient per octave band (BANDS_HZ), per m2 of the couch's surface

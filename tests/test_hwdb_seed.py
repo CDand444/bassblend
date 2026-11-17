@@ -103,7 +103,9 @@ def test_the_builder_keeps_only_what_the_page_says():
 def test_the_starter_database_holds_svs_hsu_and_revel_with_their_known_numbers():
     d = hwdb.load()
     subs, spk = d["subs"], d["speakers"]
-    assert len(subs) >= 15 and len(spk) >= 50
+    assert len(subs) >= 30 and len(spk) >= 50
+    sb = subs[hwdb.key("SB-1000")]                                                                           # the original SB-1000 as well as the SB-1000 Pro
+    assert (sb["driver_in"], sb["amp_w"], sb["f3_hz"], sb["design"]) == (12, 300, 24, "sealed") and (sb["width_in"], sb["height_in"], sb["depth_in"]) == (13.0, 13.5, 14.0)
     pb = subs[hwdb.key("PB-2000 Pro")]
     assert (pb["driver_in"], pb["amp_w"], pb["f3_hz"], pb["design"]) == (12, 550, 16, "ported") and (pb["width_in"], pb["height_in"], pb["depth_in"]) == (17.3, 20.9, 23.6)
     assert pb["manual_url"].startswith("https://") and pb["source_url"].startswith("https://www.svsound.com/")

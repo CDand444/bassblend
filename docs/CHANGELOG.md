@@ -2,6 +2,9 @@
 
 ## Nov 19, 2026 - flooring, room modeler, speaker aim in 3D
 
+- **Risers wrap around walls and obstacles**: the modeler (measurements and AI) now cuts each tier to the room's outline (angled walls, notches, alcoves) and around doors (their swing), subs, floor-standing speakers and any furniture already placed, as a few touching boxes at one height; the tier is left whole when nothing is in the way. "Wrap around walls and obstacles" can be turned off. A riser can now be as small as 1 ft (a cut piece), and a room holds up to 40 furniture items. The AI can name obstacles it is told about (a column, a fireplace) and the risers are cut around them.
+- **More SVS subwoofers in the starter database**: the original SB-1000, SB-2000, SB-3000, SB-4000, PB-2000, PB-3000, PB-4000, PC-2000, PC-4000, SB13-Ultra, PB13-Ultra, PB16-Ultra, SB16-Ultra, PB12-NSD and PB12-Plus (33 subs in all).
+
 - **Starter hardware database filled in**: 18 subwoofers (SVS, Hsu Research) and 60 speakers (SVS Prime, Revel in-room and architectural) with size, driver, rated low end, amp power, sensitivity, weight, frequency response and each maker's page (and owner's manual where the page links one). Every number is checked against the maker's own page text before it is accepted; nothing is estimated.
 - **Sub cards use the database**: each sub on the Room page now has a model drop-down (like the Speakers page); picking one fills the driver, enclosure, cabinet size, rated low end and amp power. Choose Other to type one.
 
