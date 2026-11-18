@@ -1,4 +1,4 @@
-"""Offline test for the level tap that keeps the dashboard's SPL meter reading during a test.
+r"""Offline test for the level tap that keeps the dashboard's SPL meter reading during a test.
 No hardware: a synthetic 1 kHz tone at a known level is fed in.
 
 Run:  %LOCALAPPDATA%\subtune-venv\Scripts\python.exe tests\test_spl_tap.py

@@ -4,14 +4,12 @@ Run:  %LOCALAPPDATA%\\subtune-venv\\Scripts\\python.exe tests\\test_orient.py
 """
 from __future__ import annotations
 
-import math
 import sys
-import os
 import pathlib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from subtune import orient, shape
+from subtune import orient
 
 
 def test_four_cw_turns():
@@ -213,7 +211,7 @@ def test_l_shape_outline():
 
     # Test all operations
     for op in ["cw", "ccw", "180", "mirror"]:
-        transformed = orient.transform_room(room, op)
+        orient.transform_room(room, op)
         # Just checking it doesn't crash - the bounding box constraint is implicit in the
         # coordinate transformations and should be satisfied
 

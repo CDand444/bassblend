@@ -5,7 +5,6 @@ Run:  %LOCALAPPDATA%\subtune-venv\Scripts\python.exe tests\test_local_ai.py
 """
 from __future__ import annotations
 
-import json
 import os
 import pathlib
 import sys

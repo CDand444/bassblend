@@ -97,7 +97,7 @@ def test_rythmik_f12():
 
 def test_room_saves_catalog_and_controls():
     from subtune.room import load_room, save_room
-    r = save_room({"room": {}, "seats": [], "subs": {
+    save_room({"room": {}, "seats": [], "subs": {
         "0": {"model": "Hsu Research VT-3 MK5", "controls": {"ports": "both", "eq": "EQ2", "q": "0.5", "bad": 1}},
         "2": {"model": "SVS SB-1000", "catalog": "svs-sb1000", "controls": {"lpf": "lfe", "phase": 30}},
         "1": {"model": "Something else", "controls": {"ports": "both"}}}})

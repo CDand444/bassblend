@@ -12,7 +12,7 @@ os.environ["HTTAMER_DATA"] = TMP
 os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from subtune import layout, room, treatment as T      # noqa: E402
+from subtune import treatment as T      # noqa: E402
 
 DIMS = {"L": 6.0, "W": 4.0, "H": 2.4}
 ROOM = {"room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.4, "construction": "drywall, wood floor"},

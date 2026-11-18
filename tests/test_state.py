@@ -38,9 +38,8 @@ def test_modify_state_counts_exactly():
 
 
 def test_processes_never_lose_updates():
-    try:
-        import fcntl  # noqa: F401
-    except ImportError:
+    import importlib.util
+    if importlib.util.find_spec("fcntl") is None:
         print("      (skipped: no file locks on this OS)")
         return
     code = "import sys; from subtune.state import update_state\n" \
