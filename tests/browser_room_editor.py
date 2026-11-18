@@ -151,6 +151,24 @@ def main():
             check("Apply puts the couch and riser into the Room card and closes the editor", page.evaluate("document.querySelector('#edBack').hidden") is True and page.evaluate("fuRead().length") == before + 2)
             page.evaluate("openSheet('home')")
 
+            # ---- the same pages on a phone: nothing wider than the screen, the editor fills it and shows its side panel only for a picked item
+            phone = browser.new_context(viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True).new_page()
+            phone.on("pageerror", lambda e: errs.append(str(e)))
+            for key in ("room", "subs", "speakers"):
+                phone.goto(base + "/#/" + key); phone.wait_for_timeout(1500)
+                check(f"Phone: the {key} page is no wider than the screen", phone.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 1"))
+            phone.goto(base + "/#/room"); phone.wait_for_timeout(1200)
+            phone.click("#edOpen"); phone.wait_for_timeout(600)
+            check("Phone: the room editor fills the screen", phone.evaluate("(() => { const r = document.querySelector('.ed-win').getBoundingClientRect(); return r.width >= window.innerWidth - 1 && r.height >= window.innerHeight - 1; })()"))
+            check("Phone: the side panel waits until something is picked", phone.evaluate("getComputedStyle(document.querySelector('#edSide')).display") == "none")
+            phone.evaluate("ED.sel = ED.items.findIndex(i => i.k === 'couch'); edRender(); edInspector();")
+            check("Phone: picking an item shows its numbers", phone.evaluate("getComputedStyle(document.querySelector('#edSide')).display") != "none")
+            box = phone.locator(".ed-it.sel .edr").bounding_box(); x0 = phone.evaluate("ED.items[ED.sel].d.x_m")
+            phone.dispatch_event(".ed-it.sel .edr", "pointerdown", {"pointerId": 7, "pointerType": "touch", "clientX": box["x"] + box["width"] / 2, "clientY": box["y"] + box["height"] / 2, "button": 0, "isPrimary": True, "bubbles": True})
+            phone.dispatch_event("#edStage", "pointermove", {"pointerId": 7, "pointerType": "touch", "clientX": box["x"] + box["width"] / 2 + 40, "clientY": box["y"] + box["height"] / 2, "isPrimary": True, "bubbles": True})
+            phone.dispatch_event("#edStage", "pointerup", {"pointerId": 7, "pointerType": "touch", "isPrimary": True, "bubbles": True})
+            check("Phone: a finger drag moves the couch", abs(phone.evaluate("ED.items[ED.sel].d.x_m") - x0) > 0.05)
+
             check("No script errors while clicking around", not errs, "; ".join(errs[:3]))
             browser.close()
     finally:

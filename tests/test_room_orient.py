@@ -16,18 +16,16 @@ from subtune import room                                   # noqa: E402
 from subtune.room import (ROOM_FILE, ROOM_UNDO, load_room,  # noqa: E402
                           orient_room, orient_undo_depth, undo_orient, write_room)
 
-ORIGINAL = {
-    "room": {"length_m": 6.0, "width_m": 4.0, "height_m": 2.5, "construction": "", "openings": "", "notes": "",
-             "outline": None, "shape": "rect", "wall_openings": [], "ceiling": None},
-    "seats": [{"name": "Main seat", "x_m": 1.0, "y_m": 2.0, "z_m": 1.0}],
-    "subs": {},
-    "avr": "",
-    "goals": "",
-    "treatment": {},
-    "speakers": {},
-    "furniture": [],
-    "screen": None,
-}
+def _original():
+    """The test room, completed with every key and room field the app adds (so a turn and its undo give exactly this back)."""
+    import json
+    r = json.loads(json.dumps(room.EMPTY))
+    r["room"].update({"length_m": 6.0, "width_m": 4.0, "height_m": 2.5, "outline": None, "shape": "rect", "wall_openings": [], "ceiling": None})
+    r["seats"] = [{"name": "Main seat", "x_m": 1.0, "y_m": 2.0, "z_m": 1.0}]
+    return r
+
+
+ORIGINAL = _original()
 
 
 def reset():

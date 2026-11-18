@@ -1,5 +1,13 @@
 # htTamer changelog
 
+## Nov 19, 2026 - better on a phone
+
+- **Room editor on a phone** fills the screen: a short header (Undo, Redo, Cancel, Apply), one row of things to add that scrolls sideways, the room as big as it fits, and the side panel only while something is picked. Finger drags move things the same way as the mouse.
+- **Subs page** no longer runs off the side of a phone (the sub cards were at least 400 px wide).
+- **Room page**: the rows of buttons above the plan scroll sideways instead of taking four lines.
+- **Long introductions** on the pages show three lines on a phone; a tap opens the rest.
+- Wall and ceiling speakers, lights and the screen are no longer reported as "partly outside the room" in the editor when they sit against a wall.
+
 ## Nov 19, 2026 - review fixes
 
 - **Live EQ can no longer touch slot 1**: every live EQ write now selects htTamer's slot first, and switching the live EQ off while you listen to another slot (your original slot 1 included) writes to htTamer's slot and then puts back what was playing. Before, a write between the 15-second checks, or "Live EQ off", went to whatever slot was playing.

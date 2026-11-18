@@ -55,6 +55,9 @@ document.addEventListener('keydown', e => {                       // arrow keys 
   roomTab(all[n].dataset.rtab, true);
 });
 try { const t = localStorage.getItem('htRoomTab'); if (t) roomTab(t); } catch (e) { /* not remembered */ }
+// on a phone a long introduction shows three lines; a tap opens the rest
+(function () { if (!window.matchMedia || !matchMedia('(max-width: 600px)').matches) return;
+  document.querySelectorAll('.card .lead').forEach(p => { if (p.textContent.length > 220) { p.classList.add('clamp'); p.addEventListener('click', () => p.classList.remove('clamp'), {once: true}); } }); })();
 function roomShow(id) { const el = document.querySelector(id), p = el && el.closest('[data-rpanel]'); if (p) roomTab(p.dataset.rpanel); }      // open the tab that holds an element
 document.querySelectorAll('[data-jump]').forEach(b => b.onclick = () => { roomShow(b.dataset.jump); const t = document.querySelector(b.dataset.jump); if (!t) return; if (t.tagName === 'DETAILS') t.open = true; t.scrollIntoView({behavior: 'smooth', block: 'start'}); });
 $('#scBox').addEventListener('input', () => { scSync(); renderPlan(readRoom()); });

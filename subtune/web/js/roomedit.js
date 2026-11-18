@@ -112,14 +112,17 @@ function edBuild() {
   .ed-pal button{text-align:left;cursor:grab}.ed-stage{flex:1;min-width:0;position:relative;outline:none}.ed-stage svg{width:100%;height:100%;display:block;touch-action:none}
   .ed-side{width:250px;padding:10px;border-left:1px solid var(--border);overflow:auto}.ed-side label{display:block;margin:0 0 8px;font-size:12px}.ed-side input,.ed-side select{width:100%}
   .ed-it{cursor:grab}.ed-it.sel rect.edr,.ed-it.sel polygon.edr{stroke:var(--accent);stroke-width:2.5}.ed-bad{stroke:var(--bad,#d6402a)!important;stroke-width:2.5!important}
-  @media (max-width:760px){.ed-main{flex-direction:column}.ed-pal{width:auto;flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--border)}.ed-side{width:auto;border-left:0;border-top:1px solid var(--border);max-height:34%}}`;
+  @media (max-width:760px){#edBack{padding:0}.ed-win{height:100%;width:100%;border-radius:0;border:0}.ed-top{padding:8px 10px;gap:6px}.ed-top .ed-sub,.ed-long{display:none}
+    .ed-main{flex-direction:column}.ed-pal{width:auto;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;border-right:0;border-bottom:1px solid var(--border);padding:6px 8px;scrollbar-width:none}
+    .ed-pal>*{flex:0 0 auto}.ed-pal p{display:none}.ed-pal b{align-self:center}.ed-stage{min-height:0}
+    .ed-side{width:auto;border-left:0;border-top:1px solid var(--border);max-height:42%}.ed-side:not(.has-sel){display:none}}`;
   document.head.appendChild(st);
   const d = document.createElement('div'); d.id = 'edBack'; d.hidden = true;
   d.innerHTML = `<div class="ed-win" role="dialog" aria-modal="true" aria-label="Room editor">
-    <div class="ed-top"><h2>Room editor</h2><span class="muted small">Drag things into place, from above or in 3D; walls and other items pull in close.</span><span class="grow" style="flex:1"></span><label class="cb" style="margin:0;font-size:12px"><input type="checkbox" id="edAuto" checked><span title="Risers re-fit themselves around walls, door swings, subs, floor speakers and couches whenever something moves">Auto-wrap risers</span></label>
+    <div class="ed-top"><h2>Room editor</h2><span class="muted small ed-sub">Drag things into place, from above or in 3D; walls and other items pull in close.</span><span class="grow" style="flex:1"></span><label class="cb" style="margin:0;font-size:12px"><input type="checkbox" id="edAuto" checked><span title="Risers re-fit themselves around walls, door swings, subs, floor speakers and couches whenever something moves">Auto-wrap risers</span></label>
       <div class="seg" role="radiogroup" aria-label="Editor view"><button type="button" data-edv="top" class="on">Top</button><button type="button" data-edv="3d">3D</button></div>
       <button type="button" class="btn ghost" id="edUndoB" title="Ctrl+Z">Undo</button><button type="button" class="btn ghost" id="edRedoB" title="Ctrl+Y">Redo</button>
-      <button type="button" class="btn ghost" id="edCancel">Cancel</button><button type="button" class="btn primary" id="edApplyB">Apply to the Room card</button></div>
+      <button type="button" class="btn ghost" id="edCancel">Cancel</button><button type="button" class="btn primary" id="edApplyB">Apply<span class="ed-long"> to the Room card</span></button></div>
     <div class="ed-main"><div class="ed-pal" aria-label="Add to the room (click, or drag onto the room)">
       <b class="small">Add</b>${Object.entries(ED_PRESETS).map(([k, [n]]) => `<button type="button" class="btn" draggable="true" data-edadd="couch:${k}">${esc(n)}</button>`).join('')}
       <button type="button" class="btn" draggable="true" data-edadd="riser">Riser</button><button type="button" class="btn" draggable="true" data-edadd="seat">Seat</button>
@@ -199,7 +202,7 @@ function edDown(e) {
   if (!g) { if (ED.sel !== -1) { ED.sel = -1; edRender(); edInspector(); } return; }
   const i = +g.dataset.i, it = ED.items[i], w = edPoint(e); if (!it || !w) return; e.preventDefault();
   ED.sel = i; ED.drag = {i, dx: it.d.x_m - w[0], dy: it.d.y_m - w[1], snap: edSnap(), id: e.pointerId, box0: edBox(it)}; ED.moved = false;
-  $('#edStage').setPointerCapture(e.pointerId); $('#edStage').focus(); edRender(); edInspector();
+  try { $('#edStage').setPointerCapture(e.pointerId); } catch (x) { /* a pointer the browser no longer tracks: the drag still works while it stays over the room */ } $('#edStage').focus(); edRender(); edInspector();
 }
 function edMove(e) {
   const dr = ED.drag; if (!dr) return; const it = ED.items[dr.i], w = edPoint(e); if (!w) return;
@@ -227,7 +230,7 @@ function edKey(e) {
 function edProblems() {
   const bad = new Map(), msgs = [], pts = ED.ctx.pts, name = it => it.d.name || it.o != null && `Sub ${it.o + 1}` || it.k;
   const add = (i, m) => { bad.set(i, true); msgs.push(m); };
-  ED.items.forEach((it, i) => { if (!edMovable(it)) return; const b = edBox(it), cs = edPoly(it) || [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]];
+  ED.items.forEach((it, i) => { if (!edMovable(it)) return; const b = edBox(it), cs = edPoly(it) || (['spk', 'fx', 'screen'].includes(it.k) ? [[it.d.x_m, it.d.y_m]] : [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]]);
     if (!cs.every(([x, y]) => insidePts(pts, x, y))) add(i, `${name(it)} is partly outside the room.`); });
   const ov = (a, b) => Math.min(a[2], b[2]) - Math.max(a[0], b[0]) > 0.04 && Math.min(a[3], b[3]) - Math.max(a[1], b[1]) > 0.04;
   for (let i = 0; i < ED.items.length; i++) for (let j = i + 1; j < ED.items.length; j++) { const a = ED.items[i], b = ED.items[j]; if (!edMovable(a) || !edMovable(b)) continue;
@@ -308,7 +311,7 @@ function ed3Grab(ev) {
   if (ev.button != null && ev.button > 0) return false; const i = ed3Pick(ev); if (i < 0) return false;
   const it = ED.items[i], w = ED.v3.floorAt(ev.clientX, ev.clientY); if (!w) return false;
   ED.sel = i; ED.drag = {i, dx: it.d.x_m - w[0], dy: it.d.y_m - w[1], snap: edSnap(), id: ev.pointerId, three: true, box0: edBox(it)}; ED.moved = false;
-  $('#ed3').setPointerCapture(ev.pointerId); ed3Draw(); edInspector(); return true;
+  try { $('#ed3').setPointerCapture(ev.pointerId); } catch (x) { /* as above */ } ed3Draw(); edInspector(); return true;
 }
 function ed3Move(e) {
   const dr = ED.drag; if (!dr || !dr.three) return; const it = ED.items[dr.i], w = ED.v3.floorAt(e.clientX, e.clientY); if (!w) return;
@@ -325,7 +328,7 @@ function ed3Up() { if (!ED.drag || !ED.drag.three) return; const moved = ED.move
 
 // ---- the side panel: the selected item's numbers
 function edInspector(keepFocus) {
-  const box = $('#edSide'); if (!box) return; const it = ED.items[ED.sel];
+  const box = $('#edSide'); if (!box) return; const it = ED.items[ED.sel]; box.classList.toggle('has-sel', !!it);
   if (!it) { box.innerHTML = '<p class="muted small" style="margin:0">Click an item to edit it. Drag to move; R turns a couch or riser a quarter turn; Delete removes it; arrow keys nudge (Shift = 1 ft). Hold Alt while dragging to skip the pull to walls.</p>'; return; }
   if (keepFocus && box.contains(document.activeElement)) return;
   const num = (f, v, t, step = 0.1) => `<label>${t}<span class="unit" data-u="ft"><input data-edf="${f}" type="number" step="${step}" value="${toFt(v)}"></span></label>`;

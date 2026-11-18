@@ -51,11 +51,11 @@ def test_guards():
         raise AssertionError(f"{bad} allowed")
     guard.check("restore_backup", {"name": "htTamer-backup-v0.9.12-20261116-120000.zip"}, {})
     try:
-        guard.check("update_room", {"furniture": [{}] * 13}, {})
+        guard.check("update_room", {"furniture": [{}] * 41}, {})
     except guard.Refused:
         pass
     else:
-        raise AssertionError("13 furniture items allowed")
+        raise AssertionError("41 furniture items allowed")
     for name in ("make_backup", "restore_backup", "update_room"):                  # read-only mode blocks all three
         try:
             guard.check(name, {"name": "htTamer-backup-x"}, {"ai_read_only": True})

@@ -145,7 +145,13 @@ details.fold { margin: 12px 0; border-top: 1px solid var(--border); padding-top:
 details.fold > summary { cursor: pointer; font-weight: 600; font-size: 14px; padding: 4px 0; }
 #asRules table tbody { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0 32px; }
 #asRules table tr { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding: 4px 0; }
-.subs { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)) !important; }
+.subs { grid-template-columns: repeat(auto-fit, minmax(min(400px, 100%), 1fr)) !important; }
+@media (max-width: 600px) {
+  #roTurn, .room-plan > div > .row:first-child { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+  #roTurn > *, .room-plan > div > .row:first-child > * { flex: 0 0 auto; }
+  .lead.clamp { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; cursor: pointer; position: relative; }
+  .lead.clamp::after { content: 'More'; position: absolute; right: 0; bottom: 0; padding-left: 24px; color: var(--accent); background: linear-gradient(90deg, transparent, var(--surface) 30%); }
+}
 .rs-head h2 { font-size: 20px; margin: 0; letter-spacing: -.01em; }
 .rs-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; margin-top: 16px; align-items: start; }
 @media (max-width: 900px) { .rs-grid { grid-template-columns: minmax(0, 1fr); } }
