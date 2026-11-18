@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import math
 
+from . import shape
+
 BANDS_HZ = (125, 250, 500, 1000, 2000, 4000)
 WALLS = ("front", "back", "left", "right")
 ROTATIONS = (0, 90, 180, 270)
@@ -38,18 +40,9 @@ def _clean_points(pts):
     return out if abs(a) >= 0.05 else None
 
 
-def poly_contains(pts, x, y) -> bool:
-    inside = False
-    for i in range(len(pts)):
-        (ax, ay), (bx, by) = pts[i], pts[(i + 1) % len(pts)]
-        if (ay > y) != (by > y) and x < ax + (y - ay) * (bx - ax) / (by - ay):
-            inside = not inside
-    return inside
-
-
 def poly_outside(pts, x, y) -> float:
     """How far (m) the point is outside the polygon; 0 when it is inside or on the edge."""
-    if poly_contains(pts, x, y):
+    if shape.point_in(pts, x, y, edge_ok=False):
         return 0.0
     best = 1e9
     for i in range(len(pts)):
@@ -167,7 +160,7 @@ def riser_at(room: dict, x: float, y: float) -> float:
         if r["x_m"] is None or r["y_m"] is None:
             continue
         if r.get("points"):
-            if poly_contains(r["points"], x, y):
+            if shape.point_in(r["points"], x, y, edge_ok=False):
                 best = max(best, r["height_m"])
             continue
         u, v = _uv(x - r["x_m"], y - r["y_m"], *_DIR[r["rotation"]])

@@ -107,6 +107,16 @@ def load_settings() -> dict:
     return s
 
 
+def atomic_write(path, text: str) -> None:
+    """Write a file so that it is always either the old version or the new one: a temp file per process and thread, then a swap."""
+    import os
+    import threading
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.{threading.get_ident()}.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
 def save_settings(s: dict) -> None:
-    DATA.mkdir(parents=True, exist_ok=True)
-    SETTINGS_FILE.write_text(json.dumps(s, indent=2))
+    atomic_write(SETTINGS_FILE, json.dumps(s, indent=2))

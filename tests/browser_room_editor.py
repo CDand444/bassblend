@@ -16,6 +16,8 @@ from browser_actions import PROBLEMS, check, until          # noqa: E402
 
 ROOM = {"room": {"length_m": 5.486, "width_m": 3.962, "height_m": 2.591}, "seats": [{"name": "MLP", "x_m": 2.0, "y_m": 3.2, "z_m": None}],
         "subs": {"0": {"model": "", "x_m": 0.61, "y_m": 1.524, "aim_deg": 90}},
+        "speakers": {"FL": {"x_m": 0.9, "y_m": 0.3, "kind": "tower"}, "SL": {"x_m": 0.05, "y_m": 3.0, "kind": "in-wall"}},
+        "screen": {"kind": "projector", "diagonal_in": 100, "aspect": "16:9", "width_m": 2.21, "height_m": 1.25, "at": False, "lcr_behind": False, "bottom_m": 0.6, "behind_m": 0, "frame_m": 0.08, "x_m": 1.98, "notes": ""},
         "furniture": [{"id": "couch-1", "kind": "couch", "name": "3-seat couch", "x_m": 1.98, "y_m": 4.9, "length_m": 2.2, "depth_m": 0.95, "seat_h_m": 0.45, "back_h_m": 1.0, "fabric": "fabric", "rotation": 0},
                       {"id": "riser-1", "kind": "riser", "name": "Riser", "x_m": 1.98, "y_m": 4.9, "length_m": 2.5, "depth_m": 1.3, "height_m": 0.2, "rotation": 0}]}
 
@@ -85,6 +87,20 @@ def main():
             page.evaluate("openSheet('room'); document.querySelectorAll('[data-rpanel]').forEach(p => { p.hidden = false; })"); page.wait_for_timeout(300)
             page.click("#edOpen")
             check("Room editor opens as a pop-out with the room drawn", until(page, "!document.querySelector('#edBack').hidden && !!document.querySelector('#edStage svg')", 4000) is True)
+            check("Room editor: a move re-fits only the risers it could touch", page.evaluate("""(() => {
+              const A = {k: 'riser', d: {x_m: 1, y_m: 1, length_m: 1, depth_m: 1, rotation: 0}}, B = {k: 'riser', d: {x_m: 3, y_m: 4.5, length_m: 1, depth_m: 1, rotation: 0, want: [2.5, 4, 3.5, 5]}};
+              const couch = {k: 'couch', d: {x_m: 1.2, y_m: 2.0, length_m: 1, depth_m: 0.8, rotation: 0}}, near = [{it: couch, boxes: [edBox(couch)]}];
+              return edWrapTouches(A, near) && !edWrapTouches(B, near) && edWrapTouches(B, [{it: B, boxes: []}]) && edWrapTouches(B, null); })()""") is True)
+            def drag_item(sel_js, dx, dy):
+                at = page.evaluate("(() => { const i = " + sel_js + "; const b = document.querySelector('#edStage .ed-it[data-i=\"' + i + '\"] .edr').getBoundingClientRect(); return [i, b.left + b.width / 2, b.top + b.height / 2]; })()")
+                page.mouse.move(at[1], at[2]); page.mouse.down(); page.mouse.move(at[1] + dx, at[2] + dy, steps=6); page.mouse.up()
+                return at[0]
+            i = drag_item("ED.items.findIndex(it => it.k === 'spk' && it.ch === 'SL')", 60, 50)
+            sl = page.evaluate(f"[ED.items[{i}].d.x_m, ED.items[{i}].d.y_m]")
+            check("Room editor: an in-wall speaker slides along its wall and stays on it", abs(sl[0] - 0.03) < 0.02 and sl[1] > 3.1, str(sl))
+            i = drag_item("ED.items.findIndex(it => it.k === 'screen')", -40, 80)
+            scr = page.evaluate(f"[ED.items[{i}].d.x_m, ED.items[{i}].d.y_m]")
+            check("Room editor: the screen slides along the front wall only", scr[0] < 1.95 and abs(scr[1] - 0.04) < 0.01, str(scr))
             page.click("[data-edv='3d']")
             check("Room editor: the 3D view shows the same room", until(page, "!document.querySelector('#ed3Box').hidden && !!ED.v3 && document.querySelector('#ed3').width > 100", 4000) is True)
             at = page.evaluate("""(() => { const i = ED.items.findIndex(it => it.k === 'couch'); const it = ED.items[i], p = ED.v3.project([it.d.x_m, it.d.y_m, 0.6]), r = document.querySelector('#ed3').getBoundingClientRect();
@@ -130,6 +146,8 @@ def main():
             check("Undo brings the riser back", page.evaluate("ED.items.length") == n0 + 2)
             before = page.evaluate("fuRead().length")
             page.click("#edApplyB")
+            check("Apply saves the moved speaker's position", until(page, "S.room && S.room.speakers && S.room.speakers.SL && S.room.speakers.SL.y_m > 3.1", 8000) is True)
+            check("Apply moves the screen in the Room card", abs(float(page.evaluate("document.querySelector('#scX').value") or 0) - 6.5) < 0.2 or float(page.evaluate("document.querySelector('#scX').value") or 0) < 6.4)
             check("Apply puts the couch and riser into the Room card and closes the editor", page.evaluate("document.querySelector('#edBack').hidden") is True and page.evaluate("fuRead().length") == before + 2)
             page.evaluate("openSheet('home')")
 

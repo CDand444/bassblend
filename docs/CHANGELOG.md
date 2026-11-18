@@ -1,5 +1,25 @@
 # htTamer changelog
 
+## Nov 19, 2026 - review fixes
+
+- **Live EQ can no longer touch slot 1**: every live EQ write now selects htTamer's slot first, and switching the live EQ off while you listen to another slot (your original slot 1 included) writes to htTamer's slot and then puts back what was playing. Before, a write between the 15-second checks, or "Live EQ off", went to whatever slot was playing.
+- **Settings, the room and saved tunes are written safely**: a temporary file is swapped in, so a power cut or a page reading at the wrong moment never finds a half-written file (which could stop the app until repaired).
+- A broken riser sent to the re-fit now gets a plain error instead of a server error; leftover and duplicate helpers removed.
+- **Faster riser auto-wrap**: after a move, only the risers the moved item could touch are re-fitted (one request each), so dragging things around on the Pi stays quick.
+
+## Nov 19, 2026 - the room editor moves speakers, fixtures and the screen
+
+- **Speakers in the room editor**: drag them like everything else. In-wall and on-wall speakers stay on the nearest wall and slide along it; ceiling and height speakers can pass over furniture; floor speakers count as solid for the overlap check. Apply saves their positions (their kind, height and aim stay on the Speakers page).
+- **Fixtures in the room editor**: lights, a projector, vents and the rest move too, and a ceiling light, projector or wall light can be added from the palette; wall lights stay on a wall.
+- **The screen** slides along the front wall in the editor.
+- Risers re-fitted in the editor now keep clear of the speakers where you have just moved them.
+
+## Nov 19, 2026 - Klipsch and REL in the starter database
+
+- **Klipsch** (67 models, from each product's own spec sheet): the Reference and Reference Premiere subs (R-100SW to RP-1600SW, SPL-100/120/150), bookshelf, center, Atmos elevation, on-wall, in-wall and in-ceiling speakers, with sensitivity, impedance, power handling, frequency response, size and weight; the spec sheet is linked as the manual.
+- **REL** (15 subs: Serie T/x, HT, S, the No. series, Classic, 212 and Carbon Special Black Label): cabinet size and weight from each page, and amplifier power where the page's comparison lists it.
+- 62 subs and 113 speakers in all. KEF, Polk, Definitive Technology, JL Audio and Monoprice publish their specs only through scripts or block automated reading, so they are not in yet; add your model with Remember size.
+
 ## Nov 19, 2026 - room editor in 3D, smoother risers, one sub picker
 
 - **Room editor in 3D**: a Top / 3D switch in the editor. In 3D, drag an item to move it across the floor (it pulls to walls and neighbours the same way), drag empty space to turn the view, drop new items from the palette onto the floor; the selected item is outlined.

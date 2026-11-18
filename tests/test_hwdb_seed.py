@@ -114,6 +114,12 @@ def test_the_starter_database_holds_svs_hsu_and_revel_with_their_known_numbers()
     f208 = spk[hwdb.key("F208")]
     assert (f208["sensitivity_db"], f208["height_in"], f208["weight_lb"], f208["low_hz"]) == (88.5, 46.6, 80, 31)
     assert spk[hwdb.key("W228Be")]["kind"] == "in-wall" and spk[hwdb.key("Prime Elevation")]["kind"] == "atmos module"
+    rp = subs[hwdb.key("RP-1200SW")]                                                                     # Klipsch, from its spec sheet
+    assert (rp["driver_in"], rp["amp_w"], rp["f3_hz"], rp["design"], rp["weight_lb"]) == (12, 400, 16.5, "ported", 68.6) and rp["manual_url"].endswith("1718394043")
+    assert spk[hwdb.key("RP-600M II")]["sensitivity_db"] == 94.5 and spk[hwdb.key("RP-600M II")]["kind"] == "bookshelf"
+    t9 = subs[hwdb.key("T/9x")]                                                                           # REL
+    assert (t9["width_in"], t9["height_in"], t9["depth_in"], t9["weight_lb"]) == (14.5, 13.4, 15.5, 45.5)
+    assert subs[hwdb.key("No.36")]["width_in"] == 29.25                                                     # 29 1/4 in, not the shipping box
 
 
 if __name__ == "__main__":

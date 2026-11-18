@@ -38,15 +38,6 @@ def _box(room: dict) -> tuple[float, float, float]:
 EAR = 1.05                                                     # a seated ear's height (m) when a seat has none of its own
 
 
-def _outline(room: dict):
-    pl = (room.get("room") or {}).get("outline")
-    try:
-        pts = [(float(p[0]), float(p[1])) for p in pl or []]
-    except (TypeError, ValueError, IndexError):
-        return None
-    return pts if len(pts) >= 3 else None
-
-
 def _crossings(poly, y):
     xs = []
     for (x1, y1), (x2, y2) in zip(poly, poly[1:] + poly[:1]):
@@ -56,14 +47,10 @@ def _crossings(poly, y):
     return list(zip(xs[0::2], xs[1::2]))
 
 
-def _inside(poly, x, y, tol=0.04):
-    return any(a - tol <= x <= b + tol for a, b in _crossings(poly, y)) or any(a - tol <= x <= b + tol for a, b in _crossings(poly, y + 0.01))
-
-
 def _span(room: dict, y0: float, y1: float, xc: float):
     """The left-right stretch of floor that is inside the room along the whole band y0..y1 around xc (the room's outline when it has one, else its rectangle)."""
     W, L, _ = _box(room)
-    poly = _outline(room)
+    poly = shape.outline(room.get("room") or {})
     if not poly:
         return 0.0, W
     lo, hi = -1e9, 1e9
@@ -101,6 +88,10 @@ def refit(room: dict, item: dict, others: list | None = None) -> dict:
     sitting on it. Returns {items (the riser as one or more outlines, ids kept), notes}."""
     if item.get("kind") != "riser":
         raise ValueError("only a riser can be fitted to the room")
+    try:
+        item = {**item, **{k: float(item[k]) for k in ("x_m", "y_m", "length_m", "depth_m")}}
+    except (KeyError, TypeError, ValueError):
+        raise ValueError("the riser needs its middle (x_m, y_m) and its size (length_m, depth_m) as numbers")
     w = item.get("want")
     if isinstance(w, (list, tuple)) and len(w) == 4:
         x0, y0, x1, y1 = (float(v) for v in w)
@@ -120,7 +111,7 @@ def refit(room: dict, item: dict, others: list | None = None) -> dict:
 def fit_warnings(items: list[dict], room: dict) -> list[str]:
     """Things a human would notice: outside the room, a riser reaching the ceiling, two risers that overlap by a lot, a couch off its riser."""
     W, L, H = _box(room)
-    poly = _outline(room)
+    poly = shape.outline(room.get("room") or {})
     out = []
     for it in items:
         if it.get("x_m") is None or it.get("y_m") is None:
@@ -248,7 +239,7 @@ def from_text(text: str, room: dict, existing: list | None = None, replace: bool
     seats = [{"name": s.get("name"), "x_ft": round(s["x_m"] / FT, 1), "y_ft": round(s["y_m"] / FT, 1),
               "head_height_ft": round((s.get("z_m") or EAR) / FT, 2), "head_height_above_normal_in": round(max(0.0, (s.get("z_m") or EAR) - EAR) / IN, 1)}
              for s in room.get("seats") or [] if s.get("x_m") is not None]
-    poly = _outline(room)
+    poly = (room.get("room") or {}).get("outline")                 # the drawn outline only: a plain rectangle is already given by its sizes
     ctx = {"room_width_ft": round(W / FT, 1), "room_length_ft": round(L / FT, 1), "ceiling_ft": round(H / FT, 1), "seats": seats,
            "seat_rows_front_to_back": [{"y_ft": round(r["y"] / FT, 1), "x_from_ft": round(r["x0"] / FT, 1), "x_to_ft": round(r["x1"] / FT, 1)} for r in seat_rows(room)],
            "room_outline_ft_clockwise_points_x_y": [[round(x / FT, 1), round(y / FT, 1)] for x, y in poly] if poly else None,

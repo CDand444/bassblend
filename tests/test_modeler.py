@@ -72,12 +72,12 @@ def test_rows_go_under_the_owners_seats_at_their_heights_and_stay_inside_an_angl
 
 def _covers(items, x, y):
     """Is the floor point under any riser (its contour when it has one, else its box)?"""
-    from subtune import furniture
+    from subtune import shape
     for i in items:
         if i["kind"] != "riser":
             continue
         if i.get("points"):
-            if furniture.poly_contains(i["points"], x, y):
+            if shape.point_in(i["points"], x, y, edge_ok=False):
                 return True
         elif abs(x - i["x_m"]) <= i["length_m"] / 2 and abs(y - i["y_m"]) <= i["depth_m"] / 2:
             return True
@@ -139,6 +139,11 @@ def test_one_riser_is_refitted_around_a_couch_on_the_floor_and_remembers_its_wan
         assert rs[0]["want"] == [0.2, 3.8, 3.8, 5.4]                                                         # the box it was meant to be, kept for the next re-fit
     moved = modeler.refit(room, rs[0], [dict(floor_couch, y_m=1.0), on_it])                                  # the couch moved away: the riser grows back to its wanted box
     assert _covers(moved["items"], 2.0, 3.9)
+    try:
+        modeler.refit(room, {"kind": "riser", "x_m": "x"}, [])
+        raise AssertionError("a broken riser was fitted")
+    except ValueError as e:
+        assert "middle" in str(e)
     try:
         modeler.refit(room, floor_couch, [])
     except ValueError:

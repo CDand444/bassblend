@@ -7,7 +7,6 @@ summary (busy flag, current step, plots, filters).
 from __future__ import annotations
 
 import json
-import os
 import threading
 import time
 from contextlib import contextmanager
@@ -27,11 +26,8 @@ json_dumps = lambda obj, **kw: _dumps(obj, default=_np, **kw)
 
 
 def _atomic_write(path, text):
-    DATA.mkdir(parents=True, exist_ok=True)
-    # a temp name per process and thread: two writers never share (and clobber) one temp file
-    tmp = path.with_suffix(f"{path.suffix}.{os.getpid()}.{threading.get_ident()}.tmp")
-    tmp.write_text(text)
-    os.replace(tmp, path)
+    from .config import atomic_write
+    atomic_write(path, text)
 
 
 _LOCK = threading.RLock()

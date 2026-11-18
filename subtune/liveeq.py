@@ -185,7 +185,7 @@ def write(bands, bypass=False, dsp=None, check_preset=True) -> dict:
         if playing != slot:
             raise RuntimeError(f"the miniDSP is playing slot {playing}, not slot {slot}. Switch to slot {slot} "
                                "(Tunes & slots) to use the live EQ")
-    dsp.batch(commands(bands, cur, bypass), quiet=True)
+    dsp.batch([MiniDSP.c_preset(slot - 1)] + commands(bands, cur, bypass), quiet=True)        # select htTamer's slot first: the writes go to the selected slot
     le = _save(bands=bands, active=True, bypass=bool(bypass), tune_id=cur.get("tune_id"), slot=slot, t=time.time(), note=None)
     return dict(le, peak_db=peak_gain(cur, bands))
 
@@ -193,8 +193,14 @@ def write(bands, bypass=False, dsp=None, check_preset=True) -> dict:
 def clear(log=None) -> dict:
     """Unity in the live bands on the miniDSP; the bands stay saved (switched off)."""
     from .dsp import MiniDSP
-    cur, _ = target_slot()
-    MiniDSP().batch(commands([], cur), "live EQ removed from the miniDSP")
+    cur, slot = target_slot()
+    d = MiniDSP()
+    try:
+        playing = int(d.status()["master"]["preset"]) + 1
+    except Exception:                                       # noqa: BLE001 - not known: leave htTamer's slot selected
+        playing = slot
+    back = [MiniDSP.c_preset(playing - 1)] if playing != slot else []          # then put back whatever was playing (A/B listening on another slot stays as it was)
+    d.batch([MiniDSP.c_preset(slot - 1)] + commands([], cur) + back, "live EQ removed from the miniDSP")
     from . import journal
     if any(b.get("on") for b in get()["bands"]):
         journal.add("tune", "Live EQ switched off: the playing tune is back to its own filters")

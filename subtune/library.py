@@ -12,7 +12,7 @@ import json
 import re
 import time
 
-from .config import DATA
+from .config import DATA, atomic_write
 
 LIB = DATA / "library"
 SLOTS = DATA / "slots.json"
@@ -77,7 +77,7 @@ def save(result, name, notes="", settings=None, when=None, verified=None):
     rec = {"id": tid, "name": (name or "Untitled tune")[:60], "notes": (notes or "")[:300], "t": t,
            "fingerprint": fp, "result": {k: v for k, v in result.items() if k not in ("applied",)},
            "settings": settings or {}, "verified": verified}
-    (LIB / f"{tid}.json").write_text(json.dumps(rec, indent=1), encoding="utf-8")
+    atomic_write(LIB / f"{tid}.json", json.dumps(rec, indent=1))
     return _summary(rec)
 
 
@@ -86,7 +86,7 @@ def rename(tid, name, notes=None):
     t["name"] = (name or t["name"])[:60]
     if notes is not None:
         t["notes"] = notes[:300]
-    (LIB / f"{tid}.json").write_text(json.dumps(t, indent=1), encoding="utf-8")
+    atomic_write(LIB / f"{tid}.json", json.dumps(t, indent=1))
     return _summary(t)
 
 
@@ -109,10 +109,10 @@ def slots():
 def record_slot(slot, tid, name):
     s = slots()
     s[str(slot)] = {"tune": tid, "name": name, "t": time.time()}
-    SLOTS.write_text(json.dumps(s, indent=1))
+    atomic_write(SLOTS, json.dumps(s, indent=1))
 
 
 def mark_verified(tid, rms_db):
     t = get(tid)
     t["verified"] = {"t": time.time(), "rms_db": round(rms_db, 2)}
-    (LIB / f"{tid}.json").write_text(json.dumps(t, indent=1), encoding="utf-8")
+    atomic_write(LIB / f"{tid}.json", json.dumps(t, indent=1))

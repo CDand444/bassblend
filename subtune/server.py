@@ -2186,7 +2186,8 @@ class H(BaseHTTPRequestHandler):
             ov = body.get("room") or {}                # the Room form may hold newer sizes and seats than the saved room
             room = {**room, "room": {**(room.get("room") or {}), **{k: v for k, v in (ov.get("room") or {}).items() if k in ("width_m", "length_m", "height_m") and v}, **({"outline": ov["room"]["outline"]} if (ov.get("room") or {}).get("outline") else {}),
                              **({"wall_openings": ov["room"]["wall_openings"]} if "wall_openings" in (ov.get("room") or {}) else {})},
-                    "seats": ov.get("seats") or room.get("seats"), "subs": ov["subs"] if isinstance(ov.get("subs"), dict) else room.get("subs")}
+                    "seats": ov.get("seats") or room.get("seats"), "subs": ov["subs"] if isinstance(ov.get("subs"), dict) else room.get("subs"),
+                    "speakers": ov["speakers"] if isinstance(ov.get("speakers"), dict) else room.get("speakers")}
             try:
                 if body.get("action") == "tiers":
                     return self._send(200, modeler.tiers(body.get("spec") or {}, room, body.get("existing") or []))

@@ -43,6 +43,42 @@ def test_bad_bands_are_refused():
     assert ok == [{"fc": 41.2, "q": 4.0, "gain_db": -6.0, "on": False}]
 
 
+def test_live_eq_writes_select_htTamers_slot_first_and_never_slot_1():
+    """A live EQ write, or switching it off, while another slot plays (slot 1 included) must land on htTamer's slot only."""
+    from subtune.config import load_settings, save_settings
+    from subtune.state import update_state
+    s = load_settings(); s["preset"] = 2; s["subs"] = [0, 1]; save_settings(s)
+    update_state(result=CUR)
+
+    class Fake:
+        def __init__(self, playing):
+            self.playing, self.batches = playing, []
+
+        def status(self):
+            return {"master": {"preset": self.playing - 1}}
+
+        def batch(self, cmds, why="", quiet=False):
+            self.batches.append(list(cmds))
+    d = Fake(playing=3)
+    liveeq.write([{"fc": 42, "q": 5, "gain_db": -6}], dsp=d, check_preset=False)       # the 15-second check skipped, as between checks
+    assert d.batches[0][0] == "config 2" and not any(c == "config 0" for c in d.batches[0])
+    from subtune import dsp as dspmod
+    orig = dspmod.MiniDSP
+    f1 = Fake(playing=1)                                                                  # the owner is listening to slot 1 (their original)
+    dspmod.MiniDSP = type("FakeMiniDSP", (orig,), {"__new__": lambda cls, *a, **k: f1})       # MiniDSP() gives the fake; its command helpers stay real
+    try:
+        liveeq.clear()
+    finally:
+        dspmod.MiniDSP = orig
+    cmds = f1.batches[0]
+    assert cmds[0] == "config 2" and cmds[-1] == "config 0"                                # select htTamer's slot, write, then put slot 1 back on (no write while it is selected)
+    assert all(not c.startswith("output") for c in cmds[cmds.index("config 0"):])
+    try:
+        update_state(result={**CUR, "slot": 1}); liveeq.write([], dsp=Fake(1), check_preset=False); assert False
+    except RuntimeError as e:
+        assert "slot 1" in str(e)
+
+
 def test_commands_touch_only_the_live_bands():
     bands = liveeq.clean_bands([{"fc": 42, "q": 5, "gain_db": -6}])
     c = liveeq.commands(bands, CUR)

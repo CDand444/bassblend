@@ -9,7 +9,7 @@ import itertools
 import json
 import math
 
-from .config import DATA
+from .config import DATA, atomic_write
 
 ROOM_FILE = DATA / "room.json"
 ROOM_UNDO = DATA / "room-undo.json"
@@ -160,8 +160,7 @@ def clean_shape(rm: dict, base: dict) -> dict:
 
 
 def write_room(r: dict) -> None:
-    DATA.mkdir(parents=True, exist_ok=True)
-    ROOM_FILE.write_text(json.dumps(r, indent=2))
+    atomic_write(ROOM_FILE, json.dumps(r, indent=2))
 
 
 def orient_room(op: str) -> dict:
@@ -186,7 +185,7 @@ def orient_room(op: str) -> dict:
     if len(undo_data) >= 10:
         undo_data = undo_data[1:]
     undo_data.append(room)
-    ROOM_UNDO.write_text(json.dumps(undo_data, indent=2))
+    atomic_write(ROOM_UNDO, json.dumps(undo_data, indent=2))
 
     write_room(new_room)
     return new_room
@@ -209,7 +208,7 @@ def undo_orient() -> dict:
     room = undo_data.pop()
 
     # Remove the last entry from undo history
-    ROOM_UNDO.write_text(json.dumps(undo_data, indent=2))
+    atomic_write(ROOM_UNDO, json.dumps(undo_data, indent=2))
 
     # Write the restored room
     write_room(room)
