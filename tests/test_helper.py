@@ -10,13 +10,13 @@ import sys
 import tempfile
 
 TMP = tempfile.mkdtemp(prefix="bb_helper_")
-os.environ["BASSBLEND_DATA"] = TMP
-os.environ["BASSBLEND_CONFIG"] = os.path.join(TMP, "conf")
+os.environ["HTTAMER_DATA"] = TMP
+os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import helper                            # noqa: E402
 
-STEPS = [{"title": "Verify the playing tune at the MLP", "why": "One sweep confirms it.", "who": "bassblend", "sound": True},
+STEPS = [{"title": "Verify the playing tune at the MLP", "why": "One sweep confirms it.", "who": "httamer", "sound": True},
          {"title": "Record how your subs are set", "why": "Knobs matter.", "who": "owner", "sound": False}]
 ST = {"result": {"applied": 1, "tune_name": "Evening", "slot": 3, "metrics": {"after": {"mlp_flat_rms_db": 1.8}}},
       "deep_reports": {"1": {"t": 2, "pos": 1, "areas": {"bass": {"label": "Bass", "status": "fix"}},

@@ -2,15 +2,15 @@
 # Build the htTamer SD card image with pi-gen, inside Docker.
 # Works from Linux, macOS, or Git Bash on Windows with Docker Desktop running.
 #
-#   deploy/pi-gen/build-image.sh            # result: dist/bassblend-<version>.img.xz
-#   BASSBLEND_SETTINGS=my-settings.json deploy/pi-gen/build-image.sh
+#   deploy/pi-gen/build-image.sh            # result: dist/httamer-<version>.img.xz
+#   HTTAMER_SETTINGS=my-settings.json deploy/pi-gen/build-image.sh
 #                                           # also put a settings file on the card: imported on first boot
 #   RESUME=1 deploy/pi-gen/build-image.sh   # after a failed htTamer stage: reuse the finished
 #                                           # Raspberry Pi OS stages of that failed build
 #   BASE_REFRESH=1 deploy/pi-gen/build-image.sh  # rebuild the cached Raspberry Pi OS now (security updates)
 #
 # The first build takes about 25 minutes (most of it builds Raspberry Pi OS for the Pi's ARM processor
-# through emulation). That finished OS is kept as a cache (container bassblend_pigen_base), so later
+# through emulation). That finished OS is kept as a cache (container httamer_pigen_base), so later
 # builds only add htTamer: about 8 minutes. The cache is rebuilt by itself after BASE_MAX_DAYS.
 # The image contains the htTamer files as they are in this folder right now
 # (tracked files, including uncommitted edits), never your data/ folder or keys.
@@ -25,9 +25,9 @@ PIGEN_REPO="https://github.com/RPi-Distro/pi-gen.git"
 PIGEN_COMMIT="c0d2c9f"                          # arm64 branch, Nov 6 2026 (trixie)
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$HERE/../.." && pwd)"
-WORK="${BASSBLEND_BUILD_DIR:-$ROOT/build/pi-gen}"
+WORK="${HTTAMER_BUILD_DIR:-$ROOT/build/pi-gen}"
 OUT="$ROOT/dist"
-NAME="bassblend_pigen"
+NAME="httamer_pigen"
 VERSION="${VERSION:-$(cd "$ROOT" && git describe --tags --always --dirty 2>/dev/null || date +%Y%m%d)}"   # VERSION=v1.2.3 to name it yourself
 
 say() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
@@ -65,10 +65,10 @@ fi
 say "Adding the htTamer stage and settings"
 rm -f "$WORK/stage2/EXPORT_IMAGE"              # only export the finished htTamer image
 cp "$HERE/config" "$WORK/config"
-echo "BASSBLEND_VERSION=\"$VERSION\"" >> "$WORK/config"
-rm -rf "$WORK/stage-bassblend"
-cp -R "$HERE/stage-bassblend" "$WORK/stage-bassblend"
-SRC="$WORK/stage-bassblend/00-bassblend/files/bassblend"
+echo "HTTAMER_VERSION=\"$VERSION\"" >> "$WORK/config"
+rm -rf "$WORK/stage-httamer"
+cp -R "$HERE/stage-httamer" "$WORK/stage-httamer"
+SRC="$WORK/stage-httamer/00-httamer/files/httamer"
 mkdir -p "$SRC"
 # every tracked or new file, minus the development-only ones marked export-ignore in .gitattributes
 (cd "$ROOT" && git ls-files -z --cached --others --exclude-standard \
@@ -77,16 +77,16 @@ mkdir -p "$SRC"
   | (cd "$ROOT" && xargs -0 tar -cf - --) | tar -xf - -C "$SRC"
 rm -rf "$SRC/build" "$SRC/dist" "$SRC/data" "$SRC/tools"
 printf '%s\n' "$VERSION" > "$SRC/VERSION"
-CFG="$WORK/stage-bassblend/00-bassblend/files/bassblend-config.json"
-if [ -n "${BASSBLEND_SETTINGS:-}" ]; then      # bake a settings file in: imported on first boot
-  [ -f "$BASSBLEND_SETTINGS" ] || { echo "BASSBLEND_SETTINGS: no such file: $BASSBLEND_SETTINGS" >&2; exit 1; }
-  cp "$BASSBLEND_SETTINGS" "$CFG"
-  echo "Including settings file $(basename "$BASSBLEND_SETTINGS") (anyone with the image can read it)"
+CFG="$WORK/stage-httamer/00-httamer/files/httamer-config.json"
+if [ -n "${HTTAMER_SETTINGS:-}" ]; then      # bake a settings file in: imported on first boot
+  [ -f "$HTTAMER_SETTINGS" ] || { echo "HTTAMER_SETTINGS: no such file: $HTTAMER_SETTINGS" >&2; exit 1; }
+  cp "$HTTAMER_SETTINGS" "$CFG"
+  echo "Including settings file $(basename "$HTTAMER_SETTINGS") (anyone with the image can read it)"
 fi
 # shell scripts must have Unix line endings, whatever the checkout did
-find "$WORK/stage-bassblend" "$WORK/config" -type f \( -name '*.sh' -o -name config -o -name EXPORT_IMAGE \) \
+find "$WORK/stage-httamer" "$WORK/config" -type f \( -name '*.sh' -o -name config -o -name EXPORT_IMAGE \) \
   -exec sed -i 's/\r$//' {} +
-chmod +x "$WORK"/stage-bassblend/*.sh "$WORK"/stage-bassblend/*/*.sh "$SRC/deploy/linux/install.sh"
+chmod +x "$WORK"/stage-httamer/*.sh "$WORK"/stage-httamer/*/*.sh "$SRC/deploy/linux/install.sh"
 
 say "Building the pi-gen container"
 dk build -q --build-arg BASE_IMAGE=docker.io/debian:trixie -t pi-gen "$(hostpath "$WORK")" >/dev/null
@@ -125,8 +125,8 @@ if [ "$FROM" = "$NAME" ]; then                   # a full (or resumed) build: ke
   dk rename "$NAME" "$BASE"
 fi
 img="$(ls "$WORK"/deploy/*.img.xz | head -n1)"
-cp "$img" "$OUT/bassblend-$VERSION.img.xz"
-cp "$WORK"/deploy/build.log "$OUT/bassblend-$VERSION.build.log" 2>/dev/null || true
-( cd "$OUT" && sha256sum "bassblend-$VERSION.img.xz" > "bassblend-$VERSION.img.xz.sha256" )
-say "Done: dist/bassblend-$VERSION.img.xz"
+cp "$img" "$OUT/httamer-$VERSION.img.xz"
+cp "$WORK"/deploy/build.log "$OUT/httamer-$VERSION.build.log" 2>/dev/null || true
+( cd "$OUT" && sha256sum "httamer-$VERSION.img.xz" > "httamer-$VERSION.img.xz.sha256" )
+say "Done: dist/httamer-$VERSION.img.xz"
 ls -lh "$OUT"

@@ -15,9 +15,9 @@ import threading
 import time
 
 TMP = tempfile.mkdtemp(prefix="bb_build_")
-os.environ["BASSBLEND_DATA"] = TMP
-os.environ["BASSBLEND_CONFIG"] = os.path.join(TMP, "conf")
-os.environ["BASSBLEND_AUTH_LOCAL"] = "1"                 # treat this test's own requests like a phone's: sign-in needed
+os.environ["HTTAMER_DATA"] = TMP
+os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
+os.environ["HTTAMER_AUTH_LOCAL"] = "1"                 # treat this test's own requests like a phone's: sign-in needed
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import ai, builder, legal, qr, room                   # noqa: E402

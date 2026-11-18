@@ -1,5 +1,5 @@
 @echo off
-rem Runs BassBlend with its private Python environment.
+rem Runs htTamer with its private Python environment.
 pushd "%~dp0"
 "%LOCALAPPDATA%\subtune-venv\Scripts\python.exe" -m subtune %*
 set rc=%ERRORLEVEL%

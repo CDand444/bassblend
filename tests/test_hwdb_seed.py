@@ -11,8 +11,8 @@ import sys
 import tempfile
 
 TMP = tempfile.mkdtemp(prefix="bb_hwseed_")
-os.environ["BASSBLEND_DATA"] = TMP
-os.environ["BASSBLEND_CONFIG"] = os.path.join(TMP, "conf")
+os.environ["HTTAMER_DATA"] = TMP
+os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 

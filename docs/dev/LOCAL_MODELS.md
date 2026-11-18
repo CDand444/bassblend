@@ -32,7 +32,7 @@ On Windows (PowerShell), from the repo folder:
 
 Each test file runs on its own. Run the tests for what you touched, plus the three checks above. The manager runs the whole suite and the browser check (`tests/browser_check.py`) before pushing.
 
-**Write the test first** for new behavior (a small `tests/test_<area>.py`, same style as the existing ones: `test_` functions, an `if __name__` runner printing `N/N passed`, temp data via `BASSBLEND_DATA` / `BASSBLEND_CONFIG`). A step isn't done until its test fails without your change and passes with it.
+**Write the test first** for new behavior (a small `tests/test_<area>.py`, same style as the existing ones: `test_` functions, an `if __name__` runner printing `N/N passed`, temp data via `HTTAMER_DATA` / `HTTAMER_CONFIG`). A step isn't done until its test fails without your change and passes with it.
 
 ## Be honest
 

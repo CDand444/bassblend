@@ -6,7 +6,7 @@ dashboard shows the top steps; the assistant gets the full list so its advice
 stays grounded and holistic (physical things first, then the sub tune, the
 blend, the receiver, Dirac, and finally checking and listening).
 
-Each step: id, rank (lower = do first), area, title, why, who (bassblend |
+Each step: id, rank (lower = do first), area, title, why, who (httamer |
 owner | receiver_menu | dirac), sound (plays audio?), open (dashboard page),
 tool + input (what the assistant would call), and ask (a question to start a
 chat about it).
@@ -44,7 +44,7 @@ def tuning_limits(st: dict, settings: dict, room: dict | None = None) -> dict | 
     return limits.assess(res, settings, modes, ck, measured)
 
 
-def _step(rank, sid, area, title, why, who="bassblend", sound=False, open=None, tool=None, inp=None, ask=None):
+def _step(rank, sid, area, title, why, who="httamer", sound=False, open=None, tool=None, inp=None, ask=None):
     return {"id": sid, "rank": rank, "area": area, "title": title, "why": why, "who": who, "sound": sound,
             "open": open, "tool": tool, "input": inp or {}, "ask": ask or f"Help me with this: {title}"}
 
@@ -198,7 +198,7 @@ def plan(st: dict, settings: dict, room: dict, avr: dict | None = None, live_dsp
     a = avr or {}
     if a.get("cinema_filter"):
         out.append(_step(15, "cinema_filter", "receiver", "Cinema Filter is on", "It softens the treble on everything. Turn it off unless "
-                         "you like it for bright movie mixes.", who="bassblend", open="avr", tool="avr_control", inp={"action": "cinema_filter", "value": "0"}))
+                         "you like it for bright movie mixes.", who="httamer", open="avr", tool="avr_control", inp={"action": "cinema_filter", "value": "0"}))
     if a.get("tone_bass") or a.get("tone_treble"):
         out.append(_step(15, "tone", "receiver", "The receiver's tone controls aren't flat",
                          f"Bass {a.get('tone_bass'):+d} dB, treble {a.get('tone_treble'):+d} dB on top of your tuning.",

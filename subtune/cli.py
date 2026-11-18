@@ -713,7 +713,7 @@ def main(argv=None):
     s.add_argument("--stdin", action="store_true", help="read the PIN from standard input (for setup scripts)")
     s.set_defaults(fn=cmd_set_pin)
     s = sp.add_parser("export-config", help="save room, speaker, sub and tune settings to a file")
-    s.add_argument("--out", help="file to write (default: bassblend-config-<host>-<date>.json)")
+    s.add_argument("--out", help="file to write (default: httamer-config-<host>-<date>.json)")
     s.add_argument("--no-history", action="store_true", help="leave out tunes, results and measurements")
     s.add_argument("--include-pin", action="store_true", help="include the PIN (as its hash)")
     s.add_argument("--include-key", action="store_true", help="include the Anthropic API key")

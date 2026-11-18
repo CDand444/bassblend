@@ -1610,7 +1610,7 @@ class H(BaseHTTPRequestHandler):
 
     # ---------------------------------------------------------------- sign-in
     def _local(self):
-        return self.client_address[0] in LOOPBACK and not os.environ.get("BASSBLEND_AUTH_LOCAL")
+        return self.client_address[0] in LOOPBACK and not os.environ.get("HTTAMER_AUTH_LOCAL")
 
     def _authed(self):
         """No sign-in on this-computer-only mode, or for the device itself."""
@@ -2030,7 +2030,7 @@ class H(BaseHTTPRequestHandler):
             data = deepcheck.rew_text(r, ch).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
-            self.send_header("Content-Disposition", f'attachment; filename="bassblend_spot{pos}_{ch}.txt"')
+            self.send_header("Content-Disposition", f'attachment; filename="httamer_spot{pos}_{ch}.txt"')
             self.send_header("Content-Length", str(len(data)))
             self.end_headers()
             self.wfile.write(data)
@@ -2866,8 +2866,8 @@ def serve(port=8765, lan=False):
     r = bundle.import_pending()                    # settings file copied off a fresh SD card
     if r:
         print("Imported the settings file from the SD card: " + ", ".join(r["imported"]), flush=True)
-    # BASSBLEND_BIND pins the address (tests run network mode on 127.0.0.1 with BASSBLEND_AUTH_LOCAL=1)
-    srv = ThreadingHTTPServer((os.environ.get("BASSBLEND_BIND") or ("0.0.0.0" if lan else "127.0.0.1"), port), H)
+    # HTTAMER_BIND pins the address (tests run network mode on 127.0.0.1 with HTTAMER_AUTH_LOCAL=1)
+    srv = ThreadingHTTPServer((os.environ.get("HTTAMER_BIND") or ("0.0.0.0" if lan else "127.0.0.1"), port), H)
     threading.Thread(target=_input_guard_loop, daemon=True).start()
     threading.Thread(target=_automation_loop, daemon=True).start()
     threading.Thread(target=_post_update_thread, daemon=True).start()

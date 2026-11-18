@@ -30,7 +30,7 @@ The same commands appear in the Receiver screen if a blend test fails because of
 
 ## No firewall change? Use a USB stick
 
-Choose **USB stick** in the blend test, download `bassblend_blend_test.wav` from the link
+Choose **USB stick** in the blend test, download `httamer_blend_test.wav` from the link
 shown, copy it to a USB stick, plug it into the receiver, press **Run blend test**, then play
 the file from the receiver's USB input when asked. htTamer listens for the sweeps itself.
 

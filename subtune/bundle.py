@@ -16,7 +16,7 @@ path, the Windows/Linux audio device names, the audio system), sign-in
 sessions, the activity log and the chat.
 
 Importing is a merge: settings in the file replace the same settings here,
-other things here stay. A file placed at /boot/firmware/bassblend-config.json
+other things here stay. A file placed at /boot/firmware/httamer-config.json
 on a freshly written card is imported automatically on first boot.
 """
 from __future__ import annotations
@@ -31,7 +31,8 @@ from pathlib import Path
 from .config import DATA, DEFAULTS, load_settings, save_settings
 from .state import event, json_dumps, load_state, update_state
 
-FORMAT = "bassblend-config"
+FORMAT = "httamer-config"
+OLD_FORMAT = "bassblend-config"            # settings files saved before the rename still load
 VERSION = 1
 PENDING = DATA / "import-pending.json"        # dropped here by the first-boot import (Linux service)
 
@@ -64,7 +65,7 @@ def _read_json(p: Path):
 def export(include_history: bool = True, include_pin: bool = False, include_key: bool = False) -> dict:
     s = load_settings()
     b = {"format": FORMAT, "version": VERSION, "exported": time.strftime("%Y-%m-%d %H:%M:%S"),
-         "from": socket.gethostname(), "bassblend": _version(),
+         "from": socket.gethostname(), "httamer": _version(),
          "settings": {k: v for k, v in s.items() if k not in MACHINE_KEYS},
          "room": _read_json(DATA / "room.json")}
     cal = s.get("cal_file")
@@ -115,7 +116,7 @@ def dumps(b: dict) -> str:
 
 
 def filename() -> str:
-    return f"bassblend-config-{socket.gethostname()}-{time.strftime('%Y%m%d-%H%M')}.json"
+    return f"httamer-config-{socket.gethostname()}-{time.strftime('%Y%m%d-%H%M')}.json"
 
 
 def save_cal(name: str, text: str) -> dict:
@@ -153,7 +154,7 @@ def save_cal(name: str, text: str) -> dict:
 
 
 def _check(b) -> dict:
-    if not isinstance(b, dict) or b.get("format") != FORMAT:
+    if not isinstance(b, dict) or b.get("format") not in (FORMAT, OLD_FORMAT):
         raise ValueError("that isn't a htTamer settings file")
     if int(b.get("version") or 0) > VERSION:
         raise ValueError("that settings file is from a newer htTamer; update this one first")

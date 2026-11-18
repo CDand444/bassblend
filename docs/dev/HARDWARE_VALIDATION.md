@@ -18,8 +18,8 @@ by the guarded auto-level; the receiver is put back exactly as it was.
 
 | Step | Do | Pass when |
 |---|---|---|
-| 1.1 | Write `bassblend-<version>.img.xz` to a new SD card (Raspberry Pi Imager; add Wi-Fi and SSH). Check the `.sha256` first. | the checksum matches |
-| 1.2 | Boot with the miniDSP and UMIK-1 plugged in; open `http://bassblend.local:8765`. | the page opens within 3 minutes; the safety notice shows |
+| 1.1 | Write `httamer-<version>.img.xz` to a new SD card (Raspberry Pi Imager; add Wi-Fi and SSH). Check the `.sha256` first. | the checksum matches |
+| 1.2 | Boot with the miniDSP and UMIK-1 plugged in; open `http://httamer.local:8765`. | the page opens within 3 minutes; the safety notice shows |
 | 1.3 | Accept the notice, choose a PIN, press **Run the silent check** on Home. | miniDSP, Mic and Storage show Ready (the silent check plays nothing) |
 | 1.4 | Home should open in **Basic** with the **Your first calibration** card. | Basic menu: Home, Setup, Calibrate, Results, Compare |
 
@@ -77,7 +77,7 @@ Do steps 3 to 6 three times (clear the tune between runs by calibrating again; k
 run, on this computer:
 
 ```bash
-python scripts/validation_snapshot.py snap ssh://bassblend run1      # then run2, run3
+python scripts/validation_snapshot.py snap ssh://httamer run1      # then run2, run3
 python scripts/validation_snapshot.py compare validation/run1.json validation/run2.json validation/run3.json
 ```
 

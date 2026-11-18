@@ -17,7 +17,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 def run(code: str) -> tuple[int, str, dict]:
     d = pathlib.Path(tempfile.mkdtemp(prefix="bb_slot_"))
     (d / "settings.json").write_text(json.dumps({"preset": 3, "subs": [0, 1, 2]}))
-    env = dict(os.environ, BASSBLEND_DATA=str(d), BASSBLEND_CONFIG=str(d / "conf"))
+    env = dict(os.environ, HTTAMER_DATA=str(d), HTTAMER_CONFIG=str(d / "conf"))
     r = subprocess.run([sys.executable, "-c", code], cwd=ROOT, env=env, capture_output=True, text=True)
     return r.returncode, r.stdout + r.stderr, json.loads((d / "settings.json").read_text())
 

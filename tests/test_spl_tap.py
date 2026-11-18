@@ -41,7 +41,7 @@ print("ok")
 
 def test_tap_reports_level_and_goes_stale():
     d = tempfile.mkdtemp(prefix="bb_spl_")
-    env = dict(os.environ, BASSBLEND_DATA=d, BASSBLEND_CONFIG=d)
+    env = dict(os.environ, HTTAMER_DATA=d, HTTAMER_CONFIG=d)
     r = subprocess.run([sys.executable, "-c", CODE], cwd=ROOT, env=env, capture_output=True, text=True)
     assert r.returncode == 0 and r.stdout.strip().endswith("ok"), r.stdout + r.stderr
 

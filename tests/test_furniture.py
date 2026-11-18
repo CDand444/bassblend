@@ -9,7 +9,7 @@ import pathlib
 import sys
 import tempfile
 
-os.environ.setdefault("BASSBLEND_DATA", tempfile.mkdtemp(prefix="bb_furniture_"))
+os.environ.setdefault("HTTAMER_DATA", tempfile.mkdtemp(prefix="bb_furniture_"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import furniture as fu                    # noqa: E402

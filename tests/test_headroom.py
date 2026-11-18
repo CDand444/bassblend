@@ -11,7 +11,7 @@ import pathlib
 import sys
 import tempfile
 
-os.environ.setdefault("BASSBLEND_DATA", tempfile.mkdtemp(prefix="bb_head_"))
+os.environ.setdefault("HTTAMER_DATA", tempfile.mkdtemp(prefix="bb_head_"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import numpy as np                                    # noqa: E402

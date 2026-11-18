@@ -16,8 +16,8 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TMP = tempfile.mkdtemp(prefix="bb_ai_")
-os.environ["BASSBLEND_DATA"] = TMP
-os.environ["BASSBLEND_CONFIG"] = os.path.join(TMP, "conf")
+os.environ["HTTAMER_DATA"] = TMP
+os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
 for v in ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"):
     os.environ.pop(v, None)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))

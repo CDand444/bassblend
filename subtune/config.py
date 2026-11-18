@@ -13,18 +13,23 @@ IS_WINDOWS = sys.platform == "win32"
 # folder, so the data goes to %LOCALAPPDATA%\htTamer instead.
 FROZEN = bool(getattr(sys, "frozen", False))
 ROOT = Path(getattr(sys, "_MEIPASS", "")) if FROZEN else Path(__file__).resolve().parent.parent
-# Where tunes, settings and measurements live. The Pi image sets BASSBLEND_DATA
-# (e.g. /var/lib/bassblend) so the program files can stay read-only.
+# Where tunes, settings and measurements live. The Pi image sets HTTAMER_DATA
+# (e.g. /var/lib/httamer) so the program files can stay read-only.
 _default_data = (Path(os.environ.get("LOCALAPPDATA", Path.home())) / "htTamer" / "data") if FROZEN else (ROOT / "data")
-DATA = Path(os.environ.get("BASSBLEND_DATA") or _default_data)
+def _env(name: str) -> str | None:
+    """HTTAMER_<name>, or its name from before the rename: an install that has not moved over yet still sets that one."""
+    return os.environ.get("HTTAMER_" + name) or os.environ.get("BASSBLEND_" + name)
+
+
+DATA = Path(_env("DATA") or _default_data)
 
 
 def _minidsp_exe() -> Path:
-    """The minidsp-rs command-line tool for this computer: BASSBLEND_MINIDSP if
+    """The minidsp-rs command-line tool for this computer: HTTAMER_MINIDSP if
     set, then the copy in tools/minidsp (minidsp.exe on Windows, or a Linux
     build under tools/minidsp/linux-<arch>/), then one on the PATH (the .deb
     puts it in /usr/bin)."""
-    env = os.environ.get("BASSBLEND_MINIDSP")
+    env = _env("MINIDSP")
     if env:
         return Path(env)
     tools = ROOT / "tools" / "minidsp"
@@ -88,8 +93,8 @@ DEFAULTS = {
 
 def config_dir() -> Path:
     """Per-user folder for secrets (the API key), outside the project and the
-    data folder. BASSBLEND_CONFIG overrides it."""
-    env = os.environ.get("BASSBLEND_CONFIG")
+    data folder. HTTAMER_CONFIG overrides it."""
+    env = _env("CONFIG")
     if env:
         return Path(env)
     if IS_WINDOWS:
@@ -97,7 +102,9 @@ def config_dir() -> Path:
         # the installed app keeps its own keys and PIN: it must never pick up a developer copy's saved key
         # (seen on a real machine: the installer looked "pre-configured" and skipped choosing an AI provider)
         return base / "htTamer" / "config" if FROZEN else base / "subtune"          # dev: where it has always been
-    return Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config")) / "bassblend"
+    base = Path(os.environ.get("XDG_CONFIG_HOME") or (Path.home() / ".config"))
+    old = base / "bassblend"                                   # a developer copy set up before the rename
+    return old if old.is_dir() and not (base / "httamer").exists() else base / "httamer"
 
 
 def load_settings() -> dict:

@@ -1,5 +1,17 @@
 # htTamer changelog
 
+## Nov 18, 2026 - One name everywhere
+
+- Everything is now named **httamer**: the Pi image (`httamer-<version>.img.xz`, at `http://httamer.local:8765`), the program
+  folder `/opt/httamer`, the data folder `/var/lib/httamer`, the `httamer` service and account, the `HTTAMER_*` settings for
+  developers, the settings file (`httamer-config-...json`) and the test sound files. The project's earlier name is gone.
+- **An htTamer you already run moves itself over.** It takes two updates: the first installs this version the old way, the
+  second moves the program, your data, the account and the services to the new names (your tunes, settings, keys and PIN
+  move with them). Its address on your network does not change. Logs are then `journalctl -u httamer`.
+- Settings files and backups saved before the rename still load.
+- If you put an MCP token in a file in your home folder, rename it to `~/.httamer-mcp-token`.
+- **Installing on a Pi or Linux box you already run** is now described in the README, next to the recommended SD card image.
+
 ## Nov 17, 2026 - Easier to read and to press
 
 - Grey text, blue buttons and links are darker (lighter in the dark theme) so everything meets the usual 4.5:1 reading contrast; links have one colour everywhere; keyboard focus shows a clear ring.
@@ -319,12 +331,12 @@ Built and tested offline (simulations and the browser); nothing played on the re
   first-boot setup page, or `subtune import-config`. Machine-specific settings (USB path, audio
   device names) are never carried, so a Windows file works on the Pi. A file can't give htTamer
   slot 1, and only known data files are written.
-- **First boot**: `bassblend-config.json` on a fresh card's boot drive is imported automatically
-  and removed from the boot drive. `BASSBLEND_SETTINGS=` bakes one into an image build.
+- **First boot**: `httamer-config.json` on a fresh card's boot drive is imported automatically
+  and removed from the boot drive. `HTTAMER_SETTINGS=` bakes one into an image build.
 - **Over-the-air updates**: `deploy/push-update.sh [--watch]` sends the code over SSH;
-  `bassblend-update` on the Pi checks it compiles, installs, restarts only for Python changes and
+  `httamer-update` on the Pi checks it compiles, installs, restarts only for Python changes and
   rolls back if the new version doesn't start.
-- The version shows in the dashboard; image builds write it to `BASSBLEND.txt` (was "dev").
+- The version shows in the dashboard; image builds write it to `HTTAMER.txt` (was "dev").
 - The saved API key file is owner-only on Linux. 6 checks in `tests/test_bundle.py`.
 - **Pi fix: miniDSP "not detected"**. Without a cached address, minidsp-rs also searched the
   network for ~10 s on every call, so the dashboard's status check kept the USB device busy and
@@ -353,7 +365,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
 - **Runs on Windows or Linux** without changing settings:
   - audio devices are found by name on either system ("auto" audio system; old Windows settings still work on Linux);
   - the right minidsp-rs build is picked per system, and a USB address saved on Windows is ignored on Linux;
-  - `BASSBLEND_DATA` and `BASSBLEND_CONFIG` move the data and the API key/PIN folder (used on the Pi);
+  - `HTTAMER_DATA` and `HTTAMER_CONFIG` move the data and the API key/PIN folder (used on the Pi);
   - a missing mic calibration file now shows in the Setup checklist and gives a clear message.
 - **Network mode with a PIN**: `python -m subtune set-pin`, then `serve --lan`. Sign-in page, 30-day
   sessions, wrong-PIN lockout, HttpOnly SameSite cookies, a same-site check on every action, and
@@ -384,7 +396,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
 
 ## Nov 13, 2026 — left + right blend, interface polish (silent)
 
-**Project moved** to `C:\Users\<you>\repo\bassblend`. Start the dashboard from that folder
+**Project moved** to `C:\Users\<you>\repo\httamer`. Start the dashboard from that folder
 (`subtune.cmd serve`); the app's preview launcher was still pointing at the old session folder.
 
 **New: blend with both front speakers**
@@ -393,7 +405,7 @@ Built and tested offline (simulations and the browser); nothing played on the re
   bass whichever speaker plays, so one "with subs" pass covers both.
 - Single-seat and all-seats answers average over both speakers, so the fix doesn't favour one side.
 - The graphs show the right speaker too; the all-seats graph has a Left / Right switch.
-- A second test file (`bassblend_blend_test_left_right.wav`) for the USB-stick option, made on demand.
+- A second test file (`httamer_blend_test_left_right.wav`) for the USB-stick option, made on demand.
 - The assistant can choose left or both, and is told to prefer both.
 - New offline tests: `tests/test_blend_measure.py` simulates a full mic recording (separate filter,
   delay and level for left, right and subs, plus noise) and checks the analysis recovers all three,

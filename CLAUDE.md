@@ -6,8 +6,11 @@ EQ with analyzer, and an in-app AI assistant. It runs on a **Raspberry Pi 4** (p
 Windows (dev). Web UI on port 8765. Read this before exploring; it should save re-discovery.
 
 ## Names (don't "fix" these)
-- User-facing name: **htTamer**. Infrastructure keeps the old names on purpose: Python package
-  `subtune`, paths/host/service `bassblend`, settings format id `bassblend-config`.
+- The name is **htTamer** everywhere: paths, service and account `httamer`, variables `HTTAMER_*`, settings format id
+  `httamer-config`, GitHub repo `htTamer`. Only the Python package keeps its name, `subtune`.
+- The project's earlier name survives only as migration code, on purpose (config.py `_env`, bundle.py `OLD_FORMAT`,
+  update.py `OLD_PI_UPDATER`, `deploy/linux/bassblend-update`, the move in `deploy/linux/httamer-update`,
+  push-update.sh, install.sh's refusal). Don't add it anywhere else, and don't remove those until old installs are gone.
 
 ## Layout
 - `subtune/` (all Python, stdlib HTTP server, numpy/scipy, sounddevice)
@@ -93,10 +96,10 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
 - Deploy to the Pi: `bash deploy/push-update.sh` (sends tracked + new files, restarts, rolls back
   if it fails). The owner does the real testing on the Pi; local preview isn't needed unless a
   change can only be checked in a browser (e.g. the JS split).
-- Pi: `ssh bassblend`. App in `/opt/bassblend` (venv `/opt/bassblend/venv`), data in
-  `/var/lib/bassblend` (not readable as the ssh user: use the API, e.g.
+- Pi: `ssh httamer`. App in `/opt/httamer` (venv `/opt/httamer/venv`), data in
+  `/var/lib/httamer` (not readable as the ssh user: use the API, e.g.
   `curl -s http://127.0.0.1:8765/api/state`, local requests need no sign-in). Running a test file
-  there: `BASSBLEND_DATA=$(mktemp -d) BASSBLEND_CONFIG=... /opt/bassblend/venv/bin/python3 tests/...`
+  there: `HTTAMER_DATA=$(mktemp -d) HTTAMER_CONFIG=... /opt/httamer/venv/bin/python3 tests/...`
 - Silent hardware check: `POST /api/smoke` or `subtune smoke`.
 
 ## Rules (the owner's, all still in force)

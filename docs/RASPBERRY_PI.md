@@ -10,16 +10,16 @@ yet**. Expect a first session of small fixes, ideally with an AI coding assistan
 
 ## First install
 1. Write Raspberry Pi OS Lite (64-bit) to the SD card with **Raspberry Pi Imager**. In its settings,
-   set the hostname to `bassblend`, create your user, turn on **SSH**, and add Wi-Fi if needed.
+   set the hostname to `httamer`, create your user, turn on **SSH**, and add Wi-Fi if needed.
 2. Boot the Pi and copy the htTamer folder to it, e.g. with git:
-   `git clone <your repo> ~/bassblend` (or copy the folder over).
+   `git clone <your repo> ~/httamer` (or copy the folder over).
 3. On the Pi:
    ```
-   cd ~/bassblend
+   cd ~/httamer
    sudo ./deploy/linux/install.sh
    ```
    It installs everything and starts htTamer.
-4. Open **http://bassblend.local:8765** on your phone or PC. The first visit opens a short
+4. Open **http://httamer.local:8765** on your phone or PC. The first visit opens a short
    **setup guide**: choose your PIN, add the mic calibration file, find the receiver, and
    (optionally) add your AI key. Do this straight away: until a PIN is chosen, anyone on your
    network who opens the page could choose it. After that, everyone has to sign in.
@@ -41,19 +41,19 @@ choosing a PIN), or from a terminal: `python -m subtune import-config FILE`
 (`export-config` makes one).
 
 **On a freshly written SD card**, copy the file onto the card's boot drive (the drive Windows shows
-after writing) as `bassblend-config.json` before the first start. It is imported on first boot
+after writing) as `httamer-config.json` before the first start. It is imported on first boot
 and then removed from the boot drive. With the PIN in the file, there is no setup to do at all.
-To bake it into an image: `BASSBLEND_SETTINGS=path/to/file.json deploy/pi-gen/build-image.sh`
+To bake it into an image: `HTTAMER_SETTINGS=path/to/file.json deploy/pi-gen/build-image.sh`
 (anyone with that image can read the file).
 
 ## Over-the-air updates from your computer
-With SSH set up (`ssh bassblend` works), send this folder's code to the Pi:
+With SSH set up (`ssh httamer` works), send this folder's code to the Pi:
 ```
 deploy/push-update.sh            # once
 deploy/push-update.sh --watch    # every time you save a file (Ctrl+C to stop)
 ```
 It sends the tracked and new files (uncommitted edits included; never `data/`, `tools/` or keys).
-On the Pi, `bassblend-update` checks the code compiles, installs it into `/opt/bassblend`
+On the Pi, `httamer-update` checks the code compiles, installs it into `/opt/httamer`
 (keeping the Python environment, the miniDSP tool and your data), installs Python packages only if
 `requirements.txt` changed, and restarts only if Python code changed: web page edits show on the
 next refresh. If the new version doesn't start within 30 seconds, the previous one is put back.
@@ -63,12 +63,12 @@ The version shows at the bottom of the Settings file page.
 Use the **dev** install, which runs htTamer straight from your checkout as your own user, so edits
 take effect after a restart:
 ```
-cd ~/bassblend
+cd ~/httamer
 sudo ./deploy/linux/install.sh --dev
 ```
-Then start an AI coding session **over SSH** to the Pi, in `~/bassblend` (for example a Code session in the Claude desktop app).
-The assistant can edit, run `tests/`, `sudo systemctl restart bassblend`, read `journalctl -u bassblend`,
-and check the dashboard in the browser pane at http://bassblend.local:8765.
+Then start an AI coding session **over SSH** to the Pi, in `~/httamer` (for example a Code session in the Claude desktop app).
+The assistant can edit, run `tests/`, `sudo systemctl restart httamer`, read `journalctl -u httamer`,
+and check the dashboard in the browser pane at http://httamer.local:8765.
 
 ## What's different from Windows
 | | Windows | Pi |
@@ -76,12 +76,12 @@ and check the dashboard in the browser pane at http://bassblend.local:8765.
 | Dashboard | this PC only, no sign-in | your network, PIN required |
 | Audio | Windows WASAPI | ALSA, direct hardware (no resampling) |
 | miniDSP tool | `tools/minidsp/minidsp.exe` | minidsp-rs Linux build, installed by the script |
-| Data | `data/` in the project | `/var/lib/bassblend` (`BASSBLEND_DATA`) |
-| API key / PIN | `%LOCALAPPDATA%\subtune` | `/var/lib/bassblend/config` (`BASSBLEND_CONFIG`) |
+| Data | `data/` in the project | `/var/lib/httamer` (`HTTAMER_DATA`) |
+| API key / PIN | `%LOCALAPPDATA%\subtune` | `/var/lib/httamer/config` (`HTTAMER_CONFIG`) |
 | Receiver test files | needed a firewall rule | no firewall by default |
 
 ## Things to check on the first real run
-- `minidsp probe` finds the 2x4HD (the USB permission rule is in `/etc/udev/rules.d/60-bassblend-minidsp.rules`).
+- `minidsp probe` finds the 2x4HD (the USB permission rule is in `/etc/udev/rules.d/60-httamer-minidsp.rules`).
 - Both the miniDSP and the UMIK-1 open at 48 kHz on ALSA.
 - A self-test (Manual steps) still measures −10 dB and 5 ms.
 - The receiver can fetch the blend test file from the Pi.

@@ -5,15 +5,15 @@
 #   deploy/push-update.sh --watch    # keep pushing whenever a file changes (Ctrl+C to stop)
 #
 # Options / environment:
-#   --host NAME      SSH host to update (default: bassblend, set up in ~/.ssh/config)
-#   BASSBLEND_HOST   same as --host
+#   --host NAME      SSH host to update (default: httamer, set up in ~/.ssh/config)
+#   HTTAMER_HOST   same as --host
 #
 # Sends the tracked and new (not ignored) files, including uncommitted edits,
-# never data/, tools/, build output or keys. On the Pi, bassblend-update checks
+# never data/, tools/, build output or keys. On the Pi, httamer-update checks
 # the code compiles, installs it, restarts only if Python changed, and rolls
 # back by itself if the new version doesn't start.
 set -euo pipefail
-HOST="${BASSBLEND_HOST:-bassblend}"
+HOST="${HTTAMER_HOST:-httamer}"
 WATCH=0
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -46,8 +46,14 @@ push() {
   local v; v="$(version)"
   printf '\033[1m==> Pushing %s to %s\033[0m\n' "$v" "$HOST"
   # the updater travels first, so a Pi from an older image can always take the update
-  "${SSH[@]}" 'sudo install -m 0755 /dev/stdin /usr/local/sbin/bassblend-update' < deploy/linux/bassblend-update
-  files | tar -czf - --null -T - | "${SSH[@]}" "sudo /usr/local/sbin/bassblend-update '$v'"
+  if "${SSH[@]}" 'test ! -e /usr/local/sbin/httamer-update && test -e /usr/local/sbin/bassblend-update'; then
+    # an install from before the rename: its own updater takes this version; the push after that moves it to the new names
+    files | tar -czf - --null -T - | "${SSH[@]}" "sudo /usr/local/sbin/bassblend-update '$v'"
+    echo "This Pi was set up before the rename. Push once more to move it to its new names."
+    return
+  fi
+  "${SSH[@]}" 'sudo install -m 0755 /dev/stdin /usr/local/sbin/httamer-update' < deploy/linux/httamer-update
+  files | tar -czf - --null -T - | "${SSH[@]}" "sudo /usr/local/sbin/httamer-update '$v'"
 }
 
 signature() {       # changes whenever a file is edited, added or removed

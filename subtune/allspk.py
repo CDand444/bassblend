@@ -26,7 +26,7 @@ from . import audio
 from .config import AUDIO_FS as FS, load_settings
 from .deepcheck import FG, band_mean, direct_arrival, frac_smooth, spl_offset
 
-MEDIA_NAME = "bassblend_all_speakers_7_1.wav"
+MEDIA_NAME = "httamer_all_speakers_7_1.wav"
 F1, F2 = 20.0, 20000.0
 LF1, LF2 = 15.0, 150.0
 SWEEP, GAP, LEAD, TAIL = 6.0, 2.5, 8.0, 3.0
@@ -199,7 +199,7 @@ ALSA_CHMAP = None
 # receiver plays RL/RR on the surrounds and RLC/RRC on the surround backs. aplay can't remap the WAV's
 # order onto it, so the Pi plays its own copy with the channels already in that order.
 HDMI_CH = ["FL", "FR", "LFE", "C", "SL", "SR", "SBL", "SBR"]
-HDMI_MEDIA_NAME = "bassblend_all_speakers_hdmi.wav"
+HDMI_MEDIA_NAME = "httamer_all_speakers_hdmi.wav"
 
 
 def run(pos=1, mode="hdmi", auto_volume=True, log=None, status=None, avr_input=None):

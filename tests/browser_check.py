@@ -28,7 +28,7 @@ def free_port():
 
 def start_server(port):
     tmp = tempfile.mkdtemp(prefix="bb_browser_")
-    env = {**os.environ, "BASSBLEND_DATA": os.path.join(tmp, "data"), "BASSBLEND_CONFIG": os.path.join(tmp, "conf"),
+    env = {**os.environ, "HTTAMER_DATA": os.path.join(tmp, "data"), "HTTAMER_CONFIG": os.path.join(tmp, "conf"),
            "PYTHONUNBUFFERED": "1"}
     log = open(os.path.join(tmp, "server.log"), "w", encoding="utf-8")
     p = subprocess.Popen([sys.executable, "-m", "subtune", "serve", "--port", str(port)], cwd=ROOT, env=env,

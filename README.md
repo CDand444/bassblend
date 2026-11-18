@@ -13,10 +13,11 @@ assistant. It runs on a Raspberry Pi (or Windows) and is used from a web page.
 
 ## Download
 
-Get the latest build from **[Releases](https://github.com/CDand444/bassblend/releases/latest)**. Installed copies update themselves from there (Tools → Updates), with nothing to set up:
+Get the latest build from **[Releases](https://github.com/CDand444/htTamer/releases/latest)**. Installed copies update themselves from there (Tools → Updates), with nothing to set up:
 
-- **Raspberry Pi**: `bassblend-<version>.img.xz`. Write it to an SD card with Raspberry Pi Imager
-  (it can add Wi-Fi and SSH), plug in the miniDSP and the UMIK-1, then open `http://bassblend.local:8765`.
+- **Raspberry Pi, ready-made SD card image (recommended)**: `httamer-<version>.img.xz`. Write it to an SD card
+  with Raspberry Pi Imager (it can add Wi-Fi and SSH), plug in the miniDSP and the UMIK-1, then open
+  `http://httamer.local:8765`. This is the main, tested way to run htTamer.
   See [docs/RASPBERRY_PI.md](docs/RASPBERRY_PI.md).
 - **Windows 10/11 (64-bit)**: `htTamer-<version>-windows-setup.exe`. Installs for your user only
   (no admin rights), with Start-menu and desktop shortcuts. Start htTamer and the dashboard opens
@@ -24,12 +25,30 @@ Get the latest build from **[Releases](https://github.com/CDand444/bassblend/rel
   `%LOCALAPPDATA%\htTamer` (keys and PIN in its own `config` folder, never shared with a
   developer copy) and survive updates. The miniDSP is reached over USB with no driver.
 
+### Already have a Pi or a Linux box running?
+
+The image is the recommended way. If you don't want to wipe a card that already runs something else, the same
+install script the image is built with also sets htTamer up on an existing system: Raspberry Pi OS (64-bit),
+Debian 12+ or Ubuntu 22.04+. It is for people comfortable with a terminal, and is tested far less than the image.
+
+```
+git clone https://github.com/CDand444/htTamer.git
+cd htTamer
+sudo ./deploy/linux/install.sh
+```
+
+It installs htTamer in `/opt/httamer` with its own service account and a service that starts at boot, keeps its
+data in `/var/lib/httamer`, and prints the address to open. It does not rename your computer (`--hostname NAME`
+does) and leaves your other software alone, except that it switches off minidsp-rs's own background service if
+you have one, because only one program can hold the miniDSP. Updates then come from the app (Tools → Updates),
+like on the image.
+
 Releases are built by `.github/workflows/release.yml` when a `v*` tag is pushed (the Windows
 installer); the Pi image is built with `deploy/pi-gen/build-image.sh` and uploaded to the same release.
 
 ## Getting started
 
-1. **Open the dashboard** (`http://bassblend.local:8765` on the Pi, or the window the Windows installer opens) and accept the
+1. **Open the dashboard** (`http://httamer.local:8765` on the Pi, or the window the Windows installer opens) and accept the
    safety notice. Choose a PIN if it asks.
 2. **Receiver**: enter its address (htTamer can search the network) so it can be put back exactly as it was after every test.
 3. **Room**: describe the room (size, shape, doors and windows), the **Screen** (a TV or a projector screen, acoustically
@@ -60,8 +79,7 @@ your hardware, help with each step. Everything is also in the [user manual](subt
 - Receiver setup: [docs/RECEIVER_SETUP.md](docs/RECEIVER_SETUP.md)
 - Changes: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
-Infrastructure names (the `subtune` Python package, `bassblend` paths, host and
-service) come from the project's earlier name and are kept on purpose.
+The Python package is named `subtune`; everything else (paths, service, host, files) is named `httamer`.
 
 ## Using htTamer from an AI client (MCP)
 

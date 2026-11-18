@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Install an update the dashboard downloaded from GitHub (runs as root from bassblend-ota.service).
+# Install an update the dashboard downloaded from GitHub (runs as root from httamer-ota.service).
 # The dashboard itself is locked down (it can only write its data folder), so it drops the release
-# in <data>/update/ and this script hands it to bassblend-update (compile check, keeps the previous
+# in <data>/update/ and this script hands it to httamer-update (compile check, keeps the previous
 # version, rolls back if the new one doesn't start). Its output goes to <data>/update/result.txt.
 set -uo pipefail
-DATA="${1:?usage: bassblend-ota <data folder>}"
+DATA="${1:?usage: httamer-ota <data folder>}"
 U="$DATA/update"
 [ -f "$U/incoming.version" ] && [ -f "$U/incoming.tar.gz" ] || exit 0
 VER="$(head -c 64 "$U/incoming.version" | tr -cd 'A-Za-z0-9._+-')"
@@ -14,7 +14,7 @@ trap 'rm -rf "$T"' EXIT
 {
   echo "$(date -Is) installing ${VER:-unknown}"
   if tar -xzf "$U/incoming.tar.gz" --strip-components=1 -C "$T" --no-same-owner --no-same-permissions; then
-    tar -czf - -C "$T" . | /usr/local/sbin/bassblend-update "${VER:-unknown}"
+    tar -czf - -C "$T" . | /usr/local/sbin/httamer-update "${VER:-unknown}"
     echo "exit $?"
   else
     echo "the download isn't a valid archive; nothing changed"

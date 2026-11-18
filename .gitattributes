@@ -4,8 +4,9 @@
 *.rules     text eol=lf
 # Windows launcher
 *.cmd       text eol=crlf
+deploy/linux/httamer-update text eol=lf
 deploy/linux/bassblend-update text eol=lf
-deploy/linux/bassblend-ota text eol=lf
+deploy/linux/httamer-ota text eol=lf
 
 # Development-only files: kept in the repository, left out of the source archives devices download
 # (GitHub release tarballs, which the Pi's in-app updates install) and of the Pi image.

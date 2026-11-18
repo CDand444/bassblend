@@ -13,7 +13,7 @@ import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 DATA = tempfile.mkdtemp(prefix="bb_dsp_lock_")
-os.environ["BASSBLEND_DATA"] = DATA
+os.environ["HTTAMER_DATA"] = DATA
 sys.path.insert(0, str(ROOT))
 
 HOLDER = """
@@ -27,7 +27,7 @@ with dsp.device_lock():
 
 
 def test_a_second_process_waits_for_the_first():
-    p = subprocess.Popen([sys.executable, "-c", HOLDER.format(root=str(ROOT), data=DATA, hold=1.5)], env=dict(os.environ, BASSBLEND_DATA=DATA))
+    p = subprocess.Popen([sys.executable, "-c", HOLDER.format(root=str(ROOT), data=DATA, hold=1.5)], env=dict(os.environ, HTTAMER_DATA=DATA))
     try:
         flag = pathlib.Path(DATA) / "held"
         for _ in range(100):                                           # the other process has the lock once it writes this

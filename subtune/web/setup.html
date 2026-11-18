@@ -259,7 +259,7 @@ function wire() {
     const f = imf.files[0], m = $('#impMsg'); if (!f) return;
     let b = null;
     try { b = JSON.parse(await f.text()); } catch (e) {}
-    if (!b || b.format !== 'bassblend-config') { m.className = 'msg bad'; m.textContent = 'That isn’t a htTamer settings file.'; imf.value = ''; return; }
+    if (!b || !['httamer-config', 'bassblend-config'].includes(b.format)) { m.className = 'msg bad'; m.textContent = 'That isn’t a htTamer settings file.'; imf.value = ''; return; }
     m.className = 'msg'; m.textContent = 'Importing…';
     const r = await post('/api/config/import', {bundle: b});
     if (r.error) { m.className = 'msg bad'; m.textContent = r.error; imf.value = ''; return; }

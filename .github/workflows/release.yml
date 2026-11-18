@@ -1,7 +1,7 @@
 # Builds the Windows installer and attaches it to the GitHub release for a version tag (v1.2.3),
 # but only after the checks in ci.yml pass (Linux + Windows tests, static check, browser check).
 # The Raspberry Pi image is built separately (deploy/pi-gen/build-image.sh) and uploaded to the
-# same release with: gh release upload v1.2.3 dist/bassblend-*.img.xz dist/bassblend-*.img.xz.sha256
+# same release with: gh release upload v1.2.3 dist/httamer-*.img.xz dist/httamer-*.img.xz.sha256
 name: release
 
 on:

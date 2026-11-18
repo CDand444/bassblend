@@ -68,7 +68,7 @@ function renderAllSpk() {
   $('#allAuto').disabled = manual;
   $('#allRun').disabled = !!job.running || !!S.busy || (!manual && (!S.pi_hdmi || !$('#allInp').value));
   $('#allRun').textContent = running ? (manual ? 'Listening…' : 'Running…') : manual ? 'Start listening' : 'Run all-speakers check';
-  const how = manual ? `<ol class="howto"><li>Download <a href="/media/bassblend_all_speakers_7_1.wav" download>bassblend_all_speakers_7_1.wav</a> (8 channels, about a minute) to a USB stick or an HDMI source (PC, streamer, Blu-ray player).</li>
+  const how = manual ? `<ol class="howto"><li>Download <a href="/media/httamer_all_speakers_7_1.wav" download>httamer_all_speakers_7_1.wav</a> (8 channels, about a minute) to a USB stick or an HDMI source (PC, streamer, Blu-ray player).</li>
       <li>Set the receiver to a direct or multichannel listening mode (not Stereo or an upmixer) at a normal listening volume.</li>
       <li>Put the mic at your seat, press <b>Start listening</b>, then press play.</li></ol>`
     : (S.pi_hdmi ? `<p class="muted small" style="margin:0"><b style="color:var(--good)">✓ ${esc(HW().where[0].toUpperCase() + HW().where.slice(1))} is connected.</b> ` : `<p class="small" style="margin:0">${HW().win ? '<b style="color:var(--bad)">Windows has no HDMI audio output right now.</b> Plug this computer’s HDMI cable into a free HDMI input on the receiver (receiver on). ' : '<b style="color:var(--bad)">The Pi doesn’t see anything on its HDMI ports.</b> Plug a cable from the Pi’s micro-HDMI port next to the USB-C power into a free HDMI input on the receiver (receiver on). '}`) +
@@ -396,7 +396,7 @@ function renderTreatmentForms(p) {
 
 // ---------- coach: next best steps (computed by htTamer, no AI needed)
 let coachKey = null;
-const WHO = {bassblend: 'htTamer does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};
+const WHO = {httamer: 'htTamer does it', owner: 'You do this', receiver_menu: 'Receiver menu', dirac: 'In Dirac Live'};
 function renderCoach() {
   const steps = (S.coach || []).slice(0, 3), jr = S.journal || [];
   const key = JSON.stringify([steps.map(x => x.id + x.title), jr.length && jr[jr.length - 1].t]);
@@ -466,7 +466,7 @@ function renderDeep() {
   const manual = $('#dcMode').value === 'manual', viaHdmi = $('#dcMode').value === 'hdmi';
   $('#dcAuto').disabled = manual;
   $('#dcInpF').style.display = viaHdmi ? '' : 'none';
-  $('#dcFile').innerHTML = manual ? 'Copy <a href="/media/bassblend_full_range_test.wav" download>bassblend_full_range_test.wav</a> to a USB stick, plug it into the receiver, press Run, then press play on the receiver.' : viaHdmi ? piHint() : '';
+  $('#dcFile').innerHTML = manual ? 'Copy <a href="/media/httamer_full_range_test.wav" download>httamer_full_range_test.wav</a> to a USB stick, plug it into the receiver, press Run, then press play on the receiver.' : viaHdmi ? piHint() : '';
   $('#dcRun').disabled = !!job.running || !!S.busy || (viaHdmi && (!S.pi_hdmi || !$('#dcInp').value));
   $('#dcRun').textContent = running ? 'Running…' : Object.keys(reps).length ? 'Run again' : 'Run system report';
   const latest = deepLatest();

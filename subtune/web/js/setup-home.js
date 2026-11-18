@@ -48,7 +48,7 @@ $('#cfgFile').onchange = async e => {
   const out = $('#cfgOut');
   let b;
   try { b = JSON.parse(await f.text()); } catch (err) { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a htTamer settings file.</span>'; return; }
-  if (!b || b.format !== 'bassblend-config') { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a htTamer settings file.</span>'; return; }
+  if (!b || !['httamer-config', 'bassblend-config'].includes(b.format)) { out.innerHTML = '<span style="color:var(--bad)">That file isn’t a htTamer settings file.</span>'; return; }
   const extras = [b.tunes && b.tunes.length ? `${b.tunes.length} tune${b.tunes.length > 1 ? 's' : ''}` : '', b.secrets && b.secrets.pin ? 'the PIN' : '', b.secrets && b.secrets.ai_key ? 'the AI key' : ''].filter(Boolean);
   if (!confirm(`Load the settings saved on ${b.from || 'another device'} (${b.exported || 'unknown date'})?
 
@@ -63,7 +63,7 @@ $('#cfgFile').onchange = async e => {
 };
 function renderCfgTip() {
   const t = `htTamer ${S.version || ''}` + ((S.net || {}).lan
-    ? ' · New SD card: copy a settings file onto the card’s boot drive as <code>bassblend-config.json</code> before the first start and it loads by itself.'
+    ? ' · New SD card: copy a settings file onto the card’s boot drive as <code>httamer-config.json</code> before the first start and it loads by itself.'
     : '');
   if ($('#cfgTip').dataset.t !== t) { $('#cfgTip').dataset.t = t; $('#cfgTip').innerHTML = t; }
 }

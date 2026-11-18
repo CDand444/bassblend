@@ -2,7 +2,7 @@
 
 Reads only what htTamer already stores (GET /api/readiness, /api/results, /api/state); plays nothing and changes nothing.
 
-  python scripts/validation_snapshot.py snap  ssh://bassblend run1     # asks the Pi over ssh; writes validation/run1.json (a URL works when signed in)
+  python scripts/validation_snapshot.py snap  ssh://httamer run1     # asks the Pi over ssh; writes validation/run1.json (a URL works when signed in)
   python scripts/validation_snapshot.py compare validation/run1.json validation/run2.json validation/run3.json
 
 `compare` prints how far apart the runs are on the numbers that should repeat, and says PASS or FAIL against the limits below.

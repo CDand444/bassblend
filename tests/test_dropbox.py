@@ -14,9 +14,9 @@ import urllib.parse
 import zipfile
 
 TMP = tempfile.mkdtemp(prefix="bb_dropbox_")
-os.environ["BASSBLEND_DATA"] = os.path.join(TMP, "data")
-os.environ["BASSBLEND_CONFIG"] = os.path.join(TMP, "conf")
-os.makedirs(os.environ["BASSBLEND_DATA"], exist_ok=True)
+os.environ["HTTAMER_DATA"] = os.path.join(TMP, "data")
+os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
+os.makedirs(os.environ["HTTAMER_DATA"], exist_ok=True)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import backup, dropbox          # noqa: E402
@@ -87,7 +87,7 @@ def test_connect_keeps_only_a_refresh_token_in_the_config_folder():
     _connect()
     f = dropbox._token_file()
     assert f.read_text() == "REFRESH-SECRET-TOKEN-1" and dropbox.connected() and dropbox.status()["connected"]
-    assert "REFRESH-SECRET-TOKEN-1" not in (pathlib.Path(os.environ["BASSBLEND_DATA"]) / "settings.json").read_text()
+    assert "REFRESH-SECRET-TOKEN-1" not in (pathlib.Path(os.environ["HTTAMER_DATA"]) / "settings.json").read_text()
     st = dropbox.status()
     assert "REFRESH" not in json.dumps(st) and st["app_key"] == KEY
 

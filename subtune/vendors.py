@@ -13,7 +13,7 @@ then knows, for each sub:
 
 htTamer can't turn these knobs: it says which one to change and why, then
 measures again. Facts are tagged with where they come from: the maker's manual
-or spec sheet, or "bassblend" for htTamer's own conservative choices.
+or spec sheet, or "httamer" for htTamer's own conservative choices.
 """
 from __future__ import annotations
 
@@ -285,7 +285,7 @@ def describe(cid: str, st: dict) -> dict:
             "notes": [n["text"] for n in check(cid, st)], "q_guide": c["q_guide"], "maker_tips": c["tips"],
             "modes_available": [{"name": x["name"], "set": x["when"], "for": x["for"]} for x in c["modes"]],
             "auto_eq_setup": c.get("auto_eq"), "source": c["source"],
-            "can_bassblend_change_it": "No: physical knobs and plugs. Tell the owner exactly what to change, then re-measure."}
+            "can_httamer_change_it": "No: physical knobs and plugs. Tell the owner exactly what to change, then re-measure."}
 
 
 def catalog_view() -> dict:

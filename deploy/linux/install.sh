@@ -5,7 +5,7 @@
 # minidsp-rs control tool, a USB permission rule for the miniDSP, and a service
 # that starts the dashboard at boot on your home network (PIN protected).
 #
-#   sudo ./deploy/linux/install.sh            # normal: copies htTamer to /opt/bassblend
+#   sudo ./deploy/linux/install.sh            # normal: copies htTamer to /opt/httamer
 #   sudo ./deploy/linux/install.sh --dev      # development: runs straight from this folder,
 #                                             # as your own user, so edits apply after a restart
 # Options:
@@ -45,6 +45,7 @@ say()  { printf '\n\033[1m==> %s\033[0m\n' "$*"; }
 die()  { printf '\nError: %s\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" -eq 0 ] || die "run this with sudo"
+[ "$DEV" -eq 1 ] || [ ! -d /opt/bassblend ] || die "this computer has a htTamer from before its files were renamed (in /opt/bassblend). Update it from its own page (Tools > Updates) twice: the second update moves it over."
 if [ "$IMAGE" -eq 1 ]; then
   [ "$DEV" -eq 0 ] || die "--image and --dev can't be used together"
   SET_PIN=0
@@ -59,15 +60,15 @@ if [ "$DEV" -eq 1 ]; then
   [ -n "$RUN_USER" ] && [ "$RUN_USER" != "root" ] || die "--dev needs to be run with sudo from your normal user account"
   APP="$SRC"
   RUN_HOME="$(getent passwd "$RUN_USER" | cut -d: -f6)"
-  DATA="$RUN_HOME/.local/share/bassblend"
-  CONF="$RUN_HOME/.config/bassblend"
-  VENV="$RUN_HOME/.local/share/bassblend-venv"
+  DATA="$RUN_HOME/.local/share/httamer"
+  CONF="$RUN_HOME/.config/httamer"
+  VENV="$RUN_HOME/.local/share/httamer-venv"
 else
-  RUN_USER="bassblend"
-  APP="/opt/bassblend"
-  DATA="/var/lib/bassblend"
-  CONF="/var/lib/bassblend/config"
-  VENV="/opt/bassblend/venv"
+  RUN_USER="httamer"
+  APP="/opt/httamer"
+  DATA="/var/lib/httamer"
+  CONF="/var/lib/httamer/config"
+  VENV="/opt/httamer/venv"
 fi
 
 case "$(uname -m)" in
@@ -83,9 +84,9 @@ apt-get update -qq
 apt-get install -y -qq python3 python3-venv python3-pip libportaudio2 avahi-daemon curl ca-certificates rsync >/dev/null
 
 if [ "$DEV" -eq 0 ]; then
-  say "Creating the 'bassblend' service account"
-  id -u bassblend >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin bassblend
-  usermod -a -G audio,plugdev bassblend
+  say "Creating the 'httamer' service account"
+  id -u httamer >/dev/null 2>&1 || useradd --system --home-dir "$DATA" --shell /usr/sbin/nologin httamer
+  usermod -a -G audio,plugdev httamer
 
   say "Copying htTamer to $APP"
   mkdir -p "$APP"
@@ -124,7 +125,7 @@ if systemctl list-unit-files minidspd.service >/dev/null 2>&1; then
 fi
 
 say "Letting htTamer use the miniDSP over USB without root"
-cat > /etc/udev/rules.d/60-bassblend-minidsp.rules <<'RULES'
+cat > /etc/udev/rules.d/60-httamer-minidsp.rules <<'RULES'
 # miniDSP (USB vendor 2752): control access for the plugdev group (htTamer's account is in it)
 SUBSYSTEM=="usb", ATTRS{idVendor}=="2752", MODE="0660", GROUP="plugdev"
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="2752", MODE="0660", GROUP="plugdev"
@@ -154,7 +155,7 @@ PrivateTmp=yes
 ProtectHome=yes"
 [ "$DEV" -eq 1 ] && HARDEN="NoNewPrivileges=yes
 PrivateTmp=yes"
-cat > /etc/systemd/system/bassblend.service <<UNIT
+cat > /etc/systemd/system/httamer.service <<UNIT
 [Unit]
 Description=htTamer dashboard
 After=network-online.target sound.target
@@ -163,8 +164,8 @@ Wants=network-online.target
 [Service]
 User=$RUN_USER
 WorkingDirectory=$APP
-Environment=BASSBLEND_DATA=$DATA
-Environment=BASSBLEND_CONFIG=$CONF
+Environment=HTTAMER_DATA=$DATA
+Environment=HTTAMER_CONFIG=$CONF
 Environment=PYTHONUNBUFFERED=1
 ExecStartPre=+/bin/sh $APP/deploy/linux/boot-import.sh $DATA $RUN_USER
 ExecStart=$VENV/bin/python -m subtune serve --lan --port $PORT
@@ -177,43 +178,43 @@ WantedBy=multi-user.target
 UNIT
 live && systemctl daemon-reload
 ota_units() {   # in-app updates: the locked-down dashboard drops a download in $1/update, a root path unit installs it
-  install -m 0755 "$APP/deploy/linux/bassblend-ota" /usr/local/sbin/bassblend-ota
+  install -m 0755 "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota
   install -d -m 0755 "$1/update"
   chown --reference="$1" "$1/update" 2>/dev/null || true
-  cat > /etc/systemd/system/bassblend-ota.path <<OTAP
+  cat > /etc/systemd/system/httamer-ota.path <<OTAP
 [Unit]
 Description=htTamer: install a downloaded update
 
 [Path]
 PathExists=$1/update/incoming.version
-Unit=bassblend-ota.service
+Unit=httamer-ota.service
 
 [Install]
 WantedBy=multi-user.target
 OTAP
-  cat > /etc/systemd/system/bassblend-ota.service <<OTAS
+  cat > /etc/systemd/system/httamer-ota.service <<OTAS
 [Unit]
 Description=htTamer: install a downloaded update
 
 [Service]
 Type=oneshot
-ExecStart=/usr/local/sbin/bassblend-ota $1
+ExecStart=/usr/local/sbin/httamer-ota $1
 OTAS
 }
 if [ "$DEV" -eq 0 ]; then                     # over-the-air updates pushed from your computer (deploy/push-update.sh)
-  install -m 0755 "$APP/deploy/linux/bassblend-update" /usr/local/sbin/bassblend-update
+  install -m 0755 "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update
   ota_units "$DATA"                              # ... and from GitHub, started in the app
   live && systemctl daemon-reload
-  systemctl enable bassblend-ota.path >/dev/null 2>&1 || true
-  live && systemctl start bassblend-ota.path || true
+  systemctl enable httamer-ota.path >/dev/null 2>&1 || true
+  live && systemctl start httamer-ota.path || true
 fi
-systemctl enable bassblend.service >/dev/null
+systemctl enable httamer.service >/dev/null
 
 pin_is_set() { [ -s "$CONF/auth.json" ] && grep -q pin_hash "$CONF/auth.json"; }
 if [ "$SET_PIN" -eq 1 ] && ! pin_is_set; then
   say "Choose a PIN for the dashboard"
   echo "Anyone on your network who opens htTamer will need it. Use 6 or more characters."
-  sudo -u "$RUN_USER" env BASSBLEND_DATA="$DATA" BASSBLEND_CONFIG="$CONF" \
+  sudo -u "$RUN_USER" env HTTAMER_DATA="$DATA" HTTAMER_CONFIG="$CONF" \
       bash -c "cd '$APP' && '$VENV/bin/python' -m subtune set-pin"
 fi
 
@@ -221,9 +222,9 @@ if ! live; then
   say "htTamer is installed in the image; it starts on first boot"
   exit 0
 fi
-systemctl restart bassblend.service
+systemctl restart httamer.service
 sleep 2
-systemctl is-active --quiet bassblend.service || die "the service didn't start. See: journalctl -u bassblend -n 50"
+systemctl is-active --quiet httamer.service || die "the service didn't start. See: journalctl -u httamer -n 50"
 say "Done"
 echo "Open:  http://$(hostname).local:$PORT   (or http://$(hostname -I | awk '{print $1}'):$PORT)"
 if ! pin_is_set; then
@@ -233,4 +234,4 @@ fi
 echo
 echo "Your tunes and settings live in $DATA. To bring them over from another htTamer,"
 echo "download a settings file there (menu: Settings file) and import it here."
-echo "Logs:  journalctl -u bassblend -f      Restart:  sudo systemctl restart bassblend"
+echo "Logs:  journalctl -u httamer -f      Restart:  sudo systemctl restart httamer"

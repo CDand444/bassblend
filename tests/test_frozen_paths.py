@@ -12,7 +12,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 
 def test_installed_copy_has_its_own_config_and_data():
-    os.environ.pop("BASSBLEND_CONFIG", None)
+    os.environ.pop("HTTAMER_CONFIG", None)
     import subtune.config as c
     if not c.IS_WINDOWS:
         print("      (skipped: Windows paths)")

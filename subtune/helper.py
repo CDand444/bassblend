@@ -77,7 +77,7 @@ def _latest_report(st):
 
 
 def _steps_md(steps, n=3):
-    who = {"bassblend": "htTamer does it", "owner": "you do this", "receiver_menu": "in the receiver menu", "dirac": "in Dirac Live"}
+    who = {"httamer": "htTamer does it", "owner": "you do this", "receiver_menu": "in the receiver menu", "dirac": "in Dirac Live"}
     return "\n".join(f"{i}. **{s['title']}** ({who.get(s['who'], s['who'])}{', plays test sounds' if s.get('sound') else ''}). {s['why']}"
                      for i, s in enumerate(steps[:n], 1))
 

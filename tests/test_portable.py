@@ -80,14 +80,14 @@ def test_usb_address_only_used_on_its_own_system():
 def test_data_and_config_folders_follow_environment():
     from subtune import config
     with tempfile.TemporaryDirectory() as d:
-        os.environ["BASSBLEND_DATA"] = d + "/data"
-        os.environ["BASSBLEND_CONFIG"] = d + "/conf"
+        os.environ["HTTAMER_DATA"] = d + "/data"
+        os.environ["HTTAMER_CONFIG"] = d + "/conf"
         try:
             c = importlib.reload(config)
             assert c.DATA == pathlib.Path(d + "/data") and c.SETTINGS_FILE.parent == c.DATA
             assert c.config_dir() == pathlib.Path(d + "/conf")
         finally:
-            del os.environ["BASSBLEND_DATA"], os.environ["BASSBLEND_CONFIG"]
+            del os.environ["HTTAMER_DATA"], os.environ["HTTAMER_CONFIG"]
             importlib.reload(config)
 
 
@@ -103,13 +103,13 @@ def test_missing_cal_file_is_a_clear_error():
 # ---------------------------------------------------------------- PIN sign-in
 def _with_conf(fn):
     with tempfile.TemporaryDirectory() as d:
-        os.environ["BASSBLEND_CONFIG"] = d
+        os.environ["HTTAMER_CONFIG"] = d
         try:
             from subtune import auth
             auth._fails.clear()
             fn(auth, pathlib.Path(d))
         finally:
-            del os.environ["BASSBLEND_CONFIG"]
+            del os.environ["HTTAMER_CONFIG"]
 
 
 def test_pin_rules_and_storage():

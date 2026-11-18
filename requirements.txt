@@ -1,4 +1,4 @@
-# Versions BassBlend is tested with (Windows 11, Python 3.12). On a Raspberry Pi
+# Versions htTamer is tested with (Windows 11, Python 3.12). On a Raspberry Pi
 # (64-bit Pi OS) pip installs prebuilt ARM wheels for all four.
 numpy==2.5.4
 scipy==1.18.1

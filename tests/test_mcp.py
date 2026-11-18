@@ -15,8 +15,8 @@ import sys
 import tempfile
 
 TMP = tempfile.mkdtemp(prefix="bb_mcp_")
-os.environ["BASSBLEND_DATA"] = TMP
-os.environ["BASSBLEND_CONFIG"] = os.path.join(TMP, "conf")
+os.environ["HTTAMER_DATA"] = TMP
+os.environ["HTTAMER_CONFIG"] = os.path.join(TMP, "conf")
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
@@ -250,7 +250,7 @@ def test_token_is_shown_once_kept_as_a_hash_and_revocable():
     assert not mcp.token_info()["has_token"]
     tok = mcp.new_token()
     assert tok.startswith("htm_") and len(tok) > 40
-    stored = (pathlib.Path(os.environ["BASSBLEND_CONFIG"]) / "mcp.json").read_text(encoding="utf-8")
+    stored = (pathlib.Path(os.environ["HTTAMER_CONFIG"]) / "mcp.json").read_text(encoding="utf-8")
     assert tok not in stored and mcp.token_info()["has_token"]
     assert mcp.bearer_ok("Bearer " + tok) and mcp.bearer_ok("bearer " + tok)
     assert not mcp.bearer_ok(tok) and not mcp.bearer_ok("Bearer ") and not mcp.bearer_ok(None)

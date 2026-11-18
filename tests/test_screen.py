@@ -10,7 +10,7 @@ import pathlib
 import sys
 import tempfile
 
-os.environ["BASSBLEND_DATA"] = tempfile.mkdtemp(prefix="bb_screen_")
+os.environ["HTTAMER_DATA"] = tempfile.mkdtemp(prefix="bb_screen_")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import orient, room, screen, treatment      # noqa: E402

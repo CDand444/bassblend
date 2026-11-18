@@ -22,7 +22,7 @@ import numpy as np
 
 from .config import AUDIO_FS as FS
 
-PROBE_NAME = "bassblend_level_probe.wav"
+PROBE_NAME = "httamer_level_probe.wav"
 PROBE_SECONDS = 60.0
 PROBE_DBFS_RMS = -20.0
 TARGET_DEFAULT = 75.0

@@ -11,7 +11,7 @@ import tempfile
 import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-os.environ["BASSBLEND_DATA"] = tempfile.mkdtemp(prefix="bb_dwelling_")
+os.environ["HTTAMER_DATA"] = tempfile.mkdtemp(prefix="bb_dwelling_")
 sys.path.insert(0, str(ROOT))
 
 from subtune import automation, coach, dwelling  # noqa: E402

@@ -44,7 +44,7 @@ document.addEventListener('change', async e => {
   if (sw) { const r = await post('/api/settings', {hdmi_swap_surrounds: sw.checked ? 1 : 0}); if (r.error) alert(r.error); poll(); }
 });
 let AVR = {}, avrKey = null, blendMode = 'dlna', blendSpk = 'LR', blendSide = 'L', blendKey = null;
-const blendFile = () => blendSpk === 'LR' ? 'bassblend_blend_test_left_right.wav' : 'bassblend_blend_test.wav';
+const blendFile = () => blendSpk === 'LR' ? 'httamer_blend_test_left_right.wav' : 'httamer_blend_test.wav';
 const MODE_OPTS = [['00', 'Stereo'], ['01', 'Direct'], ['0C', 'All Ch Stereo'], ['11', 'Pure Audio'], ['80', 'Dolby Surround'], ['82', 'DTS:X / Neural:X'], ['FF', 'Auto Surround']];
 const INPUT_OPTS = [['10', 'BD/DVD'], ['12', 'TV'], ['01', 'CBL/SAT'], ['11', 'STRM BOX'], ['02', 'GAME'], ['05', 'PC'], ['03', 'AUX'], ['23', 'CD'], ['2B', 'NET'], ['22', 'PHONO']];
 async function loadAvr(force) { try { AVR = await fetch('/api/avr' + (force ? '?force=1' : '')).then(r => r.json()); } catch (e) {} avrKey = null; safe('receiver', renderAvr);

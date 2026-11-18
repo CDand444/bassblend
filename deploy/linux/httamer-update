@@ -1,0 +1,135 @@
+#!/usr/bin/env bash
+# Install a new htTamer version sent over SSH, with automatic rollback.
+#
+#   tar -czf - <source files> | ssh pi@httamer sudo httamer-update <version>
+#
+# deploy/push-update.sh on your computer does this for you. Steps:
+#   1. unpack into a staging folder and check the Python code compiles;
+#   2. keep a copy of the running version;
+#   3. copy the changes into /opt/httamer (the Python environment, the
+#      miniDSP tool and your data are never touched);
+#   4. reinstall Python packages only if requirements.txt changed;
+#   5. restart the dashboard only if Python code changed (web pages load fresh
+#      on the next page refresh), then check it answers. If it doesn't, the
+#      previous version is put back and restarted.
+set -euo pipefail
+APP=/opt/httamer
+WORK=/var/lib/httamer-ota
+VER="${1:-unknown}"
+die() { echo "httamer-update: $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || die "run with sudo"
+UNITS=/etc/systemd/system
+ota_units() {   # in-app updates from GitHub: the helper and its systemd path unit, for the data folder $1
+  install -m 0755 "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota
+  install -d -m 0755 "$1/update"; chown --reference="$1" "$1/update" 2>/dev/null || true
+  printf '[Unit]
+Description=htTamer: install a downloaded update
+
+[Path]
+PathExists=%s/update/incoming.version
+Unit=httamer-ota.service
+
+[Install]
+WantedBy=multi-user.target
+' "$1" > "$UNITS/httamer-ota.path"
+  printf '[Unit]
+Description=htTamer: install a downloaded update
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/httamer-ota %s
+' "$1" > "$UNITS/httamer-ota.service"
+  systemctl daemon-reload; systemctl enable --now httamer-ota.path >/dev/null 2>&1 || true
+}
+
+# An install made before the rename: move the program, the data, the account and the services to the new names, once.
+# Only when the program there is already a renamed version (its first update after the rename still ran the old way),
+# so the version kept for rollback also understands the new names.
+OLD=bassblend
+if [ ! -e "$APP" ] && [ -f "/opt/$OLD/deploy/linux/httamer-update" ] && [ -f "$UNITS/$OLD.service" ]; then
+  echo "Moving this install to its new name (httamer): program, data and services"
+  systemctl stop "$OLD.service" "$OLD-ota.path" 2>/dev/null || true
+  mv "/opt/$OLD" "$APP"
+  [ ! -d "/var/lib/$OLD" ] || mv "/var/lib/$OLD" /var/lib/httamer
+  [ ! -d "/var/lib/$OLD-ota" ] || mv "/var/lib/$OLD-ota" "$WORK"
+  if id -u "$OLD" >/dev/null 2>&1 && ! id -u httamer >/dev/null 2>&1; then
+    usermod -l httamer -d /var/lib/httamer "$OLD"
+    groupmod -n httamer "$OLD" 2>/dev/null || true
+  fi
+  { grep -rIl "/opt/$OLD" "$APP/venv/bin" "$APP/venv/pyvenv.cfg" 2>/dev/null || true; } | xargs -r sed -i "s#/opt/$OLD#$APP#g" || true
+  sed -e "s/BASSBLEND_/HTTAMER_/g" -e "s/$OLD/httamer/g" "$UNITS/$OLD.service" > "$UNITS/httamer.service"
+  [ ! -f "/etc/udev/rules.d/60-$OLD-minidsp.rules" ] || mv "/etc/udev/rules.d/60-$OLD-minidsp.rules" /etc/udev/rules.d/60-httamer-minidsp.rules
+  systemctl disable "$OLD.service" "$OLD-ota.path" >/dev/null 2>&1 || true
+  rm -f "$UNITS/$OLD.service" "$UNITS/$OLD-ota.path" "$UNITS/$OLD-ota.service" "/usr/local/sbin/$OLD-update" "/usr/local/sbin/$OLD-ota"
+  install -m 0755 "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update
+  ota_units /var/lib/httamer
+  systemctl enable httamer.service >/dev/null 2>&1 || true
+  systemctl start httamer.service
+  echo "Moved. Logs are now: journalctl -u httamer"
+fi
+[ -x "$APP/venv/bin/python" ] || die "htTamer isn't installed in $APP (run deploy/linux/install.sh first)"
+exec 9>/run/httamer-update.lock
+flock -n 9 || die "another update is running"
+case "$VER" in *[!A-Za-z0-9._+-]*) die "bad version name: $VER" ;; esac
+
+mkdir -p "$WORK"; chmod 700 "$WORK"
+rm -rf "$WORK/new"; mkdir "$WORK/new"
+tar -xzf - -C "$WORK/new" --no-same-owner --no-same-permissions
+[ -f "$WORK/new/subtune/cli.py" ] && [ -f "$WORK/new/subtune/server.py" ] || die "that isn't a htTamer source bundle"
+printf '%s\n' "$VER" > "$WORK/new/VERSION"
+"$APP/venv/bin/python" -m compileall -q "$WORK/new/subtune" >/dev/null \
+  || die "the new code doesn't compile on the Pi; nothing changed"
+find "$WORK/new" -name __pycache__ -prune -exec rm -rf {} +
+
+EXCL=(--exclude=/venv/ --exclude=/tools/ --exclude=/data/ --exclude=.git/ --exclude=__pycache__/)
+rsync -a --delete "${EXCL[@]}" "$APP/" "$WORK/prev/"
+CHANGES="$(rsync -rlt --checksum --delete --itemize-changes --chmod=D755,F644 "${EXCL[@]}" "$WORK/new/" "$APP/" \
+           | grep -v '^\.' || true)"                  # lines starting with . only touched times or permissions
+find "$APP/deploy" -name '*.sh' -exec chmod 755 {} + 2>/dev/null || true
+chmod 755 "$APP/deploy/linux/httamer-update" 2>/dev/null || true
+OLD="$(cat "$WORK/prev/VERSION" 2>/dev/null || echo unknown)"
+FILES="$(printf '%s\n' "$CHANGES" | awk 'NF { print $NF }' | grep -v '^VERSION$' || true)"
+if [ -z "$FILES" ]; then
+  echo "Already up to date ($VER)"; exit 0
+fi
+echo "Updating $OLD -> $VER:"
+printf '%s\n' "$CHANGES" | grep -v ' VERSION$' | sed -E 's/^\*deleting +/  - /; s/^[<>c.][^ ]* /  ~ /' | head -40
+
+rollback() {
+  echo "httamer-update: $1; putting $OLD back" >&2
+  rsync -a --delete "${EXCL[@]}" "$WORK/prev/" "$APP/"
+  systemctl restart httamer || true
+  exit 1
+}
+
+if ! cmp -s "$WORK/prev/requirements.txt" "$APP/requirements.txt"; then
+  echo "Python packages changed: installing (can take a few minutes on a Pi)"
+  "$APP/venv/bin/python" -m pip install -q -r "$APP/requirements.txt" || rollback "package install failed"
+fi
+# keep the updater itself current
+if [ -f "$APP/deploy/linux/httamer-update" ] && ! cmp -s "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update; then
+  install -m 0755 "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update
+fi
+# in-app updates from GitHub: the helper and its systemd path unit (added in 0.9.2; installed here on older Pis)
+DATADIR="$(grep -oE 'HTTAMER_DATA=[^ ]+' "$UNITS/httamer.service" 2>/dev/null | head -1 | cut -d= -f2)"
+if [ -n "$DATADIR" ] && [ -f "$APP/deploy/linux/httamer-ota" ]; then
+  if ! cmp -s "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota || [ ! -f "$UNITS/httamer-ota.path" ]; then
+    ota_units "$DATADIR"
+    echo "In-app updates installed (httamer-ota.path)"
+  fi
+fi
+
+if printf '%s\n' "$FILES" | grep -qvE '^(subtune/web/|docs/|tests/|deploy/pi-gen/|[^/]*\.md$)'; then
+  PORT="$(grep -oE -- '--port [0-9]+' /etc/systemd/system/httamer.service | awk '{print $2}' || true)"
+  systemctl restart httamer
+  for _ in $(seq 1 30); do
+    if curl -fs -o /dev/null "http://127.0.0.1:${PORT:-8765}/api/setup/status"; then
+      echo "Restarted; htTamer $VER is running"; exit 0
+    fi
+    systemctl is-failed --quiet httamer && break
+    sleep 1
+  done
+  journalctl -u httamer -n 15 --no-pager >&2 || true
+  rollback "the new version didn't start"
+fi
+echo "Web pages only: no restart needed, refresh the page ($VER)"

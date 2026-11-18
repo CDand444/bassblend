@@ -24,7 +24,7 @@ def device(name: str) -> dict:
     d = TMP / name
     (d / "data").mkdir(parents=True, exist_ok=True)
     (d / "conf").mkdir(parents=True, exist_ok=True)
-    return dict(os.environ, BASSBLEND_DATA=str(d / "data"), BASSBLEND_CONFIG=str(d / "conf"), PYTHONIOENCODING="utf-8")
+    return dict(os.environ, HTTAMER_DATA=str(d / "data"), HTTAMER_CONFIG=str(d / "conf"), PYTHONIOENCODING="utf-8")
 
 
 def py(env: dict, code: str) -> str:
@@ -41,7 +41,7 @@ def cli(env: dict, *args) -> subprocess.CompletedProcess:
 def make_source() -> dict:
     """A 'Windows PC' with settings, room, a mic file, a tune, a slot record and a PIN + key."""
     env = device("pc")
-    data = pathlib.Path(env["BASSBLEND_DATA"])
+    data = pathlib.Path(env["HTTAMER_DATA"])
     (data / "Downloads").mkdir(exist_ok=True)
     (data / "Downloads" / "7000000_90deg.txt").write_text(CAL)
     s = {"minidsp_url": "usb:\\\\?\\HID#VID_2752", "play_device": "Speakers (miniDSP", "hostapi": "Windows WASAPI",
@@ -78,7 +78,7 @@ def export(env, *flags) -> dict:
 
 def test_export_leaves_out_machine_settings_and_secrets():
     b, _ = export(SRC)
-    assert b["format"] == "bassblend-config" and b["version"] == 1
+    assert b["format"] == "httamer-config" and b["version"] == 1
     for k in ("minidsp_url", "play_device", "hostapi", "cal_file", "onboarded"):
         assert k not in b["settings"], k
     assert b["settings"]["house_db"] == 5.0 and b["settings"]["system"]["heights"] == 4
@@ -99,7 +99,7 @@ def test_import_into_a_fresh_pi():
     pi = device("pi")
     r = cli(pi, "import-config", str(out))
     assert r.returncode == 0, r.stderr
-    data = pathlib.Path(pi["BASSBLEND_DATA"])
+    data = pathlib.Path(pi["HTTAMER_DATA"])
     s = json.loads((data / "settings.json").read_text())
     assert s["house_db"] == 5.0 and s["avr_model"] == "TX-RZ50" and s["system"]["beds"] == 7 and s["subs"] == [0, 1, 2]
     assert s.get("minidsp_url") is None and s.get("hostapi") in (None, "auto"), "the Pi keeps finding its own devices"
@@ -117,7 +117,7 @@ def test_import_into_a_fresh_pi():
 def test_import_keeps_the_devices_own_settings():
     _, out = export(SRC)
     pi = device("pi2")
-    data = pathlib.Path(pi["BASSBLEND_DATA"])
+    data = pathlib.Path(pi["HTTAMER_DATA"])
     (data / "settings.json").write_text(json.dumps({"hostapi": "ALSA", "play_device": "miniDSP", "house_db": 1.0}))
     assert cli(pi, "import-config", str(out)).returncode == 0
     s = json.loads((data / "settings.json").read_text())
@@ -130,11 +130,11 @@ def test_rejects_bad_files_and_protects_slot_1():
     bad.write_text('{"format": "something-else"}')
     r = cli(pi, "import-config", str(bad))
     assert r.returncode != 0 and "isn't a htTamer settings file" in (r.stderr + r.stdout)
-    b = {"format": "bassblend-config", "version": 1, "settings": {"preset": 0, "house_db": "loud", "../x": 1},
+    b = {"format": "httamer-config", "version": 1, "settings": {"preset": 0, "house_db": "loud", "../x": 1},
          "tunes": [{"id": "../../etc/passwd", "result": {}}], "files": {"measurements/../../x.npz": "AAAA"}}
     bad.write_text(json.dumps(b))
     assert cli(pi, "import-config", str(bad)).returncode == 0
-    data = pathlib.Path(pi["BASSBLEND_DATA"])
+    data = pathlib.Path(pi["HTTAMER_DATA"])
     s = json.loads((data / "settings.json").read_text())
     assert s["preset"] is None, "a file can't hand slot 1 to htTamer"
     assert s["house_db"] != "loud" and "../x" not in s
@@ -143,7 +143,7 @@ def test_rejects_bad_files_and_protects_slot_1():
 
 def test_reports_history_and_journal_travel():
     env = device("pc2")
-    data = pathlib.Path(env["BASSBLEND_DATA"])
+    data = pathlib.Path(env["HTTAMER_DATA"])
     (data / "state.json").write_text(json.dumps({"deep_reports": {"1": {"t": 5, "pos": 1}}, "deep_history": [{"t": 4}],
                                                  "fix_result": {"t": 6}}))
     (data / "journal.jsonl").write_text('{"t": 1, "kind": "tune", "text": "Applied X"}\n{"t": 2, "kind": "report", "text": "Report"}\n')
@@ -152,7 +152,7 @@ def test_reports_history_and_journal_travel():
     pi = device("pi5")
     r = cli(pi, "import-config", str(out))
     assert r.returncode == 0, r.stderr
-    pd = pathlib.Path(pi["BASSBLEND_DATA"])
+    pd = pathlib.Path(pi["HTTAMER_DATA"])
     st = json.loads((pd / "state.json").read_text())
     assert st["deep_reports"]["1"]["t"] == 5 and st["fix_result"]["t"] == 6
     assert (pd / "journal.jsonl").read_text().count("\n") == 2
@@ -161,7 +161,7 @@ def test_reports_history_and_journal_travel():
 def test_first_boot_pending_file():
     _, out = export(SRC, "--include-pin")
     pi = device("pi4")
-    data = pathlib.Path(pi["BASSBLEND_DATA"])
+    data = pathlib.Path(pi["HTTAMER_DATA"])
     (data / "import-pending.json").write_text(out.read_text(encoding="utf-8"), encoding="utf-8")
     r = py(pi, "from subtune import bundle; r = bundle.import_pending(); print(bool(r), bundle.import_pending())")
     assert r.strip().splitlines()[-1].split() == ["True", "None"], r

@@ -6,10 +6,10 @@ different repository (a fork) can be set per device, and a private one needs a r
 
   Windows (the installed app): download the release's  htTamer-<v>-windows-setup.exe  and run it
       silently; the installer closes htTamer, updates it in place and starts it again.
-  Raspberry Pi: download the release's source and hand it to the Pi's own updater (bassblend-update:
+  Raspberry Pi: download the release's source and hand it to the Pi's own updater (httamer-update:
       compile check, keeps the previous version, rolls back if the new one doesn't start). The dashboard
       runs locked down and can't install anything itself, so it drops the download in its data folder
-      and a root-owned systemd path unit (bassblend-ota.path) runs the updater.
+      and a root-owned systemd path unit (httamer-ota.path) runs the updater.
   A developer copy (git checkout) isn't updated this way: use git.
 """
 from __future__ import annotations
@@ -25,8 +25,9 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com"
-DEFAULT_REPO = "CDand444/bassblend"          # htTamer's public releases
-PI_UPDATER = Path("/usr/local/sbin/bassblend-update")
+DEFAULT_REPO = "CDand444/htTamer"          # htTamer's public releases
+PI_UPDATER = Path("/usr/local/sbin/httamer-update")
+OLD_PI_UPDATER = Path("/usr/local/sbin/bassblend-update")      # an install from before the rename, until its next update moves it over
 CHECK_EVERY_S = 24 * 3600
 CHECK_TIMEOUT_S = 30                          # a whole update check gives up after this
 
@@ -35,7 +36,7 @@ def mode() -> str:
     from .config import FROZEN, IS_WINDOWS
     if FROZEN and IS_WINDOWS:
         return "windows"
-    if PI_UPDATER.exists():
+    if PI_UPDATER.exists() or OLD_PI_UPDATER.exists():
         return "pi"
     return "dev"
 
@@ -212,7 +213,7 @@ def install(log=print) -> dict:
 
 
 def result() -> str | None:
-    """The Pi updater's last message (written by bassblend-ota.service)."""
+    """The Pi updater's last message (written by httamer-ota.service)."""
     from .config import DATA
     try:
         return (DATA / "update" / "result.txt").read_text(encoding="utf-8")[-2000:]

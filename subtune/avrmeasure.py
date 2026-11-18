@@ -31,8 +31,8 @@ from .config import AUDIO_FS as FS, load_settings
 LEAD, SWEEP, GAP, TAIL = 8.0, 6.0, 7.0, 3.0   # 8 s lead-in: receivers can skip the first seconds of network playback
 F1, F2 = 10.0, 500.0
 FILE_DBFS = -20.0
-MEDIA_NAME = "bassblend_blend_test.wav"
-MEDIA_NAME_LR = "bassblend_blend_test_left_right.wav"
+MEDIA_NAME = "httamer_blend_test.wav"
+MEDIA_NAME_LR = "httamer_blend_test_left_right.wav"
 GAP_LR = 2.0                               # pause between the left-only and right-only sweeps
 
 

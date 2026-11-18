@@ -23,7 +23,7 @@ import numpy as np
 
 from .config import AUDIO_FS as FS
 
-TONE_NAME = "bassblend_gain_tone_40hz.wav"
+TONE_NAME = "httamer_gain_tone_40hz.wav"
 TONE_HZ = 40.0
 TONE_DBFS = -30.0                 # RMS of each channel
 TONE_SECONDS = 20.0

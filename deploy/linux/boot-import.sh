@@ -5,7 +5,7 @@
 # hash or the API key, and the boot drive is readable by anyone with the card.
 #   boot-import.sh <data folder> <service user>
 DATA="$1"; RUN_USER="$2"
-for f in /boot/firmware/bassblend-config.json /boot/bassblend-config.json; do
+for f in /boot/firmware/httamer-config.json /boot/httamer-config.json; do
   [ -f "$f" ] || continue
   install -o "$RUN_USER" -m 0600 "$f" "$DATA/import-pending.json" && rm -f "$f"
   echo "htTamer: settings file found on the boot drive; importing it"

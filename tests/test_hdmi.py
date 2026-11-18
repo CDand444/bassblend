@@ -10,7 +10,7 @@ import pathlib
 import sys
 import tempfile
 
-os.environ.setdefault("BASSBLEND_DATA", tempfile.mkdtemp(prefix="bb_hdmi_"))
+os.environ.setdefault("HTTAMER_DATA", tempfile.mkdtemp(prefix="bb_hdmi_"))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import hdmi  # noqa: E402
@@ -47,10 +47,10 @@ def test_hdmi_source_switches_input_and_plays_from_the_pi():
         o = Rx()
         src = hdmi.Source("hdmi", o, settings={"avr_pi_input": "10"})
         src.select("blend")
-        src.play("bassblend_level_probe.wav")
+        src.play("httamer_level_probe.wav")
         src.stop()
         assert o.calls == ["input 10"] and src.auto and src.label == "Pi HDMI"
-        assert played == ["card vc4hdmi0", "bassblend_level_probe.wav", "stop"], played
+        assert played == ["card vc4hdmi0", "httamer_level_probe.wav", "stop"], played
     _patched(go)
 
 

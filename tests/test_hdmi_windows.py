@@ -14,7 +14,7 @@ import types
 
 import numpy as np
 
-os.environ["BASSBLEND_DATA"] = tempfile.mkdtemp(prefix="bb_hdmi_win_")
+os.environ["HTTAMER_DATA"] = tempfile.mkdtemp(prefix="bb_hdmi_win_")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import hdmi      # noqa: E402
@@ -100,14 +100,14 @@ def test_words_never_say_pi_on_a_pc():
 def test_the_pis_file_is_put_back_into_windows_channel_order():
     def go():
         d = pathlib.Path(tempfile.mkdtemp())
-        write_wav(d / "bassblend_all_speakers_hdmi.wav", 100)
-        data, fs, idx = hdmi.WinHdmiPlayer("").prepare(d / "bassblend_all_speakers_hdmi.wav", {})
+        write_wav(d / "httamer_all_speakers_hdmi.wav", 100)
+        data, fs, idx = hdmi.WinHdmiPlayer("").prepare(d / "httamer_all_speakers_hdmi.wav", {})
         # the Pi's file holds FL FR LFE C SL SR SBL SBR as 1000..8000; Windows wants FL FR C LFE SBL SBR SL SR
         assert ints(data[0]) == [1000, 2000, 4000, 3000, 7000, 8000, 5000, 6000] and fs == 48000 and idx == 7
-        write_wav(d / "bassblend_all_speakers_7_1.wav", 100)                          # the standard file is already in Windows' order
-        data, _, _ = hdmi.WinHdmiPlayer("").prepare(d / "bassblend_all_speakers_7_1.wav", {})
+        write_wav(d / "httamer_all_speakers_7_1.wav", 100)                          # the standard file is already in Windows' order
+        data, _, _ = hdmi.WinHdmiPlayer("").prepare(d / "httamer_all_speakers_7_1.wav", {})
         assert ints(data[0]) == [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
-        swapped, _, _ = hdmi.WinHdmiPlayer("").prepare(d / "bassblend_all_speakers_7_1.wav", {"hdmi_swap_surrounds": 1})
+        swapped, _, _ = hdmi.WinHdmiPlayer("").prepare(d / "httamer_all_speakers_7_1.wav", {"hdmi_swap_surrounds": 1})
         assert ints(swapped[0]) == [1000, 2000, 3000, 4000, 7000, 8000, 5000, 6000]
     with_fake(go)
 
@@ -152,9 +152,9 @@ def test_no_hdmi_output_is_a_plain_message():
 def test_playing_streams_in_blocks():
     def go():
         d = pathlib.Path(tempfile.mkdtemp())
-        write_wav(d / "bassblend_all_speakers_7_1.wav", 10000)
+        write_wav(d / "httamer_all_speakers_7_1.wav", 10000)
         p = hdmi.WinHdmiPlayer("")
-        p.play(d / "bassblend_all_speakers_7_1.wav")
+        p.play(d / "httamer_all_speakers_7_1.wav")
         p.thread.join(5)
         assert FakeSD.opened["device"] == 7 and FakeSD.opened["channels"] == 8 and FakeSD.opened["extra_settings"].auto_convert
         assert sum(len(w) for w in FakeSD.writes) == 10000 and p.error is None

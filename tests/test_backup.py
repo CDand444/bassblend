@@ -13,8 +13,8 @@ import time
 import zipfile
 
 TMP = pathlib.Path(tempfile.mkdtemp(prefix="bb_backup_"))
-os.environ["BASSBLEND_DATA"] = str(TMP / "data")
-os.environ["BASSBLEND_CONFIG"] = str(TMP / "conf")
+os.environ["HTTAMER_DATA"] = str(TMP / "data")
+os.environ["HTTAMER_CONFIG"] = str(TMP / "conf")
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 from subtune import backup, config, update      # noqa: E402

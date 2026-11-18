@@ -13,7 +13,7 @@ import sys
 import tempfile
 
 TMP = tempfile.mkdtemp(prefix="bb_all_")
-os.environ.setdefault("BASSBLEND_DATA", TMP)
+os.environ.setdefault("HTTAMER_DATA", TMP)
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import numpy as np                                    # noqa: E402
@@ -158,8 +158,8 @@ def test_hdmi_run_switches_input_uses_direct_mode_and_restores():
         (avr.receiver, A.HdmiPlayer, A.hdmi_port, avrmeasure.SweepWatcher, dsp.MiniDSP, autolevel.dial_in,
          A.audio.find_device, autolevel.build_probe, A.time.sleep) = saved
     order = [c for c in calls if not c.startswith(("snapshot", "stop", "port"))]
-    assert order == ["neutral", "input 10", "mode 00", "play bassblend_level_probe.wav", "dial_in", "mode 01",
-                     "play bassblend_all_speakers_hdmi.wav", "restore"], calls
+    assert order == ["neutral", "input 10", "mode 00", "play httamer_level_probe.wav", "dial_in", "mode 01",
+                     "play httamer_all_speakers_hdmi.wav", "restore"], calls
     assert r["mode"] == "hdmi" and r["playback"]["input"] == "10" and not r.get("stereo_only")
 
 
