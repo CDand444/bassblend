@@ -1,5 +1,11 @@
 # htTamer changelog
 
+## Nov 18, 2026 - htTamer 1.0
+
+- First stable release. Everything below is in it; the pages marked beta in the app are still beta.
+- **Pi updates always finish.** An update that changed more than 40 files stopped after copying them, so htTamer kept
+  running the old code until the next restart. Fixed, and the updater no longer rewrites itself while it runs.
+
 ## Nov 18, 2026 - Network name and port
 
 - **Tools → Network name** sets the address phones and computers use, `http://<name>.local:<port>`. On the Pi a new name
