@@ -25,7 +25,7 @@ import urllib.request
 from pathlib import Path
 
 API = "https://api.github.com"
-DEFAULT_REPO = "danand444/bassblend"          # htTamer's public releases
+DEFAULT_REPO = "CDand444/bassblend"          # htTamer's public releases
 PI_UPDATER = Path("/usr/local/sbin/bassblend-update")
 CHECK_EVERY_S = 24 * 3600
 CHECK_TIMEOUT_S = 30                          # a whole update check gives up after this
