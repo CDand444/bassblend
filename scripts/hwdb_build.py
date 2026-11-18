@@ -8,7 +8,7 @@ writes entries like
      "fields": {"sensitivity_db": 88.5, "height_in": 46.6}, "evidence": {"sensitivity_db": "Sensitivity | 88.5dB", "height_in": "46.6\\" x 13.5\\" x 14.8\\""}}
 
 Nothing is taken on trust. For every field the evidence must be quoted from that very file, and the number must be in the quote (mixed fractions such as
-17 1/4 are understood). A field that fails is dropped; the entry is kept when its source address and manual link are the file's own and enough fields held up.
+17 1/4 are understood; a size or weight the maker gives only in mm / cm / kg may be entered converted to inches / pounds). A field that fails is dropped; the entry is kept when its source address and manual link are the file's own and enough fields held up.
 
     python scripts/hwdb_build.py verify OUT.json CORPUS_DIR [--accepted accepted.json]   report, and write what held up
     python scripts/hwdb_build.py merge accepted.json [more.json ...]                      add to subtune/hwdb_seed.json (existing starter entries are replaced)
@@ -54,6 +54,17 @@ def numbers(s: str) -> list[float]:
     return out
 
 
+def metric_ok(k: str, val: float, q: str) -> bool:
+    """A size or weight a maker gives only in mm / cm or kg: accept the inch / pound value that is exactly the quoted number converted (rounded to 2 decimals / 1 decimal)."""
+    s = norm(q)
+    if k in ("width_in", "height_in", "depth_in"):
+        div = 25.4 if re.search(r"\bmm\b", s) else 2.54 if re.search(r"\bcm\b", s) else 0
+        return bool(div) and any(abs(val - n / div) <= 0.0051 for n in numbers(q))
+    if k == "weight_lb":
+        return bool(re.search(r"\bkgs?\b", s)) and any(abs(val - n * 2.20462) <= 0.051 for n in numbers(q))
+    return False
+
+
 def check_entry(e: dict, corpus: pathlib.Path) -> tuple[dict | None, list[str]]:
     """(the entry cleaned to what held up, or None) and the reasons for everything dropped."""
     why = []
@@ -91,7 +102,7 @@ def check_entry(e: dict, corpus: pathlib.Path) -> tuple[dict | None, list[str]]:
             except (TypeError, ValueError):
                 why.append(f"{k}: not a number")
                 continue
-            if not any(abs(val - n) <= 0.011 for n in numbers(q)):
+            if not any(abs(val - n) <= 0.011 for n in numbers(q)) and not metric_ok(k, val, q):
                 why.append(f"{k}: {v} is not in its evidence")
                 continue
             out[k] = int(val) if k == "year" else val

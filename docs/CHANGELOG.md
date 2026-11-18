@@ -1,5 +1,9 @@
 # htTamer changelog
 
+## Nov 20, 2026 - starter database
+
+- **More makers in the starter hardware database** (read only from each maker's own page or spec sheet, every number checked against the text): KEF (Q, R, Reference, Blade, LS50/LSX, Kube and KC subs, Ci in-wall and in-ceiling), Polk Audio, Definitive Technology, ELAC, Q Acoustics, Bowers & Wilkins (600/700/800 series, DB and ASW subs), PS Audio, the SVS Ultra Evolution speakers, and about 70 more Klipsch (Heritage towers, Forte, Heresy, Cornwall, Klipschorn, KD, CP, CS, DS, Flexus subs and others). Sizes a maker gives only in mm or kg are converted. 94 subs and 392 speakers in all. JL Audio, Monoprice, Focal, Arendal and Yamaha publish specs only through scripts or block automated reading, so they are still not in; add your model with Remember size.
+
 ## Nov 19, 2026 - better on a phone
 
 - **Room editor on a phone** fills the screen: a short header (Undo, Redo, Cancel, Apply), one row of things to add that scrolls sideways, the room as big as it fits, and the side panel only while something is picked. Finger drags move things the same way as the mouse.

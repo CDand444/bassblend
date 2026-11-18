@@ -122,6 +122,41 @@ def test_the_starter_database_holds_svs_hsu_and_revel_with_their_known_numbers()
     assert subs[hwdb.key("No.36")]["width_in"] == 29.25                                                     # 29 1/4 in, not the shipping box
 
 
+def test_the_starter_database_holds_more_brands_with_their_known_numbers():
+    d = hwdb.load()
+    subs, spk = d["subs"], d["speakers"]
+    assert len(subs) >= 85 and len(spk) >= 380
+    brands = {e.get("brand") for t in (subs, spk) for e in t.values()}
+    assert {"SVS", "Hsu Research", "Revel", "Klipsch", "REL", "KEF", "Polk Audio", "Definitive Technology", "ELAC", "Q Acoustics", "Bowers & Wilkins", "PS Audio"} <= brands
+    t = spk[hwdb.key("Ultra Evolution Titan")]                                                             # SVS
+    assert (t["kind"], t["sensitivity_db"], t["impedance_ohm"], t["low_hz"], t["height_in"], t["width_in"], t["depth_in"]) == ("tower", 88, 6, 27, 47.13, 9.8, 17.3)
+    c = spk[hwdb.key("Cornwall IV")]                                                                       # Klipsch, from its spec sheet
+    assert (c["kind"], c["sensitivity_db"], c["power_w"], c["height_in"], c["width_in"], c["depth_in"], c["weight_lb"]) == ("tower", 102, 100, 38, 25.3, 15.5, 95.76)
+    assert spk[hwdb.key("RP-8000F")]["sensitivity_db"] == 98 and spk[hwdb.key("RP-8000F")]["manual_url"].endswith("RP-8000F_Spec-Sheet_v01.pdf")
+    q3 = spk[hwdb.key("Q3 Meta")]                                                                          # KEF
+    assert (q3["sensitivity_db"], q3["low_hz"], q3["height_in"], q3["weight_lb"]) == (87, 49, 14.1, 18.1)
+    kube = subs[hwdb.key("Kube 12 MIE")]
+    assert (kube["f3_hz"], kube["design"], kube["height_in"], kube["weight_lb"]) == (22, "sealed", 16.1, 41.0)
+    r7 = spk[hwdb.key("Reserve R700")]                                                                     # Polk
+    assert (r7["kind"], r7["sensitivity_db"], r7["width_in"], r7["height_in"], r7["depth_in"], r7["weight_lb"]) == ("tower", 88, 12.6, 45, 16.9, 79.1)
+    assert spk[hwdb.key("702 S3")]["weight_lb"] == 73.8 and spk[hwdb.key("702 S3")]["source_url"].startswith("https://www.bowerswilkins.com/")   # Bowers & Wilkins
+    ds = subs[hwdb.key("DS123-BK")]                                                                        # ELAC
+    assert (ds["driver_in"], ds["amp_w"], ds["f3_hz"], ds["design"], ds["weight_lb"]) == (12, 200, 28, "sealed", 30.2)
+    assert spk[hwdb.key("DFR53")]["height_in"] == 40.0                                                     # 1016 mm on the page, converted
+    assert spk[hwdb.key("3050i")]["weight_lb"] == 39.2                                                     # Q Acoustics
+    assert spk[hwdb.key("Aspen FR30")]["weight_lb"] == 230 and subs[hwdb.key("Foundry F12")]["amp_w"] == 1000   # PS Audio
+
+
+def test_the_builder_converts_a_size_or_weight_only_given_in_metric():
+    b = _builder()
+    assert b.metric_ok("height_in", 40.0, "| H x W x D (mm) | 1016 x 202 x 242")                              # 1016 mm = 40.0 in
+    assert b.metric_ok("depth_in", 9.53, "| H x W x D (mm) | 1016 x 202 x 242")
+    assert not b.metric_ok("height_in", 41.0, "| H x W x D (mm) | 1016 x 202 x 242")                          # a number the page does not give
+    assert not b.metric_ok("height_in", 40.0, "1016 x 202 x 242")                                           # no unit in the quote
+    assert b.metric_ok("weight_lb", 44.1, "Weight 20 kg") and not b.metric_ok("weight_lb", 50, "Weight 20 kg")
+    assert not b.metric_ok("sensitivity_db", 40.0, "1016 mm")
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0
