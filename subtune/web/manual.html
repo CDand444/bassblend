@@ -37,6 +37,7 @@
   <a href="#m-ab">Blind A/B test</a>
   <a href="#m-ha">Home Assistant</a>
   <a href="#m-updates">Updates</a>
+  <a href="#m-network">Network name</a>
   <a href="#m-feedback">Bugs and feedback</a>
   <a href="#m-guards">Built-in safeguards</a>
   <a href="#m-trouble">When something goes wrong</a>
@@ -369,6 +370,9 @@
 
 <h2 id="m-updates">Updates</h2>
 <p><b>Tools → Updates</b> keeps the Windows app and the Pi up to date from htTamer's public GitHub releases, with nothing to set up. htTamer checks once a day and pops up a note when a new version is out; <b>Install</b> does the rest. On Windows the app closes, updates and opens again; on the Pi the update is checked before it's used, and if the new version doesn't start the previous one comes back by itself. Settings, tunes and measurements are always kept. (Following a fork instead? Set its repository there; a private one also needs a read-only token.) A minute or two after an update (or the first start), htTamer runs its silent hardware check by itself, once per version, and shows under Updates whether the miniDSP, the receiver and the mic all answer, so a problem shows up straight away rather than at your next tuning session.</p>
+
+<h2 id="m-network">Network name</h2>
+<p><b>Tools → Network name</b> sets the address phones and computers use: <code>http://&lt;name&gt;.local:&lt;port&gt;</code>. The name is letters, digits and dashes; the port is 8765 unless something else on that computer already uses it (any from 1024 to 65535). On the <b>Pi</b> a new name renames the Pi itself and a new port restarts htTamer on it; the dashboard moves a few seconds later, and the Pi's IP address keeps working (with the new port). On <b>Windows</b> htTamer normally listens only to that computer. Tick <b>Open htTamer to my home network</b> (here, or on the installer's Network page, which also asks for the name and port) and start htTamer again (a new port also applies then): phones on your network then open it at the name you chose, which htTamer announces itself, so the computer's own name is left alone. The first time, Windows may ask whether htTamer may use the network: allow it on private networks. Like the Pi, network mode asks for a PIN, which you choose on the Windows computer itself before anyone else can sign in.</p>
 
 <h2 id="m-feedback">Bugs and feedback</h2>
 <p><b>Tools → Feedback</b> turns a bug report or an idea into a new issue on htTamer's GitHub page. Pick the kind, write what happened (or your idea) and press <b>Open on GitHub</b>: the issue opens already filled in, you check it, and you press <b>Submit new issue</b> there (a free GitHub account is needed). htTamer never sends anything by itself. <b>Include diagnostics</b> adds htTamer's version, Windows or Pi, the receiver model, the miniDSP slot and the latest errors from the activity log, with IP addresses, keys, e-mail addresses and names removed; open <b>See the diagnostics</b> to read exactly what's added, or copy them if they're too long for the link.</p>

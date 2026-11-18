@@ -6,6 +6,45 @@
 set -uo pipefail
 DATA="${1:?usage: httamer-ota <data folder>}"
 U="$DATA/update"
+# Tools > Network name: the dashboard asks for a new name for this computer (http://<name>.local)
+if [ -f "$U/hostname.request" ]; then
+  HOSTS="${HTTAMER_HOSTS_FILE:-/etc/hosts}"        # tests point this at a copy
+  N="$(head -c 64 "$U/hostname.request" | tr -d '\r\n\t ')"
+  rm -f "$U/hostname.request"
+  {
+    if [[ "$N" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$ ]]; then
+      if hostnamectl set-hostname "$N"; then
+        if grep -q '^127\.0\.1\.1' "$HOSTS"; then sed -i "s/^127\.0\.1\.1.*/127.0.1.1\t$N/" "$HOSTS"
+        else printf '127.0.1.1\t%s\n' "$N" >> "$HOSTS"; fi
+        systemctl restart avahi-daemon 2>/dev/null || true
+        echo "ok $N"
+      else
+        echo "failed: the name couldn't be set"
+      fi
+    else
+      echo "refused: not a valid name"
+    fi
+  } > "$U/hostname.result" 2>&1
+  chown --reference="$U" "$U/hostname.result" 2>/dev/null || true
+fi
+# ... and a new port for the dashboard: the service's --port, then a restart
+if [ -f "$U/port.request" ]; then
+  SVC="${HTTAMER_SERVICE_FILE:-/etc/systemd/system/httamer.service}"   # tests point this at a copy
+  P="$(head -c 16 "$U/port.request" | tr -d '\r\n\t ')"
+  rm -f "$U/port.request"
+  if [[ "$P" =~ ^[0-9]{4,5}$ ]] && [ "$P" -ge 1024 ] && [ "$P" -le 65535 ] && [ "$P" -ne 5353 ]; then
+    if sed -i -E "s/--port [0-9]+/--port $P/" "$SVC" && grep -q -- "--port $P" "$SVC"; then
+      echo "ok $P" > "$U/port.result"
+      chown --reference="$U" "$U/port.result" 2>/dev/null || true
+      systemctl daemon-reload; systemctl restart httamer.service
+    else
+      echo "failed: the port couldn't be set" > "$U/port.result"
+    fi
+  else
+    echo "refused: not a valid port" > "$U/port.result"
+  fi
+  chown --reference="$U" "$U/port.result" 2>/dev/null || true
+fi
 [ -f "$U/incoming.version" ] && [ -f "$U/incoming.tar.gz" ] || exit 0
 VER="$(head -c 64 "$U/incoming.version" | tr -cd 'A-Za-z0-9._+-')"
 rm -f "$U/incoming.version"

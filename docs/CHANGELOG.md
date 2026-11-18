@@ -1,5 +1,14 @@
 # htTamer changelog
 
+## Nov 18, 2026 - Network name and port
+
+- **Tools → Network name** sets the address phones and computers use, `http://<name>.local:<port>`. On the Pi a new name
+  renames the Pi and a new port restarts htTamer on it (a Pi updated from an earlier version can do this after one more
+  update). The MCP page's client setup follows the port.
+- **Windows can open to your home network.** The installer has a Network page (network mode on or off, the name and port),
+  also changeable under Tools → Network name. In network mode htTamer answers its name itself and asks for a PIN,
+  chosen on the Windows computer before anyone else can sign in.
+
 ## Nov 18, 2026 - One name everywhere
 
 - Everything is now named **httamer**: the Pi image (`httamer-<version>.img.xz`, at `http://httamer.local:8765`), the program

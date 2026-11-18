@@ -60,6 +60,10 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     `view3d.js`: what goes into the 3D view (speakers, subs, treatment solids that never pass through each other); `treatpick.js`: the
     Treatment page picker (items and value tiers on/off, cost, buy list; kept in localStorage, never changes the plan).
   - `dropbox.py`: optional Dropbox copy of every backup (owner's own scoped app, PKCE sign-in, refresh token in the config folder like an AI key); `_open` is the only network call, tests replace it.
+  - `netname.py`: Tools > Network name (`/api/network`): name and port. Pi: `hostname.request` / `port.request` in
+    `<data>/update`, applied by the root `httamer-ota` (same path unit as updates; a port change rewrites the service's
+    `--port` and restarts it). Windows: network mode, name and port in `DATA/network.json` (the installer's Network page
+    writes it too; the launcher reads the port), the name answered by htTamer's own mDNS responder.
   - `backup.py`: automatic backups (weekly, before an update, on demand) and restore; never holds keys/tokens/PIN
     (`secrets_check`). Card Tools -> Backups, `/api/backups`.
   - `channels.py`: the every-channel report and receiver setup sheet from the newest all-speakers check (pure; `/api/channels`,

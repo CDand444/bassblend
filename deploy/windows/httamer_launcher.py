@@ -15,9 +15,13 @@ def main():
     from subtune.cli import main as cli
     if args[:2] == ["-m", "subtune"]:
         return cli(args[2:])
+    from subtune import netname
+    port = netname.load()["port"]                  # chosen in the installer or Tools > Network name
+    if args == ["manual"]:                         # the Start-menu "htTamer manual" shortcut
+        webbrowser.open(f"http://127.0.0.1:{port}/manual")
+        return 0
     if args:
         return cli(args)
-    port = 8765
     print("htTamer is starting. Keep this window open while you use it; close it to stop htTamer.")
     print(f"Open http://127.0.0.1:{port} in your browser if it doesn't open by itself.")
     threading.Thread(target=lambda: (time.sleep(2.5), webbrowser.open(f"http://127.0.0.1:{port}")), daemon=True).start()

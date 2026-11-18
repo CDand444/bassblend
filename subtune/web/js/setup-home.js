@@ -575,6 +575,53 @@ $('#updSave').onclick = async () => {
   if (!r.error) { updInit = false; await post('/api/update', {action: 'check'}); await poll(); loadUpdates(); }
 };
 
+// ---------- network name and port: http://<name>.local:<port> (the Pi renames itself; Windows answers the name itself in network mode)
+let NETW = null, netWait = null;
+async function loadNetwork() {
+  try { NETW = await fetch('/api/network').then(r => r.json()); } catch (e) { return; }
+  const N = NETW, url = `http://${esc(N.name)}.local:${N.port_now}`;
+  $('#netSub').textContent = `${N.name}.local:${N.port_now}`;
+  let h = '';
+  if (N.mode === 'dev') {
+    h = `<p class="muted">This is a developer copy: it answers at this computer's own name (<b>${esc(N.name)}.local</b>). Rename the computer to change it; the port is <code>serve --port</code>.</p>`;
+  } else {
+    if (N.mode === 'windows') {
+      h += N.lan_now ? `<p>Phones and other computers on your network open htTamer at <a href="${url}">${url}</a>.</p>`
+                     : '<p class="muted">htTamer only listens to this computer. Turn on network mode to open it from a phone or another computer (it then asks for a PIN).</p>';
+      h += `<label class="cb"><input type="checkbox" id="netLan" ${N.lan ? 'checked' : ''}><span>Open htTamer to my home network</span></label>`;
+      if (N.restart) h += `<div class="notice warn" style="margin-top:8px">Close htTamer's window and start it again for this to apply.${N.lan ? ' Windows may ask once whether to let htTamer use the network: allow it on private networks.' : ''}</div>`;
+    } else {
+      h += `<p>Phones and computers on your network open htTamer at <a href="${url}">${url}</a>.</p>`;
+      if (N.pending) h += '<div class="notice">Changing… this takes a few seconds.</div>';
+      else if (N.result) h += `<div class="notice warn">${esc(N.result)}</div>`;
+      if (N.supported === false) h += '<div class="notice warn">This Pi can change its name and port after its next update (Tools > Updates).</div>';
+    }
+    h += `<div class="row" style="align-items:end;margin-top:10px">
+      <label class="f" style="width:220px">Name<input id="netName" value="${esc(N.name)}" spellcheck="false" autocapitalize="none" maxlength="63"></label>
+      <span class="muted" style="padding-bottom:8px">.local :</span>
+      <label class="f" style="width:100px">Port<input id="netPort" value="${N.port}" inputmode="numeric" maxlength="5"></label>
+      <button class="btn" id="netSave">Save</button><span class="muted small" id="netMsg"></span></div>
+      <p class="muted small">Name: letters, digits and dashes. Port: 1024 to 65535 (8765 unless something else uses it). Bookmarks with the old address stop working; the ${N.mode === 'pi' ? "Pi's" : "computer's"} IP address still works with the new port.</p>`;
+  }
+  $('#netOut').innerHTML = h;
+  const b = $('#netSave'); if (!b) return;
+  b.onclick = async () => {
+    const name = $('#netName').value.trim().toLowerCase().replace(/\.local$/, ''), lanBox = $('#netLan');
+    const port = $('#netPort').value.trim(), body = {name, port}; if (lanBox) body.lan = lanBox.checked;
+    const moved = port !== String(N.port_now);
+    if (N.mode === 'pi' && (name !== N.name || moved) && !confirm(`Move this Pi's dashboard to http://${name}.local:${port}?\n\nThe old address stops answering in a few seconds${moved ? ' (htTamer restarts on the new port)' : ''}.`)) return;
+    const r = await post('/api/network', body);
+    if (r.error) { $('#netMsg').textContent = r.error; return; }
+    if (r.pending) {
+      toast('Moving the dashboard', `Open htTamer at http://${r.name}.local:${r.port} in a few seconds.`, '', {sticky: true});
+      clearTimeout(netWait); const t0 = Date.now();
+      const wait = async () => { await loadNetwork(); if (NETW && NETW.pending && Date.now() - t0 < 30000) netWait = setTimeout(wait, 1500); };
+      netWait = setTimeout(wait, 1500);
+    }
+    loadNetwork();
+  };
+}
+
 // ---------- bug reports and feedback: a pre-filled GitHub issue the owner submits themselves
 let FB = null;
 async function loadFeedback() {

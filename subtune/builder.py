@@ -72,7 +72,8 @@ def pair_info(port: int, host_header: str | None = None) -> dict:
     urls = []
     if host:
         urls.append(f"http://{host}:{port}/build?pair={code}")
-    urls.append(f"http://{socket.gethostname().lower()}.local:{port}/build?pair={code}")
+    from . import netname
+    urls.append(f"http://{netname.current()}.local:{port}/build?pair={code}")
     from . import qr
     return {"url": urls[0], "urls": urls, "svg": qr.svg(urls[0], px=5), "expires_s": PAIR_S}
 

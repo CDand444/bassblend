@@ -23,7 +23,9 @@ Get the latest build from **[Releases](https://github.com/CDand444/htTamer/relea
   (no admin rights), with Start-menu and desktop shortcuts. Start htTamer and the dashboard opens
   in your browser; keep its window open while you use it. Settings and measurements live in
   `%LOCALAPPDATA%\htTamer` (keys and PIN in its own `config` folder, never shared with a
-  developer copy) and survive updates. The miniDSP is reached over USB with no driver.
+  developer copy) and survive updates. The miniDSP is reached over USB with no driver. To open it
+  from a phone too, choose network mode, a name and a port on the installer's Network page (or later in
+  Tools → Network name); it then asks for a PIN, like the Pi.
 
 ### Already have a Pi or a Linux box running?
 

@@ -2,7 +2,7 @@
 # this and only builds when it passes):
 #   Linux, Python 3.13 (what the Pi runs): static check, all offline tests, and the browser check
 #     (every page opened in headless Chromium with a real reload; fails on any script error).
-#   Windows, Python 3.12 (the installed app): all offline tests.
+#   Windows, Python 3.12 (the installed app): all offline tests, and the installer script compiles.
 # Nothing here needs hardware or plays sound.
 name: checks
 
@@ -58,3 +58,9 @@ jobs:
       - name: Offline tests
         shell: bash
         run: for t in tests/test_*.py; do python "$t" > /dev/null || { echo "FAILED $t"; python "$t"; exit 1; }; done
+      - name: Installer script compiles (Inno Setup, with a stand-in program)
+        run: |
+          New-Item -ItemType Directory -Force dist\htTamer | Out-Null
+          Set-Content dist\htTamer\htTamer.exe "stand-in"
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q /DAppVersion=0.0.0 deploy\windows\httamer.iss
+          if ($LASTEXITCODE -ne 0) { exit 1 }

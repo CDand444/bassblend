@@ -18,7 +18,7 @@ import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
-from .config import EVENTS_FILE, ROOT, WEB_DIR, load_settings, save_settings
+from .config import EVENTS_FILE, IS_WINDOWS, ROOT, WEB_DIR, load_settings, save_settings
 from .state import event, load_state, update_state
 
 _live = {"t": 0, "data": None, "err": None}
@@ -1286,9 +1286,11 @@ def mcp_info(host_header=""):
     pi = sys.platform.startswith("linux") and str(ROOT).startswith("/opt/")
     if pi:                                        # an AI client on another computer reaches the Pi over ssh
         cmd, args, env = "ssh", [socket.gethostname() + ".local", f"cd {ROOT} && venv/bin/python3 -m subtune mcp"], {}
+    if NET["port"] != 8765:                       # the dashboard moved off the default port (Tools > Network name)
+        args = args[:-1] + [args[-1] + f" --port {NET['port']}"] if pi else args + ["--port", str(NET["port"])]
     return {"enabled": bool(s.get("mcp_enabled")), "actions": int(s.get("mcp_actions") or 0),
             "command": cmd, "args": args, "env": env, "pi": pi, "lan": NET["lan"],
-            "url": f"http://{host_header or '127.0.0.1:8765'}/mcp", "tools": len(TOOLS),
+            "url": f"http://{host_header or '127.0.0.1:' + str(NET['port'])}/mcp", "tools": len(TOOLS),
             **token_info()}
 
 
@@ -1581,7 +1583,7 @@ def _apply_settings(body):
     return changed
 
 
-NET = {"lan": False}                                # set by serve()
+NET = {"lan": False, "port": 8765}                  # set by serve()
 LOOPBACK = ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 
 
@@ -1632,6 +1634,14 @@ class H(BaseHTTPRequestHandler):
         if path in ("/logo.svg", "/favicon.ico", "/favicon.svg"):   # the app logo: public, on every page
             return True
         setup = self._setup_needed()
+        if setup and IS_WINDOWS and not self._local():
+            # a Windows PC just opened to the network: its owner chooses the PIN on that PC, not the first visitor
+            if path.startswith(("/api/", "/media/", "/mcp")):
+                self._send(403, {"error": "choose htTamer's PIN on the computer it runs on first"})
+            else:
+                self._send(403, b"<p>Open htTamer on the computer it runs on and choose a PIN there first, then reload this page.</p>",
+                           "text/html; charset=utf-8")
+            return False
         if path == "/setup":
             if setup or self._authed():
                 self._send(200, (WEB_DIR / "setup.html").read_bytes(), "text/html; charset=utf-8")
@@ -1726,9 +1736,9 @@ class H(BaseHTTPRequestHandler):
         from .analysis import key_source
         s = load_settings()
         cal = s.get("cal_file")
-        import socket
+        from . import netname
         return {"lan": NET["lan"], "pin_set": auth.pin_set(), "signed_in": self._authed(),
-                "onboarded": bool(s.get("onboarded")), "host": socket.gethostname(), "port": self.server.server_address[1],
+                "onboarded": bool(s.get("onboarded")), "host": netname.current(), "port": self.server.server_address[1],
                 "cal": {"ok": bool(cal) and Path(cal).is_file(), "name": Path(str(cal).replace("\\", "/")).name if cal else None},
                 "avr": {"configured": bool(s.get("avr_host")), "host": s.get("avr_host"), "make": s.get("avr_make", "Onkyo"),
                         "model": s.get("avr_model", "")},
@@ -1960,6 +1970,9 @@ class H(BaseHTTPRequestHandler):
             return self._send(200, {**automation.status(), "ab": abtest.view(), "ha": ha.token_info(),
                                     "ha_yaml": ha.yaml(f"http://{self.headers.get('Host') or '127.0.0.1:8765'}"),
                                     "inputs": _input_names(), "modes": _mode_names()})
+        if u.path == "/api/network":                 # the name htTamer answers at (Tools > Network name)
+            from . import netname
+            return self._send(200, netname.status(NET["lan"], self.server.server_address[1]))
         if u.path == "/api/update":
             from . import update, version
             s = load_settings()
@@ -2384,6 +2397,14 @@ class H(BaseHTTPRequestHandler):
                     event("config", "the Home Assistant token was revoked")
                     return self._send(200, ha.token_info())
                 return self._send(400, {"error": "new_token or revoke"})
+            if path == "/api/network":
+                from . import netname
+                lan = body.get("lan")
+                port_now = self.server.server_address[1]
+                r = netname.change(body.get("name"), None if lan is None else bool(lan), body.get("port"), port_now)
+                event("config", f"network address {'change to' if r.get('pending') else 'set to'} {r['name']}.local:{r['port']}"
+                      + ("" if lan is None else (", network mode on" if lan else ", this computer only")))
+                return self._send(200, {**netname.status(NET["lan"], port_now), **r})
             if path == "/api/update":                  # over-the-air updates from GitHub releases
                 from . import update
                 act = body.get("action")
@@ -2859,7 +2880,11 @@ def serve(port=8765, lan=False):
     if not RUN.running():                          # clear stale flags from a killed run
         update_state(busy=False, step="idle", analysis_status={"running": False},
                      suggest_status={"running": False})
-    NET["lan"] = bool(lan)
+    from . import netname
+    windows_lan = netname.mode() == "windows" and netname.load()["lan"]     # chosen in the installer or Tools > Network name
+    NET["lan"] = bool(lan or windows_lan)
+    NET["port"] = port
+    lan = NET["lan"]
     from . import mcp
     mcp.local_key(create=True)                     # lets `subtune mcp` run as this user authenticate
     from . import bundle
@@ -2876,8 +2901,9 @@ def serve(port=8765, lan=False):
     from . import backup
     threading.Thread(target=backup.weekly_loop, daemon=True).start()
     if lan:
-        import socket
-        name = socket.gethostname()
+        if netname.mode() == "windows":
+            netname.start_responder()
+        name = netname.current()
         print(f"htTamer dashboard on your network: http://{name}.local:{port}  "
               + ("(PIN required)" if auth.pin_set() else "(first boot: open it to choose a PIN)"), flush=True)
     else:

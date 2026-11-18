@@ -27,11 +27,13 @@ Description=htTamer: install a downloaded update
 
 [Path]
 PathExists=%s/update/incoming.version
+PathExists=%s/update/hostname.request
+PathExists=%s/update/port.request
 Unit=httamer-ota.service
 
 [Install]
 WantedBy=multi-user.target
-' "$1" > "$UNITS/httamer-ota.path"
+' "$1" "$1" "$1" > "$UNITS/httamer-ota.path"
   printf '[Unit]
 Description=htTamer: install a downloaded update
 
@@ -39,7 +41,8 @@ Description=htTamer: install a downloaded update
 Type=oneshot
 ExecStart=/usr/local/sbin/httamer-ota %s
 ' "$1" > "$UNITS/httamer-ota.service"
-  systemctl daemon-reload; systemctl enable --now httamer-ota.path >/dev/null 2>&1 || true
+  systemctl daemon-reload; systemctl enable httamer-ota.path >/dev/null 2>&1 || true
+  systemctl restart httamer-ota.path >/dev/null 2>&1 || true     # so it watches the files the new unit names
 }
 
 # An install made before the rename: move the program, the data, the account and the services to the new names, once.
@@ -113,7 +116,7 @@ fi
 # in-app updates from GitHub: the helper and its systemd path unit (added in 0.9.2; installed here on older Pis)
 DATADIR="$(grep -oE 'HTTAMER_DATA=[^ ]+' "$UNITS/httamer.service" 2>/dev/null | head -1 | cut -d= -f2)"
 if [ -n "$DATADIR" ] && [ -f "$APP/deploy/linux/httamer-ota" ]; then
-  if ! cmp -s "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota || [ ! -f "$UNITS/httamer-ota.path" ]; then
+  if ! cmp -s "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota || ! grep -qs port.request "$UNITS/httamer-ota.path"; then
     ota_units "$DATADIR"
     echo "In-app updates installed (httamer-ota.path)"
   fi

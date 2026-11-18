@@ -24,7 +24,7 @@ TOKEN = re.compile(r"\b(?:sk-ant-[\w-]{20,}|sk-[A-Za-z0-9]{32,}|ghp_[A-Za-z0-9]{
                    r"|AIza[\w-]{30,}|ht[aml]_[\w-]{30,})")
 
 OK_NETS = [ipaddress.ip_network(n) for n in (
-    "127.0.0.0/8", "0.0.0.0/32", "255.255.255.255/32",
+    "127.0.0.0/8", "0.0.0.0/32", "255.255.255.255/32", "224.0.0.251/32",   # mDNS's own multicast address
     "192.0.2.0/24", "198.51.100.0/24", "203.0.113.0/24",       # documentation ranges
     "192.168.1.0/24", "10.0.0.0/24")]                          # the placeholder networks the docs and tests use
 OK_IPS = {"1.2.3.4", "5.6.7.8", "192.168.7.21"}                  # made-up values in tests

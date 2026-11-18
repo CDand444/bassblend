@@ -98,6 +98,7 @@ const MENU = [
   {grp: 'Tools', key: 'backups', beta: true, icon: 'file', title: 'Backups', full: 'Backups: save and restore', el: $('#bkCard'), tag: () => null},
   {grp: 'Tools', key: 'updates', icon: 'wand', title: 'Updates', full: 'Updates', el: $('#updCard'),
    tag: () => (S.update || {}).newer ? ['new', 'alert'] : null},
+  {grp: 'Tools', key: 'network', icon: 'gear', title: 'Network name', full: 'Network name: the address phones and computers use', el: $('#netCard'), tag: () => null},
   {grp: 'Tools', key: 'automation', beta: true, icon: 'gear', title: 'Automation', full: 'Automation: night mode, automatic slot, watchdog', el: $('#autoCard'),
    tag: () => (S.night || {}).on ? ['night', 'alert'] : null},
   {grp: 'Tools', key: 'feedback', icon: 'chat', title: 'Feedback', full: 'Report a bug or send feedback', el: $('#fbCard'), tag: () => null},
@@ -201,6 +202,7 @@ function openSheet(key, fromHash = false) {
   if (!fromHash && location.hash !== '#/' + m.key) history.pushState(null, '', '#/' + m.key);
   if (m.key === 'tunes') loadTunes();
   if (m.key === 'updates') loadUpdates();
+  if (m.key === 'network') loadNetwork();
   if (m.key === 'backups') bkLoad();
   if (m.key === 'workshop') wkLoad();
   if (m.key === 'feedback') loadFeedback();

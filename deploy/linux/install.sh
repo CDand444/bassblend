@@ -187,6 +187,8 @@ Description=htTamer: install a downloaded update
 
 [Path]
 PathExists=$1/update/incoming.version
+PathExists=$1/update/hostname.request
+PathExists=$1/update/port.request
 Unit=httamer-ota.service
 
 [Install]
