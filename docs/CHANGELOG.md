@@ -1,5 +1,9 @@
 # htTamer changelog
 
+## Nov 20, 2026 - starter database
+
+- **More makers in the starter hardware database** (read only from each maker's own page or spec sheet, every number checked against the text): KEF (Q, R, Reference, Blade, LS50/LSX, Kube and KC subs, Ci in-wall and in-ceiling), Polk Audio, Definitive Technology, ELAC, Q Acoustics, Bowers & Wilkins (600/700/800 series, DB and ASW subs), PS Audio, the SVS Ultra Evolution speakers, and about 70 more Klipsch (Heritage towers, Forte, Heresy, Cornwall, Klipschorn, KD, CP, CS, DS, Flexus subs and others). Sizes a maker gives only in mm or kg are converted. 94 subs and 392 speakers in all. JL Audio, Monoprice, Focal, Arendal and Yamaha publish specs only through scripts or block automated reading, so they are still not in; add your model with Remember size.
+
 ## Nov 19, 2026 - review fixes
 
 - **Live EQ can no longer touch slot 1**: every live EQ write now selects htTamer's slot first, and switching the live EQ off while you listen to another slot (your original slot 1 included) writes to htTamer's slot and then puts back what was playing. Before, a write between the 15-second checks, or "Live EQ off", went to whatever slot was playing.
