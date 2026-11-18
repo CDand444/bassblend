@@ -231,5 +231,16 @@ class MiniDSP:
         c.append(self.c_xover_bypass(o, 1, True))
         return c
 
+    def refuse_original(self, what: str = "this test") -> None:
+        """Stop before anything is written when the miniDSP is playing slot 1, the owner's original: a test's mutes would be written into it."""
+        from .library import ORIGINAL_SLOT
+        try:
+            playing = int(self.status()["master"]["preset"])
+        except Exception:                                  # noqa: BLE001 - can't tell: the test's own checks decide
+            return
+        if playing == ORIGINAL_SLOT:
+            raise RuntimeError(f"the miniDSP is playing slot 1 (your original setup), and htTamer never writes to it. "
+                               f"Switch to htTamer's slot (Tunes & slots) and start {what} again")
+
     def all_outputs(self):
         return range(N_OUTPUTS)

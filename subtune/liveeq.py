@@ -484,6 +484,7 @@ def run_rta(mode="hdmi", avr_input=None, auto_volume=True, minutes=MAX_MINUTES, 
             buf[-k:] = x
             fill["n"] += k
 
+    dsp.refuse_original("the live analyzer")
     dsp_before = dsp.status()["master"]["source"].lower()
     snap = o.snapshot()
     stream = None

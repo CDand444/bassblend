@@ -267,8 +267,13 @@ def modal_report(room: dict, fmax=150.0) -> dict | None:
     modes = room_modes(L, W, H, fmax)
     axial = [m for m in modes if m["type"] == "axial"]
     vol = shape.volume(rm) or L * W * H
-    # Schroeder frequency (rough, assumes RT60 ~0.4 s)
-    schroeder = 2000 * math.sqrt(0.4 / vol)
+    # Schroeder frequency from the room's own ring-time estimate (surfaces, floor, couches); 0.4 s when that can't be worked out
+    try:
+        from . import furniture
+        rt = (furniture.room_rt60(room) or {}).get("mid_s") or 0.4
+    except Exception:                                    # noqa: BLE001 - an estimate must never stop the modes report
+        rt = 0.4
+    schroeder = 2000 * math.sqrt(rt / vol)
     rep = {"modes": modes, "axial": axial, "schroeder_hz": round(schroeder, 0),
            "volume_m3": round(vol, 1), "coupling": {}}
     from . import dwelling

@@ -221,6 +221,7 @@ def run(mode="dlna", pos=1, log=None, status=None, speakers="L", auto_volume=Fal
     if auto_volume:
         autolevel.build_probe()
     level = {}
+    dsp.refuse_original("the blend test")
     dsp_before = dsp.status()["master"]["source"].lower()
     snap = o.snapshot()
     mute = lambda on: [dsp.c_out_mute(x, on) for x in subs]

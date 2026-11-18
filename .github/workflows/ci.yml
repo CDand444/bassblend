@@ -40,6 +40,7 @@ jobs:
           python tests/browser_check.py
           python tests/browser_actions.py
           python tests/browser_room_editor.py
+          python tests/browser_analysis.py
 
   windows:
     runs-on: windows-latest

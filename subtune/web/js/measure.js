@@ -542,18 +542,19 @@ function renderDeep() {
     <dt>Signal-to-noise</dt><dd>How far the test was above the room's background noise. Below 15 dB, that part of the result isn't trustworthy.</dd></dl></details>`;
   $('#dcOut').innerHTML = h;
   if ($('#dcSpots')) tabs($('#dcSpots'), Object.keys(reps).sort().concat(comb ? ['all'] : []), dcSel, k => k === 'all' ? 'All spots (average)' : spotName(+k), k => { dcSel = k; dcKey = null; renderDeep(); });
-  if ($('#dcView')) $('#dcView').querySelectorAll('button').forEach(b => b.onclick = () => { dcView = b.dataset.k; dcKey = null; renderDeep(); });
+  if ($('#dcView')) $('#dcView').querySelectorAll('button').forEach(b => b.onclick = () => {
+    if (b.dataset.k === 'waterfall') { anWhat = 'system'; anPos = dcSel === 'all' ? null : String(dcSel); anKey = null; openSheet('analysis'); return; }      // one waterfall, on the Bass analysis page
+    dcView = b.dataset.k; dcKey = null; renderDeep(); });
   if ($('#dcCmp')) $('#dcCmp').onchange = e => { dcCmp = e.target.value; dcKey = null; renderDeep(); };
   drawDeepChart(r);
 }
-const DC_VIEWS = [['resp', 'Response'], ['phase', 'Phase'], ['gd', 'Group delay'], ['impulse', 'Impulse'], ['step', 'Step'], ['waterfall', 'Waterfall']];
+const DC_VIEWS = [['resp', 'Response'], ['phase', 'Phase'], ['gd', 'Group delay'], ['impulse', 'Impulse'], ['step', 'Step'], ['waterfall', 'Waterfall (opens Bass analysis)']];
 const DC_HINT = {
   resp: 'How loud each pitch arrives at your seat, against your target (dashed). The midrange is set to 0 dB so the shapes compare. Dotted lines split the ranges in the table below. Above about 5 kHz the exact mic position matters a lot.',
   phase: 'The timing of each pitch, relative to the direct sound (degrees, wrapping at ±180°). Smooth lines are good; sudden jumps sit at cancellations. Left and right should look alike.',
   gd: 'Group delay: how late each pitch arrives, in milliseconds. Bass naturally lags (the subs, the crossover); a sharp spike marks a resonance that rings. Flat near 0 ms in the treble means the speakers are well timed.',
   impulse: 'What a single click sounds like at your seat (both speakers): the first spike is the direct sound, later spikes are reflections. A clean, single spike is ideal.',
-  step: 'The click response added up over time: it shows whether the speakers and subs push together (a smooth rise) or fight (wiggles).',
-  waterfall: 'How the bass dies away after the sound stops, from 0 ms (top) to 300 ms (bottom). Darker = louder. Long dark streaks are room resonances that ring.'};
+  step: 'The click response added up over time: it shows whether the speakers and subs push together (a smooth rise) or fight (wiggles).'};
 let dcView = 'resp';
 function renderCombined(c, running, ds) {
   let h = running ? `<div class="notice"><span class="spin"></span>&nbsp; ${esc(ds.text || 'Working')}</div>` : '';
@@ -593,19 +594,6 @@ function timeChart(el, t, series, opt = {}) {
   series.forEach(s => { g += `<path d="${s.y.map((v, i) => (i ? 'L' : 'M') + X(t[i]).toFixed(1) + ',' + Y(v).toFixed(1)).join('')}" fill="none" stroke="${s.color}" stroke-width="${s.w || 1.5}" stroke-linejoin="round"/>`; });
   el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.aria || 'time response')}">${g}</svg>`;
 }
-function waterfallChart(el, w) {
-  const W = el.clientWidth, H = el.clientHeight, m = {l: 48, r: 12, t: 10, b: 26};
-  if (W < 80) return;
-  const nf = w.f.length, nt = w.t_ms.length, x0 = w.f[0], x1 = w.f[nf - 1];
-  const X = f => m.l + Math.log(f / x0) / Math.log(x1 / x0) * (W - m.l - m.r), rowH = (H - m.t - m.b) / nt;
-  let g = '';
-  w.db.forEach((row, ti) => row.forEach((v, fi) => {
-    const xa = fi ? (X(w.f[fi - 1]) + X(w.f[fi])) / 2 : X(w.f[0]), xb = fi < nf - 1 ? (X(w.f[fi]) + X(w.f[fi + 1])) / 2 : X(w.f[nf - 1]);
-    g += `<rect x="${xa.toFixed(1)}" y="${(m.t + ti * rowH).toFixed(1)}" width="${(xb - xa + .6).toFixed(1)}" height="${(rowH + .6).toFixed(1)}" fill="var(--accent)" opacity="${Math.max(0.03, (45 + v) / 45).toFixed(2)}"><title>${w.f[fi]} Hz at ${w.t_ms[ti]} ms: ${v} dB</title></rect>`; }));
-  [20, 30, 50, 100, 200, 300].filter(f => f >= x0 && f <= x1).forEach(f => g += `<text x="${X(f)}" y="${H - 7}" text-anchor="middle" font-size="11" fill="var(--text-3)">${f}${f === 300 ? ' Hz' : ''}</text>`);
-  [0, 100, 200, 300].forEach(t => { const i = w.t_ms.indexOf(t); if (i >= 0) g += `<text x="${m.l - 6}" y="${m.t + (i + .7) * rowH}" text-anchor="end" font-size="11" fill="var(--text-3)">${t} ms</text>`; });
-  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Bass waterfall">${g}</svg>`;
-}
 function drawDeepChart(r) {
   const el = $('#dcChart'); if (!el) return;
   const pro = r.pro && !r.pro.error ? r.pro : null;
@@ -622,7 +610,6 @@ function drawDeepChart(r) {
       legend($('#dcLegend'), [{name: 'Both speakers + subs', color: css('--text'), thick: true}]);
       return timeChart(el, t, [{y, color: css('--text'), w: 1.5}], {ymin: -1.05, ymax: 1.05, aria: dcView});
     }
-    if (dcView === 'waterfall') { legend($('#dcLegend'), [{name: 'Darker = louder (dB below the peak)', color: css('--accent'), thick: true}]); return waterfallChart(el, pro.waterfall); }
   }
   const t = $('#dcViewTitle'); if (t) t.textContent = 'Frequency response';
   const cl = y => y.map(v => Math.max(v, -30));             // a deep null shouldn't squash the whole chart

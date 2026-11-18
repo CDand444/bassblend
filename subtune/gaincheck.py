@@ -91,6 +91,7 @@ def run(mode="hdmi", avr_input=None, log=None, status=None) -> dict:
     from . import audio
     rec_dev = audio.find_device(s["rec_device"], s["hostapi"], "input", wait=5)
     build_tone(); autolevel.build_probe()
+    dsp.refuse_original("the gain check")
     dsp_before = dsp.status()["master"]["source"].lower()
     snap = o.snapshot()
     readings = []

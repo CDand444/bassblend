@@ -140,7 +140,7 @@ class Rig:
         sw = self._sweep()
         n, D = len(sw), len(sw) + int(GAP * FS)
         pre = np.zeros(int(PRE * FS))
-        H, quality = {}, {}
+        H, quality, repeats = {}, {}, []
         canon = None
         f1, f2 = self.s["sweep_f1"], self.s["sweep_f2"]
         order = [self.ref] + [o for o in self.subs if o != self.ref]
@@ -174,16 +174,19 @@ class Rig:
                 q = self._quality(rec, a + D, a + D + n)
                 q.update(ref_repeat_db=round(ref_dev, 2), timing_fix_ms=round(tau * 1e3, 3), takes=take + 1)
                 if best is None or ref_dev < best[0]:
-                    best = (ref_dev, Ht * np.exp(2j * np.pi * GRID * tau), q)
+                    best = (ref_dev, Ht * np.exp(2j * np.pi * GRID * tau), q, Href)
                 if ref_dev <= REPEAT_TOL_DB:
                     break
                 event("warn", f"pos {pos} output {o + 1}: reference sweep repeat differs by {ref_dev:.1f} dB "
                               "(noise or something moved?)" + (" - measuring it again" if take < RETAKES else " - kept the best take"))
             H[o], q = best[1], best[2]
+            if len(best) > 3:                                # the reference sweep taken again with this sub: how far the two takes agree, per frequency
+                from .decay import repeat_curve
+                repeats.append(repeat_curve(best[3], canon))
             quality[o] = q
             event("measure", f"pos {pos} output {o + 1}: SNR {q['snr_db']} dB", **q)
         self.dsp.batch(self.mute_except(self.subs), "unmute all subs")
-        self._save(pos, H, quality)
+        self._save(pos, H, quality, repeats)
         return H, quality
 
     def measure_combined(self, tag: str, pos: int):
@@ -415,7 +418,7 @@ class Rig:
         return audio.window_response(ir, a), audio.window_response(ir, a + D)
 
     # ----------------------------------------------------------- persist
-    def _save(self, pos, H, quality):
+    def _save(self, pos, H, quality, repeats=None):
         MEAS_DIR.mkdir(parents=True, exist_ok=True)
         subs = sorted(H)
         np.savez(MEAS_DIR / f"pos{pos}.npz", grid=GRID, subs=np.array(subs),
@@ -427,6 +430,8 @@ class Rig:
             "db": {str(o): np.round(audio.smooth_db(H[o], 12), 2).tolist() for o in subs},
             "quality": {str(o): quality[o] for o in subs},
         }
+        if repeats:                                          # the worst disagreement between takes of the reference sweep, per frequency
+            meas[str(pos)]["repeat_db"] = np.max(np.array(repeats), axis=0).round(1).tolist()
         update_state(measurements=meas, grid=np.round(GRID, 3).tolist())
 
 

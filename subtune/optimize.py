@@ -29,6 +29,14 @@ WEIGHTS = {1: dict(seat=1.0, flat=0.35, loss=0.6, gain=0.04),
 SMOOTH = max(1, PPO // 12)
 
 
+BOOST_MAX_Q = 3.0      # a boost is always broad: a narrow boost only fills a dip at one seat, rings, and costs headroom. Cuts may be narrow.
+
+
+def boost_q(q, g):
+    """The Q a band really gets: boosts are never narrower than BOOST_MAX_Q."""
+    return np.where(np.asarray(g) > 0, np.minimum(q, BOOST_MAX_Q), q)
+
+
 def target_curve(f, s):
     return s["house_db"] / (1 + (f / s["house_fc"]) ** 4)
 
@@ -123,7 +131,7 @@ class Problem:
         peq = None
         if k:
             r = X[:, 2 * S:].reshape(len(X), S, k, 3)
-            peq = (10 ** r[..., 0], r[..., 1], r[..., 2])     # fc from log10
+            peq = (10 ** r[..., 0], boost_q(r[..., 1], r[..., 2]), r[..., 2])     # fc from log10; boosts kept broad
         return g, d, peq
 
     def coeffs(self, X, pol):
@@ -175,7 +183,7 @@ def fit_global_peq(f, avg_db, T, n_bands, max_boost, seat_std=None, allow=None, 
     def gdb(b):          # b: (nb, 3) rows of (log10 fc, q, gain)
         if len(b) == 0:
             return np.zeros_like(f)
-        return 20 * np.log10(np.abs(peq_chain_response([(10 ** fc, q, g) for fc, q, g in b], f)))
+        return 20 * np.log10(np.abs(peq_chain_response([(10 ** fc, float(boost_q(q, g)), g) for fc, q, g in b], f)))
 
     def resid(p, nb, with_pen=True):
         G = gdb(p[:-1].reshape(nb, 3))
@@ -215,7 +223,7 @@ def fit_global_peq(f, avg_db, T, n_bands, max_boost, seat_std=None, allow=None, 
             tried |= np.abs(np.log2(f / f[i])) < 1 / 6       # skip this region, try the next
             continue
         bands, offset, cur_rms = r.x[:-1].reshape(nb, 3), float(r.x[-1]), new_rms
-    return [(float(10 ** fc), float(q), float(g)) for fc, q, g in bands]
+    return [(float(10 ** fc), float(boost_q(q, g)), float(g)) for fc, q, g in bands]
 
 
 def sub_roles(subs):

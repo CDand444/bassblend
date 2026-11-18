@@ -100,7 +100,7 @@ function lineChart(el, series, opt = {}) {
   const fl = f => f >= 1000 ? f / 1000 + 'k' : f;
   ticks.forEach((f, i) => { const last = i === ticks.length - 1;
     g += `<line x1="${X(f)}" x2="${X(f)}" y1="${m.t}" y2="${H - m.b}" stroke="var(--grid)"/><text x="${X(f)}" y="${H - 7}" text-anchor="${last ? 'end' : 'middle'}" font-size="11" fill="var(--text-3)">${fl(f)}${last ? ' Hz' : ''}</text>`; });
-  g += `<text x="${m.l - 8}" y="${m.t - 5}" text-anchor="end" font-size="11" fill="var(--text-3)">dB</text>`;
+  g += `<text x="${m.l - 8}" y="${m.t - 5}" text-anchor="end" font-size="11" fill="var(--text-3)">${esc(opt.unit || 'dB')}</text>`;
   let lastLbl = -99;                                // skip a marker's label when it would sit on the previous one
   (opt.markers || []).filter(k => k.f >= x0 && k.f <= x1).sort((a, b) => a.f - b.f).forEach(k => {
     const x = X(k.f), show = x - lastLbl >= 20; if (show) lastLbl = x;
@@ -145,7 +145,7 @@ function render() {
   const job = st.job || {}, a = job.auto, waiting = a && a.status === 'waiting';
   const busy = st.busy || job.running;
   $('#busyDot').className = 'dot ' + (waiting ? 'wait' : busy ? 'busy' : 'ok');
-  $('#busyTxt').textContent = waiting ? 'Waiting for you' : busy ? (st.step && st.step !== 'idle' ? st.step[0].toUpperCase() + st.step.slice(1) : 'Working') : 'Ready';
+  $('#busyTxt').textContent = waiting ? 'Waiting for you' : busy ? (st.step && st.step !== 'idle' ? st.step[0].toUpperCase() + st.step.slice(1) : 'Working') : 'Idle';
   $('#stopBtn').hidden = !job.running;
   const cal = set.cal_file ? set.cal_file.split(/[\\/]/).pop() : null;
   $('#micPill').innerHTML = cal ? '<span class="dot ok"></span>Mic cal ✓' : '<span class="dot busy"></span>Mic not calibrated';

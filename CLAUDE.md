@@ -46,6 +46,8 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
     assistant grows (`hw_lookup`/`hw_save`, plus Claude web_search); used for driver choice and `protect_hz`.
   - `workshop.py` + `js/workshop.js`: the Sub workshop (Tune > Sub workshop): guided active tuning of a catalog sub's own controls (Hsu: ports, EQ, Q) and a sub crawl, each a
     list of measured trials (`Rig.probe`, `subtune probe`, started by the owner's Measure press) with score, plain feedback, retests, a final verification.
+  - `livecheck.py`: the live music check (two-channel): the owner's WAV (stored in `MEDIA` as `httamer_live_music.wav`) is the reference, the UMIK the measurement; `analyze` finds the delay, corrects clock drift, and gives H1 response, phase and coherence. Job `subtune livecheck` (`Runner.start_livecheck`, `POST /api/livecheck`); plays sound only when the owner presses Start.
+  - `decay.py` + `js/analysis.js`: Verify → Bass analysis, from stored complex measurements only (no sound): waterfall and band ring times, sub/speaker blend phase per seat (as measured and with the blend test's fix), and take-to-take repeatability (`repeat_db`, recorded per spot by `measure_position`). `GET /api/analysis`.
   - `risercut.py`: cuts a riser to the room outline, door-swing arcs, subs, floor speakers and furniture in the way (a contour, or boxes when something stands inside it); `js/roomedit.js` is the top-down Room editor (pop-out, drag and drop, stage 1; 3D editing is next).
   - `modeler.py`: Room-card furniture proposals (stepped risers with couches) from measurements or, via one AI request, from words; `/api/modeler`, nothing saved. Room `floor`/`rug` feed `furniture.floor_coef`.
   - `fixtures.py`: lights, a ceiling projector (and its beam), fans, vents, sprinkler heads, wall lights, plus on-wall/in-wall/in-ceiling speakers: what
@@ -85,7 +87,7 @@ Windows (dev). Web UI on port 8765. Read this before exploring; it should save r
 - Checks on GitHub (`.github/workflows/ci.yml`, every push to main and before every release, which only
   builds when they pass): pyflakes, all offline tests on Linux/Python 3.13 and Windows/3.12, and
   `tests/browser_check.py` (every page in headless Chromium with real reloads) and `tests/browser_actions.py` (clicks the
-  buttons that touch no hardware and checks the page updates by itself) and `tests/browser_room_editor.py` (the Room page's sub drop-down, flooring, modeler and top-down editor, split out so it stays fast; keep browser tests small and per-feature); locally all need
+  buttons that touch no hardware and checks the page updates by itself) `tests/browser_analysis.py` (the Bass analysis page with seeded measurements) and `tests/browser_room_editor.py` (the Room page's sub drop-down, flooring, modeler and top-down editor, split out so it stays fast; keep browser tests small and per-feature); locally all need
   `pip install playwright` + `python -m playwright install chromium`). `tests/test_no_personal_info.py`
   enforces the no-personal-info rule.
 - Deploy to the Pi: `bash deploy/push-update.sh` (sends tracked + new files, restarts, rolls back

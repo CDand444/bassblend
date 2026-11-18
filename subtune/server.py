@@ -303,6 +303,23 @@ class Runner:
         self.cmd = f"live analyzer ({mode})"
         return self.cmd
 
+    def start_livecheck(self, body):
+        """The live music check: the owner's music through the receiver, the mic recorded, analysed two-channel."""
+        if self.running() or load_state().get("busy"):
+            raise RuntimeError("another step is running")
+        from . import livecheck
+        if not livecheck.music_info():
+            raise RuntimeError("add a music file first (a WAV of a song you know well)")
+        mode, pargs = _playback(body, modes=("hdmi", "dlna"))
+        secs = max(15.0, min(float(body.get("seconds") or 60), float(livecheck.MAX_SECONDS)))
+        args = [sys.executable, "-m", "subtune", "livecheck", *pargs, "--seconds", f"{secs:g}"]
+        if body.get("auto_volume") is False:
+            args.append("--no-auto-volume")
+        update_state(live_check_status={"running": True, "text": "Starting…", "mode": mode, "started": time.time()})
+        self.proc = self._popen(args)
+        self.cmd = f"live music check ({mode})"
+        return self.cmd
+
     def start_gaincheck(self, body):
         """Gain structure: a quiet 40 Hz tone through the receiver, the miniDSP's input meter read."""
         if self.running() or load_state().get("busy"):
@@ -547,7 +564,7 @@ def mic_free() -> bool:
 
 
 for _name in ("start_single", "start_auto", "start_tone", "start_verify", "start_avrblend", "start_deepcheck", "start_fixup",
-              "start_allspk", "start_liveeq", "start_gaincheck"):
+              "start_allspk", "start_liveeq", "start_gaincheck", "start_livecheck"):
     _orig = getattr(Runner, _name)
     def _wrapped(self, *a, _o=_orig, **k):
         MIC["held"], MIC["t"] = True, time.time()
@@ -1758,6 +1775,10 @@ class H(BaseHTTPRequestHandler):
             s = load_settings()
             s["cal_ok"] = bool(s.get("cal_file")) and os.path.isfile(str(s["cal_file"]))
             return self._send(200, readiness.build(load_state(), s))
+        if u.path == "/api/analysis":                  # bass decay, blend phase and measurement trust, from stored measurements (nothing plays)
+            from . import decay
+            q = parse_qs(u.query)
+            return self._send(200, decay.view(load_state(), (q.get("pos") or [None])[0], (q.get("what") or ["tuned"])[0]))
         if u.path == "/api/results":                   # did the calibration help: before and after, in plain words (reads stored results only)
             from . import results
             return self._send(200, results.build(load_state()))
@@ -2163,7 +2184,7 @@ class H(BaseHTTPRequestHandler):
         if origin and urlparse(origin).netloc != self.headers.get("Host", ""):
             return self._send(403, {"error": "forbidden"})
         n = int(self.headers.get("Content-Length", 0) or 0)
-        if n > (70_000_000 if path == "/api/backups" else 12_000_000 if path in ("/api/config/import", "/api/build/analyze") else 4_000_000):
+        if n > (70_000_000 if path in ("/api/backups", "/api/livecheck") else 12_000_000 if path in ("/api/config/import", "/api/build/analyze") else 4_000_000):
             return self._send(413, {"error": "too large"})
         try:
             body = json.loads(self.rfile.read(n) or b"{}") if n else {}
@@ -2179,6 +2200,17 @@ class H(BaseHTTPRequestHandler):
             return self._ha_action(path, body)
         if not self._gate(path):
             return
+        if path == "/api/livecheck":                   # the live music check: store the music (no sound), or start the check (plays the music: the owner pressed Start)
+            from . import livecheck
+            try:
+                if body.get("action") == "music":
+                    import base64
+                    return self._send(200, livecheck.save_music(base64.b64decode(body.get("data") or "", validate=True)))
+                if body.get("action") == "start":
+                    return self._send(200, {"started": RUN.start_livecheck(body)})
+            except (ValueError, RuntimeError) as e:
+                return self._send(400, {"error": str(e)})
+            return self._send(400, {"error": "action must be music or start"})
         if path == "/api/modeler":                     # a furniture proposal from measurements (no AI) or from words (one AI request); nothing is saved
             from . import modeler
             from .room import load_room

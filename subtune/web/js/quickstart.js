@@ -7,7 +7,7 @@ function renderQuickStart() {
   const card = $('#qsCard'), done = $('#qsDone'); if (!card) return;
   const res = S.result || {}, job = S.job || {}, auto = job.auto || {}, running = !!job.running && auto.status === 'running';
   const calibrated = !!res.tune_id;
-  card.hidden = calibrated && !running; done.hidden = !calibrated;
+  card.hidden = calibrated && !running; done.hidden = !(calibrated && rsData && rsData.ready);      // no empty card while the result loads
   if (calibrated && !running) {
     if (rsData && rsData.ready) done.innerHTML = `<div class="card-h"><h2>Your latest result</h2><span class="sub">${esc(rsData.tune.name || '')}</span></div><p class="qs-head">${esc(rsData.headline)}</p><div class="row"><button type="button" class="btn primary" data-rsgo="results">See before and after</button><button type="button" class="btn ghost" data-rsgo="wizard">Calibrate again</button></div>`;
     if (Date.now() - qsRsT > 15000) { qsRsT = Date.now(); rsLoad(); }

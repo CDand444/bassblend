@@ -1,5 +1,34 @@
 # htTamer changelog
 
+## Nov 17, 2026 - Easier to read and to press
+
+- Grey text, blue buttons and links are darker (lighter in the dark theme) so everything meets the usual 4.5:1 reading contrast; links have one colour everywhere; keyboard focus shows a clear ring.
+- On a phone or touch screen nothing you press is under 36 px tall, the Beta badges in the menu are readable, and the Room page's buttons wrap instead of running off the edge.
+- **Basic is the starting view** on every device that has not chosen one (a calibrated system used to open in Advanced). Your choice is remembered per device.
+- The status pill at the top says **Idle** when nothing is running (it said "Ready" even when Home said "Not ready"). Home no longer shows an empty card while the latest result loads.
+
+## Nov 17, 2026 - Maths review
+
+- **Ring times you can rely on**: below about 40 Hz the analysis filter rings longer than most rooms, so no ring time is given there any more; a time that reaches the end of the recording says "at least". The waterfall stops at 300 ms, where a stored sweep stops being the room.
+- **Blend loss** is measured against the true perfect sum of speakers and subs (it read up to 3 dB too high).
+- **Live music check** plays your song as mono on every speaker, so the coherence it shows is noise and echoes, not the difference between left and right.
+- **Sound field**: the subs are driven with the playing tune's levels, delays and polarity (they were all driven equally); the bass ring time comes from your own measurements where they can tell, and the textbook estimate is labeled as rough; what goes through the walls is a rough dB figure, no longer a percentage.
+- **One waterfall**: the System report's Waterfall button opens Bass analysis, which now also shows the whole system. **One trust answer** per mic spot, from noise and take-to-take agreement together.
+- **Tuning: boosts are always broad.** An EQ boost is never narrower than Q 3 (cuts may still be narrow): a narrow boost only fills a dip at one seat, rings, and costs headroom. The tuning engine also has its own offline test now (limits on boost, level, delay).
+- The room's Schroeder frequency uses the room's own ring-time estimate, not a fixed 0.4 s.
+- **Safety**: removing the protective limiters, the live analyzer, the live music check, the blend test and the level check can no longer touch or play through the original preset (slot 1) by accident.
+
+## Nov 20, 2026 - Live music check (two-channel)
+
+- **Live music check** (Verify → Bass analysis): pick a WAV of a song you know, press Start, and htTamer plays it through the receiver (the Pi's HDMI or the network player) while it records the mic. The music itself is the reference channel, so you get the system's response, phase and **coherence** (how much of what the mic heard is your music rather than room noise or late echoes) from 20 Hz to 20 kHz, measured with real music. It finds the player's delay, corrects the small clock drift between player and mic, can set the test volume (guarded, put back after), and restores the receiver as every test does. Nothing plays until you press Start.
+
+## Nov 20, 2026 - Bass analysis
+
+- **New page: Verify → Bass analysis**, made from the sweeps htTamer already takes (nothing plays):
+  - **How long the bass rings**: a waterfall of the first 300 ms after the sound stops, for all subs with the playing tune, all subs as measured, or one sub, at each mic spot; plus the ring time (time to fall 20 dB) and the frequencies that ring longest, with what to do about a long one.
+  - **Subs and speakers: in phase?** For each seat of the blend test: the speakers, the subs and the two together, the phase between them where both play, and how much they lose to cancelling, as measured and with the blend test's best delay and polarity.
+  - **Can this measurement be trusted?** Measuring now records how much two takes of the same reference sweep disagree at each frequency; the page names the frequencies where they disagreed by more than 1.5 dB.
+
 ## Nov 20, 2026 - starter database
 
 - **More makers in the starter hardware database** (read only from each maker's own page or spec sheet, every number checked against the text): KEF (Q, R, Reference, Blade, LS50/LSX, Kube and KC subs, Ci in-wall and in-ceiling), Polk Audio, Definitive Technology, ELAC, Q Acoustics, Bowers & Wilkins (600/700/800 series, DB and ASW subs), PS Audio, the SVS Ultra Evolution speakers, and about 70 more Klipsch (Heritage towers, Forte, Heresy, Cornwall, Klipschorn, KD, CP, CS, DS, Flexus subs and others). Sizes a maker gives only in mm or kg are converted. 94 subs and 392 speakers in all. JL Audio, Monoprice, Focal, Arendal and Yamaha publish specs only through scripts or block automated reading, so they are still not in; add your model with Remember size.

@@ -64,6 +64,46 @@ def test_applied_tunes_keep_the_limiters():
     assert "output 0 compressor -b on" in cmds and any(c.startswith("output 1 compressor -b off --threshold=-20") for c in cmds)
 
 
+def test_removing_limiters_never_writes_to_the_slot_that_happens_to_play():
+    """With slot 1 (the owner's original) playing, Remove selects htTamer's slot, writes there, and puts slot 1 back on."""
+    from subtune import dsp as dspmod, limiter
+    from subtune.config import load_settings, save_settings
+    from subtune.state import update_state
+    s = load_settings(); s["preset"] = 2; s["subs"] = [0, 1]; s["sub_limiters"] = {"0": {"threshold_db": -10, "on": True}}; save_settings(s)
+    update_state(result={"applied": 1.0, "slot": 3, "tune_id": "T", "subs": [{"output": 0, "biquads": []}, {"output": 1, "biquads": []}]})
+
+    class Fake:
+        batches = []
+
+        def status(self):
+            return {"master": {"preset": 0}}
+
+        def batch(self, cmds, why="", quiet=False):
+            Fake.batches.append(list(cmds))
+    orig = dspmod.MiniDSP
+    dspmod.MiniDSP = type("FakeMiniDSP", (orig,), {"__new__": lambda cls, *a, **k: Fake()})
+    try:
+        limiter.remove()
+    finally:
+        dspmod.MiniDSP = orig
+    cmds = Fake.batches[0]
+    assert cmds[0] == "config 2" and cmds[-1] == "config 0" and all(c.startswith("output") for c in cmds[1:-1])
+
+
+def test_a_receiver_test_refuses_to_start_on_the_original_slot():
+    from subtune.dsp import MiniDSP
+    d = MiniDSP.__new__(MiniDSP)
+    d.status = lambda: {"master": {"preset": 0}}
+    try:
+        d.refuse_original("the blend test")
+    except RuntimeError as e:
+        assert "slot 1" in str(e) and "blend test" in str(e)
+    else:
+        raise AssertionError("it would have written to slot 1")
+    d.status = lambda: {"master": {"preset": 2}}
+    d.refuse_original()                                   # htTamer's slot: fine
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

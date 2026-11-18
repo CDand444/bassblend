@@ -106,7 +106,7 @@ def apply(outputs=None, log=None, force=False) -> dict:
         done.append(f"out {int(k) + 1} at {p['threshold_db']:g} dBFS")
     if not done:
         raise RuntimeError("no measured limit to set: run the headroom test on the subs first")
-    d.batch(cmds, "protective limiters: " + ", ".join(done))
+    d.batch([MiniDSP.c_preset(slot - 1)] + cmds, "protective limiters: " + ", ".join(done))
     s["sub_limiters"] = lims
     save_settings(s)
     journal.add("tune", "Protective limiters set from the headroom test: " + ", ".join(done))
@@ -118,10 +118,16 @@ def remove(log=None) -> dict:
     from .config import load_settings, save_settings
     from .dsp import MiniDSP
     from .liveeq import target_slot
-    target_slot()
+    _, slot = target_slot()
     s = load_settings()
     outs = [int(k) for k in saved(s)] or list(s.get("subs") or [])
-    MiniDSP(s).batch([f"output {o} compressor -b on" for o in outs], "protective limiters off")
+    d = MiniDSP(s)
+    try:
+        playing = int(d.status()["master"]["preset"]) + 1
+    except Exception:                                     # noqa: BLE001 - not known: leave htTamer's slot selected
+        playing = slot
+    back = [MiniDSP.c_preset(playing - 1)] if playing != slot else []         # the writes go to the selected slot: never the one that happens to play
+    d.batch([MiniDSP.c_preset(slot - 1)] + [f"output {o} compressor -b on" for o in outs] + back, "protective limiters off")
     s["sub_limiters"] = {}
     save_settings(s)
     journal.add("tune", "Protective limiters switched off")

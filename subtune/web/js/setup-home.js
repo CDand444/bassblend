@@ -634,7 +634,7 @@ function renderAutomation() {
   $('#asOn').checked = !!AUTO.auto_slot_on; $('#wdOn').checked = !!AUTO.watchdog_on; $('#wdFix').checked = AUTO.watchdog_fix !== false;
   if (document.activeElement !== $('#wdSub')) { $('#wdSub').value = AUTO.watch_sub_level ?? ''; $('#wdSub').placeholder = AUTO.keep_sub_level != null ? `${AUTO.keep_sub_level} (last set by htTamer)` : 'not set'; }
   const sel = (key) => { const v = (AUTO.auto_slot_map || {})[key] || 0;
-    return `<select data-as="${esc(key)}">${[0, 1, 2, 3, 4].map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n ? 'slot ' + n : '–'}</option>`).join('')}</select>`; };
+    return `<select data-as="${esc(key)}" aria-label="miniDSP slot">${[0, 1, 2, 3, 4].map(n => `<option value="${n}" ${n === v ? 'selected' : ''}>${n ? 'slot ' + n : '–'}</option>`).join('')}</select>`; };
   const rows = (pre, names) => Object.entries(names || {}).map(([c, n]) => `<tr><td>${esc(n)}</td><td style="width:120px">${sel(pre + c)}</td></tr>`).join('');
   $('#asRules').innerHTML = `<details open><summary class="small">Inputs</summary><table class="small"><tbody>${rows('in:', AUTO.inputs)}</tbody></table></details>
     <details><summary class="small">Listening modes (win over inputs)</summary><table class="small"><tbody>${rows('mode:', AUTO.modes)}</tbody></table></details>`;

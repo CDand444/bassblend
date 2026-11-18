@@ -16,7 +16,8 @@ function sfRoom() {                                                      // the 
   const x0 = irregular && mb && mb.x0 != null ? mb.x0 : 0, y0 = irregular && mb && mb.y0 != null ? mb.y0 : 0;
   const W = irregular && mb ? mb.W : r.room.width_m, L = irregular && mb ? mb.L : r.room.length_m, H = r.room.height_m;
   const cl = (v, hi) => Math.min(hi, Math.max(0, v));
-  const subs = Object.entries(r.subs || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([o, s]) => ({o: +o, x: cl(s.x_m - x0, W), y: cl(s.y_m - y0, L), z: cl(s.z_m ?? 0.3, H)}));
+  const subs = Object.entries(r.subs || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([o, s]) => { const t = ((S.result || {}).subs || []).find(q => q.output === +o);      // the playing tune's gain, polarity and delay for this sub (its EQ is not modelled)
+      return {o: +o, x: cl(s.x_m - x0, W), y: cl(s.y_m - y0, L), z: cl(s.z_m ?? 0.3, H), g: t ? Math.pow(10, (t.gain_db || 0) / 20) * (t.invert ? -1 : 1) : 1, d: t ? (t.delay_ms || 0) / 1000 : 0, tuned: !!t}; });
   const st = (r.seats || []).find(s => s.x_m != null && s.y_m != null), seat = st ? {x: cl(st.x_m - x0, W), y: cl(st.y_m - y0, L), z: st.z_m || 1.05} : null;
   const speakers = Object.entries(r.speakers || {}).filter(([, s]) => s.x_m != null && s.y_m != null).map(([ch, s]) => {
     const pos = {x: cl(s.x_m - x0, W), y: cl(s.y_m - y0, L), z: cl(s.z_m ?? (ch.startsWith('T') ? H - 0.1 : 1.1), H)}, a = v3Aim3(ch, s, pos, seat, H);
@@ -26,7 +27,7 @@ function sfRoom() {                                                      // the 
 }
 function sfItems(on = SF.treat !== 'without') { const p = S.treatment; return !on ? [] : p && p.items ? (typeof tpVisible === 'function' ? tpVisible(p).items : p.items) : []; }      // the treatment the Treatment page has switched on ('without' = the bare room)
 function sfPatches(on) { return SF.room ? srPatches(SF.room, sfItems(on)) : []; }
-const sfBareT60 = f => srT60(SF.room, f, []);
+const sfBareT60 = f => sfRoomT60(f, []);
 
 // ---------------------------------------------------------------- bass: modal pressure on any slice plane
 function sfModes(R, fmax = 300) {
@@ -37,11 +38,24 @@ function sfModes(R, fmax = 300) {
   return out.sort((a, b) => a.f - b.f);
 }
 const sfPsi = (m, R, x, y, z) => Math.cos(m.nx * Math.PI * x / R.W) * Math.cos(m.ny * Math.PI * y / R.L) * Math.cos(m.nz * Math.PI * z / R.H);
-function sfT60(f) { return SF.damp === 'auto' ? srT60(SF.room, f, sfPatches()) : SF_DAMP[SF.damp] || 0.5; }
+function sfMeasuredT60(f) {                                              // the ring time your own sweeps show near f (three times the time to fall 20 dB), when they can tell
+  const r = SF.ring; if (!r || !r.freqs) return null; let b = -1;
+  r.freqs.forEach((x, i) => { if (r.ms[i] != null && Math.abs(Math.log2(x / f)) < 1 / 6 && (b < 0 || Math.abs(Math.log2(x / f)) < Math.abs(Math.log2(r.freqs[b] / f)))) b = i; });
+  return b < 0 ? null : Math.max(0.15, Math.min(3, 3 * r.ms[b] / 1000));
+}
+function sfRoomT60(f, patches) {                                         // the ring time with these treatment patches: the formula, anchored to your measurement when there is one
+  const est = srT60(SF.room, f, patches), m = sfMeasuredT60(f); SF.t60Measured = m != null;
+  if (m == null) return est;                                             // the measurement is the room as it stands (what is already installed); the formula only supplies the change from there
+  const now = srT60(SF.room, f, srPatches(SF.room, ((S.treatment || {}).items || []).filter(i => i.installed)));
+  return Math.max(0.15, Math.min(3, m * est / Math.max(now, 0.05)));
+}
+function sfT60(f) { return SF.damp !== 'auto' ? SF_DAMP[SF.damp] || 0.5 : sfRoomT60(f, sfPatches()); }
+async function sfLoadRing() { try { const d = await fetch('/api/analysis?what=raw').then(r => r.json()); SF.ring = d.ring || null; } catch (e) { SF.ring = null; } if (SF.room) sfRefresh(); }
 function sfCoef(m, R, f, t60) {                                          // the complex weight of one mode at f: the subs' drive over the mode's resonance term
-  let drive = 0; R.subs.forEach(s => { drive += sfPsi(m, R, s.x, s.y, s.z); });
-  const w = 2 * Math.PI * f, d = 6.91 / t60, re = m.w * m.w - w * w, im = 2 * d * w, den = re * re + im * im, g = w / (m.lam * den);
-  return [drive * g * im, drive * g * re];
+  const w = 2 * Math.PI * f; let dr = 0, di = 0;                         // each sub drives the mode with its own level, polarity and delay
+  R.subs.forEach(s => { const p = sfPsi(m, R, s.x, s.y, s.z) * (s.g ?? 1), ph = -w * (s.d || 0); dr += p * Math.cos(ph); di += p * Math.sin(ph); });
+  const d = 6.91 / t60, re = m.w * m.w - w * w, im = 2 * d * w, den = re * re + im * im, g = w / (m.lam * den), A = g * im, B = g * re;
+  return [dr * A - di * B, dr * B + di * A];
 }
 function sfSeatDb(R, modes, t60, fs) {
   return fs.map(f => { let a = 0, b = 0; modes.forEach(m => { if (Math.abs(m.f - f) > 120 + f * 0.6) return; const c = sfCoef(m, R, f, t60), p = sfPsi(m, R, R.seat.x, R.seat.y, R.seat.z); a += c[0] * p; b += c[1] * p; });
@@ -167,12 +181,13 @@ function sfExplain() {
     if (near) t += Math.abs(near.f - SF.fb) < 4 ? `That is close to a room mode, ${near.f.toFixed(1)} Hz (${kind(near)}): sound sloshes between those walls, so some places get loud (red) and others nearly silent (blue). ` : `The nearest room mode is ${near.f.toFixed(1)} Hz (${kind(near)}); away from a mode the pattern is weaker and flatter. `;
     const F = SF.fields.plan; if (R.seat && F) { const i = Math.min(F.nu - 1, Math.max(0, Math.round(R.seat.x / R.W * F.nu - 0.5))), j = Math.min(F.nv - 1, Math.max(0, Math.round(R.seat.y / R.L * F.nv - 0.5))), d = 20 * Math.log10((F.amp[j * F.nu + i] || 1e-30) / F.med);
       t += `At ear height your seat is ${Math.abs(d) < 1.5 ? 'at about the typical level' : d > 0 ? `in a loud area (${d.toFixed(0)} dB above typical)` : `in a quiet area (${Math.abs(d).toFixed(0)} dB below typical)`}. `; }
-    t += `The room rings for about ${SF.t60.toFixed(2)} s at this frequency${SF.damp === 'auto' ? ' (worked out from its surfaces and the treatment you have switched on: panels hardly touch bass)' : ''}. `; }
+    t += `The room rings for about ${SF.t60.toFixed(2)} s at this frequency${SF.damp !== 'auto' ? '' : SF.t60Measured ? ' (from your own measurements at this frequency, adjusted for treatment that is not installed yet)' : ' (an estimate from its surfaces and treatment: a textbook formula that is only rough in the bass; measure your subs and your real ring times are used)'}. `
+    + (R.subs.some(s => s.tuned) ? 'The subs are driven with your playing tune\'s levels, delays and polarity (its EQ is not modelled). ' : 'The subs are all driven equally: apply a tune and its levels, delays and polarity are used. '); }
   if (SF.treble) { const lk = srLeak(R, SF.ft, R.structure), wall = srAlpha(SR_SURF[srKind(R.construction)], SF.ft), src = sfSource(); t += `<br><b>Treble at ${SF.ft >= 1000 ? (SF.ft / 1000).toFixed(1) + ' kHz' : SF.ft + ' Hz'}:</b> the wavelength is ${(SR_C / SF.ft * 100).toFixed(0)} cm. A bare ${srKind(R.construction)} wall soaks up ${(wall * 100).toFixed(0)}% of it each time it bounces; `;
     const pn = sfItems().filter(i => i.rect && ['absorber', 'cloud'].includes(i.kind))[0]; if (pn) t += `your ${pn.thickness_in} in panels soak up ${(srPanelAlpha((pn.thickness_in || 2) * 0.0254, (pn.gap_in || 0) * 0.0254, SF.ft) * 100).toFixed(0)}% at this frequency; `;
-    t += `${(lk.share * 100).toFixed(lk.share < 0.01 ? 2 : 1)}% goes through the ${lk.kind} walls (${lk.tl_db.toFixed(0)} dB lost). `; if (src) t += `Blue is the direct sound from ${src.ch}; orange is its reflections, fainter after each bounce.`; }
+    t += `the ${lk.kind} walls stop roughly ${lk.tl_db.toFixed(0)} dB of it (a rule of thumb; real walls, doors and gaps let more through, bass most of all). `; if (src) t += `Blue is the direct sound from ${src.ch}; orange is its reflections, fainter after each bounce.`; }
   if (SF.treat !== 'with') t += `<br><b>${SF.treat === 'without' ? 'Showing the bare room' : 'Comparing the bare room (red dashed) with your treatment (orange)'}.</b> ` + (sfItems(true).length ? '' : 'No treatment is switched on in the Treatment picker yet, so there is no difference to see. ')
-    + (SF.bass && SF.damp === 'auto' ? `Bare, the room rings about ${sfBareT60(SF.fb).toFixed(2)} s at ${SF.fb.toFixed(0)} Hz; with treatment ${srT60(R, SF.fb, sfPatches(true)).toFixed(2)} s. ` : '');
+    + (SF.bass && SF.damp === 'auto' ? `Bare, the room rings about ${sfBareT60(SF.fb).toFixed(2)} s at ${SF.fb.toFixed(0)} Hz; with treatment ${sfRoomT60(SF.fb, sfPatches(true)).toFixed(2)} s. ` : '');
   $('#sfExplain').innerHTML = t || 'Switch Bass or Treble on to see the waves.';
   $('#sfModes').innerHTML = SF.modes.filter(m => m.f <= 250).slice(0, 12).map(m => `<button type="button" class="chip" data-sfmode="${m.f.toFixed(1)}">${m.f.toFixed(0)} Hz</button>`).join('');
 }
@@ -216,9 +231,9 @@ function sfLoop(t) {
 }
 function sfStart() { if (!SF.raf && SF.playing && ((SF.bass && SF.mode === 'wave') || SF.treble)) { SF.last = 0; SF.raf = requestAnimationFrame(sfLoop); } }
 function renderSoundfield() {                                            // from the page poll: rebuild when the room, the treatment or the speakers change
-  const el = $('#sfBody'); if (!el) return; const R = sfRoom(), key = JSON.stringify([R && [R.W, R.L, R.H, R.subs, R.seat, R.speakers.map(s => [s.ch, s.x, s.y, s.z, s.dir]), R.construction], sfItems().map(i => i.id), (S.verify || {}).after && 1]);
+  const el = $('#sfBody'); if (!el) return; const R = sfRoom(), key = JSON.stringify([R && [R.W, R.L, R.H, R.subs, R.seat, R.speakers.map(s => [s.ch, s.x, s.y, s.z, s.dir]), R.construction], sfItems().map(i => i.id), (S.verify || {}).after && 1, (S.result || {}).tune_id, (S.result || {}).applied]);
   if (!R) { el.hidden = true; $('#sfEmpty').hidden = false; return; } el.hidden = false; $('#sfEmpty').hidden = true;
-  if (key === SF.key) return; SF.key = key; SF.room = R; SF.modes = sfModes(R); if (SF.xSide == null || SF.xSide > R.W) SF.xSide = R.W / 2; if (SF.yEnd == null || SF.yEnd > R.L) SF.yEnd = R.L / 2; SF.zPlan = Math.min(SF.zPlan, R.H);
+  if (key === SF.key) return; SF.key = key; SF.room = R; sfLoadRing(); SF.modes = sfModes(R); if (SF.xSide == null || SF.xSide > R.W) SF.xSide = R.W / 2; if (SF.yEnd == null || SF.yEnd > R.L) SF.yEnd = R.L / 2; SF.zPlan = Math.min(SF.zPlan, R.H);
   $('#sfH').max = R.H.toFixed(2); $('#sfX').max = R.W.toFixed(2); $('#sfX').value = SF.xSide; $('#sfY').max = R.L.toFixed(2); $('#sfY').value = SF.yEnd;
   const sel = $('#sfSpk'), cur = SF.spk; sel.innerHTML = R.speakers.map(s => `<option value="${esc(s.ch)}">${esc(s.ch)}</option>`).join(''); if (!R.speakers.length) sel.innerHTML = '<option value="">no speakers recorded</option>'; SF.spk = R.speakers.some(s => s.ch === cur) ? cur : (R.speakers.find(s => s.ch === 'FL') || R.speakers[0] || {ch: ''}).ch; sel.value = SF.spk;
   sfRefresh();

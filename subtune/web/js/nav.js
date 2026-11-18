@@ -72,6 +72,7 @@ const MENU = [
    tag: () => (S.live_rta_status || {}).running ? ['● live', 'live'] : (S.live_eq || {}).active ? [(S.live_eq || {}).bypass ? 'bypassed' : 'on', ''] : null},
   {grp: 'Verify', key: 'results', icon: 'match', title: 'Results', full: 'Results: before and after', el: $('#resCard'),
    tag: () => null},
+  {grp: 'Verify', key: 'analysis', beta: true, icon: 'report', title: 'Bass analysis', full: 'Bass analysis: ringing, phase and trust', el: $('#anCard'), tag: () => null},
   {grp: 'Verify', key: 'report', icon: 'report', title: 'System report', full: 'System report: bass, mids and highs', el: $('#deepCard'),
    tag: () => (S.deep_status || {}).running ? ['…', ''] : (() => { const r = deepLatest(); if (!r) return null; const f = r.findings.filter(x => x.status === 'fix').length; return f ? [String(f), 'alert'] : ['✓', '']; })()},
   {grp: 'Verify', key: 'allspk', beta: true, icon: 'speakers', title: 'Speaker check', full: 'Speaker levels, distances and LFE', el: $('#allCard'), tag: () => null},
@@ -125,7 +126,7 @@ const BASIC_LABEL = {home: 'Home', setup: 'Setup', wizard: 'Calibrate', results:
 let uiMode = null;
 try { uiMode = localStorage.getItem('httamer-mode'); } catch (e) { /* private window */ }
 if (uiMode !== 'basic' && uiMode !== 'advanced') uiMode = null;
-if (uiMode) document.body.dataset.mode = uiMode;                           // decided once the first state arrives: new systems start Basic, calibrated ones keep Advanced
+if (uiMode) document.body.dataset.mode = uiMode;                           // no saved choice: Basic, set once the first state arrives
 function setMode(m, remember = true) {
   uiMode = m; document.body.dataset.mode = m;
   if (remember) { try { localStorage.setItem('httamer-mode', m); } catch (e) { /* ignore */ } }
@@ -310,7 +311,7 @@ async function poll() {
   }
   try {
     S = st;
-    if (uiMode === null) setMode((S.result || {}).tune_id ? 'advanced' : 'basic', false);       // a system that has been calibrated keeps the full view
+    if (uiMode === null) setMode('basic', false);                 // everyone starts in Basic; choosing Advanced is remembered on that device
     safe('terms', () => renderTerms());
     safe('host words', () => applyHostWords());
     safe('night', () => renderNight());
@@ -318,7 +319,7 @@ async function poll() {
     safe('settings', () => initSettings()); safe('room', () => initRoom());
     const parts = {render, renderAuto, renderAI, renderModes, renderSuggest, renderTones, renderMatch, renderCoach, renderPlacement,
       renderTreatment, renderHeadroom, renderAllSpk, renderFixLog, renderSpeakers, renderCheckup, renderDeep, renderLevelMatch,
-      renderBlend, renderWorkshop, renderSoundfield, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderReadiness, renderQuickStart};
+      renderBlend, renderWorkshop, renderSoundfield, renderSetup, renderHome, renderWizard, renderMenu, renderRxSetup, renderLimiters, renderResults, renderAnalysis, renderReadiness, renderQuickStart};
     for (const [n, f] of Object.entries(parts)) safe(n, () => f());
     safe('notifications', notifyChanges);
     if (S.updated !== plainKey) { plainKey = S.updated; safe('summary', renderPlain); }

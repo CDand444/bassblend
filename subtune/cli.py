@@ -283,6 +283,19 @@ def cmd_deepcheck(a):
         raise
 
 
+def cmd_livecheck(a):
+    """Live music check: play the owner's music, record the mic, two-channel response, phase and coherence."""
+    from . import livecheck
+    try:
+        livecheck.run(a.mode, a.avr_input, seconds=a.seconds, auto_volume=not a.no_auto_volume)
+    except BaseException as e:
+        if not (isinstance(e, SystemExit) and str(e) == "stopped"):
+            update_state(live_check_status={"running": False, "error": str(e) or type(e).__name__})
+        else:
+            update_state(live_check_status={"running": False})
+        raise
+
+
 def cmd_liveeq(a):
     """Live analyzer for the live EQ page; runs until stopped (or the time limit)."""
     from . import liveeq
@@ -708,6 +721,12 @@ def main(argv=None):
     s = sp.add_parser("import-config", help="load a settings file saved by export-config or the dashboard")
     s.add_argument("file")
     s.set_defaults(fn=cmd_import_config)
+    s = sp.add_parser("livecheck", help="live music check: play your music, record the mic, two-channel response and coherence")
+    s.add_argument("--mode", choices=["hdmi", "dlna"], default="hdmi")
+    s.add_argument("--avr-input", default=None, help="receiver input this device's HDMI is plugged into (hdmi mode)")
+    s.add_argument("--seconds", type=float, default=60.0)
+    s.add_argument("--no-auto-volume", action="store_true", help="leave the receiver volume as it is")
+    s.set_defaults(fn=cmd_livecheck)
     s = sp.add_parser("liveeq", help="live analyzer: bass noise through the receiver, the mic's response live")
     s.add_argument("--mode", choices=["hdmi", "dlna"], default="hdmi")
     s.add_argument("--avr-input", default=None, help="receiver input this device's HDMI is plugged into (hdmi mode)")
