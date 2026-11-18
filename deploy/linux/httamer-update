@@ -15,6 +15,9 @@
 set -euo pipefail
 APP=/opt/httamer
 WORK=/var/lib/httamer-ota
+HT_NEW=1                      # this updater (see "An updater from before 1.0" below)
+FINISH=0                      # --finish: the files are already in place; refresh the helpers and restart
+if [ "${1:-}" = "--finish" ]; then FINISH=1; shift; fi
 VER="${1:-unknown}"
 die() { echo "httamer-update: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || die "run with sudo"
@@ -75,28 +78,74 @@ exec 9>/run/httamer-update.lock
 flock -n 9 || die "another update is running"
 case "$VER" in *[!A-Za-z0-9._+-]*) die "bad version name: $VER" ;; esac
 
-mkdir -p "$WORK"; chmod 700 "$WORK"
-rm -rf "$WORK/new"; mkdir "$WORK/new"
-tar -xzf - -C "$WORK/new" --no-same-owner --no-same-permissions
-[ -f "$WORK/new/subtune/cli.py" ] && [ -f "$WORK/new/subtune/server.py" ] || die "that isn't a htTamer source bundle"
-printf '%s\n' "$VER" > "$WORK/new/VERSION"
-"$APP/venv/bin/python" -m compileall -q "$WORK/new/subtune" >/dev/null \
-  || die "the new code doesn't compile on the Pi; nothing changed"
-find "$WORK/new" -name __pycache__ -prune -exec rm -rf {} +
+# An updater from before 1.0 rewrote itself in place while bash was still reading it, then carried on reading
+# this new file at the byte where its old copy left off (by then it had installed the files and packages).
+# That byte falls inside the block of # lines below (kept there by tests/test_updater.py), so it reads only
+# comments, reaches the next line and hands the rest (helpers, restart, check, rollback) to this updater.
+# A normal run passes straight through.
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+[ -n "${HT_NEW:-}" ] || { export FILES OLD; exec /usr/local/sbin/httamer-update --finish "$VER"; }
 
 EXCL=(--exclude=/venv/ --exclude=/tools/ --exclude=/data/ --exclude=.git/ --exclude=__pycache__/)
-rsync -a --delete "${EXCL[@]}" "$APP/" "$WORK/prev/"
-CHANGES="$(rsync -rlt --checksum --delete --itemize-changes --chmod=D755,F644 "${EXCL[@]}" "$WORK/new/" "$APP/" \
-           | grep -v '^\.' || true)"                  # lines starting with . only touched times or permissions
-find "$APP/deploy" -name '*.sh' -exec chmod 755 {} + 2>/dev/null || true
-chmod 755 "$APP/deploy/linux/httamer-update" 2>/dev/null || true
-OLD="$(cat "$WORK/prev/VERSION" 2>/dev/null || echo unknown)"
-FILES="$(printf '%s\n' "$CHANGES" | awk 'NF { print $NF }' | grep -v '^VERSION$' || true)"
+if [ "$FINISH" -eq 0 ]; then
+  mkdir -p "$WORK"; chmod 700 "$WORK"
+  rm -rf "$WORK/new"; mkdir "$WORK/new"
+  tar -xzf - -C "$WORK/new" --no-same-owner --no-same-permissions
+  [ -f "$WORK/new/subtune/cli.py" ] && [ -f "$WORK/new/subtune/server.py" ] || die "that isn't a htTamer source bundle"
+  printf '%s\n' "$VER" > "$WORK/new/VERSION"
+  "$APP/venv/bin/python" -m compileall -q "$WORK/new/subtune" >/dev/null \
+    || die "the new code doesn't compile on the Pi; nothing changed"
+  find "$WORK/new" -name __pycache__ -prune -exec rm -rf {} +
+
+  rsync -a --delete "${EXCL[@]}" "$APP/" "$WORK/prev/"
+  CHANGES="$(rsync -rlt --checksum --delete --itemize-changes --chmod=D755,F644 "${EXCL[@]}" "$WORK/new/" "$APP/" \
+             | grep -v '^\.' || true)"                  # lines starting with . only touched times or permissions
+  find "$APP/deploy" -name '*.sh' -exec chmod 755 {} + 2>/dev/null || true
+  chmod 755 "$APP/deploy/linux/httamer-update" 2>/dev/null || true
+  OLD="$(cat "$WORK/prev/VERSION" 2>/dev/null || echo unknown)"
+  FILES="$(printf '%s\n' "$CHANGES" | awk 'NF { print $NF }' | grep -v '^VERSION$' || true)"
+else                          # handed over by an older updater, which passes what it changed
+  OLD="${OLD:-unknown}"; FILES="${FILES:-}"; CHANGES=""
+fi
+# in-app updates from GitHub, renames and port changes: the helper and its systemd path unit (also on a repeat update)
+DATADIR="$(grep -oE 'HTTAMER_DATA=[^ ]+' "$UNITS/httamer.service" 2>/dev/null | head -1 | cut -d= -f2)"
+if [ -n "$DATADIR" ] && [ -f "$APP/deploy/linux/httamer-ota" ]; then
+  if ! cmp -s "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota || ! grep -qs port.request "$UNITS/httamer-ota.path"; then
+    ota_units "$DATADIR"
+    echo "In-app updates installed (httamer-ota.path)"
+  fi
+fi
+# keep the updater itself current: a new file swapped in, never this one rewritten while bash still reads it
+if [ -f "$APP/deploy/linux/httamer-update" ] && ! cmp -s "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update; then
+  install -m 0755 "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update.new
+  mv -f /usr/local/sbin/httamer-update.new /usr/local/sbin/httamer-update
+fi
 if [ -z "$FILES" ]; then
   echo "Already up to date ($VER)"; exit 0
 fi
-echo "Updating $OLD -> $VER:"
-printf '%s\n' "$CHANGES" | grep -v ' VERSION$' | sed -E 's/^\*deleting +/  - /; s/^[<>c.][^ ]* /  ~ /' | head -40
+if [ "$FINISH" -eq 0 ]; then
+  echo "Updating $OLD -> $VER:"
+  # || true: with more than 40 changes head stops reading early, and under pipefail that would end the update here
+  printf '%s\n' "$CHANGES" | grep -v ' VERSION$' | sed -E 's/^\*deleting +/  - /; s/^[<>c.][^ ]* /  ~ /' | head -40 || true
+fi
 
 rollback() {
   echo "httamer-update: $1; putting $OLD back" >&2
@@ -108,18 +157,6 @@ rollback() {
 if ! cmp -s "$WORK/prev/requirements.txt" "$APP/requirements.txt"; then
   echo "Python packages changed: installing (can take a few minutes on a Pi)"
   "$APP/venv/bin/python" -m pip install -q -r "$APP/requirements.txt" || rollback "package install failed"
-fi
-# keep the updater itself current
-if [ -f "$APP/deploy/linux/httamer-update" ] && ! cmp -s "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update; then
-  install -m 0755 "$APP/deploy/linux/httamer-update" /usr/local/sbin/httamer-update
-fi
-# in-app updates from GitHub: the helper and its systemd path unit (added in 0.9.2; installed here on older Pis)
-DATADIR="$(grep -oE 'HTTAMER_DATA=[^ ]+' "$UNITS/httamer.service" 2>/dev/null | head -1 | cut -d= -f2)"
-if [ -n "$DATADIR" ] && [ -f "$APP/deploy/linux/httamer-ota" ]; then
-  if ! cmp -s "$APP/deploy/linux/httamer-ota" /usr/local/sbin/httamer-ota || ! grep -qs port.request "$UNITS/httamer-ota.path"; then
-    ota_units "$DATADIR"
-    echo "In-app updates installed (httamer-ota.path)"
-  fi
 fi
 
 if printf '%s\n' "$FILES" | grep -qvE '^(subtune/web/|docs/|tests/|deploy/pi-gen/|[^/]*\.md$)'; then
