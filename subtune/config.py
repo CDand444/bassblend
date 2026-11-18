@@ -111,6 +111,11 @@ def load_settings() -> dict:
     s = dict(DEFAULTS)
     if SETTINGS_FILE.exists():
         s.update(json.loads(SETTINGS_FILE.read_text()))
+    cal = s.get("cal_file")
+    if cal and not Path(cal).is_file():          # the data folder moved (a restore, a renamed install): the file is still in its cal folder
+        here = DATA / "cal" / Path(str(cal).replace("\\", "/")).name
+        if here.is_file():
+            s["cal_file"] = str(here)
     return s
 
 

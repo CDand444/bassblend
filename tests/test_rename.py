@@ -65,6 +65,17 @@ def test_an_install_not_yet_moved_over_keeps_its_data_folder():
     assert out[0] == os.path.join(TMP, "new"), out              # the new name wins
 
 
+def test_the_mic_file_is_found_again_after_the_data_folder_moved():
+    from subtune import config
+    (config.DATA / "cal").mkdir(parents=True, exist_ok=True)
+    (config.DATA / "cal" / "mic_90deg.txt").write_text("20 0", encoding="utf-8")
+    config.atomic_write(config.SETTINGS_FILE, '{"cal_file": "/var/lib/elsewhere/cal/mic_90deg.txt"}')
+    assert config.load_settings()["cal_file"] == str(config.DATA / "cal" / "mic_90deg.txt")
+    config.atomic_write(config.SETTINGS_FILE, '{"cal_file": "/var/lib/elsewhere/cal/gone.txt"}')
+    assert config.load_settings()["cal_file"] == "/var/lib/elsewhere/cal/gone.txt"      # not there either: left as it was
+    config.SETTINGS_FILE.unlink()
+
+
 def test_the_old_updater_file_hands_over_to_the_new_one():
     shim = (ROOT / "deploy" / "linux" / (OLD + "-update")).read_text(encoding="utf-8")
     assert "httamer-update" in shim and "\r" not in shim and shim.startswith("#!")

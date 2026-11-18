@@ -49,7 +49,7 @@ push() {
   if "${SSH[@]}" 'test ! -e /usr/local/sbin/httamer-update && test -e /usr/local/sbin/bassblend-update'; then
     # an install from before the rename: its own updater takes this version; the push after that moves it to the new names
     files | tar -czf - --null -T - | "${SSH[@]}" "sudo /usr/local/sbin/bassblend-update '$v'"
-    echo "This Pi was set up before the rename. Push once more to move it to its new names."
+    "${SSH[@]}" "test -e /usr/local/sbin/httamer-update" || echo "This Pi was set up before the rename. Push once more to move it to its new names."
     return
   fi
   "${SSH[@]}" 'sudo install -m 0755 /dev/stdin /usr/local/sbin/httamer-update' < deploy/linux/httamer-update
