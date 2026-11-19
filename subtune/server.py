@@ -35,6 +35,10 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "mlp_weight": (float, 1, 4), "nearfield_max_cut_db": (float, 0, 12),
             "nearfield_max_boost_db": (float, 0, 6), "nearfield_max_eq_cut_db": (float, 1, 10),
             "nearfield_min_q": (float, 0.5, 6), "infra_hz": (float, 12, 40),
+            "shaker_gain_db": (float, -30, 0),   # bass shakers: level under the subs
+            "shaker_hpf_hz": (float, 5, 40),     # the shakers' band starts above this
+            "shaker_lpf_hz": (float, 40, 150),   # the shakers' band stops above this
+            "shaker_night": (int, 0, 1),         # night mode leaves the shakers on (subs muted)
             "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70),
             "listen_max_volume": (float, 10, 100),
             "ai_hwdb": (int, 0, 1),
@@ -150,15 +154,22 @@ class Runner:
             secs = float(body.get("seconds", 3))
         except (TypeError, ValueError):
             raise ValueError("bad tone parameters")
-        if out - 1 not in s.get("subs", []):
-            raise ValueError(f"output {out} is not a sub output")
-        if not 1 <= secs <= 10:
-            raise ValueError("a tone must be 1-10 seconds")
-        from .subouts import check_in_tune, check_tone, missing_in
-        check_tone(out - 1, freq, s)                   # 20-200 Hz, or the sub's own range with an infrasonic sub
-        route = bool(body.get("override")) and out in missing_in(load_state().get("result"), s)
-        if not route:                                  # the owner's override routes the input to it for the tone
-            check_in_tune(out - 1, s)                  # otherwise a sub the playing tune leaves out gets nothing: say so
+        from . import shakers
+        if out - 1 in shakers.outputs(s):
+            if not 1 <= secs <= 10:
+                raise ValueError("a tone must be 1-10 seconds")
+            shakers.check_tone(out - 1, freq, s)           # the shakers' band, and the playing tune feeds it
+            route = False
+        else:
+            if out - 1 not in s.get("subs", []):
+                raise ValueError(f"output {out} is not a sub output")
+            if not 1 <= secs <= 10:
+                raise ValueError("a tone must be 1-10 seconds")
+            from .subouts import check_in_tune, check_tone, missing_in
+            check_tone(out - 1, freq, s)                   # 20-200 Hz, or the sub's own range with an infrasonic sub
+            route = bool(body.get("override")) and out in missing_in(load_state().get("result"), s)
+            if not route:                                  # the owner's override routes the input to it for the tone
+                check_in_tune(out - 1, s)                  # otherwise a sub the playing tune leaves out gets nothing: say so
         args = [sys.executable, "-m", "subtune", "tone", "--output", str(out), "--freq", f"{freq:g}",
                 "--seconds", f"{secs:g}"] + (["--route"] if route else [])
         self.proc = self._popen(args)
@@ -220,9 +231,12 @@ class Runner:
         from .dsp import MiniDSP
         d = MiniDSP(load_settings())
         d.batch([MiniDSP.c_preset(n - 1)], f"active preset -> slot {n}")
-        from .automation import night_on
-        if night_on():                                   # night mode: the subs stay cut whatever the slot
-            d.batch([MiniDSP.c_master_mute(True)], "night mode: subs stay muted")
+        from .automation import after_switch_cmds, shaker_mode
+        s = load_settings()
+        extra = after_switch_cmds(s, n - 1)
+        if extra:                                        # night mode: the subs stay cut whatever the slot
+            d.batch(extra, "night mode: "
+                           + ("subs muted, shakers stay on" if shaker_mode(s, n - 1) else "subs stay muted"))
         _live["t"] = 0
 
     def start_avrblend(self, body):
@@ -853,13 +867,24 @@ def build_executors(origin="assistant"):
         return {"tune": t, "summary": f"saved as {t['name']}"}
 
     def set_target(**changes):
+        from . import shakers
         from .assistant import TOOLS
         allowed = next(t for t in TOOLS if t["name"] == "set_target_settings")["input_schema"]["properties"]
         bad = [k for k in changes if k not in allowed]        # never the MCP or other owner-only switches
         if bad:
             raise RuntimeError("not a tuning target setting: " + ", ".join(bad))
-        ch = _apply_settings(changes)
-        return {"changed": ch, "summary": ", ".join(f"{k} {v}" for k, v in ch.items())}
+        shaker_keys = {k: k[len("shaker_"):] for k in changes if k.startswith("shaker_")}
+        parts, changed = [], {}
+        if shaker_keys:
+            r = shakers.update(shaker_keys)
+            changed.update({f"shaker_{k}": v for k, v in r["settings"].items()})
+            parts.append(r["summary"])
+        rest = {k: v for k, v in changes.items() if k not in shaker_keys}
+        if rest:
+            ch = _apply_settings(rest)
+            changed.update(ch)
+            parts.append(", ".join(f"{k} {v}" for k, v in ch.items()))
+        return {"changed": changed, "summary": "; ".join(p for p in parts if p) or "no settings changed"}
 
     def apply_tune(tune_id, slot, tune_name=None):
         if slot == 1:
@@ -1502,6 +1527,20 @@ def sub_outputs(body):
     raise ValueError("action must be remove, add or mute")
 
 
+def shaker_outputs(body):
+    """Room & subs: drive a bass shaker from an output (add), stop it (remove), or set its level,
+    band, delay and night setting. Nothing here writes the miniDSP."""
+    from . import shakers
+    act = body.get("action") or "settings"
+    if act == "add":
+        return shakers.add(body.get("output"))
+    if act == "remove":
+        return shakers.remove(body.get("output"))
+    if act == "settings":
+        return shakers.update({k: v for k, v in body.items() if k != "action"})
+    raise ValueError("action must be add, remove or settings")
+
+
 def _events(since: float, limit=300):
     if not EVENTS_FILE.exists():
         return []
@@ -1909,6 +1948,8 @@ class H(BaseHTTPRequestHandler):
             from .subouts import missing_in, tone_range
             st["tone_range"] = {str(o): list(tone_range(o, s)) for o in (s.get("subs") or [])}   # per sub: [lo, hi, why]
             st["result_missing"] = missing_in(st.get("result"), s)   # subs added after the playing tune: they get nothing yet
+            from . import shakers
+            st["shakers"] = shakers.view(st.get("result"), s, room)   # bass shakers: outputs, settings, band, automatic delay
             from . import vendors
             st["sub_checks"] = {k: {"mode": (vendors.mode_of(d["catalog"], {**vendors.defaults(d["catalog"]), **(d.get("controls") or {})}) or {}).get("name"),
                                     "notes": vendors.check(d["catalog"], d.get("controls") or {}),
@@ -2587,6 +2628,8 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, {"changed": _apply_settings(body)})
             if path == "/api/subs":
                 return self._send(200, sub_outputs(body))
+            if path == "/api/shakers":
+                return self._send(200, shaker_outputs(body))
             if path == "/api/build/pair":                # dashboard: a one-time QR code for the phone room builder
                 from . import builder
                 if not NET["lan"]:

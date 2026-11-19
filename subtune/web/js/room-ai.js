@@ -41,16 +41,55 @@ function toneBar(o) {
   const def = why.startsWith('infrasonic') ? (fs.includes(15) ? 15 : fs[0]) : fs.includes(50) ? 50 : fs[0];
   return `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency">${fs.map(f => `<option value="${f}" ${f === def ? 'selected' : ''}>${f} Hz</option>`).join('')}</select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span>${why ? `<span class="muted small">${esc(why)}: ${lo}-${hi} Hz</span>` : ''}</div>`;
 }
+// bass shakers: tactile transducers on free outputs. S.shakers: outputs/unfed (1-based), settings, tone_range,
+// delay_auto_ms, changed. Nothing here writes the miniDSP; the next applied tune writes the shaker plan.
+const SHAKER_TONES = [15, 20, 30, 40, 50, 80, 100];
+function shakerToneBar(o) {
+  const [lo, hi] = (S.shakers || {}).tone_range || [15, 80];
+  const fs = SHAKER_TONES.filter(f => f >= lo && f <= hi);
+  if (!fs.length) return '';
+  const def = fs.includes(40) ? 40 : fs.reduce((a, b) => Math.abs(b - 40) < Math.abs(a - 40) ? b : a);
+  return `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency">${fs.map(f => `<option value="${f}" ${f === def ? 'selected' : ''}>${f} Hz</option>`).join('')}</select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span><span class="muted small">${lo}-${hi} Hz</span></div>`;
+}
+function shakerCard(o) {
+  const sh = S.shakers || {}, out = o + 1;
+  const body = (sh.unfed || []).includes(out)
+    ? `<div class="notice warn" style="margin:6px 0">The playing tune doesn't feed this shaker yet. <button type="button" class="btn shakerreapply" data-o="${o}">Apply the tune again</button></div>`
+    : shakerToneBar(o);
+  return `<div class="subcard slim" data-o="${o}"><div class="hd" style="margin:0"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${out}</b><span class="muted">bass shaker</span><button type="button" class="btn ghost shakerrm" data-o="${o}" style="height:26px;padding:0 8px">Remove shaker</button></div>${body}</div>`;
+}
+function shakerBlock() {
+  const sh = S.shakers || {}, st = sh.settings || {};
+  if (!(sh.outputs || []).length) return '';
+  const custom = st.delay_ms != null;
+  const autoTxt = sh.delay_auto_ms != null ? `auto: ${sh.delay_auto_ms} ms, from the sub delays and their distance to the seat` : "auto: the tuned subs' delay";
+  const unfed = (sh.unfed || []).length;
+  return `<div style="margin:10px 0 0">
+    <div class="hd"><b>Bass shakers</b><span class="muted" style="margin-left:8px">output ${esc((sh.outputs || []).join(', '))} · the subs' band, own level, timed to the seat</span></div>
+    <div class="grid g2" style="margin:8px 0">
+      <label class="f">Level<span class="unit" data-u="dB"><input id="shkGain" type="number" step="1" min="-30" max="0" value="${st.gain_db ?? 0}"></span></label>
+      <label class="f">High-pass<span class="unit" data-u="Hz"><input id="shkHpf" type="number" step="1" min="5" max="40" value="${st.hpf_hz ?? 0}"></span></label>
+      <label class="f">Low-pass<span class="unit" data-u="Hz"><input id="shkLpf" type="number" step="1" min="40" max="150" value="${st.lpf_hz ?? 0}"></span></label>
+      <label class="f">Delay<select id="shkDelayMode" aria-label="Delay mode"><option value="auto"${custom ? '' : ' selected'}>Auto</option><option value="custom"${custom ? ' selected' : ''}>Custom</option></select><span class="unit" data-u="ms"><input id="shkDelay" type="number" step="0.1" min="0" max="30" value="${custom ? st.delay_ms : ''}"${custom ? '' : ' disabled'}></span></label>
+    </div>
+    <div class="muted small" id="shkAuto" style="margin:-4px 0 6px">${custom ? '' : autoTxt + '.'}</div>
+    <label class="check" style="margin:4px 0 8px"><input type="checkbox" id="shkNight"${st.night ? ' checked' : ''}> Keep the shakers on in night mode (only the subs are muted)</label>
+    <div class="row" style="margin:0 0 8px"><button type="button" class="btn primary shakersave">Save shaker settings</button></div>
+    ${sh.changed || unfed ? `<div class="notice warn" style="margin:0">The miniDSP doesn't match the shakers yet${unfed ? ` (out ${esc(sh.unfed.join(', '))} don't get signal)` : ''}. <button type="button" class="btn shakerreapply">Apply the tune again</button></div>` : ''}
+  </div>`;
+}
 function subCard(o, s = {}, used) {
+  if (((S.shakers || {}).outputs || []).includes(o + 1)) return shakerCard(o);
   const v = k => esc(s[k] ?? '');
   const blank = !Object.values(s).some(x => x !== '' && x != null);
   const addBtn = `<button type="button" class="btn ghost subadd" data-o="${o}" style="height:26px;padding:0 8px">Use for a sub</button>`;
+  const shakerBtn = `<button type="button" class="btn ghost shakeradd" data-o="${o}" style="height:26px;padding:0 8px">Use for a bass shaker</button>`;
   const stillDriven = !used && (S.result_removed || []).includes(o + 1);
   const muteNote = stillDriven ? `<div class="notice warn" style="margin:6px 0">The playing tune still drives this output on the miniDSP. Optimize and apply again without it, or <button type="button" class="btn submute" data-o="${o}">Mute it on the miniDSP</button></div>` : '';
-  if (!used && blank) return `<div class="subcard off slim" data-o="${o}"><div class="hd" style="margin:0"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">not used for a sub</span>${addBtn}</div>${muteNote}</div>`;
+  if (!used && blank) return `<div class="subcard off slim" data-o="${o}"><div class="hd" style="margin:0"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">not used for a sub</span>${addBtn}${shakerBtn}</div>${muteNote}</div>`;
   return `<div class="subcard ${used ? '' : 'off'}" data-o="${o}">
     <div class="hd"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">${used ? '' : 'not a sub output'}</span>${used
-      ? `<button type="button" class="btn ghost subrm" data-o="${o}" style="height:26px;padding:0 8px" title="Unplugged, sold or moved: stop using this output for a sub">Remove this sub</button>` : addBtn}</div>${muteNote}
+      ? `<button type="button" class="btn ghost subrm" data-o="${o}" style="height:26px;padding:0 8px" title="Unplugged, sold or moved: stop using this output for a sub">Remove this sub</button>` : addBtn + shakerBtn}</div>${muteNote}
     ${used && (S.result_missing || []).includes(o + 1)
       ? `<div class="notice warn" style="margin:6px 0">Not in the playing tune yet: the miniDSP sends this output nothing until you tune again, so it stays silent. <button type="button" class="btn" data-open="wizard">Tune my system</button><div class="small" style="margin-top:6px">To check the sub anyway, a test tone routes the input to it for the tone only:</div>${toneBar(o)}</div>`
       : used ? toneBar(o) : ''}
@@ -160,10 +199,20 @@ function hwCheck(card) {
   box.innerHTML = notes.map(([l, t]) => `<div class="hwnote ${l}">${l === 'danger' ? icon('warn') + ' ' : ''}${esc(t)}</div>`).join('');
 }
 $('#subsCard').addEventListener('change', e => {
+  if (e.target.id === 'shkDelayMode') return shakerDelayMode();
   const card = e.target.closest('.subcard'); if (!card) return;
   if (e.target.matches('input[data-f="model"]')) hwFollow(card);
   if (e.target.matches('[data-c]')) hwCheck(card);
 });
+function shakerDelayMode() {
+  const mode = $('#shkDelayMode'), d = $('#shkDelay'), info = $('#shkAuto');
+  if (!mode || !d) return;
+  const custom = mode.value === 'custom';
+  d.disabled = !custom;
+  if (custom && d.value === '') d.value = (S.shakers || {}).delay_auto_ms ?? 0;
+  if (info) info.textContent = custom ? '' : (((S.shakers || {}).delay_auto_ms != null
+    ? `auto: ${S.shakers.delay_auto_ms} ms, from the sub delays and their distance to the seat` : "auto: the tuned subs' delay") + '.');
+}
 function initRoom() {
   if (roomInit || !S.room) return; roomInit = true; roomBuild++;
   const r = S.room, rm = r.room, subs = (S.settings || {}).subs || [];
@@ -175,6 +224,7 @@ function initRoom() {
   $('#seatRows').innerHTML = (r.seats.length ? r.seats : [{name: 'MLP'}]).map(seatRow).join('');
   fuRender(r.furniture); fxRender(r.fixtures); scFill(r.screen); dwFill(r.dwelling);
   $('#subRows').innerHTML = [0, 1, 2, 3].map(o => subCard(o, r.subs[o] || {}, subs.includes(o))).join('');
+  $('#shakerBox').innerHTML = shakerBlock();
   document.querySelectorAll('#subRows .subcard').forEach(hwCheck);
   document.querySelectorAll('#subRows .subcard').forEach(v3AimRefresh);
 }
@@ -185,6 +235,12 @@ async function subOutput(body, done) {
   if (r.needs_tune) toast(done, r.summary || '', 'warn', {action: 'Tune my system', onAction: () => openSheet('wizard'), sticky: true});
   else toast(done, r.summary || '', 'good');
   roomInit = false; await poll(); loadTunes();
+}
+async function shakerPost(body, done) {
+  const r = await post('/api/shakers', body);
+  if (r.error) { alert(r.error); return; }
+  toast(done, r.summary || '', 'good');
+  roomInit = false; await poll();
 }
 $('#subsCard').addEventListener('click', async e => {
   const rm = e.target.closest('.subrm'), ad = e.target.closest('.subadd'), mu = e.target.closest('.submute');
@@ -213,6 +269,38 @@ Nothing is written to the miniDSP now; measure it with Auto-tune before it gets 
 One write to htTamer's slot ${slot}, and only if that slot is the one playing. Slot 1 is never touched. The next tune applied there keeps it muted.`)) return;
     return subOutput({action: 'mute', output: o, confirm: true}, `Output ${o} muted`);
   }
+  const sa = e.target.closest('.shakeradd');
+  if (sa) {
+    const o = +sa.dataset.o + 1;
+    if (!confirm(`Use output ${o} for a bass shaker?
+
+A shaker is felt at the seat, not heard. htTamer gives it the subs' band, its own level and delay. Nothing is written to the miniDSP now; the next applied tune writes it.`)) return;
+    return shakerPost({action: 'add', output: o}, `Output ${o} drives a bass shaker`);
+  }
+  const sr = e.target.closest('.shakerrm');
+  if (sr) {
+    const o = +sr.dataset.o + 1;
+    if (!confirm(`Remove the bass shaker on output ${o}?
+
+htTamer stops driving it; the next applied tune leaves it silent. Nothing is written to the miniDSP now.`)) return;
+    return shakerPost({action: 'remove', output: o}, `Bass shaker on output ${o} removed`);
+  }
+  if (e.target.closest('.shakersave')) {
+    const body = {action: 'settings', gain_db: +$('#shkGain').value, hpf_hz: +$('#shkHpf').value, lpf_hz: +$('#shkLpf').value,
+                  delay_ms: $('#shkDelayMode').value === 'auto' ? null : +$('#shkDelay').value, night: $('#shkNight').checked};
+    return shakerPost(body, 'Shaker settings saved');
+  }
+  const rp = e.target.closest('.shakerreapply');
+  if (rp) {
+    const tune = (S.result || {}).tune_id, slot = (S.result || {}).slot;
+    if (!tune || !slot) { alert('There is no playing tune to apply.'); return; }
+    if (!confirm(`Rewrite slot ${slot} with the playing tune and the new shaker settings? No new measuring.`)) return;
+    const r = await post('/api/apply', {tune, slot});
+    if (r.error) { alert(r.error); return; }
+    toast('Shakers', r.summary || `Slot ${slot} now plays the tune with the shaker settings.`, 'good');
+    roomInit = false; await poll(); loadTunes();
+    return;
+  }
   const tb = e.target.closest('.tonebtn');
   if (tb) {
     const o = +tb.dataset.o, f = +tb.parentElement.querySelector('.tonef').value;
@@ -231,6 +319,12 @@ function renderTones() {
     const o = el.dataset.o, t = tests[o], waiting = tonePending[o] && (!t || t.t < tonePending[o]);
     if (waiting && running) { el.className = 'toneres muted small'; el.innerHTML = '<span class="spin"></span> Playing…'; return; }
     if (!t) { el.className = 'toneres muted small'; el.textContent = '6 s tone on this output only'; return; }
+    if (((S.shakers || {}).outputs || []).includes(+o + 1)) {
+      el.className = 'toneres small ok';
+      el.textContent = `Played ${t.freq} Hz · feel it at the seat`;
+      el.title = 'A shaker is felt at the seat, not heard by the mic: "Played" is the good result.';
+      return;
+    }
     el.className = 'toneres small ' + (t.heard ? 'ok' : 'bad');
     el.textContent = `${t.heard ? 'Heard' : 'Not heard'} at ${t.freq} Hz · level ${t.level_dbfs} dB · SNR ${t.snr_db} dB · ${new Date(t.t * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'})}`;
     el.title = 'Level is what the mic heard. Compare it between subs at the same frequency to match gain knobs.';

@@ -26,6 +26,8 @@ class Rig:
         self.rec = audio.find_device(self.s["rec_device"], self.s["hostapi"], "input", wait=5)
         self.cal = audio.load_cal(self.s["cal_file"]) if self.s.get("cal_file") else None
         self.subs = list(self.s["subs"])
+        from . import shakers
+        self.shakers = shakers.outputs(self.s)
         self.ref = self.s.get("ref_sub")
         if self.ref is None and self.subs:
             self.ref = self.subs[0]
@@ -61,7 +63,8 @@ class Rig:
                        f"restore source -> {src}, subs unmuted")
 
     def mute_except(self, keep):
-        return [self.dsp.c_out_mute(o, o not in keep) for o in self.subs]
+        sh = getattr(self, "shakers", None) or []     # a Rig built without __init__ has no shakers yet
+        return [self.dsp.c_out_mute(o, o not in keep) for o in self.subs + sh]
 
     # ------------------------------------------------------------ helpers
     def _sweep(self, seconds=None, f1=None, f2=None, dbfs=None):
@@ -274,7 +277,8 @@ class Rig:
                         + [d.c_routing(i, out, False) for i in (0, 1)],
                         f"test tone done: output {out + 1} back to not routed and muted (not in the playing tune)")
             else:
-                d.batch(self.mute_except(self.subs), "test tone done: all subs unmuted")
+                d.batch(self.mute_except(self.subs + (getattr(self, "shakers", None) or [])),
+                        "test tone done: subs and shakers unmuted")
         lo, hi = freq / 1.4, min(freq * 1.4, FS / 2 - 1)
         bp = sosfiltfilt(butter(4, [lo, hi], "bandpass", fs=FS, output="sos"), rec)
         start = pre + int(0.2 * FS) + int(0.4 * FS)                     # skip stream offset + fade-in/auto-on

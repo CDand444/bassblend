@@ -119,6 +119,18 @@ def cmd_headroom(a):
 def cmd_tone(a):
     s = load_settings()
     out = a.output - 1
+    from . import shakers
+    if out in shakers.outputs(s):
+        if not 1 <= a.seconds <= 10 or (a.dbfs is not None and not -60 <= a.dbfs <= -10):
+            sys.exit("tone limits: 1-10 s, -60..-10 dBFS")
+        try:
+            shakers.check_tone(out, a.freq, s)            # the shakers' band, and the playing tune feeds it
+        except ValueError as e:
+            sys.exit(str(e))
+        with busy(f"test tone on output {a.output}"):
+            r = _rig().tone(out, a.freq, a.seconds, a.dbfs)
+        print(json.dumps(r))
+        return
     if out not in s.get("subs", []):
         sys.exit(f"output {a.output} is not a sub output")
     if not 1 <= a.seconds <= 10 or (a.dbfs is not None and not -60 <= a.dbfs <= -10):
@@ -181,19 +193,27 @@ def cmd_optimize(a):
                      default=lambda o: o if not isinstance(o, tuple) else list(o)))
 
 
-def full_slot_cmds(d, slot0, r, lpf=None):
-    """Every write needed to make a DSP slot hold exactly this tune: the DSP
-    can't report what's already there, so nothing is left to chance."""
+def full_slot_cmds(d, slot0, r, lpf=None, s=None, room=None):
+    """Every write needed to make a DSP slot hold exactly this tune (its subs and, when set, its
+    bass shakers): the DSP can't report what's already there, so nothing is left to chance."""
     from .config import N_OUTPUTS
-    from . import limiter
+    from . import limiter, shakers
+    if s is None:
+        s = load_settings()
+    if room is None:
+        from .room import load_room
+        room = load_room()
     lims = limiter.saved()
     subs = [x["output"] for x in r["subs"]]
+    sk_plan = shakers.plan(r, s, room)
+    sk_outs = [p["output"] for p in sk_plan]
+    driven = subs + sk_outs
     cmds = [d.c_preset(slot0)]
     for i in (0, 1):
         cmds += [f"input {i} gain -- 0", f"input {i} mute off", f"input {i} peq all bypass on"]
         for o in range(N_OUTPUTS):
-            cmds.append(d.c_routing(i, o, o in subs))
-            if o in subs:
+            cmds.append(d.c_routing(i, o, o in driven))
+            if o in driven:
                 cmds.append(d.c_routing_gain(i, o, 0))
     from .biquad import bw4_highpass, to_minidsp
     for o in range(N_OUTPUTS):
@@ -202,6 +222,8 @@ def full_slot_cmds(d, slot0, r, lpf=None):
             hpf = [to_minidsp(*bq) for bq in bw4_highpass(float(sub["hpf_hz"]))] if sub.get("hpf_hz") else None   # from the tune itself
             cmds += d.write_sub_filters(o, sub["gain_db"], sub["delay_ms"], sub["invert"], sub["biquads"], lpf, hpf)
             cmds += [f"output {o} fir bypass on", *limiter.commands(o, lims.get(str(o))), d.c_out_mute(o, False)]
+        elif o in sk_outs:
+            cmds += shakers.slot_cmds(d, [p for p in sk_plan if p["output"] == o])
         else:
             cmds.append(d.c_out_mute(o, True))
     return cmds
@@ -243,6 +265,11 @@ def cmd_apply(a):
             f.write(json.dumps({"t": now, "preset": slot0, "tune": saved["id"], "result": r}) + "\n")
         # the dashboard's "current result" becomes whatever is now playing
         cur = dict(r, applied=now, lpf_hz=a.lpf, slot=slot0 + 1, tune_id=saved["id"], tune_name=saved["name"])
+        from . import shakers
+        from .room import load_room
+        shakers_plan = shakers.plan(r, s, load_room())
+        if shakers_plan:
+            cur["shakers"] = shakers_plan
         (DATA / "result.json").write_text(json.dumps(cur, indent=2))
         st = load_state()
         prev = st.get("result") or {}

@@ -90,6 +90,13 @@ A sub that is gone for good or unplugged (sold, moved to another room): set_sub_
 out of the sub list without touching the miniDSP; then optimize again from the other subs' measurements. Muting \
 that output on the miniDSP is a separate step (set_sub_output mute): ask before offering both.
 
+## Bass shakers
+When the room has bass shakers (tactile transducers driven from the free miniDSP outputs, set on the \
+Room & subs page), they get the subs' bass, band-limited, at their own level, lined up in time with the \
+main seat. test_tone works on a shaker output inside the shakers' band; the assistant can change their \
+level and band (set_target_settings). Night mode can leave them on while it mutes the subs, when the \
+owner wants the rumble but not the speakers.
+
 ## Automation (get_overview -> automation)
 htTamer can switch the miniDSP slot by itself when the receiver's input or listening mode changes, keep the \
 receiver's sub level where htTamer set it (the watchdog), and run a blind A/B test between two slots. These are \
@@ -311,9 +318,15 @@ TOOLS = [
     _t("save_simulation", "Save the last simulate_tune result to the tune library (not applied).",
        {"name": {"type": "string"}, "notes": {"type": "string"}}, ["name"]),
     _t("set_target_settings", "Change the tuning target used by the next optimization/auto-tune.",
-       {k: {"type": "number"} for k in ("fmin", "fmax", "house_db", "house_fc", "max_boost_db", "mlp_weight",
-                                        "nearfield_max_cut_db", "nearfield_max_boost_db", "nearfield_max_eq_cut_db",
-                                        "nearfield_min_q", "infra_hz")}, approval=True),
+       {"fmin": {"type": "number"}, "fmax": {"type": "number"}, "house_db": {"type": "number"},
+        "house_fc": {"type": "number"}, "max_boost_db": {"type": "number"}, "mlp_weight": {"type": "number"},
+        "nearfield_max_cut_db": {"type": "number"}, "nearfield_max_boost_db": {"type": "number"},
+        "nearfield_max_eq_cut_db": {"type": "number"}, "nearfield_min_q": {"type": "number"},
+        "infra_hz": {"type": "number"},
+        "shaker_gain_db": {"type": "number", "description": "-30 to 0 dB; the bass shakers' own level"},
+        "shaker_hpf_hz": {"type": "number", "description": "5-40 Hz; the shakers' high-pass, below shaker_lpf_hz"},
+        "shaker_lpf_hz": {"type": "number", "description": "40-150 Hz; the shakers' low-pass, above shaker_hpf_hz"}},
+       approval=True),
     _t("apply_tune", "Write a saved tune to a miniDSP slot (whole slot rewritten; becomes the playing slot).",
        {"tune_id": {"type": "string"}, "slot": {"type": "integer", "description": "1-4; 1 is the owner's original"}},
        ["tune_id", "slot"], approval=True),

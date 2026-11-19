@@ -89,6 +89,12 @@ DEFAULTS = {
     "nearfield_min_q": 1.0,           # its own EQ cuts must be at least this narrow (higher = narrower only)
     "min_gain_db": -10.0,
     "infra_hz": 20.0,                 # with an infrasonic sub: the other subs are high-passed here (24 dB/oct)
+    "shakers": [],                    # output indices (0-based) that drive bass shakers
+    "shaker_gain_db": -6.0,           # the shakers' level, under the subs
+    "shaker_hpf_hz": 15.0,            # the shakers' band starts above this
+    "shaker_lpf_hz": 80.0,            # the shakers' band stops above this
+    "shaker_delay_ms": None,          # extra shaker delay in ms; None = line them up from the room positions
+    "shaker_night": True,             # night mode leaves the shakers on (subs muted)
 }
 
 

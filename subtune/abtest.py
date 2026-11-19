@@ -34,9 +34,13 @@ def _switch(d, slot, why):
     from .dsp import MiniDSP
     d.batch([MiniDSP.c_preset(slot - 1)], why, quiet=True)
     try:
-        from .automation import night_on
-        if night_on():
-            d.batch([MiniDSP.c_master_mute(True)], "night mode: subs stay muted", quiet=True)
+        from .automation import after_switch_cmds, shaker_mode
+        from .config import load_settings
+        s = load_settings()
+        extra = after_switch_cmds(s, slot - 1)
+        if extra:
+            d.batch(extra, "night mode: "
+                          + ("subs muted, shakers stay on" if shaker_mode(s, slot - 1) else "subs stay muted"), quiet=True)
     except Exception:                                  # noqa: BLE001
         pass
 

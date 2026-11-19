@@ -103,15 +103,25 @@ def check(name: str, args: dict, s=None) -> None:
     elif name in ("test_tone", "run_headroom"):
         out = _int(a.get("output"), "output")
         subs = [o + 1 for o in (s.get("subs") or [])]
-        if out not in (subs or [1, 2, 3, 4]):
-            raise Refused(f"output {out} isn't a sub output" + (f" (subs: {', '.join(map(str, subs))})" if subs else ""))
         if name == "test_tone":
-            from .subouts import check_in_tune, check_tone
-            try:
-                check_tone(out - 1, _num(a.get("freq"), "freq"), s)     # the sub's own range (infrasonic split)
-                check_in_tune(out - 1, s)                                 # not in the playing tune: it would be silent
-            except ValueError as e:
-                raise Refused(str(e))
+            from . import shakers
+            if out in [o + 1 for o in shakers.outputs(s)]:
+                # a shaker output: its own band, and only when the playing tune feeds it (no override, no route)
+                try:
+                    shakers.check_tone(out - 1, _num(a.get("freq"), "freq"), s)
+                except ValueError as e:
+                    raise Refused(str(e))
+            elif out not in (subs or [1, 2, 3, 4]):
+                raise Refused(f"output {out} isn't a sub output" + (f" (subs: {', '.join(map(str, subs))})" if subs else ""))
+            else:
+                from .subouts import check_in_tune, check_tone
+                try:
+                    check_tone(out - 1, _num(a.get("freq"), "freq"), s)     # the sub's own range (infrasonic split)
+                    check_in_tune(out - 1, s)                                 # not in the playing tune: it would be silent
+                except ValueError as e:
+                    raise Refused(str(e))
+        elif out not in (subs or [1, 2, 3, 4]):
+            raise Refused(f"output {out} isn't a sub output" + (f" (subs: {', '.join(map(str, subs))})" if subs else ""))
     elif name == "avr_control":
         act = a.get("action")
         if act in AVR_CAPS:

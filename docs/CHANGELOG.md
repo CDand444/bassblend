@@ -1,5 +1,15 @@
 # htTamer changelog
 
+## Unreleased
+
+- **Bass shakers**: assign a free output to a tactile transducer on Room & subs. Each shaker gets the subs' bass,
+  band-limited by a high- and low-pass at its own level, timed to the main seat (Auto works it out from the tuned subs'
+  delays and the distance to the seat; Custom adds 0-30 ms). The new **Bass shakers** block sets level, band, delay and
+  night mode (with **Keep the shakers on**, night mode mutes only the subs). Adding, removing or changing shaker
+  settings writes nothing to the miniDSP until you **Apply the tune again** — one slot rewrite with the playing tune
+  and the shaker settings, no new measuring. A shaker's test tone is felt at the seat, not heard by the mic: its
+  result says **Played … feel it at the seat**.
+
 ## Nov 18, 2026 - Infrasonic sub
 
 - **An infrasonic sub**: set one sub's role to **Infrasonic** (Room & subs) and the lowest notes go to it alone. The other

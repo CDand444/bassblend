@@ -39,17 +39,50 @@ def night_on() -> bool:
     return bool(night().get("on"))
 
 
+def shaker_mode(s, playing0) -> bool:
+    """Night mode that can leave the shakers on: the master mute is global, so the subs are muted per
+    output instead. Only on htTamer's own slot - never slot 1 (the owner's original)."""
+    return bool((s.get("shakers") and s.get("shaker_night")
+                 and playing0 == s.get("preset") and s.get("preset") not in (None, 0)))
+
+
+def night_cmds(on, s, playing0) -> list[str]:
+    """Night mode on/off. In shaker mode the master mute is released (it is global and would cut the
+    shakers) and the subs are muted per output - per slot, so slot 1 is untouched. Else the master mute."""
+    from .dsp import MiniDSP
+    if shaker_mode(s, playing0):
+        return [MiniDSP.c_master_mute(False)] + [MiniDSP.c_out_mute(o, bool(on)) for o in (s.get("subs") or [])]
+    return [MiniDSP.c_master_mute(bool(on))]
+
+
+def after_switch_cmds(s, playing0) -> list[str]:
+    """What to send after a slot switch: the night mutes back (in shaker mode the subs' output mutes,
+    the shakers stay on). Nothing when night is off and shaker mode doesn't apply."""
+    if night_on() or shaker_mode(s, playing0):
+        return night_cmds(night_on(), s, playing0)
+    return []
+
+
 def set_night(on: bool, who: str = "you", dsp=None) -> dict:
-    """Cut (or bring back) all bass from the subs: the miniDSP's master mute."""
+    """Cut (or bring back) all bass from the subs. In shaker mode the shakers stay on: the master mute
+    is global, so the subs are muted per output instead (slot 1 is never touched)."""
     from .config import load_settings
     from .dsp import MiniDSP
     from .state import event, update_state
     s = load_settings()
     d = dsp or MiniDSP(s)
-    d.batch([MiniDSP.c_master_mute(bool(on))], ("night mode on: subs muted" if on else "night mode off: subs back") + f" ({who})")
-    st = {"on": bool(on), "since": time.time(), "who": who}
+    on = bool(on)
+    playing0 = int(d.status()["master"]["preset"])
+    if shaker_mode(s, playing0):
+        what = "subs muted, shakers still on" if on else "subs back, shakers stay on"
+        headline = "Night mode on: subs muted, shakers still on" if on else "Night mode off: the subs play again"
+    else:
+        what = "subs muted" if on else "subs back"
+        headline = "Night mode on: no bass from the subs" if on else "Night mode off: the subs play again"
+    d.batch(night_cmds(on, s, playing0), f"night mode {'on' if on else 'off'}: {what} ({who})")
+    st = {"on": on, "since": time.time(), "who": who}
     update_state(night=st)
-    event("config", ("Night mode on: no bass from the subs" if on else "Night mode off: the subs play again") + f" ({who})")
+    event("config", headline + f" ({who})")
     return st
 
 
@@ -284,8 +317,10 @@ def tick(busy, avr_status, receiver=None, dsp=None, now=None, refresh=lambda: No
                 if cur != want:
                     label = (st.get("mode") if why.startswith("mode:") else st.get("input")) or why
                     d.batch([MiniDSP.c_preset(want - 1)], f"automatic slot: {label} -> slot {want}")
-                    if n.get("on"):
-                        d.batch([MiniDSP.c_master_mute(True)], "night mode: subs stay muted after the slot change")
+                    extra = after_switch_cmds(s, want - 1)
+                    if extra:
+                        d.batch(extra, "night mode after the slot change: "
+                                      + ("subs muted, shakers still on" if shaker_mode(s, want - 1) else "subs muted"))
                     update_state(auto_slot={"t": now, "slot": want, "because": label, "from": cur})
                     event("info", f"Automatic slot: {label} → slot {want}")
                     did.append(f"slot {want}")
@@ -308,7 +343,13 @@ def _watch(s, st, n, receiver, dsp, now, busy, refresh) -> list:
     master = d.status().get("master") or {}
     if busy():
         return ["paused: in use"]
-    if n.get("on") and not master.get("mute"):        # night mode is the owner's explicit wish: always put it back
+    playing0 = int(master.get("preset", -1))
+    if n.get("on") and shaker_mode(s, playing0):
+        # the master mute is global: in shaker mode night mode rides on the subs' per-output mutes, which
+        # status can't report - so re-assert them every pass (quietly; that is not a fix)
+        d.batch(night_cmds(True, s, playing0), "watchdog: night mode - the subs stay muted, the shakers stay on",
+                quiet=True)
+    elif n.get("on") and not master.get("mute"):      # night mode is the owner's explicit wish: always put it back
         d.batch([MiniDSP.c_master_mute(True)], "watchdog: night mode's mute was off, muted the subs again")
         fixed.append("Night mode: the subs had been unmuted; muted again")
     if s.get("watchdog_on"):

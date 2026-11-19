@@ -226,6 +226,8 @@ class MiniDSP:
         if lpf_biquads:
             for i, bq in enumerate(lpf_biquads[:4]):
                 c.append(self.c_xover_set(o, 0, i, bq))
+            for i in range(len(lpf_biquads), 4):          # the group's unused sections stay flat
+                c.append(self.c_xover_set(o, 0, i, UNITY))
             c.append(self.c_xover_bypass(o, 0, False))
         else:
             c.append(self.c_xover_bypass(o, 0, True))
