@@ -74,6 +74,31 @@ installer); the Pi image is built with `deploy/pi-gen/build-image.sh` and upload
 The built-in assistant (the chat button) can read all of this and, with your approval for anything that plays sound or changes
 your hardware, help with each step. Everything is also in the [user manual](subtune/web/manual.html).
 
+## Turning on the AI (optional)
+
+The assistant, the room analysis, AI treatment plans and the phone room builder need an AI provider; everything else works
+without one. Set it up in **Tools → AI analysis** (or the AI step of the first-start setup), either way:
+
+**Your own API key** (billed by the provider per use; htTamer caps requests at 300 a day by default)
+1. Make a key: [Anthropic](https://console.anthropic.com) → API keys (best tested), [OpenAI](https://platform.openai.com) →
+   API keys, or [Google Gemini](https://aistudio.google.com) → Get API key.
+2. Choose that **AI provider**, paste the key, press **Save**.
+3. Press **Load list**, pick a **Model**, press **Test**.
+
+The key stays on the device running htTamer and is only sent to that provider.
+
+**A local model** (free, on your own computer; on a Pi, run it on another computer on your network)
+1. Install [Ollama](https://ollama.com) and pull a model (`ollama pull qwen3`), or [LM Studio](https://lmstudio.ai) with a
+   model and its server started.
+2. If htTamer runs on another computer: Ollama needs `OLLAMA_HOST=0.0.0.0` (then restart it); LM Studio needs
+   **Serve on Local Network**. Allow it through that computer's firewall on private networks if asked.
+3. Choose **Local model (Ollama, LM Studio…)** and enter the **Local server address**:
+   `http://<that computer's address>:11434/v1` (Ollama) or `:1234/v1` (LM Studio). No key needed.
+4. Press **Save**, **Load list**, pick the model, press **Test**.
+
+Local models are slower and weaker with the assistant's tools; use the largest one your graphics card holds. The
+safety rules are the same either way: anything that plays sound or changes something still asks you first.
+
 ## Documentation
 
 - User manual: `subtune/web/manual.html` (in the app under System → Manual, or at `/manual`)

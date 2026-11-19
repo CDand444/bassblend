@@ -28,6 +28,7 @@
   <a href="#m-backups">Backups</a>
   <a href="#m-treatment">Room treatment</a>
   <a href="#m-play">How tests play through the receiver</a>
+  <a href="#m-ai">Turning on the AI</a>
   <a href="#m-assistant">The assistant</a>
   <a href="#m-mcp">Using htTamer from another AI app (MCP)</a>
   <a href="#m-dirac">Dirac Live</a>
@@ -324,8 +325,26 @@
 <p><b>Supported receivers</b> (Survey → Receiver → Make, or <b>Auto-detect</b> from the address): Onkyo, Integra and Pioneer (eISCP; tested on a TX-RZ50), Denon and Marantz (telnet; follows Denon's published protocol), and JBL Synthesis SDP-55/58 and SDR-35/38 (Harman's IP protocol on port 50000; turn Control on in the unit's network settings). The last two aren't tested on hardware yet. A JBL Synthesis unit also reports its whole speaker setup (sizes, crossovers, distances and levels), which <b>Copy to Speakers</b> on the Receiver page fills in for you. Turn network control on in the receiver's menu. The Pi-HDMI input list follows the make.</p>
 <p><b>Hardware database</b> (Tools → AI analysis): htTamer's built-in knowledge covers specific models. For anything else, models can be recorded in the hardware database, and with <b>Let the assistant build the hardware database</b> ticked the assistant does it for you whenever a model comes up, looking up the maker's specs on the web and saving the source. htTamer uses what's recorded: a receiver's control protocol picks its driver, a ported sub's safe limit stops EQ boosts below it, and speaker specs inform the advice. Every entry is listed there and in the journal, and can be removed.</p>
 
+<h2 id="m-ai">Turning on the AI</h2>
+<p>The AI features (the chat assistant, the room analysis, AI room treatment plans and the phone room builder) are optional and need an AI provider. Everything else works without one. Pick one of two ways in <b>Tools → AI analysis</b> (or the <b>Turn on the AI assistant</b> step of the first-start setup).</p>
+<p><b>With an API key (bring your own key).</b> You pay the provider per use; htTamer has a daily request cap (300 by default) so it can't run up a bill.</p>
+<ol>
+  <li>Make a key with the provider you want: <b>Anthropic</b> (best tested) at console.anthropic.com → API keys, <b>OpenAI</b> at platform.openai.com → API keys, or <b>Google Gemini</b> at aistudio.google.com → Get API key. The provider may ask you to add credit first.</li>
+  <li>In htTamer, choose that <b>AI provider</b>, paste the key into <b>API key</b> and press <b>Save</b>.</li>
+  <li>Press <b>Load list</b> and pick a <b>Model</b> (or keep the suggested one), then press <b>Test</b>. A ✓ with a short reply from the AI means you're done; otherwise it shows what went wrong.</li>
+</ol>
+<p>The key is kept only on the device running htTamer (in its config folder), is only sent to that provider, and is never shown again, put in a backup, or in a settings file unless you tick it. <b>Remove key</b> deletes it.</p>
+<p><b>With a local model (free, runs on your own computer).</b> Any OpenAI-compatible server works; the two easiest are Ollama and LM Studio, on a computer with a decent graphics card. On a Pi, run the model on another computer on your network.</p>
+<ol>
+  <li>Install <b>Ollama</b> (ollama.com) and download a model, e.g. <code>ollama pull qwen3</code>; or install <b>LM Studio</b> (lmstudio.ai), download a model and start its server (Developer tab).</li>
+  <li>If htTamer runs on a different computer (such as the Pi), let the server answer the network: for Ollama set the environment variable <code>OLLAMA_HOST=0.0.0.0</code> and restart it; in LM Studio turn on <b>Serve on Local Network</b>. That computer's firewall may ask once: allow it on private networks.</li>
+  <li>In htTamer choose <b>Local model (Ollama, LM Studio…)</b> and type the <b>Local server address</b>: <code>http://&lt;that computer's address&gt;:11434/v1</code> for Ollama or <code>…:1234/v1</code> for LM Studio (<code>http://127.0.0.1:11434/v1</code> if it's the same computer). No key is needed.</li>
+  <li>Press <b>Save</b>, <b>Load list</b>, pick your model, and press <b>Test</b>.</li>
+</ol>
+<p>Local models are slower and less sure-footed than the big providers, especially with the assistant's tools; pick the largest model your graphics card holds. To read photos (the phone room builder), the model has to understand images; if yours doesn't, set a <b>Photo model</b> that does. The safety rules are the same either way: anything that plays sound or changes something still asks you first.</p>
+
 <h2 id="m-assistant">The assistant</h2>
-<p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It can read the room treatment plan, explain it and adjust it to your budget, looks and the walls you can't treat, and record what you've put up. It needs an AI provider key (Setup → AI analysis). Without one, a built-in helper answers common questions.</p>
+<p>The chat knows your system: the playing tune, measurements, reports, the fix log, your equipment and the live EQ. Ask it what a result means or what to do next, or ask it to run a test. Anything that plays sound or changes a tune asks for your approval first, with a one-line description. You can tell it about your speakers, subs and room and it records them (each change is logged). It can read the room treatment plan, explain it and adjust it to your budget, looks and the walls you can't treat, and record what you've put up. It needs an AI provider: an API key or a local model (see <a href="#m-ai">Turning on the AI</a>). Without one, a built-in helper answers common questions.</p>
 <p><b>What keeps it safe.</b> The assistant only acts through htTamer's own tools, and htTamer checks every one itself, whatever the AI says:</p>
 <ul>
   <li><b>Your approval</b> for anything that plays sound or changes the miniDSP, the receiver or a tune. An approval you don't answer within 15 minutes expires, and after 4 approval requests for one message it has to stop and talk to you.</li>
