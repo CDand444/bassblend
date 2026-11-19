@@ -21,7 +21,8 @@ ORIGINAL_SLOT = 0          # 0-based: preset 1 holds the owner's own setup
 
 def _fingerprint(result) -> str:
     key = [(s["output"], round(s["gain_db"], 2), round(s["delay_ms"], 3), s["invert"],
-            [[round(c, 6) for c in b] for b in s["biquads"]]) for s in result["subs"]]
+            [[round(c, 6) for c in b] for b in s["biquads"]]) + ((round(float(s["hpf_hz"]), 2),) if s.get("hpf_hz") else ())
+           for s in result["subs"]]                # the infrasonic high-pass only when there is one: older tunes keep their fingerprint
     return hashlib.sha1(json.dumps(key).encode()).hexdigest()[:12]
 
 

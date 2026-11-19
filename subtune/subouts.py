@@ -25,6 +25,39 @@ def _out0(output) -> int:
     return o - 1
 
 
+TONE_MIN, TONE_MAX, INFRA_TONE_MIN = 20.0, 200.0, 12.0
+
+
+def tone_range(out0: int, s=None) -> tuple[float, float, str]:
+    """(lowest Hz, highest Hz, why) for a test tone on one sub output (0-based), from the sub's role. With an
+    infrasonic sub (and another sub): it alone may go below 20 Hz, down to 12 Hz but never below a ported sub's
+    safe limit; the other subs start at the infrasonic cutoff, where their high-pass starts. Otherwise 20-200 Hz."""
+    s = s or load_settings()
+    subs = list(s.get("subs") or [])
+    from .room import load_room
+    room = load_room().get("subs") or {}
+    infra = [o for o in subs if (room.get(str(o)) or {}).get("role") == "infrasonic"]
+    if not infra or len(subs) < 2 or out0 not in subs:
+        return TONE_MIN, TONE_MAX, ""
+    hz = min(40.0, max(12.0, float(s.get("infra_hz") or 20.0)))
+    if out0 == infra[0]:
+        try:
+            from .optimize import sub_protect
+            p = sub_protect([out0])[0]
+        except Exception:                                  # noqa: BLE001 - unknown sub: the plain floor
+            p = None
+        lo = max(INFRA_TONE_MIN, float(p)) if p else INFRA_TONE_MIN
+        return lo, TONE_MAX, "infrasonic sub" + (f" (ported: not below {float(p):g} Hz)" if p else "")
+    return max(TONE_MIN, hz), TONE_MAX, f"high-passed at {hz:g} Hz for the infrasonic sub"
+
+
+def check_tone(out0: int, freq: float, s=None) -> None:
+    """Refuse a tone outside that sub's range (the page, the tone command and the assistant all ask here)."""
+    lo, hi, why = tone_range(out0, s)
+    if not lo <= float(freq) <= hi:
+        raise ValueError(f"a test tone on output {out0 + 1} must be {lo:g}-{hi:g} Hz" + (f" ({why})" if why else ""))
+
+
 def removed_in(result, settings=None) -> list[int]:
     """1-based outputs a tune/result drives that are no longer sub outputs (empty = still fits).
     With no sub outputs set at all nothing is judged stale (a fresh install, or a settings reset)."""
@@ -32,6 +65,25 @@ def removed_in(result, settings=None) -> list[int]:
     if not subs or not result:
         return []
     return sorted(int(s["output"]) + 1 for s in result.get("subs") or [] if int(s["output"]) not in subs)
+
+
+def missing_in(result, settings=None) -> list[int]:
+    """1-based sub outputs the playing tune leaves out (added after it was made): on htTamer's slot the miniDSP
+    sends them nothing until a new tune includes them. Empty with no tune applied yet."""
+    subs = (settings if settings is not None else load_settings()).get("subs") or []
+    if not subs or not result or not result.get("applied") or not result.get("subs"):
+        return []
+    driven = {int(x["output"]) for x in result["subs"]}
+    return sorted(o + 1 for o in subs if o not in driven)
+
+
+def check_in_tune(out0: int, settings=None, result=None) -> None:
+    """Refuse a test tone on a sub the playing tune leaves out: it would be silent and look like a dead sub."""
+    if result is None:
+        result = load_state().get("result")
+    if out0 + 1 in missing_in(result, settings):
+        raise ValueError(f"output {out0 + 1} isn't in the playing tune yet, so the miniDSP sends it nothing and a test tone "
+                         f"would be silent. Tune again (Tune my system) to include it.")
 
 
 def check_apply(result, settings=None) -> None:
@@ -99,8 +151,10 @@ def add(output) -> dict:
     event("config", f"output {o + 1} is a sub output again", subs=[x + 1 for x in subs])
     from . import journal
     journal.add("hardware", f"Output {o + 1} drives a sub again", output=o + 1)
-    return {"output": o + 1, "subs": [x + 1 for x in subs], "dsp_written": False,
-            "summary": f"output {o + 1} added to the sub list; measure it (Auto-tune) before it gets a tune"}
+    needs = bool(missing_in(st.get("result"), s))
+    return {"output": o + 1, "subs": [x + 1 for x in subs], "dsp_written": False, "needs_tune": needs,
+            "summary": f"output {o + 1} added to the sub list; tune again (Tune my system) to include it"
+                       + (": until then the playing tune sends it nothing" if needs else "")}
 
 
 def mute(output, dsp=None) -> dict:

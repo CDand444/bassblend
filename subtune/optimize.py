@@ -226,6 +226,20 @@ def fit_global_peq(f, avg_db, T, n_bands, max_boost, seat_std=None, allow=None, 
     return [(float(10 ** fc), float(boost_q(q, g)), float(g)) for fc, q, g in bands]
 
 
+def infra_plan(roles, s):
+    """With an infrasonic sub (and at least one other): which sub it is, the cutoff, which subs get the high-pass,
+    and that high-pass's response on GRID per sub, shape (S, F). None without one."""
+    if "infrasonic" not in roles or len(roles) < 2:
+        return None
+    from .biquad import bw4_highpass, chain_response
+    idx = roles.index("infrasonic")
+    hz = float(min(40.0, max(12.0, float(s.get("infra_hz") or 20.0))))
+    hp = chain_response(bw4_highpass(hz), GRID)
+    filtered = [i for i in range(len(roles)) if i != idx]
+    return {"index": idx, "hz": hz, "filtered": filtered,
+            "hpf": np.stack([hp if i in filtered else np.ones(len(GRID), complex) for i in range(len(roles))])}
+
+
 def sub_roles(subs):
     from .room import load_room
     room = load_room()
@@ -241,6 +255,13 @@ def optimize(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
         raise ValueError(f"sub_peq_bands + global_peq_bands must be <= {PEQ_BANDS}")
     roles = roles or sub_roles(subs)
     nearfield = np.array([r == "nearfield" for r in roles])
+    Hraw = Hs                                      # as measured: the "before" curves
+    infra = infra_plan(roles, s)
+    if infra:
+        Hs = Hs * infra["hpf"][None, :, :]         # fit the system as it will play: the other subs high-passed
+        log("opt", f"infrasonic: output {subs[infra['index']] + 1} plays below {infra['hz']:g} Hz alone; "
+                   + ", ".join(f"output {o + 1}" for i, o in enumerate(subs) if i in infra["filtered"])
+                   + f" high-passed at {infra['hz']:g} Hz (24 dB/oct)")
     if "_protect_hz" not in s:                     # ported subs: no EQ boost below their mode's safe limit
         try:
             prot = sub_protect(subs)
@@ -339,7 +360,7 @@ def optimize(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
         a = 10 * np.log10(np.mean(10 ** (Lp / 10), axis=0))
         return Lp, a
 
-    Lb, avg_b = curves(Hs.sum(axis=1))
+    Lb, avg_b = curves(Hraw.sum(axis=1))
     Ya = np.einsum("sf,psf->pf", np.stack([10 ** (g[i] / 20) * pol[i] * np.exp(-2j * np.pi * GRID * d[i] / 1e3)
                                            * peq_chain_response(indiv[i] + glob, GRID) for i in range(S)]), Hs)
     La, avg_a = curves(Ya)
@@ -365,7 +386,8 @@ def optimize(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
                          "gain_db": round(float(g[i]), 2), "delay_ms": round(float(d[i]), 3),
                          "invert": bool(pol[i] < 0),
                          "peq_individual": [[round(fc, 2), round(q, 3), round(gg, 2)] for fc, q, gg in indiv[i]],
-                         "biquads": bq})
+                         "biquads": bq,
+                         **({"hpf_hz": infra["hz"]} if infra and i in infra["filtered"] else {})})
     r2 = lambda a: np.round(a, 2).tolist()
     result = {
         "subs": out_subs,
@@ -380,6 +402,8 @@ def optimize(Hs, subs, pos_names, s=None, log=event, roles=None, save=True):
         "mlp_weight": float(s.get("mlp_weight", 1.0)),
         "applied": False,
     }
+    if infra:
+        result["infra"] = {"output": int(subs[infra["index"]]), "hz": infra["hz"]}
     if not save:
         return result
     (DATA / "result.json").write_text(json.dumps(result, indent=2))

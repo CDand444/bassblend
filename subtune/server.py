@@ -34,7 +34,7 @@ SETTABLE = {"fmin": (float, 10, 40), "fmax": (float, 60, 200), "house_db": (floa
             "global_peq_bands": (int, 0, 8), "sub_peq_bands": (int, 0, 3),
             "mlp_weight": (float, 1, 4), "nearfield_max_cut_db": (float, 0, 12),
             "nearfield_max_boost_db": (float, 0, 6), "nearfield_max_eq_cut_db": (float, 1, 10),
-            "nearfield_min_q": (float, 0.5, 6),
+            "nearfield_min_q": (float, 0.5, 6), "infra_hz": (float, 12, 40),
             "test_spl": (float, 65, 85), "avr_test_max_volume": (float, 20, 70),
             "listen_max_volume": (float, 10, 100),
             "ai_hwdb": (int, 0, 1),
@@ -152,10 +152,15 @@ class Runner:
             raise ValueError("bad tone parameters")
         if out - 1 not in s.get("subs", []):
             raise ValueError(f"output {out} is not a sub output")
-        if not (20 <= freq <= 200 and 1 <= secs <= 10):
-            raise ValueError("tone must be 20-200 Hz and 1-10 seconds")
+        if not 1 <= secs <= 10:
+            raise ValueError("a tone must be 1-10 seconds")
+        from .subouts import check_in_tune, check_tone, missing_in
+        check_tone(out - 1, freq, s)                   # 20-200 Hz, or the sub's own range with an infrasonic sub
+        route = bool(body.get("override")) and out in missing_in(load_state().get("result"), s)
+        if not route:                                  # the owner's override routes the input to it for the tone
+            check_in_tune(out - 1, s)                  # otherwise a sub the playing tune leaves out gets nothing: say so
         args = [sys.executable, "-m", "subtune", "tone", "--output", str(out), "--freq", f"{freq:g}",
-                "--seconds", f"{secs:g}"]
+                "--seconds", f"{secs:g}"] + (["--route"] if route else [])
         self.proc = self._popen(args)
         self.cmd = f"tone output {out} {freq:g} Hz"
         return self.cmd
@@ -1901,6 +1906,9 @@ class H(BaseHTTPRequestHandler):
             st["modes"] = modal_report(room, 200)
             from .subouts import removed_in
             st["result_removed"] = removed_in(st.get("result"), s)   # the playing tune still drives a removed sub
+            from .subouts import missing_in, tone_range
+            st["tone_range"] = {str(o): list(tone_range(o, s)) for o in (s.get("subs") or [])}   # per sub: [lo, hi, why]
+            st["result_missing"] = missing_in(st.get("result"), s)   # subs added after the playing tune: they get nothing yet
             from . import vendors
             st["sub_checks"] = {k: {"mode": (vendors.mode_of(d["catalog"], {**vendors.defaults(d["catalog"]), **(d.get("controls") or {})}) or {}).get("name"),
                                     "notes": vendors.check(d["catalog"], d.get("controls") or {}),

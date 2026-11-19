@@ -121,10 +121,21 @@ def cmd_tone(a):
     out = a.output - 1
     if out not in s.get("subs", []):
         sys.exit(f"output {a.output} is not a sub output")
-    if not 20 <= a.freq <= 200 or not 1 <= a.seconds <= 10 or (a.dbfs is not None and not -60 <= a.dbfs <= -10):
-        sys.exit("tone limits: 20-200 Hz, 1-10 s, -60..-10 dBFS")
+    if not 1 <= a.seconds <= 10 or (a.dbfs is not None and not -60 <= a.dbfs <= -10):
+        sys.exit("tone limits: 1-10 s, -60..-10 dBFS")
+    from .subouts import check_in_tune, check_tone, missing_in
+    route = bool(getattr(a, "route", False))
+    try:
+        check_tone(out, a.freq, s)                     # 20-200 Hz, or the sub's own range with an infrasonic sub
+        if route:                                      # the owner's override: only for a sub the playing tune leaves out
+            if a.output not in missing_in(load_state().get("result"), s):
+                sys.exit(f"--route is only for a sub the playing tune leaves out; output {a.output} is in it")
+        else:
+            check_in_tune(out, s)                      # a sub the playing tune leaves out would be silent
+    except ValueError as e:
+        sys.exit(str(e))
     with busy(f"test tone on output {a.output}"):
-        r = _rig().tone(out, a.freq, a.seconds, a.dbfs)
+        r = _rig().tone(out, a.freq, a.seconds, a.dbfs, route=route)
     print(json.dumps(r))
 
 
@@ -184,10 +195,12 @@ def full_slot_cmds(d, slot0, r, lpf=None):
             cmds.append(d.c_routing(i, o, o in subs))
             if o in subs:
                 cmds.append(d.c_routing_gain(i, o, 0))
+    from .biquad import bw4_highpass, to_minidsp
     for o in range(N_OUTPUTS):
         sub = next((x for x in r["subs"] if x["output"] == o), None)
         if sub:
-            cmds += d.write_sub_filters(o, sub["gain_db"], sub["delay_ms"], sub["invert"], sub["biquads"], lpf)
+            hpf = [to_minidsp(*bq) for bq in bw4_highpass(float(sub["hpf_hz"]))] if sub.get("hpf_hz") else None   # from the tune itself
+            cmds += d.write_sub_filters(o, sub["gain_db"], sub["delay_ms"], sub["invert"], sub["biquads"], lpf, hpf)
             cmds += [f"output {o} fir bypass on", *limiter.commands(o, lims.get(str(o))), d.c_out_mute(o, False)]
         else:
             cmds.append(d.c_out_mute(o, True))
@@ -222,7 +235,7 @@ def cmd_apply(a):
         # every applied tune lives in the library (same filters are only stored once)
         saved = library.save(r, name or time.strftime("Tune %b %d, %I:%M %p"), settings={
             k: s.get(k) for k in ("fmin", "fmax", "house_db", "house_fc", "max_boost_db", "mlp_weight",
-                                  "nearfield_max_cut_db", "nearfield_max_boost_db", "nearfield_max_eq_cut_db")})
+                                  "nearfield_max_cut_db", "nearfield_max_boost_db", "nearfield_max_eq_cut_db", "infra_hz")})
         d.batch(cmds, f"apply '{saved['name']}' to slot {slot0 + 1} ({len(cmds)} writes)")
         library.record_slot(slot0 + 1, saved["id"], saved["name"])
         now = time.time()
@@ -692,6 +705,8 @@ def main(argv=None):
     s.add_argument("--freq", type=float, default=50.0)
     s.add_argument("--seconds", type=float, default=3.0)
     s.add_argument("--dbfs", type=float)
+    s.add_argument("--route", action="store_true",
+                   help="a sub the playing tune leaves out: route the input to it for the tone, then put it back")
     s.set_defaults(fn=cmd_tone)
     sp.add_parser("analysis-context").set_defaults(fn=cmd_analysis_context)
     s = sp.add_parser("set-analysis"); s.add_argument("--file", required=True)

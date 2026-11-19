@@ -306,13 +306,14 @@ TOOLS = [
         "max_boost_db": {"type": "number", "description": "0-6"},
         "nearfield_max_eq_cut_db": {"type": "number", "description": "1-10; lower makes the nearfield sub play louder"},
         "nearfield_min_q": {"type": "number", "description": "0.5-6"},
-        "nearfield_max_cut_db": {"type": "number", "description": "0-12, max gain cut on the nearfield sub"}}),
+        "nearfield_max_cut_db": {"type": "number", "description": "0-12, max gain cut on the nearfield sub"},
+        "infra_hz": {"type": "number", "description": "12-40 Hz; with an infrasonic sub, the other subs are high-passed here"}}),
     _t("save_simulation", "Save the last simulate_tune result to the tune library (not applied).",
        {"name": {"type": "string"}, "notes": {"type": "string"}}, ["name"]),
     _t("set_target_settings", "Change the tuning target used by the next optimization/auto-tune.",
        {k: {"type": "number"} for k in ("fmin", "fmax", "house_db", "house_fc", "max_boost_db", "mlp_weight",
                                         "nearfield_max_cut_db", "nearfield_max_boost_db", "nearfield_max_eq_cut_db",
-                                        "nearfield_min_q")}, approval=True),
+                                        "nearfield_min_q", "infra_hz")}, approval=True),
     _t("apply_tune", "Write a saved tune to a miniDSP slot (whole slot rewritten; becomes the playing slot).",
        {"tune_id": {"type": "string"}, "slot": {"type": "integer", "description": "1-4; 1 is the owner's original"}},
        ["tune_id", "slot"], approval=True),
@@ -348,7 +349,8 @@ TOOLS = [
        approval=True),
     _t("test_tone", "Play a 6-second tone on ONE sub output to check it works.",
        {"output": {"type": "integer", "description": "1-based miniDSP output"},
-        "freq": {"type": "number", "description": "20-200 Hz"}}, ["output", "freq"], approval=True),
+        "freq": {"type": "number", "description": "20-200 Hz; with an infrasonic sub, that sub may go down to 12 Hz "
+                 "(not below a ported sub's safe limit) and the others start at infra_hz"}}, ["output", "freq"], approval=True),
     _t("start_autotune", "Start the guided auto-tune (measures several mic spots; the owner follows on-screen "
        "prompts to move the mic and approve applying).",
        {"spots": {"type": "integer", "description": "1-8"}, "prechecks": {"type": "boolean"}},
@@ -451,7 +453,8 @@ TOOLS = [
         "subs": {"type": "object", "description": "1-based sub output -> fields: model, driver, enclosure, location, x_ft, y_ft, "
                                                   "facing, aim_deg (which way it fires: degrees clockwise on the plan, 0 = at the back wall, 90 = the left wall, 180 = the "
                                                   "screen, 270 = the right wall; omit or null = at the main seat), width_in, height_in, depth_in (the cabinet), "
-                                                  "role (main or nearfield), notes, controls {knob: value}"},
+                                                  "role (main, nearfield, or infrasonic: at most one sub, the one that plays "
+                                                  "below infra_hz alone while the others are high-passed there), notes, controls {knob: value}"},
         "goals": {"type": "string"}, "avr": {"type": "string", "description": "receiver model and notes"}},
        []),
     _t("list_backups", "The saved backups (newest first): when, why, which htTamer version and what each holds. Keys, PIN and tokens "

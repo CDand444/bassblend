@@ -105,8 +105,13 @@ def check(name: str, args: dict, s=None) -> None:
         subs = [o + 1 for o in (s.get("subs") or [])]
         if out not in (subs or [1, 2, 3, 4]):
             raise Refused(f"output {out} isn't a sub output" + (f" (subs: {', '.join(map(str, subs))})" if subs else ""))
-        if name == "test_tone" and not 20 <= _num(a.get("freq"), "freq") <= 200:
-            raise Refused("a test tone must be 20-200 Hz")
+        if name == "test_tone":
+            from .subouts import check_in_tune, check_tone
+            try:
+                check_tone(out - 1, _num(a.get("freq"), "freq"), s)     # the sub's own range (infrasonic split)
+                check_in_tune(out - 1, s)                                 # not in the playing tune: it would be silent
+            except ValueError as e:
+                raise Refused(str(e))
     elif name == "avr_control":
         act = a.get("action")
         if act in AVR_CAPS:

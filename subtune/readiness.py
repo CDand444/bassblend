@@ -63,6 +63,12 @@ def build(st: dict, settings: dict, now: float | None = None) -> dict:
     subs = s.get("subs") or []
     setup.append(_item("subs", "Subwoofer outputs", "ok" if subs else "bad",
                        f"{len(subs)} sub output{'s' if len(subs) != 1 else ''} chosen" if subs else "choose which miniDSP outputs drive subs", page="subs", blocks=True))
+    from .subouts import missing_in
+    left_out = missing_in(res, s)
+    if left_out:                                   # added after the playing tune: the miniDSP sends them nothing yet
+        outs = ", ".join(str(o) for o in left_out)
+        setup.append(_item("intune", "Every sub in the playing tune", "warn",
+                           f"output {outs} isn't in the playing tune, so it plays nothing: tune again to include it", page="wizard"))
     setup.append(_item("avr", "Receiver address", "ok" if s.get("avr_host") else "warn",
                        "set" if s.get("avr_host") else "not set: the receiver can't be restored automatically, and blend tests need it", page="avr"))
     setup.append(_item("vol", "Loudest volume you listen at", "ok" if s.get("listen_max_volume") else "warn",

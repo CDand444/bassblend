@@ -31,6 +31,16 @@ document.addEventListener('change', e => {                      // a model picke
   }
   hwFollow(card);
 });
+// test tone choices from the sub's own range (the server says it: [lo, hi, why]); with an infrasonic sub, that one
+// gets the deep tones and the high-passed ones start at the cutoff. The server refuses anything outside it anyway.
+function toneBar(o) {
+  const [lo, hi, why] = (S.tone_range || {})[o] || [20, 200, ''];
+  const pick = why.startsWith('infrasonic') ? [12, 15, 20, 30, 50, 80] : why ? [20, 25, 30, 40, 50, 80] : [30, 50, 80];
+  let fs = pick.filter(f => f >= lo && f <= hi);
+  if (why && !why.startsWith('infrasonic') && !fs.includes(lo)) fs = [lo, ...fs];      // the cutoff itself
+  const def = why.startsWith('infrasonic') ? (fs.includes(15) ? 15 : fs[0]) : fs.includes(50) ? 50 : fs[0];
+  return `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency">${fs.map(f => `<option value="${f}" ${f === def ? 'selected' : ''}>${f} Hz</option>`).join('')}</select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span>${why ? `<span class="muted small">${esc(why)}: ${lo}-${hi} Hz</span>` : ''}</div>`;
+}
 function subCard(o, s = {}, used) {
   const v = k => esc(s[k] ?? '');
   const blank = !Object.values(s).some(x => x !== '' && x != null);
@@ -41,13 +51,16 @@ function subCard(o, s = {}, used) {
   return `<div class="subcard ${used ? '' : 'off'}" data-o="${o}">
     <div class="hd"><span class="sw4" style="background:${css(SUBC[o])}"></span><b>Output ${o + 1}</b><span class="muted">${used ? '' : 'not a sub output'}</span>${used
       ? `<button type="button" class="btn ghost subrm" data-o="${o}" style="height:26px;padding:0 8px" title="Unplugged, sold or moved: stop using this output for a sub">Remove this sub</button>` : addBtn}</div>${muteNote}
-    ${used ? `<div class="tonebar"><select class="tonef" aria-label="Test tone frequency"><option value="30">30 Hz</option><option value="50" selected>50 Hz</option><option value="80">80 Hz</option></select><button type="button" class="btn tonebtn" data-o="${o}">Play test tone</button><span class="toneres muted small" data-o="${o}"></span></div>` : ''}
+    ${used && (S.result_missing || []).includes(o + 1)
+      ? `<div class="notice warn" style="margin:6px 0">Not in the playing tune yet: the miniDSP sends this output nothing until you tune again, so it stays silent. <button type="button" class="btn" data-open="wizard">Tune my system</button><div class="small" style="margin-top:6px">To check the sub anyway, a test tone routes the input to it for the tone only:</div>${toneBar(o)}</div>`
+      : used ? toneBar(o) : ''}
     <div class="grid g2">
       <label class="f sub-model">Model<select data-pick="submodel" aria-label="Subwoofer model: pick one from the database or choose Other">${subModelOptions(s.model || '')}</select>
         <input data-f="model" value="${v('model')}" placeholder="Type the make and model" ${subInDb(s.model) || !s.model ? 'hidden' : ''}></label>
-      <label class="f">Role<select data-f="role" title="Nearfield: sits by the seats; the optimizer keeps it near full level and never boosts it">
-        <option value="main" ${s.role !== 'nearfield' ? 'selected' : ''}>Main</option>
-        <option value="nearfield" ${s.role === 'nearfield' ? 'selected' : ''}>Nearfield</option></select></label>
+      <label class="f">Role<select data-f="role" title="Nearfield: sits by the seats; the optimizer keeps it near full level and never boosts it. Infrasonic: the one sub that plays the lowest notes alone; the others are high-passed at the infrasonic cutoff (Tune > target settings, 20 Hz by default)">
+        <option value="main" ${s.role !== 'nearfield' && s.role !== 'infrasonic' ? 'selected' : ''}>Main</option>
+        <option value="nearfield" ${s.role === 'nearfield' ? 'selected' : ''}>Nearfield</option>
+        <option value="infrasonic" ${s.role === 'infrasonic' ? 'selected' : ''}>Infrasonic (plays the lowest notes alone)</option></select></label>
       <label class="f">Driver<input data-f="driver" value="${v('driver')}" placeholder='15"'></label>
       <label class="f">Enclosure<select data-f="enclosure">${ENCL.map(e => `<option value="${e}" ${s.enclosure === e ? 'selected' : ''}>${e || '–'}</option>`).join('')}</select></label>
       <label class="f span2">Where it sits<input data-f="location" value="${v('location')}" placeholder="Front left corner, 8 in from each wall"></label>
@@ -169,7 +182,8 @@ function initRoom() {
 async function subOutput(body, done) {
   const r = await post('/api/subs', body);
   if (r.error) { alert(r.error); return; }
-  toast(done, r.summary || '', 'good');
+  if (r.needs_tune) toast(done, r.summary || '', 'warn', {action: 'Tune my system', onAction: () => openSheet('wizard'), sticky: true});
+  else toast(done, r.summary || '', 'good');
   roomInit = false; await poll(); loadTunes();
 }
 $('#subsCard').addEventListener('click', async e => {
@@ -202,7 +216,9 @@ One write to htTamer's slot ${slot}, and only if that slot is the one playing. S
   const tb = e.target.closest('.tonebtn');
   if (tb) {
     const o = +tb.dataset.o, f = +tb.parentElement.querySelector('.tonef').value;
-    const r = await post('/api/tone', {output: o + 1, freq: f, seconds: 6});
+    const override = (S.result_missing || []).includes(o + 1);
+    if (override && !confirm(`Output ${o + 1} isn't in the playing tune.\n\nFor this tone htTamer routes the input to it, then puts it back (not routed, muted) right after. Play ${f} Hz on output ${o + 1}?`)) return;
+    const r = await post('/api/tone', {output: o + 1, freq: f, seconds: 6, override});
     if (r.error) alert(r.error); else tonePending[o] = Date.now() / 1000;
     poll(); return;
   }

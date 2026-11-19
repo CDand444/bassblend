@@ -211,8 +211,9 @@ class MiniDSP:
         return c
 
     def write_sub_filters(self, o, gain_db, delay_ms, invert, biquads,
-                          lpf_biquads=None) -> list[str]:
-        """Commands that fully define one sub output's tuning."""
+                          lpf_biquads=None, hpf_biquads=None) -> list[str]:
+        """Commands that fully define one sub output's tuning. Crossover group 0: the optional low-pass;
+        group 1: the infrasonic high-pass (on the subs that leave the lowest notes to the infrasonic one)."""
         if len(biquads) > PEQ_BANDS:
             raise DSPError(f"output {o}: {len(biquads)} PEQ bands > {PEQ_BANDS}")
         c = [self.c_out_gain(o, gain_db), self.c_out_delay(o, delay_ms),
@@ -228,7 +229,14 @@ class MiniDSP:
             c.append(self.c_xover_bypass(o, 0, False))
         else:
             c.append(self.c_xover_bypass(o, 0, True))
-        c.append(self.c_xover_bypass(o, 1, True))
+        if hpf_biquads:
+            for i, bq in enumerate(hpf_biquads[:4]):
+                c.append(self.c_xover_set(o, 1, i, bq))
+            for i in range(len(hpf_biquads), 4):          # the group's unused sections stay flat
+                c.append(self.c_xover_set(o, 1, i, UNITY))
+            c.append(self.c_xover_bypass(o, 1, False))
+        else:
+            c.append(self.c_xover_bypass(o, 1, True))
         return c
 
     def refuse_original(self, what: str = "this test") -> None:

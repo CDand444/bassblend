@@ -1,5 +1,16 @@
 # htTamer changelog
 
+## Nov 18, 2026 - Infrasonic sub
+
+- **An infrasonic sub**: set one sub's role to **Infrasonic** (Room & subs) and the lowest notes go to it alone. The other
+  subs get a 24 dB/oct high-pass at the **Infrasonic cutoff** (Tune target settings, 20 Hz by default), written to their
+  outputs with the tune on htTamer's slot. The fit tunes the system with that split in place; each tune keeps its own cutoff.
+- **Test tones follow the split**: the infrasonic sub can play tones down to 12 Hz (never below a ported sub's safe
+  limit); the other subs' tones start at the cutoff. The page, the tone command and the assistant share one rule.
+- **A sub added after the playing tune needs a tune**: it gets no signal on htTamer's slot until it's tuned in, so its
+  card, Home and the toast after adding it say so (with a Tune my system button), and its test tone is refused with that
+  reason instead of playing silence.
+
 ## Nov 18, 2026 - htTamer 1.0
 
 - First stable release. Everything below is in it; the pages marked beta in the app are still beta.

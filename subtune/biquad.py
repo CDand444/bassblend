@@ -47,6 +47,28 @@ def lr4_lowpass(fc):
     return [lowpass(fc), lowpass(fc)]
 
 
+def highpass(fc, q=0.70710678, fs=DSP_FS):
+    w = 2 * np.pi * fc / fs
+    alpha = np.sin(w) / (2 * q)
+    cw = np.cos(w)
+    b = np.array([(1 + cw) / 2, -(1 + cw), (1 + cw) / 2])
+    a = np.array([1 + alpha, -2 * cw, 1 - alpha])
+    return b / a[0], a / a[0]
+
+
+def bw4_highpass(fc):
+    """Butterworth 24 dB/oct high-pass (-3 dB at fc, flat above): the infrasonic split on the other subs."""
+    return [highpass(fc, 0.54119610), highpass(fc, 1.30656296)]
+
+
+def chain_response(sections, f, fs=DSP_FS):
+    """The response of cascaded (b, a) sections at f."""
+    h = np.ones(len(f), dtype=complex)
+    for b, a in sections:
+        h *= response(b, a, f, fs)
+    return h
+
+
 def to_minidsp(b, a):
     return (float(b[0]), float(b[1]), float(b[2]), float(-a[1]), float(-a[2]))
 

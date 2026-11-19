@@ -948,6 +948,7 @@ details.card[open] > summary::after { transform: rotate(45deg); }
             <label class="f">Nearfield max boost<span class="unit" data-u="dB"><input data-k="nearfield_max_boost_db" type="number" step="0.5"></span><span class="hint">0 = never boost it</span></label>
             <label class="f">Nearfield EQ cut limit<span class="unit" data-u="dB"><input data-k="nearfield_max_eq_cut_db" type="number" step="0.5"></span><span class="hint">10 = no limit; lower = it plays louder</span></label>
             <label class="f">Nearfield EQ min Q<input data-k="nearfield_min_q" type="number" step="0.5"><span class="hint">higher = only narrow cuts</span></label>
+            <label class="f">Infrasonic cutoff<span class="unit" data-u="Hz"><input data-k="infra_hz" type="number" step="1" min="12" max="40"></span><span class="hint">with an infrasonic sub: the others stop below this</span></label>
           </div>
           <div class="row" style="margin-top:12px"><button class="btn" id="setSave">Save target</button><span class="muted" id="setMsg"></span></div>
         </div>

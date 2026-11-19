@@ -248,9 +248,11 @@ class Rig:
         q = self._quality(rec, a, a + len(sw))
         return np.round(audio.smooth_db(H, 12), 2), q
 
-    def tone(self, out: int, freq=50.0, seconds=3.0, dbfs=None):
+    def tone(self, out: int, freq=50.0, seconds=3.0, dbfs=None, route=False):
         """Play a sine tone on ONE output (others muted) and report whether
-        the mic heard it. Switches the owned preset to USB input first."""
+        the mic heard it. Switches the owned preset to USB input first.
+        route=True (the owner's override for a sub the playing tune leaves out): the inputs are routed to that
+        output for the tone only, then it goes back to how the tune left it: not routed, muted."""
         from scipy.signal import butter, sosfiltfilt
         lvl = dbfs if dbfs is not None else min(self.s["sweep_dbfs"], -15.0)
         n = int(seconds * FS)
@@ -260,12 +262,19 @@ class Rig:
         pre = int(0.8 * FS)
         sig = np.concatenate([np.zeros(pre), x, np.zeros(int(0.5 * FS))])
         d = self.dsp
-        d.batch([d.c_preset(self.s["preset"]), d.c_source("usb")] + self.mute_except([out]),
-                f"test tone: {freq:g} Hz on output {out + 1} only, {lvl:.0f} dBFS, {seconds:g} s")
+        routes = [c for i in (0, 1) for c in (d.c_routing(i, out, True), d.c_routing_gain(i, out, 0))] if route else []
+        d.batch([d.c_preset(self.s["preset"]), d.c_source("usb")] + routes + self.mute_except([out]),
+                f"test tone: {freq:g} Hz on output {out + 1} only, {lvl:.0f} dBFS, {seconds:g} s"
+                + (" (input routed to it for the tone: it isn't in the playing tune)" if route else ""))
         try:
             rec = audio.playrec(self._stereo(sig), self.play, self.rec)
         finally:
-            d.batch(self.mute_except(self.subs), "test tone done: all subs unmuted")
+            if route:                                     # back to how the playing tune left it: not routed, muted
+                d.batch(self.mute_except([o for o in self.subs if o != out])
+                        + [d.c_routing(i, out, False) for i in (0, 1)],
+                        f"test tone done: output {out + 1} back to not routed and muted (not in the playing tune)")
+            else:
+                d.batch(self.mute_except(self.subs), "test tone done: all subs unmuted")
         lo, hi = freq / 1.4, min(freq * 1.4, FS / 2 - 1)
         bp = sosfiltfilt(butter(4, [lo, hi], "bandpass", fs=FS, output="sos"), rec)
         start = pre + int(0.2 * FS) + int(0.4 * FS)                     # skip stream offset + fade-in/auto-on

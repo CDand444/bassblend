@@ -36,7 +36,7 @@ SUB_FIELDS = {"model": str, "driver": str, "enclosure": str, "tuning_hz": float,
               "facing": str, "notes": str, "fixed": bool, "role": str,
               "aim_deg": float,                                            # which way it fires: degrees clockwise on the plan, 0 = at the back wall (dims.py); blank = at the main seat
               "width_in": float, "height_in": float, "depth_in": float}   # the cabinet, as the spec sheet gives it (dims.py)
-ROLES = ("main", "nearfield")
+ROLES = ("main", "nearfield", "infrasonic")     # infrasonic: the one sub that plays below infra_hz; the others are high-passed there
 
 
 def load_room() -> dict:
@@ -113,6 +113,9 @@ def save_room(body: dict) -> dict:
         d["catalog"] = cid or ""
         d["controls"] = vendors.clean(cid, s.get("controls") or {}) if cid else {}
         subs[str(k)] = d
+    infra = [k for k, d in subs.items() if d.get("role") == "infrasonic"]
+    for k in infra[1:]:                            # only one sub can be the infrasonic one: the first keeps it
+        subs[k]["role"] = "main"
     r["subs"] = subs
     if "screen" in body:
         from . import screen

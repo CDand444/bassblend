@@ -88,6 +88,7 @@ DEFAULTS = {
     "nearfield_max_eq_cut_db": 10.0,  # deepest cut its own EQ may make (10 = no limit)
     "nearfield_min_q": 1.0,           # its own EQ cuts must be at least this narrow (higher = narrower only)
     "min_gain_db": -10.0,
+    "infra_hz": 20.0,                 # with an infrasonic sub: the other subs are high-passed here (24 dB/oct)
 }
 
 
