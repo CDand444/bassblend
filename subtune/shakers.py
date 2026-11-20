@@ -68,6 +68,14 @@ def _sub_positions(subs, room):
     return seat, out
 
 
+def _mean_sub_delay(result) -> float | None:
+    """The mean of the tuned subs' delays in ms, or None when the result has no subs."""
+    subs = (result or {}).get("subs") or []
+    if not subs:
+        return None
+    return sum(float(x.get("delay_ms") or 0.0) for x in subs) / len(subs)
+
+
 def delay_ms(result, s, room=None) -> float:
     """The shakers' delay in ms. With `shaker_delay_ms` set: that number plus the mean of the
     tuned subs' delays. Automatic (None): the mean of (sub delay + its travel time to the main seat)
@@ -77,7 +85,7 @@ def delay_ms(result, s, room=None) -> float:
     if not subs:
         return 0.0
     s = s or {}
-    mean = sum(float(x.get("delay_ms") or 0.0) for x in subs) / len(subs)
+    mean = _mean_sub_delay(result)
     v = None
     if s.get("shaker_delay_ms") is not None:
         v = float(s["shaker_delay_ms"]) + mean
@@ -261,11 +269,20 @@ def missing(result, s=None, room=None) -> dict:
 
 def view(result, s=None, room=None) -> dict:
     """The state block the Room & subs page reads: the shaker outputs, the five settings, the band for
-    test tones, what an automatic delay would be, and what the playing tune doesn't match yet."""
+    test tones, what an automatic delay would be, the subs' mean delay, how far a custom delay has
+    drifted from the automatic one (only when it really uses positions), and what the playing tune
+    doesn't match yet."""
     s = s if s is not None else load_settings()
     if room is None:
         from .room import load_room
         room = load_room()
+    subs = (result or {}).get("subs") or []
+    auto = delay_ms(result, {**s, "shaker_delay_ms": None}, room) if subs else None
+    subs_mean = round(_mean_sub_delay(result), 3) if subs else None
+    custom = s.get("shaker_delay_ms")
+    _, positioned = _sub_positions(subs, room) if subs else (None, None)
+    drift = (round(float(custom) + subs_mean - auto, 1)
+             if custom is not None and auto is not None and positioned is not None else None)
     v = {"outputs": [o + 1 for o in outputs(s)],
          "settings": {"gain_db": float(s.get("shaker_gain_db", -6.0)),
                       "hpf_hz": float(s.get("shaker_hpf_hz", 15.0)),
@@ -273,7 +290,8 @@ def view(result, s=None, room=None) -> dict:
                       "delay_ms": s.get("shaker_delay_ms"),
                       "night": bool(s.get("shaker_night"))},
          "tone_range": list(tone_range(s)),
-         "delay_auto_ms": delay_ms(result, {**s, "shaker_delay_ms": None}, room)
-                        if (result or {}).get("subs") else None}
+         "delay_auto_ms": auto,
+         "delay_subs_ms": subs_mean,
+         "delay_drift_ms": drift}
     v.update(missing(result, s, room))
     return v

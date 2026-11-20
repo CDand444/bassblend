@@ -513,6 +513,48 @@ def test_view_is_the_state_block_the_page_reads():
     settings()
 
 
+def test_view_reports_the_subs_mean_delay_and_the_custom_drift():
+    room = {"room": {}, "seats": [], "subs": {}}                    # no positions: the auto is the mean
+    shaker_defaults()
+    s = settings(subs=(0, 1), shakers=(2,))
+    s["shaker_delay_ms"] = 8.0
+    save_settings(s)
+    try:
+        v = shakers.view(None, s, room)
+        assert (v["delay_subs_ms"], v["delay_auto_ms"], v["delay_drift_ms"]) == (None, None, None)
+        v = shakers.view(tune(), s, room)
+        assert v["delay_subs_ms"] == 6.0                          # (5+7)/2
+        assert v["delay_auto_ms"] == 6.0                          # no positions: the mean alone
+        assert v["delay_drift_ms"] is None                        # no positions: no drift to report
+        s["shaker_delay_ms"] = None                               # Auto: nothing to drift from
+        save_settings(s)
+        v = shakers.view(tune(), s, room)
+        assert v["delay_drift_ms"] is None
+    finally:
+        shaker_defaults()
+    settings()
+
+
+def test_view_drift_is_measured_against_the_positioned_auto_delay():
+    shaker_defaults()
+    s = settings(subs=(0, 1), shakers=(2,))
+    seat = {"name": "main", "x_m": 1.0, "y_m": 3.0}
+    room = {"room": {}, "seats": [seat],
+            "subs": {"0": {"x_m": 0.0, "y_m": 0.0}, "1": {"x_m": 3.0, "y_m": 0.0}}}
+    auto = shakers.delay_ms(tune(), s, room)
+    assert 16.0 < auto < 16.2                                      # the mean delay plus the travel times
+    s["shaker_delay_ms"] = 2.0
+    save_settings(s)
+    try:
+        v = shakers.view(tune(), s, room)
+        assert v["delay_subs_ms"] == 6.0
+        assert v["delay_auto_ms"] == auto
+        assert v["delay_drift_ms"] == round(2.0 + 6.0 - auto, 1)  # 8 - 16.1: the custom is 8 ms short
+    finally:
+        shaker_defaults()
+    settings()
+
+
 if __name__ == "__main__":
     tests = [(n, f) for n, f in sorted(globals().items()) if n.startswith("test_") and callable(f)]
     bad = 0

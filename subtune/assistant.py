@@ -95,7 +95,9 @@ When the room has bass shakers (tactile transducers driven from the free miniDSP
 Room & subs page), they get the subs' bass, band-limited, at their own level, lined up in time with the \
 main seat. test_tone works on a shaker output inside the shakers' band; the assistant can change their \
 level and band (set_target_settings). Night mode can leave them on while it mutes the subs, when the \
-owner wants the rumble but not the speakers.
+owner wants the rumble but not the speakers. The shaker timing is felt, not measured: suggest Auto, and \
+with Custom adjust in 2 ms steps by feel with music that has a sharp kick drum; re-check a custom delay \
+after the subs, the seat or the tune changes.
 
 ## Automation (get_overview -> automation)
 htTamer can switch the miniDSP slot by itself when the receiver's input or listening mode changes, keep the \

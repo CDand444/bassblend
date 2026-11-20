@@ -63,6 +63,17 @@ function shakerBlock() {
   if (!(sh.outputs || []).length) return '';
   const custom = st.delay_ms != null;
   const autoTxt = sh.delay_auto_ms != null ? `auto: ${sh.delay_auto_ms} ms, from the sub delays and their distance to the seat` : "auto: the tuned subs' delay";
+  const customTxt = `custom: extra ms on top of the subs' delay${sh.delay_subs_ms != null ? ` (${sh.delay_subs_ms} ms)` : ''}`;
+  const driftWarn = custom && sh.delay_drift_ms != null && Math.abs(sh.delay_drift_ms) >= 5
+    ? `<div class="notice warn" id="shkDrift" style="margin:-4px 0 6px">Your custom delay is ${Math.abs(sh.delay_drift_ms)} ms off the automatic timing (the subs, the seat or the tune changed?). Check the feel, or switch to Auto.</div>` : '';
+  const timingHelp = `<details class="muted small" style="margin:-2px 0 6px"><summary>When to adjust the timing</summary><ul class="small" style="margin:4px 0">
+    <li>A shaker doesn't add to the subs' sound, so there's no cancellation to fix: its "phase" is only timing, the punch you feel against the bass you hear. Auto is right for most rooms, so leave it.</li>
+    <li>Judge it with music with a sharp kick drum or a movie hit, not the test tone (a steady tone can't show timing).</li>
+    <li>The punch arrives before the sound: add delay, 2 ms at a time. It feels late, soft or doubled: take some off.</li>
+    <li>Differences under about 3 ms can't be felt, so stop when it feels like one hit.</li>
+    <li>Re-check after moving the subs or the seat, or after a new tune, if you use Custom (Auto follows by itself).</li>
+    <li>Boomy or slow-feeling shaking isn't timing: lower the low-pass or the level instead.</li>
+    <li>Polarity doesn't matter for a shaker, so there's no invert.</li></ul></details>`;
   const unfed = (sh.unfed || []).length;
   return `<div style="margin:10px 0 0">
     <div class="hd"><b>Bass shakers</b><span class="muted" style="margin-left:8px">output ${esc((sh.outputs || []).join(', '))} · the subs' band, own level, timed to the seat</span></div>
@@ -72,7 +83,8 @@ function shakerBlock() {
       <label class="f">Low-pass<span class="unit" data-u="Hz"><input id="shkLpf" type="number" step="1" min="40" max="150" value="${st.lpf_hz ?? 0}"></span></label>
       <label class="f">Delay<select id="shkDelayMode" aria-label="Delay mode"><option value="auto"${custom ? '' : ' selected'}>Auto</option><option value="custom"${custom ? ' selected' : ''}>Custom</option></select><span class="unit" data-u="ms"><input id="shkDelay" type="number" step="0.1" min="0" max="30" value="${custom ? st.delay_ms : ''}"${custom ? '' : ' disabled'}></span></label>
     </div>
-    <div class="muted small" id="shkAuto" style="margin:-4px 0 6px">${custom ? '' : autoTxt + '.'}</div>
+    <div class="muted small" id="shkAuto" style="margin:-4px 0 6px">${custom ? customTxt : autoTxt}.</div>
+    ${driftWarn}${timingHelp}
     <label class="check" style="margin:4px 0 8px"><input type="checkbox" id="shkNight"${st.night ? ' checked' : ''}> Keep the shakers on in night mode (only the subs are muted)</label>
     <div class="row" style="margin:0 0 8px"><button type="button" class="btn primary shakersave">Save shaker settings</button></div>
     ${sh.changed || unfed ? `<div class="notice warn" style="margin:0">The miniDSP doesn't match the shakers yet${unfed ? ` (out ${esc(sh.unfed.join(', '))} don't get signal)` : ''}. <button type="button" class="btn shakerreapply">Apply the tune again</button></div>` : ''}
@@ -207,11 +219,16 @@ $('#subsCard').addEventListener('change', e => {
 function shakerDelayMode() {
   const mode = $('#shkDelayMode'), d = $('#shkDelay'), info = $('#shkAuto');
   if (!mode || !d) return;
+  const sh = S.shakers || {};
   const custom = mode.value === 'custom';
   d.disabled = !custom;
-  if (custom && d.value === '') d.value = (S.shakers || {}).delay_auto_ms ?? 0;
-  if (info) info.textContent = custom ? '' : (((S.shakers || {}).delay_auto_ms != null
-    ? `auto: ${S.shakers.delay_auto_ms} ms, from the sub delays and their distance to the seat` : "auto: the tuned subs' delay") + '.');
+  if (custom && d.value === '') d.value = (sh.delay_auto_ms != null && sh.delay_subs_ms != null
+    ? Math.round(Math.max(0, sh.delay_auto_ms - sh.delay_subs_ms) * 10) / 10   // the travel time, not the subs' delay again
+    : 0);
+  if (info) info.textContent = custom
+    ? `custom: extra ms on top of the subs' delay${sh.delay_subs_ms != null ? ` (${sh.delay_subs_ms} ms)` : ''}.`
+    : ((sh.delay_auto_ms != null ? `auto: ${sh.delay_auto_ms} ms, from the sub delays and their distance to the seat` : "auto: the tuned subs' delay") + '.');
+  const warn = $('#shkDrift'); if (warn) warn.hidden = !custom;
 }
 function initRoom() {
   if (roomInit || !S.room) return; roomInit = true; roomBuild++;
